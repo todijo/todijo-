@@ -1,28 +1,26 @@
 # Todijo
 
-پڕۆژەی سەرەتایی Todijo بە Next.js App Router و TypeScript.
+Todijo is a multilingual marketplace starter built with Next.js App Router and TypeScript.
 
-## تایبەتمەندییەکانی ئەم وەشانە
+## Included
 
-- پەڕەی سەرەکی Marketplace
-- گۆڕینی زمان: کوردی، ئینگلیزی، فەرەنسی و عەرەبی
-- دیزاینی مۆبایل و کۆمپیوتەر
-- Dockerfile بۆ بڵاوکردنەوە لە Coolify
+- Responsive marketplace home page
+- Automatic browser-language detection
+- Kurdish, English, French and Arabic
+- Manual language selector saved in local storage
+- Seller subscription section
+- Product cards and categories
+- Dockerfile ready for Coolify
 
-## بەکارهێنان لە کۆمپیوتەر
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-پاشان بچۆ بۆ `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-## هەنگاوی داهاتوو
+## Deployment
 
-داتابەیسی PostgreSQL، هەژماری فرۆشیار و کڕیار، زیادکردنی بەرهەم، سەبەتە و پارەدان زیاد دەکرێن.
-
-
-## Automatic language
-
-Todijo reads the visitor browser/device language automatically. It currently supports Kurdish, English, French, and Arabic, falls back to English, and remembers a visitor's manual choice in local storage. More locales can be added to the translation object later.
+Push all files to GitHub, connect the repository to Coolify, select Dockerfile build, then deploy.

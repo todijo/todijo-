@@ -1,5 +1,6 @@
 node_modules
 .next
 .git
-npm-debug.log
+.gitignore
 README.md
+npm-debug.log*
