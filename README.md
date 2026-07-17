@@ -24,3 +24,10 @@ Open `http://localhost:3000`.
 ## Deployment
 
 Push all files to GitHub, connect the repository to Coolify, select Dockerfile build, then deploy.
+
+## Authentication UI v1
+
+- `/login` login page
+- `/register` customer/seller registration page
+- Homepage buttons connected to the new routes
+- PostgreSQL/backend connection is the next milestone

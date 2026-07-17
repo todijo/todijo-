@@ -126,7 +126,7 @@ export default function Home() {
       <header className="header container">
         <a className="logo" href="#">Todijo<span>.</span></a>
         <nav className="nav">
-          <button className="textButton">{t.account}</button>
+          <a className="textButton" href="/login">{t.account}</a>
           <button className="textButton">{t.cart}</button>
           <select
             aria-label="Language"
@@ -152,7 +152,7 @@ export default function Home() {
               <button aria-label="Search">⌕</button>
             </div>
             <div className="actions">
-              <a className="primary" href="#seller">{t.sell}</a>
+              <a className="primary" href="/register?role=seller">{t.sell}</a>
               <a className="secondary" href="#products">{t.browse}</a>
             </div>
           </div>
@@ -203,7 +203,7 @@ export default function Home() {
           <div>
             <span className="badge light">{t.sellers}</span>
             <h2>{t.sellerText}</h2>
-            <a className="whiteButton" href="#">{t.join}</a>
+            <a className="whiteButton" href="/register?role=seller">{t.join}</a>
           </div>
           <div className="price">
             <strong>€19</strong>
