@@ -31,3 +31,20 @@ Push all files to GitHub, connect the repository to Coolify, select Dockerfile b
 - `/register` customer/seller registration page
 - Homepage buttons connected to the new routes
 - PostgreSQL/backend connection is the next milestone
+
+## Real authentication v2
+
+This version includes:
+- PostgreSQL database via Prisma
+- Secure bcrypt password hashing
+- Signed HttpOnly session cookie
+- Real registration and login APIs
+- Customer and seller roles
+- Protected `/dashboard`
+- Logout
+
+Required Coolify environment variables:
+- `DATABASE_URL`
+- `SESSION_SECRET` (at least 32 random characters)
+
+The `npm start` script automatically runs `prisma db push` before starting Next.js.

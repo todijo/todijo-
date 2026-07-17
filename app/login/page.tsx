@@ -1,12 +1,24 @@
 "use client";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [loading,setLoading]=useState(false);
   const [message,setMessage]=useState("");
-  function submit(event:FormEvent<HTMLFormElement>){
+  async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault(); setLoading(true); setMessage("");
-    setTimeout(()=>{setLoading(false);setMessage("پەڕەی چوونەژوورەوە ئامادەیە. هەنگاوی داهاتوو پەیوەستکردنی بە داتابەیسە.");},650);
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: form.get("email"), password: form.get("password") }),
+    });
+    const data = await response.json();
+    setLoading(false);
+    if (!response.ok) return setMessage(data.error ?? "Connexion impossible.");
+    router.push("/dashboard");
+    router.refresh();
   }
   return <main className="authPage">
     <section className="authBrand">
@@ -18,8 +30,8 @@ export default function LoginPage() {
     <section className="authPanel"><div className="authBox">
       <a className="authBack" href="/">← Retour à l’accueil</a><h2>Se connecter</h2><p className="authIntro">Entrez vos informations pour accéder à votre compte.</p>
       <form className="authForm" onSubmit={submit}>
-        <div className="formField"><label htmlFor="email">Adresse e-mail</label><input id="email" type="email" autoComplete="email" placeholder="vous@exemple.com" required /></div>
-        <div className="formField"><div className="passwordLine"><label htmlFor="password">Mot de passe</label><a href="#">Mot de passe oublié ?</a></div><input id="password" type="password" autoComplete="current-password" minLength={8} required /></div>
+        <div className="formField"><label htmlFor="email">Adresse e-mail</label><input id="email" name="email" type="email" autoComplete="email" placeholder="vous@exemple.com" required /></div>
+        <div className="formField"><div className="passwordLine"><label htmlFor="password">Mot de passe</label><a href="#">Mot de passe oublié ?</a></div><input id="password" name="password" type="password" autoComplete="current-password" minLength={8} required /></div>
         {message&&<p className="authMessage">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading}>{loading?"Connexion…":"Se connecter"}</button>
       </form>

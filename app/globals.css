@@ -335,3 +335,9 @@ h1 {
 .terms{display:flex;align-items:flex-start;gap:10px;color:var(--muted);font-size:13px;line-height:1.5}.terms input{margin-top:3px;accent-color:var(--green)}
 @media(max-width:850px){.authPage{grid-template-columns:1fr}.authBrand{min-height:290px;padding:28px 22px}.authPitch h1{font-size:42px}.authBenefits{display:none}.authPanel{padding:34px 20px 50px}}
 @media(max-width:520px){.formRow,.roleOptions{grid-template-columns:1fr}.authBox h2{font-size:32px}}
+
+.dashboardPage{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(145deg,#e9f8f2,#fff)}
+.dashboardCard{width:min(620px,100%);padding:42px;border:1px solid var(--line);border-radius:24px;background:#fff;box-shadow:0 22px 70px rgba(6,87,61,.12)}
+.dashboardLogo{color:var(--green-dark)}.dashboardBadge{display:inline-block;margin:30px 0 10px;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--green-dark);font-weight:800;font-size:13px}
+.dashboardCard h1{font-size:42px;margin:10px 0}.dashboardCard p{color:var(--muted);line-height:1.7}.dashboardActions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px}.dashboardLink{display:grid;place-items:center}
+@media(max-width:560px){.dashboardCard{padding:26px}.dashboardCard h1{font-size:32px}.dashboardActions{grid-template-columns:1fr}}

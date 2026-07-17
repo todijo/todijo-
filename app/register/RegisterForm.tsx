@@ -1,16 +1,34 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RegisterForm(){
   const params=useSearchParams();
+  const router=useRouter();
   const [role,setRole]=useState<"customer"|"seller">("customer");
   const [loading,setLoading]=useState(false);
   const [message,setMessage]=useState("");
   useEffect(()=>{if(params.get("role")==="seller")setRole("seller");},[params]);
-  function submit(event:FormEvent<HTMLFormElement>){
+  async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();setLoading(true);setMessage("");
-    setTimeout(()=>{setLoading(false);setMessage("فۆڕمی هەژمار دروستکردن ئامادەیە. هەنگاوی داهاتوو: PostgreSQL و پشتڕاستکردنەوەی ئیمەیل.");},650);
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role,
+        firstName: form.get("firstName"),
+        lastName: form.get("lastName"),
+        email: form.get("email"),
+        storeName: form.get("storeName"),
+        password: form.get("password"),
+      }),
+    });
+    const data = await response.json();
+    setLoading(false);
+    if (!response.ok) return setMessage(data.error ?? "Création impossible.");
+    router.push("/dashboard");
+    router.refresh();
   }
   return <main className="authPage">
     <section className="authBrand"><a className="authLogo" href="/">Todijo<span>.</span></a>
@@ -25,10 +43,10 @@ export default function RegisterForm(){
           <label className="roleCard"><input type="radio" name="role" checked={role==="customer"} onChange={()=>setRole("customer")} /><strong>🛍️ Acheteur</strong><span>Découvrir et acheter des produits.</span></label>
           <label className="roleCard"><input type="radio" name="role" checked={role==="seller"} onChange={()=>setRole("seller")} /><strong>🏪 Vendeur</strong><span>Créer une boutique et vendre.</span></label>
         </div>
-        <div className="formRow"><div className="formField"><label htmlFor="firstName">Prénom</label><input id="firstName" autoComplete="given-name" required /></div><div className="formField"><label htmlFor="lastName">Nom</label><input id="lastName" autoComplete="family-name" required /></div></div>
-        <div className="formField"><label htmlFor="email">Adresse e-mail</label><input id="email" type="email" autoComplete="email" placeholder="vous@exemple.com" required /></div>
-        {role==="seller"&&<div className="formField"><label htmlFor="storeName">Nom de la boutique</label><input id="storeName" placeholder="Ma boutique Todijo" required /></div>}
-        <div className="formField"><label htmlFor="password">Mot de passe</label><input id="password" type="password" autoComplete="new-password" minLength={8} required /></div>
+        <div className="formRow"><div className="formField"><label htmlFor="firstName">Prénom</label><input id="firstName" name="firstName" autoComplete="given-name" required /></div><div className="formField"><label htmlFor="lastName">Nom</label><input id="lastName" name="lastName" autoComplete="family-name" required /></div></div>
+        <div className="formField"><label htmlFor="email">Adresse e-mail</label><input id="email" name="email" type="email" autoComplete="email" placeholder="vous@exemple.com" required /></div>
+        {role==="seller"&&<div className="formField"><label htmlFor="storeName">Nom de la boutique</label><input id="storeName" name="storeName" placeholder="Ma boutique Todijo" required /></div>}
+        <div className="formField"><label htmlFor="password">Mot de passe</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required /></div>
         <label className="terms"><input type="checkbox" required /><span>J’accepte les conditions d’utilisation et la politique de confidentialité de Todijo.</span></label>
         {message&&<p className="authMessage">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading}>{loading?"Création…":role==="seller"?"Créer ma boutique":"Créer mon compte"}</button>
