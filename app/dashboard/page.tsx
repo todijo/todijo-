@@ -5,8 +5,7 @@ import { readSession } from "@/lib/session";
 export default async function DashboardPage() {
   const session = await readSession();
 
-  if (!session) {
-    redirect("https://todijo.com/login");
+  if (!session) { redirect("/login");
   }
 
   const user = await prisma.user.findUnique({
@@ -20,9 +19,8 @@ export default async function DashboardPage() {
     },
   });
 
-  if (!user) {
-    redirect("https://todijo.com/login");
-  }
+  if (!user) { redirect("/login");
+   }            
 
   return (
     <main className="dashboardPage">
