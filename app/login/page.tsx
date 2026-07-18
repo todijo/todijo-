@@ -17,7 +17,8 @@ export default function LoginPage() {
     const data = await response.json();
     setLoading(false);
     if (!response.ok) return setMessage(data.error ?? "Connexion impossible.");
-    window.location.href = "https://todijo.com/dashboard";
+    router.push("/dashboard");
+router.refresh();
   }
   return <main className="authPage">
     <section className="authBrand">
