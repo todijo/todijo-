@@ -14,18 +14,20 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  firstName    String
-  lastName     String
-  email        String   @unique
-  passwordHash String
-  role         UserRole @default(CUSTOMER)
-  storeName    String?
-  emailVerified Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  passwordHash  String
+  role          UserRole @default(CUSTOMER)
+  storeName     String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store         Store?
 }
-store Store?
+
 model Store {
   id          String    @id @default(cuid())
   name        String    @unique
@@ -37,7 +39,7 @@ model Store {
   city        String
 
   ownerId     String    @unique
-  owner       User      @relation(fields: [ownerId], references: [id])
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   products    Product[]
 
@@ -47,23 +49,17 @@ model Store {
 
 model Product {
   id          String   @id @default(cuid())
-
   name        String
   description String
   price       Decimal
-
   currency    String   @default("EUR")
-
   category    String
-
   stock       Int      @default(1)
-
   condition   String
-
   images      String[]
 
-  storeId      String
-  store        Store    @relation(fields: [storeId], references: [id])
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
