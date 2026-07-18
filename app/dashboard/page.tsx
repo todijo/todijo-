@@ -10,7 +10,7 @@ export default async function DashboardPage() {
     where: { id: session.userId },
     select: { firstName: true, lastName: true, email: true, role: true, storeName: true },
   });
- if (!session) redirect("https://todijo.com/login");
+ if (!user) redirect("https://todijo.com/login");
 
   return (
     <main className="dashboardPage">
