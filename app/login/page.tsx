@@ -18,7 +18,7 @@ export default function LoginPage() {
     setLoading(false);
     if (!response.ok) return setMessage(data.error ?? "Connexion impossible.");
     router.push("/dashboard");
-router.refresh();
+    router.refresh();
   }
   return <main className="authPage">
     <section className="authBrand">
