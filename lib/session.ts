@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "todijo_session";
+export const SESSION_COOKIE_NAME = "todijo_session";
 const secretText = process.env.SESSION_SECRET;
 
 function getSecret() {
@@ -16,25 +16,16 @@ export type SessionPayload = {
   role: "CUSTOMER" | "SELLER" | "ADMIN";
 };
 
-export async function createSession(payload: SessionPayload) {
-  const token = await new SignJWT(payload)
+export async function createSessionToken(payload: SessionPayload) {
+  return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
     .sign(getSecret());
-
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7,
-    path: "/",
-  });
 }
 
 export async function readSession(): Promise<SessionPayload | null> {
-  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
 
   try {
@@ -46,8 +37,4 @@ export async function readSession(): Promise<SessionPayload | null> {
   } catch {
     return null;
   }
-}
-
-export async function deleteSession() {
-  (await cookies()).delete(COOKIE_NAME);
 }

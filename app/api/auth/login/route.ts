@@ -1,7 +1,7 @@
 import { compare } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createSession } from "@/lib/session";
+import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +11,28 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !(await compare(password, user.passwordHash))) {
-      return NextResponse.json({ error: "Adresse e-mail ou mot de passe incorrect." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Adresse e-mail ou mot de passe incorrect." },
+        { status: 401 },
+      );
     }
 
-    await createSession({ userId: user.id, role: user.role });
-    return NextResponse.json({ ok: true });
+    const token = await createSessionToken({ userId: user.id, role: user.role });
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+
+    return response;
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Connexion impossible pour le moment." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Connexion impossible pour le moment." },
+      { status: 500 },
+    );
   }
 }
