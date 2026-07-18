@@ -1,0 +1,15 @@
+TODIJO - FIX READY
+
+Files already corrected:
+- lib/session.ts
+- app/api/auth/login/route.ts
+- app/api/auth/register/route.ts
+- app/api/auth/logout/route.ts
+- app/dashboard/page.tsx
+- app/components/LoginRedirect.tsx
+- app/login/page.tsx
+- next.config.ts
+
+Upload the CONTENTS of this folder to the root of the GitHub repository.
+Do not upload the outer folder as a subfolder.
+Then commit and redeploy in Coolify.
