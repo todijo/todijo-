@@ -17,8 +17,7 @@ export default function LoginPage() {
     const data = await response.json();
     setLoading(false);
     if (!response.ok) return setMessage(data.error ?? "Connexion impossible.");
-    router.push("/dashboard");
-    router.refresh();
+    window.location.assign("/dashboard");
   }
   return <main className="authPage">
     <section className="authBrand">

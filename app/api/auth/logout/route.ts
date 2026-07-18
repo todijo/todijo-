@@ -9,6 +9,7 @@ export async function POST() {
     sameSite: "lax",
     expires: new Date(0),
     path: "/",
+    domain: ".todijo.com",
   });
   return response;
 }

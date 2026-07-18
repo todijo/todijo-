@@ -19,12 +19,14 @@ export async function POST(request: Request) {
 
     const token = await createSessionToken({ userId: user.id, role: user.role });
     const response = NextResponse.json({ ok: true });
+
     response.cookies.set(SESSION_COOKIE_NAME, token, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7,
       path: "/",
+      domain: ".todijo.com",
     });
 
     return response;
