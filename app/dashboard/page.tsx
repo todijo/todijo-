@@ -6,7 +6,7 @@ export default async function DashboardPage() {
   const session = await readSession();
 
   if (!session) {
-    redirect("/login");
+    redirect("https://todijo.com/login");
   }
 
   const user = await prisma.user.findUnique({
@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   });
 
   if (!user) {
-    redirect("/login");
+    redirect("https://todijo.com/login");
   }
 
   return (
