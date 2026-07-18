@@ -1,13 +1,15 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "todijo_session";
+export const SESSION_COOKIE_NAME = "todijo_session";
+const COOKIE_NAME = SESSION_COOKIE_NAME;
 const secretText = process.env.SESSION_SECRET;
 
 function getSecret() {
   if (!secretText || secretText.length < 32) {
     throw new Error("SESSION_SECRET must contain at least 32 characters.");
   }
+
   return new TextEncoder().encode(secretText);
 }
 
@@ -24,6 +26,7 @@ export async function createSession(payload: SessionPayload) {
     .sign(getSecret());
 
   const cookieStore = await cookies();
+
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -35,10 +38,14 @@ export async function createSession(payload: SessionPayload) {
 
 export async function readSession(): Promise<SessionPayload | null> {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
-  if (!token) return null;
+
+  if (!token) {
+    return null;
+  }
 
   try {
     const { payload } = await jwtVerify(token, getSecret());
+
     return {
       userId: String(payload.userId),
       role: payload.role as SessionPayload["role"],
@@ -49,5 +56,13 @@ export async function readSession(): Promise<SessionPayload | null> {
 }
 
 export async function deleteSession() {
-  (await cookies()).delete(COOKIE_NAME);
+  const cookieStore = await cookies();
+
+  cookieStore.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    expires: new Date(0),
+    path: "/",
+  });
 }
