@@ -14,6 +14,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
   const t = useTranslations("Checkout");
   const cart = useTranslations("Cart");
+  const connect = useTranslations("Connect");
   const locale = useLocale();
 
   async function beginCheckout() {
@@ -24,8 +25,8 @@ export default function CheckoutPage() {
     window.localStorage.setItem(storageKey, requestId);
     try {
       const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, items: items.map((item) => ({ productId: item.id, quantity: item.quantity })) }) });
-      const result = await response.json() as { url?: string; error?: string };
-      if (!response.ok || !result.url) throw new Error(result.error ?? t("startError"));
+      const result = await response.json() as { url?: string; error?: string; code?: string };
+      if (!response.ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : result.error ?? t("startError"));
       window.location.assign(result.url);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("startError"));

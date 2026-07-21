@@ -12,8 +12,9 @@ export async function POST(request: Request) {
     return NextResponse.json(checkout);
   } catch (error) {
     const status = error instanceof CheckoutError ? error.status : 500;
-    const message = error instanceof CheckoutError ? error.message : "Unable to start secure checkout.";
+    const code = error instanceof CheckoutError ? error.message : "CHECKOUT_FAILED";
+    const message = code === "MULTIPLE_SELLERS" ? "Items from different sellers require separate checkout." : code === "SELLER_STRIPE_NOT_READY" ? "The seller cannot receive Stripe payments yet." : code;
     console.error("Checkout creation failed", error);
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message, code }, { status });
   }
 }

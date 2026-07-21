@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { getTranslations } from "next-intl/server";
+import StripeConnectSection from "@/components/StripeConnectSection";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,10 @@ export default async function DashboardPage() {
       lastName: true,
       email: true,
       role: true,
+      stripeAccountId: true,
+      stripeOnboardingComplete: true,
+      stripeChargesEnabled: true,
+      stripePayoutsEnabled: true,
       store: {
         select: {
           name: true,
@@ -87,6 +92,7 @@ export default async function DashboardPage() {
 
           </>
         ) : !user.store ? (
+          <>
           <section className="emptyStoreCard">
             <div className="emptyStoreIcon">🏪</div>
             <p className="dashboardBadge">{t("sellerAccount")}</p>
@@ -94,6 +100,8 @@ export default async function DashboardPage() {
             <p>{t("openShopText")}</p>
             <a className="authSubmit dashboardPrimaryAction" href="/seller/create-store">{t("createShop")}</a>
           </section>
+          <StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }} />
+          </>
         ) : (
           <>
             <section className="dashboardWelcome">
@@ -121,6 +129,7 @@ export default async function DashboardPage() {
               </div>
               <p>{t("sellerNote")}</p>
             </section>
+            <StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }} />
           </>
         )}
       </div>

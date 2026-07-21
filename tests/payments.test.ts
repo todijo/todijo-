@@ -5,10 +5,10 @@ import { Prisma } from "@prisma/client";
 import { CheckoutError, createCheckout, processStripeEvent } from "../lib/payments";
 import { verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
-function checkoutDb(stock = 5) {
+function checkoutDb(stock = 5, sellerReady = true) {
   let order: any = null;
   let creates = 0;
-  const product = { id: "prod_1", name: "Produit", price: new Prisma.Decimal("12.50"), currency: "EUR", stock };
+  const product = { id: "prod_1", name: "Produit", price: new Prisma.Decimal("12.50"), currency: "EUR", stock, storeId: "store_1", store: { owner: { stripeAccountId: sellerReady ? "acct_seller" : null, stripeOnboardingComplete: sellerReady, stripeChargesEnabled: sellerReady } } };
   const db: any = {
     order: {
       findUnique: async () => order,
@@ -57,10 +57,39 @@ test("duplicate checkout request creates one order and one Stripe session", asyn
   assert.equal(fixture.getCreates(), 1); assert.equal(stripeCalls, 1);
 });
 
+test("destination checkout calculates and stores the platform commission", async () => {
+  const fixture = checkoutDb(); let stripeInput: any;
+  const stripe: any = async (input: any) => { stripeInput = input; return { id: "cs_fee", url: "https://checkout.stripe.test/cs_fee" }; };
+  await createCheckout(fixture.db, "buyer_1", "request_fee", [{ productId: "prod_1", quantity: 2 }], stripe);
+  assert.equal(stripeInput.connectedAccountId, "acct_seller");
+  assert.equal(stripeInput.platformFeeAmount, 250);
+});
+
+test("checkout rejects sellers that cannot accept Connect charges", async () => {
+  const fixture = checkoutDb(5, false);
+  await assert.rejects(() => createCheckout(fixture.db, "buyer_1", "request_not_ready", [{ productId: "prod_1", quantity: 1 }]), (error: unknown) => error instanceof CheckoutError && error.message === "SELLER_STRIPE_NOT_READY");
+});
+
 test("duplicate webhook event is acknowledged without processing", async () => {
   const db: any = { $transaction: async (callback: any) => callback({ stripeWebhookEvent: { create: async () => { throw { code: "P2002" }; } } }) };
   const event: StripeEvent = { id: "evt_duplicate", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", payment_status: "paid", client_reference_id: "order_1" } } };
   assert.deepEqual(await processStripeEvent(db, event), { duplicate: true });
+});
+
+test("account.updated synchronizes connected seller capabilities", async () => {
+  let update: any;
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, user: { updateMany: async (args: any) => { update = args; return { count: 1 }; } } };
+  const db: any = { $transaction: (callback: any) => callback(tx) };
+  const event: StripeEvent = { id: "evt_account", type: "account.updated", data: { object: { id: "acct_seller", object: "account", details_submitted: true, charges_enabled: true, payouts_enabled: false } } };
+  assert.deepEqual(await processStripeEvent(db, event), { accountUpdated: true });
+  assert.equal(update.where.stripeAccountId, "acct_seller"); assert.equal(update.data.stripeChargesEnabled, true);
+});
+
+test("paid webhook rejects a mismatched destination account", async () => {
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: { findUnique: async () => ({ id: "order_1", status: "PENDING", stripeCheckoutSessionId: "cs_1", stripeConnectedAccountId: "acct_expected", items: [] }) } };
+  const db: any = { $transaction: (callback: any) => callback(tx) };
+  const event: StripeEvent = { id: "evt_wrong_destination", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", payment_status: "paid", client_reference_id: "order_1", metadata: { orderId: "order_1", connectedAccountId: "acct_wrong" } } } };
+  await assert.rejects(() => processStripeEvent(db, event), /destination account/);
 });
 
 test("checkout rejects insufficient stock before creating an order", async () => {
