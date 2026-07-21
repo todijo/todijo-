@@ -3,10 +3,11 @@
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import { useCart } from "@/components/CartProvider";
+import { useLocale, useTranslations } from "next-intl";
 
-function formatMoney(value: number, currency: string) {
+function formatMoney(value: number, currency: string, locale: string) {
   try {
-    return new Intl.NumberFormat("fr-FR", { style: "currency", currency }).format(value);
+    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(value);
   } catch {
     return `${value.toFixed(2)} ${currency}`;
   }
@@ -14,6 +15,8 @@ function formatMoney(value: number, currency: string) {
 
 export default function CartPage() {
   const { items, subtotal, currency, updateQuantity, removeItem, clearCart } = useCart();
+  const t = useTranslations("Cart");
+  const locale = useLocale();
 
   return (
     <main className="cartPage">
@@ -22,22 +25,22 @@ export default function CartPage() {
       <section className="cartShell">
         <div className="cartTitleRow">
           <div>
-            <p className="dashboardBadge">Votre sélection</p>
-            <h1>Votre panier</h1>
+            <p className="dashboardBadge">{t("selection")}</p>
+            <h1>{t("title")}</h1>
           </div>
-          {items.length > 0 && <button className="cartClearButton" type="button" onClick={clearCart}>Vider le panier</button>}
+          {items.length > 0 && <button className="cartClearButton" type="button" onClick={clearCart}>{t("clear")}</button>}
         </div>
 
         {items.length === 0 ? (
           <section className="emptyCartCard">
             <div>🛒</div>
-            <h2>Votre panier est vide</h2>
-            <p>Découvrez les produits proposés par les boutiques Todijo.</p>
-            <Link className="primary" href="/">Continuer mes achats</Link>
+            <h2>{t("empty")}</h2>
+            <p>{t("emptyHelp")}</p>
+            <Link className="primary" href="/">{t("continue")}</Link>
           </section>
         ) : (
           <div className="cartLayout">
-            <section className="cartItems" aria-label="Produits du panier">
+            <section className="cartItems" aria-label={t("items")}>
               {items.map((item) => (
                 <article className="cartItem" key={item.id}>
                   <Link href={`/product/${item.id}`} className="cartItemImage">
@@ -53,16 +56,16 @@ export default function CartPage() {
                         <Link href={`/product/${item.id}`}><h2>{item.name}</h2></Link>
                         {item.selectedOptions && <p className="cartOptions">{item.selectedOptions}</p>}
                       </div>
-                      <strong>{formatMoney(item.price * item.quantity, item.currency)}</strong>
+                      <strong>{formatMoney(item.price * item.quantity, item.currency, locale)}</strong>
                     </div>
                     <div className="cartItemBottom">
-                      <div className="cartQuantity" aria-label={`Quantité de ${item.name}`}>
-                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} aria-label="Réduire la quantité">−</button>
+                      <div className="cartQuantity" aria-label={t("quantity", {name:item.name})}>
+                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} aria-label={t("decrease")}>−</button>
                         <span>{item.quantity}</span>
-                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock} aria-label="Augmenter la quantité">+</button>
+                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock} aria-label={t("increase")}>+</button>
                       </div>
-                      <span className="cartStock">{item.stock} disponible{item.stock > 1 ? "s" : ""}</span>
-                      <button className="cartRemoveButton" type="button" onClick={() => removeItem(item.id)}>Supprimer</button>
+                      <span className="cartStock">{t("stock", {count:item.stock})}</span>
+                      <button className="cartRemoveButton" type="button" onClick={() => removeItem(item.id)}>{t("clear")}</button>
                     </div>
                   </div>
                 </article>
@@ -70,13 +73,13 @@ export default function CartPage() {
             </section>
 
             <aside className="cartSummary">
-              <h2>Récapitulatif</h2>
-              <div><span>Sous-total</span><strong>{formatMoney(subtotal, currency)}</strong></div>
-              <div><span>Livraison</span><span>Calculée à l’étape suivante</span></div>
-              <div className="cartTotal"><span>Total</span><strong>{formatMoney(subtotal, currency)}</strong></div>
-              <Link className="authSubmit checkoutLink" href="/checkout">Passer la commande</Link>
-              <p>Paiement sécurisé et adresse de livraison à l’étape suivante.</p>
-              <Link href="/">← Continuer mes achats</Link>
+              <h2>{t("summary")}</h2>
+              <div><span>{t("subtotal")}</span><strong>{formatMoney(subtotal, currency, locale)}</strong></div>
+              <div><span>{t("shipping")}</span><span>{t("shippingNext")}</span></div>
+              <div className="cartTotal"><span>{t("total")}</span><strong>{formatMoney(subtotal, currency, locale)}</strong></div>
+              <Link className="authSubmit checkoutLink" href="/checkout">{t("checkout")}</Link>
+              <p>{t("secure")}</p>
+              <Link href="/">← {t("continue")}</Link>
             </aside>
           </div>
         )}

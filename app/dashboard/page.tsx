@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const t = await getTranslations("Dashboard");
+  const common = await getTranslations("Common");
   const session = await readSession();
   if (!session) redirect("/login");
 
@@ -49,7 +52,7 @@ export default async function DashboardPage() {
           <div className="sellerDashboardUser">
             <span>{user.firstName} {user.lastName}</span>
             <form action="/api/auth/logout" method="post">
-              <button className="dashboardLogout" type="submit">Se déconnecter</button>
+              <button className="dashboardLogout" type="submit">{common("logout")}</button>
             </form>
           </div>
         </header>
@@ -58,65 +61,65 @@ export default async function DashboardPage() {
           <>
             <section className="dashboardWelcome">
               <div>
-                <p className="dashboardBadge">Espace acheteur</p>
-                <h1>Bonjour {user.firstName} 👋</h1>
-                <p>Gérez vos achats, vos messages et vos avis depuis votre compte Todijo.</p>
+                <p className="dashboardBadge">{t("buyerArea")}</p>
+                <h1>{t("hello", {name:user.firstName})}</h1>
+                <p>{t("buyerIntro")}</p>
               </div>
-              <a className="secondary dashboardStoreLink" href="/">Découvrir les produits</a>
+              <a className="secondary dashboardStoreLink" href="/">{t("discover")}</a>
             </section>
 
             <section className="dashboardStats">
-              <article><span>Commandes</span><strong>{user._count.orders}</strong></article>
-              <article><span>Conversations</span><strong>{user._count.buyerConversations}</strong></article>
-              <article><span>Avis publiés</span><strong>{user._count.reviews}</strong></article>
-              <article><span>Type de compte</span><strong>Acheteur</strong></article>
+              <article><span>{t("orders")}</span><strong>{user._count.orders}</strong></article>
+              <article><span>{t("conversations")}</span><strong>{user._count.buyerConversations}</strong></article>
+              <article><span>{t("reviews")}</span><strong>{user._count.reviews}</strong></article>
+              <article><span>{t("accountType")}</span><strong>{t("buyer")}</strong></article>
             </section>
 
             <section className="dashboardQuickActions">
-              <h2>Actions rapides</h2>
+              <h2>{t("quick")}</h2>
               <div>
-                <a className="quickActionLink primary" href="/">🛍️ Voir les produits</a>
-                <a className="quickActionLink secondary" href="/messages">💬 Mes conversations</a>
-                <a className="quickActionLink secondary" href="/cart">🛒 Mon panier</a>
+                <a className="quickActionLink primary" href="/">🛍️ {t("viewProducts")}</a>
+                <a className="quickActionLink secondary" href="/messages">💬 {t("myConversations")}</a>
+                <a className="quickActionLink secondary" href="/cart">🛒 {t("myCart")}</a>
               </div>
-              <p>Un compte acheteur ne crée jamais de boutique automatiquement.</p>
+              <p>{t("buyerNote")}</p>
             </section>
 
           </>
         ) : !user.store ? (
           <section className="emptyStoreCard">
             <div className="emptyStoreIcon">🏪</div>
-            <p className="dashboardBadge">Compte vendeur</p>
-            <h1>Ouvrez votre boutique Todijo</h1>
-            <p>Votre compte vendeur est prêt. Complétez maintenant les informations de votre boutique pour publier des produits.</p>
-            <a className="authSubmit dashboardPrimaryAction" href="/seller/create-store">Créer ma boutique</a>
+            <p className="dashboardBadge">{t("sellerAccount")}</p>
+            <h1>{t("openShop")}</h1>
+            <p>{t("openShopText")}</p>
+            <a className="authSubmit dashboardPrimaryAction" href="/seller/create-store">{t("createShop")}</a>
           </section>
         ) : (
           <>
             <section className="dashboardWelcome">
               <div>
-                <p className="dashboardBadge">Tableau de bord vendeur</p>
-                <h1>Bonjour {user.firstName} 👋</h1>
-                <p>Boutique <strong>{user.store.name}</strong> · {user.store.city}, {user.store.country}</p>
+                <p className="dashboardBadge">{t("sellerDashboard")}</p>
+                <h1>{t("hello", {name:user.firstName})}</h1>
+                <p>{t("shop", {name:user.store.name, city:user.store.city, country:user.store.country})}</p>
               </div>
-              <a className="secondary dashboardStoreLink" href={`/store/${user.store.slug}`}>Voir ma boutique</a>
+              <a className="secondary dashboardStoreLink" href={`/store/${user.store.slug}`}>{t("viewShop")}</a>
             </section>
 
             <section className="dashboardStats">
-              <article><span>Produits</span><strong>{user.store._count.products}</strong></article>
-              <article><span>Commandes</span><strong>0</strong></article>
-              <article><span>Chiffre d’affaires</span><strong>0 {user.store.currency}</strong></article>
-              <article><span>Clients</span><strong>0</strong></article>
+              <article><span>{t("products")}</span><strong>{user.store._count.products}</strong></article>
+              <article><span>{t("orders")}</span><strong>0</strong></article>
+              <article><span>{t("revenue")}</span><strong>0 {user.store.currency}</strong></article>
+              <article><span>{t("customers")}</span><strong>0</strong></article>
             </section>
 
             <section className="dashboardQuickActions">
-              <h2>Actions rapides</h2>
+              <h2>{t("quick")}</h2>
               <div>
-                <a className="quickActionLink primary" href="/seller/products/new">＋ Ajouter un produit</a>
-                <a className="quickActionLink secondary" href="/seller/products">📦 Gérer les produits</a>
-                <a className="quickActionLink secondary" href="/seller/store-settings">⚙️ Paramètres de la boutique</a>
+                <a className="quickActionLink primary" href="/seller/products/new">＋ {t("addProduct")}</a>
+                <a className="quickActionLink secondary" href="/seller/products">📦 {t("manageProducts")}</a>
+                <a className="quickActionLink secondary" href="/seller/store-settings">⚙️ {t("shopSettings")}</a>
               </div>
-              <p>Ajoutez vos produits, définissez leur prix et suivez votre stock.</p>
+              <p>{t("sellerNote")}</p>
             </section>
           </>
         )}

@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 const categories = ["Mode", "Électronique", "Maison", "Beauté", "Sports", "Livres", "Enfants", "Auto", "Artisanat", "Autre"];
 const MAX_PHOTOS = 10;
@@ -16,6 +17,7 @@ type ProductData = {
 
 export default function EditProductForm({ product }: { product: ProductData }) {
   const router = useRouter();
+  const t = useTranslations("Seller");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState(product.images);
   const [message, setMessage] = useState("");
@@ -75,15 +77,15 @@ export default function EditProductForm({ product }: { product: ProductData }) {
   }
 
   return <form className="storeForm productForm" onSubmit={submit}>
-    <div className="formField"><label htmlFor="name">Nom du produit</label><input id="name" name="name" defaultValue={product.name} minLength={2} maxLength={120} required /></div>
-    <div className="formField"><label htmlFor="description">Description</label><textarea id="description" name="description" defaultValue={product.description} rows={7} minLength={10} maxLength={5000} required /></div>
+    <div className="formField"><label htmlFor="name">{t("productName")}</label><input id="name" name="name" defaultValue={product.name} minLength={2} maxLength={120} required /></div>
+    <div className="formField"><label htmlFor="description">{t("description")}</label><textarea id="description" name="description" defaultValue={product.description} rows={7} minLength={10} maxLength={5000} required /></div>
     <div className="formRow">
       <div className="formField"><label htmlFor="price">Prix ({product.currency})</label><input id="price" name="price" type="number" defaultValue={product.price} min="0.01" max="1000000" step="0.01" required /></div>
       <div className="formField"><label htmlFor="compareAtPrice">Ancien prix ({product.currency})</label><input id="compareAtPrice" name="compareAtPrice" type="number" defaultValue={product.compareAtPrice ?? ""} min="0.01" max="1000000" step="0.01" /></div>
     </div>
     <div className="formRow">
-      <div className="formField"><label htmlFor="stock">Stock</label><input id="stock" name="stock" type="number" defaultValue={product.stock} min="0" max="1000000" step="1" required /></div>
-      <div className="formField"><label htmlFor="category">Catégorie</label><select id="category" name="category" defaultValue={product.category} required>{categories.map(c => <option key={c}>{c}</option>)}</select></div>
+      <div className="formField"><label htmlFor="stock">{t("stock")}</label><input id="stock" name="stock" type="number" defaultValue={product.stock} min="0" max="1000000" step="1" required /></div>
+      <div className="formField"><label htmlFor="category">{t("category")}</label><select id="category" name="category" defaultValue={product.category} required>{categories.map(c => <option key={c}>{c}</option>)}</select></div>
     </div>
     <div className="formRow">
       <div className="formField"><label htmlFor="colors">Couleurs</label><input id="colors" name="colors" defaultValue={product.colors.join(", ")} /></div>
@@ -103,6 +105,6 @@ export default function EditProductForm({ product }: { product: ProductData }) {
       </article>)}</div>}
     </fieldset>
     {message && <p className="authMessage storeError">{message}</p>}
-    <div className="editProductActions"><button className="authSubmit" type="submit" disabled={submitting || uploading}>{submitting ? "Enregistrement…" : "Enregistrer les modifications"}</button><button className="dangerButton" type="button" onClick={removeProduct} disabled={submitting}>Supprimer le produit</button></div>
+    <div className="editProductActions"><button className="authSubmit" type="submit" disabled={submitting || uploading}>{t("saveChanges")}</button><button className="dangerButton" type="button" onClick={removeProduct} disabled={submitting}>{t("deleteProduct")}</button></div>
   </form>;
 }

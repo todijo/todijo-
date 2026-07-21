@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SellerProductsPage() {
+  const t = await getTranslations("Seller"); const c = await getTranslations("Common");
   const session = await readSession();
   if (!session) redirect("/login");
 
@@ -28,27 +30,27 @@ export default async function SellerProductsPage() {
         <header className="sellerDashboardHeader">
           <a className="authLogo dashboardLogo" href="/">Todijo<span>.</span></a>
           <nav className="sellerProductNav">
-            <a href="/dashboard">Tableau de bord</a>
-            <a href={`/store/${store.slug}`}>Voir la boutique</a>
-            <form action="/api/auth/logout" method="post"><button className="dashboardLogout" type="submit">Se déconnecter</button></form>
+            <a href="/dashboard">{t("dashboard")}</a>
+            <a href={`/store/${store.slug}`}>{c("view")}</a>
+            <form action="/api/auth/logout" method="post"><button className="dashboardLogout" type="submit">{c("logout")}</button></form>
           </nav>
         </header>
 
         <section className="productsManagerHeader">
           <div>
             <p className="dashboardBadge">{store.name}</p>
-            <h1>Mes produits</h1>
-            <p>Gérez les articles publiés dans votre boutique.</p>
+            <h1>{t("myProducts")}</h1>
+            <p>{t("manageIntro")}</p>
           </div>
-          <a className="authSubmit dashboardPrimaryAction" href="/seller/products/new">＋ Ajouter un produit</a>
+          <a className="authSubmit dashboardPrimaryAction" href="/seller/products/new">＋ {t("addProduct")}</a>
         </section>
 
         {store.products.length === 0 ? (
           <section className="emptyProductsPanel">
             <div>📦</div>
-            <h2>Aucun produit pour le moment</h2>
-            <p>Ajoutez votre premier article pour commencer à vendre.</p>
-            <a className="primary" href="/seller/products/new">Ajouter mon premier produit</a>
+            <h2>{t("noProducts")}</h2>
+            <p>{t("noProductsText")}</p>
+            <a className="primary" href="/seller/products/new">{t("firstProduct")}</a>
           </section>
         ) : (
           <section className="sellerProductsGrid">
@@ -67,7 +69,7 @@ export default async function SellerProductsPage() {
                   </div>
                   <h2>{product.name}</h2>
                   <strong>{product.price.toString()} {product.currency}</strong>
-                  <div className="sellerProductActions"><a href={`/seller/products/${product.id}/edit`}>✏️ Modifier</a>{product.status === "PUBLISHED" ? (<a href={`/product/${product.id}`}>Voir la fiche →</a>) : (<span className="draftHint">Brouillon non visible</span>)}</div>
+                  <div className="sellerProductActions"><a href={`/seller/products/${product.id}/edit`}>✏️ {c("edit")}</a>{product.status === "PUBLISHED" ? (<a href={`/product/${product.id}`}>{t("viewListing")} →</a>) : (<span className="draftHint">{t("draft")}</span>)}</div>
                 </div>
               </article>
             ))}

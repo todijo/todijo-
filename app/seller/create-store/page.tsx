@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import CreateStoreForm from "./CreateStoreForm";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateStorePage() {
+  const t = await getTranslations("Seller");
   const session = await readSession();
   if (!session) redirect("/login");
 
@@ -22,8 +24,8 @@ export default async function CreateStorePage() {
         <a className="authLogo dashboardLogo" href="/">
           Todijo<span>.</span>
         </a>
-        <p className="dashboardBadge">Espace vendeur</p>
-        <h1>Créez votre boutique</h1>
+        <p className="dashboardBadge">{t("sellerArea")}</p>
+        <h1>{t("createShop")}</h1>
         <p className="storeSetupIntro">
           Configurez votre espace vendeur. Vous pourrez ensuite ajouter vos
           produits et recevoir vos premières commandes.

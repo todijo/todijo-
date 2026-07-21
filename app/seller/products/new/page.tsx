@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import NewProductForm from "./NewProductForm";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewProductPage() {
+  const t = await getTranslations("Seller");
   const session = await readSession();
   if (!session) redirect("/login");
 
@@ -19,14 +21,14 @@ export default async function NewProductPage() {
   return (
     <main className="storeSetupPage">
       <section className="storeSetupCard productSetupCard">
-        <a className="authBack" href="/dashboard">← Retour au tableau de bord</a>
+        <a className="authBack" href="/dashboard">← {t("dashboard")}</a>
         <div className="productFormHeader">
           <div>
             <p className="dashboardBadge">{store.name}</p>
-            <h1>Ajouter un produit</h1>
-            <p className="storeSetupIntro">Publiez un article dans votre boutique Todijo.</p>
+            <h1>{t("addProduct")}</h1>
+            <p className="storeSetupIntro">{t("manageIntro")}</p>
           </div>
-          <span className="currencyPill">Devise : {store.currency}</span>
+          <span className="currencyPill">{t("currency")} : {store.currency}</span>
         </div>
         <NewProductForm currency={store.currency} />
       </section>

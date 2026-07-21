@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import CartLink from "@/components/CartLink";
 import StoreExperience from "./StoreExperience";
+import { getLocale, getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ function initials(firstName: string, lastName: string) {
 }
 
 export default async function StorePage({ params }: Props) {
+  const common = await getTranslations("Common"); const locale = await getLocale();
   const { slug } = await params;
   const store = await prisma.store.findUnique({
     where: { slug },
@@ -24,7 +26,7 @@ export default async function StorePage({ params }: Props) {
 
   if (!store) notFound();
 
-  const dateFormat = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
+  const dateFormat = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" });
   const storeData = {
     name: store.name,
     slug: store.slug,
@@ -46,11 +48,11 @@ export default async function StorePage({ params }: Props) {
       <header className="publicStoreHeader premiumStoreHeader">
         <a className="authLogo dashboardLogo" href="/">Todijo<span>.</span></a>
         <nav className="storeTopNav">
-          <a href="/">Accueil</a><a href="/#categories">Catégories</a><a className="secondary" href="/dashboard">Mon compte</a><CartLink />
+          <a href="/">{common("home")}</a><a href="/#categories">{common("categories")}</a><a className="secondary" href="/dashboard">{common("account")}</a><CartLink label={common("cart")} />
         </nav>
       </header>
       <StoreExperience store={storeData} />
-      <footer className="premiumStoreFooter"><a className="authLogo" href="/">Todijo<span>.</span></a><p>Une boutique indépendante propulsée par Todijo.</p></footer>
+      <footer className="premiumStoreFooter"><a className="authLogo" href="/">Todijo<span>.</span></a><p>© 2026 Todijo. {common("footer")}</p></footer>
     </main>
   );
 }

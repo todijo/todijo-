@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
+import { useTranslations } from "next-intl";
 
 type Product = {
   id: string;
@@ -59,14 +60,15 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 }
 
 const tabs = [
-  { id: "products", label: "Produits", icon: "grid" as IconName },
-  { id: "reviews", label: "Avis", icon: "star" as IconName },
-  { id: "about", label: "À propos", icon: "info" as IconName },
-  { id: "gallery", label: "Galerie", icon: "image" as IconName },
-  { id: "policies", label: "Politiques", icon: "file" as IconName },
+  { id: "products", icon: "grid" as IconName },
+  { id: "reviews", icon: "star" as IconName },
+  { id: "about", icon: "info" as IconName },
+  { id: "gallery", icon: "image" as IconName },
+  { id: "policies", icon: "file" as IconName },
 ];
 
 export default function StoreExperience({ store }: Props) {
+  const common = useTranslations("Common"); const market = useTranslations("Marketplace"); const seller = useTranslations("Seller"); const productText = useTranslations("Product");
   const [activeTab, setActiveTab] = useState("products");
   const [followed, setFollowed] = useState(false);
   const [query, setQuery] = useState("");
@@ -105,21 +107,21 @@ export default function StoreExperience({ store }: Props) {
               {store.logo ? <img src={store.logo} alt={`Logo ${store.name}`} /> : <span>{store.sellerInitials}</span>}
             </div>
             <div className="premiumStoreTitleBlock">
-              <div className="premiumStoreOfficial"><span>Boutique officielle Todijo</span>{store.verified && <span className="verifiedPill"><Icon name="check" size={14} /> Vendeur vérifié</span>}</div>
+              <div className="premiumStoreOfficial"><span>Todijo</span>{store.verified && <span className="verifiedPill"><Icon name="check" size={14} /> {seller("sellerArea")}</span>}</div>
               <h1>{store.name}</h1>
               <p><Icon name="pin" size={17} /> {store.city}, {store.country}</p>
             </div>
           </div>
           <div className="premiumStoreActions">
             <button className={followed ? "storeActionButton followed" : "storeActionButton primaryAction"} onClick={() => setFollowed((v) => !v)}><Icon name="heart" size={18} /> {followed ? "Suivi" : "Suivre"}</button>
-            <a className="storeActionButton" href="#seller"><Icon name="message" size={18} /> Contacter</a>
-            <button className="storeActionButton iconAction" onClick={shareStore} aria-label="Partager la boutique"><Icon name="share" size={19} /><span>{copied ? "Lien copié" : "Partager"}</span></button>
+            <a className="storeActionButton" href="#seller"><Icon name="message" size={18} /> {productText("contact")}</a>
+            <button className="storeActionButton iconAction" onClick={shareStore} aria-label={productText("share")}><Icon name="share" size={19} /><span>{copied ? productText("copied") : productText("share")}</span></button>
           </div>
         </div>
       </section>
 
       <section className="premiumStats" aria-label="Statistiques de la boutique">
-        <div><span className="statIcon"><Icon name="package" /></span><span><strong>{store.products.length}</strong><small>Produits publiés</small></span></div>
+        <div><span className="statIcon"><Icon name="package" /></span><span><strong>{store.products.length}</strong><small>{market("products")}</small></span></div>
         <div><span className="statIcon"><Icon name="star" /></span><span><strong>5,0</strong><small>Satisfaction client</small></span></div>
         <div><span className="statIcon"><Icon name="clock" /></span><span><strong>&lt; 24 h</strong><small>Temps de réponse</small></span></div>
         <div><span className="statIcon"><Icon name="users" /></span><span><strong>{followed ? "1+" : "Nouveau"}</strong><small>Communauté</small></span></div>
@@ -127,7 +129,7 @@ export default function StoreExperience({ store }: Props) {
 
       <div className="storeTabsShell">
         <nav className="storeTabs" aria-label="Sections de la boutique">
-          {tabs.map((tab) => <button key={tab.id} className={activeTab === tab.id ? "active" : ""} onClick={() => setActiveTab(tab.id)}><Icon name={tab.icon} size={18} /><span>{tab.label}</span>{tab.id === "products" && <em>{store.products.length}</em>}</button>)}
+          {tabs.map((tab) => <button key={tab.id} className={activeTab === tab.id ? "active" : ""} onClick={() => setActiveTab(tab.id)}><Icon name={tab.icon} size={18} /><span>{tab.id === "products" ? market("products") : tab.id === "reviews" ? seller("viewListing") : common("view")}</span>{tab.id === "products" && <em>{store.products.length}</em>}</button>)}
         </nav>
       </div>
 
@@ -135,13 +137,13 @@ export default function StoreExperience({ store }: Props) {
         <main className="premiumStoreMain">
           {activeTab === "products" && <section className="storeTabPanel">
             <div className="catalogHeader">
-              <div><span className="sectionKicker">Catalogue</span><h2>Produits de la boutique</h2><p>Une sélection proposée directement par {store.name}.</p></div>
+              <div><span className="sectionKicker">Todijo</span><h2>{market("products")}</h2><p>{store.name}</p></div>
               <div className="catalogTools">
-                <label className="catalogSearch"><Icon name="search" size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher un produit" /></label>
-                <label className="catalogSort"><Icon name="sort" size={17} /><select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Trier les produits"><option value="newest">Plus récents</option><option value="price-low">Prix croissant</option><option value="price-high">Prix décroissant</option></select></label>
+                <label className="catalogSearch"><Icon name="search" size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={common("searchPlaceholder")} /></label>
+                <label className="catalogSort"><Icon name="sort" size={17} /><select value={sort} onChange={(e) => setSort(e.target.value)} aria-label={market("sort")}><option value="newest">{market("newest")}</option><option value="price-low">{market("low")}</option><option value="price-high">{market("high")}</option></select></label>
               </div>
             </div>
-            {products.length === 0 ? <div className="premiumEmpty"><Icon name="package" size={44} /><h3>Aucun produit trouvé</h3><p>Essayez une autre recherche.</p></div> : <div className="premiumProductGrid">{products.map((product) => {
+            {products.length === 0 ? <div className="premiumEmpty"><Icon name="package" size={44} /><h3>{market("empty")}</h3></div> : <div className="premiumProductGrid">{products.map((product) => {
               const price = Number(product.price);
               const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
               const discount = oldPrice && oldPrice > price ? Math.round(((oldPrice - price) / oldPrice) * 100) : null;
@@ -151,7 +153,7 @@ export default function StoreExperience({ store }: Props) {
                   <div className="productBadges">{discount && <span className="saleBadge">-{discount}%</span>}<span className="conditionBadge">{product.condition}</span></div>
                   <ProductCardWishlist productId={product.id} />
                 </a>
-                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.stock > 0 ? "stockDot in" : "stockDot out"}>{product.stock > 0 ? "En stock" : "Épuisé"}</span></div></div>
+                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.stock > 0 ? "stockDot in" : "stockDot out"}>{product.stock > 0 ? common("available") : common("soldOut")}</span></div></div>
               </article>;
             })}</div>}
           </section>}

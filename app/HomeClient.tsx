@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import CartLink from "@/components/CartLink";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type Locale = "ku" | "en" | "fr" | "ar";
 
@@ -67,7 +69,10 @@ export default function HomeClient({ products, categories, total, page, pageSize
   const [locale, setLocale] = useState<Locale>("fr");
   const [filters, setFilters] = useState(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const t = translations[locale];
+  const activeLocale = useLocale();
+  const m = useTranslations("Marketplace");
+  const c = useTranslations("Common");
+  const t = { dir: ["ar", "ku"].includes(activeLocale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   useEffect(() => {
@@ -110,9 +115,7 @@ export default function HomeClient({ products, categories, total, page, pageSize
             <a className="textButton" href="/register?role=seller">{t.sell}</a>
             <a className="textButton" href="/login">{t.account}</a>
             <CartLink label={t.cart} className="homeCartLink" />
-            <select aria-label="Language" value={locale} onChange={(e) => changeLocale(e.target.value as Locale)}>
-              <option value="ku">کوردی</option><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option>
-            </select>
+            <LanguageSwitcher />
           </nav>
         </div>
       </header>
@@ -189,7 +192,7 @@ export default function HomeClient({ products, categories, total, page, pageSize
         </div>
       </section>
 
-      <footer className="footer container">© 2026 Todijo. All rights reserved.</footer>
+      <footer className="footer container">© 2026 Todijo. {c("footer")}</footer>
     </main>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 import { FormEvent, useState } from "react";
+import { useTranslations } from "next-intl";
 
 export default function LoginPage() {
   const [loading,setLoading]=useState(false);
   const [message,setMessage]=useState("");
+  const t=useTranslations("Auth");
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault(); setLoading(true); setMessage("");
     const form = new FormData(event.currentTarget);
@@ -14,26 +16,25 @@ export default function LoginPage() {
     });
     const data = await response.json();
     setLoading(false);
-    if (!response.ok) return setMessage(data.error ?? "Connexion impossible.");
+    if (!response.ok) return setMessage(data.error ?? t("error"));
     window.location.assign(data.role === "SELLER" ? "/dashboard" : "/dashboard");
   }
   return <main className="authPage">
     <section className="authBrand">
       <a className="authLogo" href="/">Todijo<span>.</span></a>
-      <div className="authPitch"><h1>Bienvenue sur Todijo.</h1><p>Achetez, vendez et gérez votre boutique depuis un seul compte sécurisé.</p>
-        <div className="authBenefits"><div className="authBenefit"><i>✓</i> Un compte pour acheter et vendre</div><div className="authBenefit"><i>✓</i> Gestion simple de votre boutique</div><div className="authBenefit"><i>✓</i> Paiements et données protégés</div></div>
+      <div className="authPitch"><h1>{t("welcome")}</h1><p>{t("pitch")}</p>
+        <div className="authBenefits"><div className="authBenefit"><i>✓</i> {t("buyerHelp")}</div><div className="authBenefit"><i>✓</i> {t("sellerHelp")}</div><div className="authBenefit"><i>✓</i> Stripe</div></div>
       </div><small>© 2026 Todijo</small>
     </section>
     <section className="authPanel"><div className="authBox">
-      <a className="authBack" href="/">← Retour à l’accueil</a><h2>Se connecter</h2><p className="authIntro">Entrez vos informations pour accéder à votre compte.</p>
+      <a className="authBack" href="/">← {t("back")}</a><h2>{t("login")}</h2><p className="authIntro">{t("loginIntro")}</p>
       <form className="authForm" onSubmit={submit}>
-        <div className="formField"><label htmlFor="email">Adresse e-mail</label><input id="email" name="email" type="email" autoComplete="email" placeholder="vous@exemple.com" required /></div>
-        <div className="formField"><div className="passwordLine"><label htmlFor="password">Mot de passe</label><a href="#">Mot de passe oublié ?</a></div><input id="password" name="password" type="password" autoComplete="current-password" minLength={8} required /></div>
+        <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></div>
+        <div className="formField"><div className="passwordLine"><label htmlFor="password">{t("password")}</label><a href="#">{t("forgot")}</a></div><input id="password" name="password" type="password" autoComplete="current-password" minLength={8} required /></div>
         {message&&<p className="authMessage">{message}</p>}
-        <button className="authSubmit" type="submit" disabled={loading}>{loading?"Connexion…":"Se connecter"}</button>
+        <button className="authSubmit" type="submit" disabled={loading}>{loading?t("signingIn"):t("login")}</button>
       </form>
-      <div className="authDivider">ou</div><button className="googleButton" type="button">G&nbsp;&nbsp; Continuer avec Google</button>
-      <p className="authSwitch">Pas encore de compte ? <a href="/register">Créer un compte</a></p>
+      <p className="authSwitch">{t("noAccount")} <a href="/register">{t("create")}</a></p>
     </div></section>
   </main>;
 }

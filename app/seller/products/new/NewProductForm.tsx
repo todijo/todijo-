@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 const categories = [
   "Mode", "Électronique", "Maison", "Beauté", "Sports", "Livres", "Enfants", "Auto", "Artisanat", "Autre",
@@ -18,6 +19,7 @@ type UploadedPhoto = {
 
 export default function NewProductForm({ currency }: { currency: string }) {
   const router = useRouter();
+  const t = useTranslations("Seller");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -164,12 +166,12 @@ export default function NewProductForm({ currency }: { currency: string }) {
   return (
     <form className="storeForm productForm" onSubmit={submit}>
       <div className="formField">
-        <label htmlFor="name">Nom du produit</label>
+        <label htmlFor="name">{t("productName")}</label>
         <input id="name" name="name" minLength={2} maxLength={120} required placeholder="Exemple : Baskets blanches" />
       </div>
 
       <div className="formField">
-        <label htmlFor="description">Description</label>
+        <label htmlFor="description">{t("description")}</label>
         <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required placeholder="Décrivez le produit, ses dimensions, sa matière et ses avantages." />
       </div>
 
@@ -186,19 +188,19 @@ export default function NewProductForm({ currency }: { currency: string }) {
 
       <div className="formRow">
         <div className="formField">
-          <label htmlFor="stock">Stock</label>
+          <label htmlFor="stock">{t("stock")}</label>
           <input id="stock" name="stock" type="number" min="0" max="1000000" step="1" defaultValue="1" required />
         </div>
       </div>
 
       <div className="formRow">
-        <div className="formField"><label htmlFor="colors">Couleurs disponibles</label><input id="colors" name="colors" placeholder="Noir, Blanc, Vert" /><small>Séparez les choix par des virgules.</small></div>
-        <div className="formField"><label htmlFor="sizes">Tailles / modèles</label><input id="sizes" name="sizes" placeholder="S, M, L ou 128 Go, 256 Go" /><small>Séparez les choix par des virgules.</small></div>
+        <div className="formField"><label htmlFor="colors">{t("colors")}</label><input id="colors" name="colors" placeholder="Black, White, Green" /></div>
+        <div className="formField"><label htmlFor="sizes">{t("sizes")}</label><input id="sizes" name="sizes" placeholder="S, M, L" /></div>
       </div>
 
       <div className="formRow">
         <div className="formField">
-          <label htmlFor="category">Catégorie</label>
+          <label htmlFor="category">{t("category")}</label>
           <select id="category" name="category" required defaultValue="">
             <option value="" disabled>Choisir une catégorie</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -216,7 +218,7 @@ export default function NewProductForm({ currency }: { currency: string }) {
       </div>
 
       <fieldset className="imageUploadFields">
-        <legend>Photos du produit</legend>
+        <legend>{t("photos")}</legend>
         <p>Ajoutez jusqu’à 10 photos JPG, PNG ou WebP. Glissez-les pour changer l’ordre, ou choisissez directement l’image principale.</p>
 
         <input
@@ -267,10 +269,10 @@ export default function NewProductForm({ currency }: { currency: string }) {
       </fieldset>
 
       <div className="formField">
-        <label htmlFor="status">Publication</label>
+        <label htmlFor="status">{t("publication")}</label>
         <select id="status" name="status" defaultValue="PUBLISHED">
-          <option value="PUBLISHED">Publier maintenant</option>
-          <option value="DRAFT">Enregistrer comme brouillon</option>
+          <option value="PUBLISHED">{t("publish")}</option>
+          <option value="DRAFT">{t("saveDraft")}</option>
         </select>
       </div>
 

@@ -292,7 +292,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
         </div>
         <div className="formRow">
           <div className="formField"><label htmlFor="currency"><LabelWithIcon icon="money">Devise</LabelWithIcon></label><select id="currency" name="currency" defaultValue={initialValues.currency}><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option><option value="GBP">GBP — Livre sterling</option></select></div>
-          <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">Langue</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="fr">Français</option><option value="en">English</option><option value="de">Deutsch</option><option value="ar">العربية</option></select></div>
+          <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">Langue</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="ku">کوردی</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option></select></div>
         </div>
       </section>
 

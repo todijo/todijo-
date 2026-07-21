@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { CartProduct, useCart } from "./CartProvider";
+import { useTranslations } from "next-intl";
 
 export default function AddToCartButton({ product }: { product: CartProduct }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
+  const t = useTranslations("Product");
 
   function handleAdd() {
     addItem(product);
@@ -20,7 +22,7 @@ export default function AddToCartButton({ product }: { product: CartProduct }) {
       disabled={product.stock === 0}
       onClick={handleAdd}
     >
-      {product.stock === 0 ? "Indisponible" : added ? "✓ Ajouté au panier" : "Ajouter au panier"}
+      {product.stock === 0 ? t("unavailable") : added ? t("added") : t("add")}
     </button>
   );
 }

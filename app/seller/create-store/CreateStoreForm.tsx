@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 function slugify(value: string) {
   return value
@@ -16,6 +17,7 @@ function slugify(value: string) {
 
 export default function CreateStoreForm() {
   const router = useRouter();
+  const t = useTranslations("Seller");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
@@ -61,7 +63,7 @@ export default function CreateStoreForm() {
   return (
     <form className="storeForm" onSubmit={submit}>
       <div className="formField">
-        <label htmlFor="name">Nom de la boutique</label>
+        <label htmlFor="name">{t("shopName")}</label>
         <input
           id="name"
           name="name"
@@ -75,7 +77,7 @@ export default function CreateStoreForm() {
       </div>
 
       <div className="formField">
-        <label htmlFor="slug">Adresse de la boutique</label>
+        <label htmlFor="slug">{t("shopAddress")}</label>
         <div className="slugField">
           <span>todijo.com/store/</span>
           <input
@@ -95,7 +97,7 @@ export default function CreateStoreForm() {
       </div>
 
       <div className="formField">
-        <label htmlFor="description">Description</label>
+        <label htmlFor="description">{t("description")}</label>
         <textarea
           id="description"
           name="description"
@@ -107,18 +109,18 @@ export default function CreateStoreForm() {
 
       <div className="formRow">
         <div className="formField">
-          <label htmlFor="country">Pays</label>
+          <label htmlFor="country">{t("country")}</label>
           <input id="country" name="country" required placeholder="France" />
         </div>
         <div className="formField">
-          <label htmlFor="city">Ville</label>
+          <label htmlFor="city">{t("city")}</label>
           <input id="city" name="city" required placeholder="Lille" />
         </div>
       </div>
 
       <div className="formRow">
         <div className="formField">
-          <label htmlFor="currency">Devise</label>
+          <label htmlFor="currency">{t("currency")}</label>
           <select id="currency" name="currency" defaultValue="EUR">
             <option value="EUR">EUR — Euro</option>
             <option value="USD">USD — Dollar américain</option>
@@ -126,12 +128,17 @@ export default function CreateStoreForm() {
           </select>
         </div>
         <div className="formField">
-          <label htmlFor="language">Langue</label>
+          <label htmlFor="language">{t("language")}</label>
           <select id="language" name="language" defaultValue="fr">
             <option value="fr">Français</option>
             <option value="en">English</option>
             <option value="de">Deutsch</option>
             <option value="ar">العربية</option>
+            <option value="ku">کوردی</option>
+            <option value="tr">Türkçe</option>
+            <option value="es">Español</option>
+            <option value="it">Italiano</option>
+            <option value="nl">Nederlands</option>
           </select>
         </div>
       </div>
@@ -139,7 +146,7 @@ export default function CreateStoreForm() {
       {message && <p className="authMessage storeError">{message}</p>}
 
       <button className="authSubmit" type="submit" disabled={submitting}>
-        {submitting ? "Création en cours…" : "Créer ma boutique"}
+        {submitting ? t("saveChanges") : t("createShop")}
       </button>
     </form>
   );

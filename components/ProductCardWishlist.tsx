@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const KEY = "todijo-wishlist-v1";
 
 export default function ProductCardWishlist({ productId }: { productId: string }) {
   const [saved, setSaved] = useState(false);
+  const t = useTranslations("Product");
 
   useEffect(() => {
     try {
@@ -25,7 +27,7 @@ export default function ProductCardWishlist({ productId }: { productId: string }
   }
 
   return (
-    <button className={`cardWishlist ${saved ? "saved" : ""}`} onClick={toggle} aria-label={saved ? "Retirer des favoris" : "Ajouter aux favoris"} aria-pressed={saved}>
+    <button className={`cardWishlist ${saved ? "saved" : ""}`} onClick={toggle} aria-label={saved ? t("favoriteRemove") : t("favoriteAdd")} aria-pressed={saved}>
       {saved ? "♥" : "♡"}
     </button>
   );
