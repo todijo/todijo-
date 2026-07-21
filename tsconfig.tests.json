@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "outDir": ".test-dist",
+    "noEmit": false,
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": ["lib/payments.ts", "lib/stripe.ts", "tests/**/*.test.ts"],
+  "exclude": ["node_modules"]
+}

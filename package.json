@@ -8,7 +8,9 @@
     "start": "prisma db push && next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.tests.json && node --test .test-dist/tests/*.test.js"
   },
   "dependencies": {
     "next": "15.5.20",
