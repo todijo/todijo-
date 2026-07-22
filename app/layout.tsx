@@ -12,7 +12,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const pathname = (await headers()).get("x-todijo-pathname") ?? `/${locale}`;
   const suffix = pathname.replace(new RegExp(`^/${locale}`), "") || "/";
   const base = process.env.APP_URL ?? "http://localhost:3000";
-  return { title: { default: t("title"), template: `%s · ${t("brand")}` }, description: t("description"), metadataBase: new URL(base), alternates: { canonical: `/${locale}${suffix === "/" ? "" : suffix}`, languages: Object.fromEntries(locales.map((item) => [item, `/${item}${suffix === "/" ? "" : suffix}`])) } };
+  return {
+    title: { default: t("title"), template: `%s · ${t("brand")}` },
+    description: t("description"),
+    metadataBase: new URL(base),
+    themeColor: "#063d2d",
+    icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png" },
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Todijo" },
+    alternates: { canonical: `/${locale}${suffix === "/" ? "" : suffix}`, languages: Object.fromEntries(locales.map((item) => [item, `/${item}${suffix === "/" ? "" : suffix}`])) },
+  };
 }
 
 export default async function RootLayout({
