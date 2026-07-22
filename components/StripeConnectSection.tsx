@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 type Status = { connected: boolean; onboardingComplete: boolean; chargesEnabled: boolean; payoutsEnabled: boolean };
@@ -9,11 +9,31 @@ export default function StripeConnectSection({ initialStatus }: { initialStatus:
   const t = useTranslations("Connect");
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const latestRefresh = useRef(0);
 
   async function refresh() {
-    const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
-    if (response.ok) setStatus(await response.json() as Status);
+    const requestId = ++latestRefresh.current;
+    setRefreshing(true);
+    setError("");
+    try {
+      const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
+      const result = await response.json() as Partial<Status> & { error?: string };
+      if (!response.ok) throw new Error(result.error || t("error"));
+      if (requestId === latestRefresh.current) {
+        setStatus({
+          connected: result.connected === true,
+          onboardingComplete: result.onboardingComplete === true,
+          chargesEnabled: result.chargesEnabled === true,
+          payoutsEnabled: result.payoutsEnabled === true,
+        });
+      }
+    } catch (cause) {
+      if (requestId === latestRefresh.current) setError(cause instanceof Error ? cause.message : t("error"));
+    } finally {
+      if (requestId === latestRefresh.current) setRefreshing(false);
+    }
   }
 
   useEffect(() => { void refresh(); }, []);
@@ -33,12 +53,12 @@ export default function StripeConnectSection({ initialStatus }: { initialStatus:
   return <section className="dashboardQuickActions stripeConnectSection">
     <h2>{t("title")}</h2><p>{t("description")}</p>
     <div className="stripeStatusGrid">
-      <span className={status.connected ? "isReady" : ""}>{status.connected ? "Stripe" : t("notConnected")}</span>
-      <span className={status.onboardingComplete ? "isReady" : ""}>{t("pending")}</span>
-      <span className={status.chargesEnabled ? "isReady" : ""}>{t("chargesEnabled")}</span>
-      <span className={status.payoutsEnabled ? "isReady" : ""}>{t("payoutsEnabled")}</span>
+      <span className={status.connected ? "isReady" : ""}>{status.connected ? "✓ Stripe" : t("notConnected")}</span>
+      <span className={status.onboardingComplete ? "isReady" : ""}>{status.onboardingComplete ? `✓ ${t("complete")}` : t("pending")}</span>
+      <span className={status.chargesEnabled ? "isReady" : ""}>{status.chargesEnabled ? "✓ " : ""}{t("chargesEnabled")}</span>
+      <span className={status.payoutsEnabled ? "isReady" : ""}>{status.payoutsEnabled ? "✓ " : ""}{t("payoutsEnabled")}</span>
     </div>
     {error && <p className="formError" role="alert">{error}</p>}
-    <div><button className="quickActionLink primary" type="button" onClick={onboard} disabled={busy}>{busy ? t("loading") : status.connected ? t("resume") : t("start")}</button><button className="quickActionLink secondary" type="button" onClick={() => void refresh()}>{t("refresh")}</button></div>
+    <div><button className="quickActionLink primary" type="button" onClick={onboard} disabled={busy}>{busy ? t("loading") : status.connected ? t("resume") : t("start")}</button><button className="quickActionLink secondary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? t("refreshing") : t("refresh")}</button></div>
   </section>;
 }
