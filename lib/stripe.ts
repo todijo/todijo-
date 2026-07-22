@@ -48,7 +48,7 @@ async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; b
 export async function createConnectedAccount(input: { userId: string; email: string }) {
   return stripeRequest<StripeConnectedAccount>("/accounts", {
     method: "POST",
-    idempotencyKey: `connect-account:${input.userId}`,
+    idempotencyKey: `connect-account-v2:${input.userId}`,
     body: new URLSearchParams({
       type: "express",
       email: input.email,
