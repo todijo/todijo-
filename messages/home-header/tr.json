@@ -1,1 +1,22 @@
-{"menu":"Menüyü aç","mobileNavigation":"Mobil gezinme","accountNavigation":"Hesap gezinmesi","categoryNavigation":"Pazar yeri gezinmesi","locationLabel":"Teslimat konumu","deliverTo":"Teslimat yeri","marketplace":"Pazar yerin","hello":"Merhaba, giriş yap","returns":"İadeler ve","orders":"Siparişler","searchCategory":"Arama kategorisi","allCategories":"Tüm kategoriler","deals":"Fırsatlar","newArrivals":"Yeni gelenler","bestSellers":"Çok satanlar"}
+{
+  "menu": "Menüyü aç",
+  "mobileNavigation": "Mobil gezinme",
+  "accountNavigation": "Hesap gezinmesi",
+  "categoryNavigation": "Pazar yeri gezinmesi",
+  "locationLabel": "Teslimat konumu",
+  "deliverTo": "Teslimat yeri",
+  "marketplace": "Pazar yerin",
+  "hello": "Merhaba, giriş yap",
+  "returns": "İadeler ve",
+  "orders": "Siparişler",
+  "searchCategory": "Arama kategorisi",
+  "allCategories": "Tüm kategoriler",
+  "deals": "Fırsatlar",
+  "newArrivals": "Yeni gelenler",
+  "bestSellers": "Çok satanlar",
+  "exploreProducts": "Ürünleri keşfet",
+  "sellerCta": "Satışa başla",
+  "viewAll": "Tümünü gör",
+  "marketplaceVisual": "Bağımsız Todijo mağazalarının ürünlerini keşfet",
+  "discoverCategories": "Pazar yeri kategorilerini keşfet"
+}

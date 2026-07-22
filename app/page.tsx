@@ -7,6 +7,20 @@ export const revalidate = 0;
 
 const PAGE_SIZE = 24;
 
+const productSelect = {
+  id: true, name: true, price: true, compareAtPrice: true, currency: true,
+  category: true, stock: true, condition: true, images: true, createdAt: true,
+  store: { select: { name: true, slug: true, city: true, country: true } },
+} satisfies Prisma.ProductSelect;
+
+type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
+
+function serializeProduct(p: ProductRow) {
+  return { id: p.id, name: p.name, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
+    currency: p.currency, category: p.category, stock: p.stock, condition: p.condition, image: p.images[0] ?? null,
+    storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString() };
+}
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function one(value: string | string[] | undefined) {
@@ -67,25 +81,13 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
           ? { createdAt: "asc" }
           : { createdAt: "desc" };
 
-  const [rows, total, categoryRows] = await Promise.all([
+  const [rows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        compareAtPrice: true,
-        currency: true,
-        category: true,
-        stock: true,
-        condition: true,
-        images: true,
-        createdAt: true,
-        store: { select: { name: true, slug: true, city: true, country: true } },
-      },
+      select: productSelect,
     }),
     prisma.product.count({ where }),
     prisma.product.findMany({
@@ -94,28 +96,33 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       orderBy: { category: "asc" },
       select: { category: true },
     }),
+    prisma.product.findMany({ where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, take: 8, select: productSelect }),
+    prisma.orderItem.groupBy({
+      by: ["productId"],
+      where: { order: { status: { in: ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"] } }, product: { status: "PUBLISHED" } },
+      _sum: { quantity: true }, orderBy: { _sum: { quantity: "desc" } }, take: 8,
+    }),
+    prisma.store.findMany({
+      where: { products: { some: { status: "PUBLISHED" } } },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+      select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
+        products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
+    }),
   ]);
 
-  const products = rows.map((p) => ({
-    id: p.id,
-    name: p.name,
-    price: p.price.toString(),
-    compareAtPrice: p.compareAtPrice?.toString() ?? null,
-    currency: p.currency,
-    category: p.category,
-    stock: p.stock,
-    condition: p.condition,
-    image: p.images[0] ?? null,
-    storeName: p.store.name,
-    storeSlug: p.store.slug,
-    city: p.store.city,
-    country: p.store.country,
-    createdAt: p.createdAt.toISOString(),
-  }));
+  const bestSellerIds = bestSellerCounts.map((item) => item.productId);
+  const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED" }, select: productSelect }) : [];
+  const bestSellerById = new Map(bestSellerRows.map((product) => [product.id, product]));
+  const bestSellers = bestSellerIds.map((id) => bestSellerById.get(id)).filter((product): product is ProductRow => Boolean(product)).map(serializeProduct);
+  const products = rows.map(serializeProduct);
 
   return (
     <HomeClient
       products={products}
+      newArrivals={newArrivalRows.map(serializeProduct)}
+      bestSellers={bestSellers}
+      stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: product.name, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
       page={page}

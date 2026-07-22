@@ -1,1 +1,22 @@
-{"menu":"Open menu","mobileNavigation":"Mobile navigation","accountNavigation":"Account navigation","categoryNavigation":"Marketplace navigation","locationLabel":"Marketplace location","deliverTo":"Deliver to","marketplace":"Your marketplace","hello":"Hello, sign in","returns":"Returns &","orders":"Orders","searchCategory":"Search category","allCategories":"All categories","deals":"Deals","newArrivals":"New arrivals","bestSellers":"Best sellers"}
+{
+  "menu": "Open menu",
+  "mobileNavigation": "Mobile navigation",
+  "accountNavigation": "Account navigation",
+  "categoryNavigation": "Marketplace navigation",
+  "locationLabel": "Marketplace location",
+  "deliverTo": "Deliver to",
+  "marketplace": "Your marketplace",
+  "hello": "Hello, sign in",
+  "returns": "Returns &",
+  "orders": "Orders",
+  "searchCategory": "Search category",
+  "allCategories": "All categories",
+  "deals": "Deals",
+  "newArrivals": "New arrivals",
+  "bestSellers": "Best sellers",
+  "exploreProducts": "Explore products",
+  "sellerCta": "Start selling",
+  "viewAll": "View all",
+  "marketplaceVisual": "Discover products from independent Todijo stores",
+  "discoverCategories": "Explore marketplace categories"
+}

@@ -14,5 +14,7 @@ export default getRequestConfig(async () => {
   messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
   messages.SellerDashboard = (await import(`../messages/seller-dashboard/${locale}.json`)).default;
   messages.HomeHeader = (await import(`../messages/home-header/${locale}.json`)).default;
+  messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
+  messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   return { locale, messages };
 });

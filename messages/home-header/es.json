@@ -1,1 +1,22 @@
-{"menu":"Abrir menú","mobileNavigation":"Navegación móvil","accountNavigation":"Navegación de cuenta","categoryNavigation":"Navegación del mercado","locationLabel":"Ubicación de entrega","deliverTo":"Enviar a","marketplace":"Tu mercado","hello":"Hola, inicia sesión","returns":"Devoluciones y","orders":"Pedidos","searchCategory":"Categoría de búsqueda","allCategories":"Todas las categorías","deals":"Ofertas","newArrivals":"Novedades","bestSellers":"Más vendidos"}
+{
+  "menu": "Abrir menú",
+  "mobileNavigation": "Navegación móvil",
+  "accountNavigation": "Navegación de cuenta",
+  "categoryNavigation": "Navegación del mercado",
+  "locationLabel": "Ubicación de entrega",
+  "deliverTo": "Enviar a",
+  "marketplace": "Tu mercado",
+  "hello": "Hola, inicia sesión",
+  "returns": "Devoluciones y",
+  "orders": "Pedidos",
+  "searchCategory": "Categoría de búsqueda",
+  "allCategories": "Todas las categorías",
+  "deals": "Ofertas",
+  "newArrivals": "Novedades",
+  "bestSellers": "Más vendidos",
+  "exploreProducts": "Explorar productos",
+  "sellerCta": "Empezar a vender",
+  "viewAll": "Ver todo",
+  "marketplaceVisual": "Descubre productos de tiendas Todijo independientes",
+  "discoverCategories": "Explorar categorías"
+}

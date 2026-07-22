@@ -1,1 +1,22 @@
-{"menu":"Apri menu","mobileNavigation":"Navigazione mobile","accountNavigation":"Navigazione account","categoryNavigation":"Navigazione marketplace","locationLabel":"Luogo di consegna","deliverTo":"Consegna a","marketplace":"Il tuo marketplace","hello":"Ciao, accedi","returns":"Resi e","orders":"Ordini","searchCategory":"Categoria di ricerca","allCategories":"Tutte le categorie","deals":"Offerte","newArrivals":"Nuovi arrivi","bestSellers":"Più venduti"}
+{
+  "menu": "Apri menu",
+  "mobileNavigation": "Navigazione mobile",
+  "accountNavigation": "Navigazione account",
+  "categoryNavigation": "Navigazione marketplace",
+  "locationLabel": "Luogo di consegna",
+  "deliverTo": "Consegna a",
+  "marketplace": "Il tuo marketplace",
+  "hello": "Ciao, accedi",
+  "returns": "Resi e",
+  "orders": "Ordini",
+  "searchCategory": "Categoria di ricerca",
+  "allCategories": "Tutte le categorie",
+  "deals": "Offerte",
+  "newArrivals": "Nuovi arrivi",
+  "bestSellers": "Più venduti",
+  "exploreProducts": "Esplora i prodotti",
+  "sellerCta": "Inizia a vendere",
+  "viewAll": "Vedi tutto",
+  "marketplaceVisual": "Scopri prodotti di negozi Todijo indipendenti",
+  "discoverCategories": "Esplora le categorie"
+}
