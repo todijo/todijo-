@@ -9,6 +9,6 @@
     "incremental": false,
     "isolatedModules": false
   },
-  "include": ["lib/payments.ts", "lib/stripe.ts", "tests/**/*.test.ts"],
+  "include": ["lib/buyer-orders.ts", "lib/payments.ts", "lib/stripe.ts", "tests/**/*.test.ts"],
   "exclude": ["node_modules"]
 }

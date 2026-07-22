@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import StripeConnectSection from "@/components/StripeConnectSection";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const t = await getTranslations("Dashboard");
   const common = await getTranslations("Common");
+  const ordersText = await getTranslations("Orders");
+  const locale = await getLocale();
   const session = await readSession();
   if (!session) redirect("/login");
 
@@ -74,7 +76,7 @@ export default async function DashboardPage() {
             </section>
 
             <section className="dashboardStats">
-              <article><span>{t("orders")}</span><strong>{user._count.orders}</strong></article>
+              <a className="dashboardStatCard" href={`/${locale}/account/orders`}><span>{t("orders")}</span><strong>{user._count.orders}</strong></a>
               <article><span>{t("conversations")}</span><strong>{user._count.buyerConversations}</strong></article>
               <article><span>{t("reviews")}</span><strong>{user._count.reviews}</strong></article>
               <article><span>{t("accountType")}</span><strong>{t("buyer")}</strong></article>
@@ -84,6 +86,7 @@ export default async function DashboardPage() {
               <h2>{t("quick")}</h2>
               <div>
                 <a className="quickActionLink primary" href="/">🛍️ {t("viewProducts")}</a>
+                <a className="quickActionLink secondary" href={`/${locale}/account/orders`}>📦 {ordersText("title")}</a>
                 <a className="quickActionLink secondary" href="/messages">💬 {t("myConversations")}</a>
                 <a className="quickActionLink secondary" href="/cart">🛒 {t("myCart")}</a>
               </div>
