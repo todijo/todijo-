@@ -13,9 +13,25 @@ import { readSession } from "@/lib/session";
 import SellerAnalytics from "@/components/SellerAnalytics";
 
 export const dynamic = "force-dynamic";
+const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
+
+function dashboardData<T>(query: PromiseLike<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Dashboard data request timed out")), DASHBOARD_DATA_TIMEOUT_MS);
+    Promise.resolve(query).then(
+      (value) => { clearTimeout(timeout); resolve(value); },
+      (error) => { clearTimeout(timeout); reject(error); },
+    );
+  });
+}
 
 function money(locale: string, amount: number, currency: string) {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(safeAmount);
+  } catch {
+    return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(safeAmount);
+  }
 }
 
 function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }: { order: BuyerOrder; locale: string; detailsLabel: string; unknownStore: string; statusLabel: string }) {
@@ -39,7 +55,7 @@ export default async function DashboardPage() {
   const session = await readSession();
   if (!session) redirect("/login");
 
-  const user = await prisma.user.findUnique({
+  const user = await dashboardData(prisma.user.findUnique({
     where: { id: session.userId },
     select: {
       firstName: true, lastName: true, email: true, role: true,
@@ -47,15 +63,15 @@ export default async function DashboardPage() {
       store: { select: { id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, currency: true, _count: { select: { products: true } } } },
       _count: { select: { orders: true, buyerConversations: true, reviews: true } },
     },
-  });
+  }));
   if (!user) redirect("/login");
 
   const isSeller = dashboardAudience(user.role) === "seller";
   const paths = dashboardPaths(locale);
-  const [notificationCount, unreadMessages] = await Promise.all([
+  const [notificationCount, unreadMessages] = await dashboardData(Promise.all([
     prisma.notification.count({ where: { userId: session.userId, readAt: null } }),
     prisma.message.count({ where: { readAt: null, senderId: { not: session.userId }, conversation: isSeller ? { sellerId: session.userId } : { buyerId: session.userId } } }),
-  ]);
+  ]));
   const homeHref = paths.home;
   const buyerOrdersHref = paths.orders;
   const buyerNav: DashboardNavItem[] = [
@@ -81,7 +97,7 @@ export default async function DashboardPage() {
   ];
 
   if (!isSeller) {
-    const orders = await listBuyerOrders(prisma, session.userId);
+    const orders = await dashboardData(listBuyerOrders(prisma, session.userId));
     const pending = orders.filter((order) => ["PENDING", "PAID", "PROCESSING", "SHIPPED"].includes(order.status)).length;
     const delivered = orders.filter((order) => order.status === "DELIVERED").length;
     const spentByCurrency = orders.filter((order) => buyerPaymentState(order) === "paid").reduce<Record<string, number>>((totals, order) => { totals[order.currency] = (totals[order.currency] ?? 0) + Number(order.total); return totals; }, {});
@@ -115,7 +131,7 @@ export default async function DashboardPage() {
 
   if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><DashboardEmptyState title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
 
-  const sellerOrders = await prisma.order.findMany({ where: { items: { some: { product: { store: { ownerId: session.userId } } } } }, include: { buyer: { select: { firstName: true, lastName: true } }, items: { include: { product: { select: { id: true, name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } });
+  const sellerOrders = await dashboardData(prisma.order.findMany({ where: { items: { some: { product: { store: { ownerId: session.userId } } } } }, include: { buyer: { select: { firstName: true, lastName: true } }, items: { include: { product: { select: { id: true, name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } }));
   const paidSellerOrders = sellerOrders.filter((order) => order.paidAt || order.stripePaymentIntentId);
   const revenue = paidSellerOrders.reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
   const customers = new Set(paidSellerOrders.map((order) => order.buyerId)).size;
@@ -132,11 +148,11 @@ export default async function DashboardPage() {
   const comparison = (current: number, previous: number) => { const percent = comparisonPercent(current, previous); return percent == null ? s("noComparison") : s("comparison", { value: percent > 0 ? `+${percent}` : String(percent) }); };
   const productCurrentStart = new Date(now); productCurrentStart.setDate(productCurrentStart.getDate() - 30);
   const productPreviousStart = new Date(now); productPreviousStart.setDate(productPreviousStart.getDate() - 60);
-  const [currentProducts, previousProducts, reviewStats] = await Promise.all([
+  const [currentProducts, previousProducts, reviewStats] = await dashboardData(Promise.all([
     prisma.product.count({ where: { storeId: user.store.id, createdAt: { gte: productCurrentStart } } }),
     prisma.product.count({ where: { storeId: user.store.id, createdAt: { gte: productPreviousStart, lt: productCurrentStart } } }),
     prisma.review.aggregate({ where: { product: { storeId: user.store.id }, status: "PUBLISHED" }, _avg: { rating: true }, _count: { rating: true } }),
-  ]);
+  ]));
   const analytics = sellerAnalytics(sellerOrders, locale, now);
   const analyticsStatuses = analytics.statuses.map((item) => ({ label: ordersText(`status.${item.status}`), value: item.value }));
   const cancellationRate = sellerOrders.length ? sellerOrders.filter((order) => order.status === "CANCELLED").length / sellerOrders.length * 100 : null;
