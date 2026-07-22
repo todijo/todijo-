@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { ChevronDown, MapPin, Menu, Search, ShoppingCart, UserRound } from "lucide-react";
 import CartLink from "@/components/CartLink";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import TodijoLogo from "@/components/TodijoLogo";
 
 type Locale = "ku" | "en" | "fr" | "ar";
 
@@ -72,6 +74,7 @@ export default function HomeClient({ products, categories, total, page, pageSize
   const activeLocale = useLocale();
   const m = useTranslations("Marketplace");
   const c = useTranslations("Common");
+  const h = useTranslations("HomeHeader");
   const t = { dir: ["ar", "ku"].includes(activeLocale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -104,20 +107,36 @@ export default function HomeClient({ products, categories, total, page, pageSize
   return (
     <main dir={t.dir}>
       <header className="marketHeader">
-        <div className="container marketHeaderInner">
-          <a className="logo" href="/">Todijo<span>.</span></a>
+        <div className="marketPrimaryHeader">
+        <div className="marketHeaderInner">
+          <details className="marketMobileMenu">
+            <summary aria-label={h("menu")}><Menu size={22} aria-hidden="true"/></summary>
+            <nav aria-label={h("mobileNavigation")}><a href="/login"><UserRound size={18} aria-hidden="true"/>{t.account}</a><a href={`/${activeLocale}/account/orders`}>{h("orders")}</a><a href="/register?role=seller">{t.sell}</a><LanguageSwitcher className="marketMobileLanguage"/></nav>
+          </details>
+          <TodijoLogo href={`/${activeLocale}`} inverse/>
+          <div className="marketLocation" aria-label={h("locationLabel")}><MapPin size={20} aria-hidden="true"/><span><small>{h("deliverTo")}</small><strong>{h("marketplace")}</strong></span></div>
           <form className="marketTopSearch" onSubmit={submit}>
             <span aria-hidden>⌕</span>
-            <input value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
-            <button>{t.searchButton}</button>
+            <label className="srOnly" htmlFor="market-category">{h("searchCategory")}</label>
+            <select id="market-category" value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">{t.all}</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select>
+            <label className="srOnly" htmlFor="market-search">{t.search}</label>
+            <input id="market-search" type="search" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
+            <button type="submit" aria-label={t.searchButton}><Search size={21} aria-hidden="true"/><span>{t.searchButton}</span></button>
           </form>
-          <nav className="nav">
-            <a className="textButton" href="/register?role=seller">{t.sell}</a>
-            <a className="textButton" href="/login">{t.account}</a>
-            <CartLink label={t.cart} className="homeCartLink" />
-            <LanguageSwitcher />
+          <nav className="marketDesktopActions" aria-label={h("accountNavigation")}>
+            <LanguageSwitcher className="marketHeaderLanguage"/>
+            <a className="marketAccountAction" href="/login"><UserRound size={20} aria-hidden="true"/><span><small>{h("hello")}</small><strong>{t.account}</strong></span><ChevronDown size={14} aria-hidden="true"/></a>
+            <a className="marketOrdersAction" href={`/${activeLocale}/account/orders`}><small>{h("returns")}</small><strong>{h("orders")}</strong></a>
+            <div className="marketCartAction"><ShoppingCart size={25} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div>
           </nav>
+          <div className="marketMobileActions"><a href="/login" aria-label={t.account}><UserRound size={22} aria-hidden="true"/></a><div className="marketCartAction"><ShoppingCart size={23} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div></div>
         </div>
+        </div>
+        <nav className="marketSecondaryNav" aria-label={h("categoryNavigation")}><div className="marketSecondaryInner">
+          <a className="marketAllCategories" href="#categories"><Menu size={18} aria-hidden="true"/>{h("allCategories")}</a>
+          {categories.slice(0, 5).map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}>{category}</button>)}
+          <a href="#products">{h("deals")}</a><a href={buildUrl({ ...filters, sort: "newest" })}>{h("newArrivals")}</a><a href="#products">{h("bestSellers")}</a><a className="marketSellLink" href="/register?role=seller">{t.sell}</a>
+        </div></nav>
       </header>
 
       <section className="discoveryHero">
