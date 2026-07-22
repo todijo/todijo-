@@ -30,7 +30,10 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-todijo-locale", pathLocale);
   requestHeaders.set("x-todijo-pathname", request.nextUrl.pathname);
-  const response = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  const isLocalizedConnectCallback = segments.length === 3 && segments[1] === "connect" && ["success", "refresh"].includes(segments[2]);
+  const response = isLocalizedConnectCallback
+    ? NextResponse.next({ request: { headers: requestHeaders } })
+    : NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   if (request.cookies.get(localeCookie)?.value !== pathLocale) {
     response.cookies.set(localeCookie, pathLocale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
   }
