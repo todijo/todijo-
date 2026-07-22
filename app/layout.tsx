@@ -19,6 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
     themeColor: "#063d2d",
     icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png" },
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Todijo" },
+    manifest: "/manifest.webmanifest",
+    openGraph: { title: t("title"), description: t("description"), type: "website", images: [{ url: "/icon.svg", width: 512, height: 512, alt: "Todijo" }] },
     alternates: { canonical: `/${locale}${suffix === "/" ? "" : suffix}`, languages: Object.fromEntries(locales.map((item) => [item, `/${item}${suffix === "/" ? "" : suffix}`])) },
   };
 }

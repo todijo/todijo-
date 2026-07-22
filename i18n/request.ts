@@ -12,5 +12,6 @@ export default getRequestConfig(async () => {
   messages.Connect = (await import(`../messages/connect/${locale}.json`)).default;
   messages.DashboardPremium = (await import(`../messages/dashboard-premium/${locale}.json`)).default;
   messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
+  messages.SellerDashboard = (await import(`../messages/seller-dashboard/${locale}.json`)).default;
   return { locale, messages };
 });

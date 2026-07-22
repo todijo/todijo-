@@ -8,7 +8,9 @@ import StripeConnectSection from "@/components/StripeConnectSection";
 import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer-orders";
 import { dashboardAudience, dashboardPaths } from "@/lib/dashboard";
 import { prisma } from "@/lib/prisma";
+import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "@/lib/seller-dashboard";
 import { readSession } from "@/lib/session";
+import SellerAnalytics from "@/components/SellerAnalytics";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
 export default async function DashboardPage() {
   const t = await getTranslations("Dashboard");
   const p = await getTranslations("DashboardPremium");
+  const s = await getTranslations("SellerDashboard");
   const common = await getTranslations("Common");
   const ordersText = await getTranslations("Orders");
   const locale = await getLocale();
@@ -41,7 +44,7 @@ export default async function DashboardPage() {
     select: {
       firstName: true, lastName: true, email: true, role: true,
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
-      store: { select: { name: true, slug: true, country: true, city: true, currency: true, _count: { select: { products: true } } } },
+      store: { select: { id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, currency: true, _count: { select: { products: true } } } },
       _count: { select: { orders: true, buyerConversations: true, reviews: true } },
     },
   });
@@ -49,12 +52,16 @@ export default async function DashboardPage() {
 
   const isSeller = dashboardAudience(user.role) === "seller";
   const paths = dashboardPaths(locale);
+  const [notificationCount, unreadMessages] = await Promise.all([
+    prisma.notification.count({ where: { userId: session.userId, readAt: null } }),
+    prisma.message.count({ where: { readAt: null, senderId: { not: session.userId }, conversation: isSeller ? { sellerId: session.userId } : { buyerId: session.userId } } }),
+  ]);
   const homeHref = paths.home;
   const buyerOrdersHref = paths.orders;
   const buyerNav: DashboardNavItem[] = [
     { label: p("nav.dashboard"), href: paths.dashboard, icon: Home, active: true },
     { label: p("nav.orders"), href: buyerOrdersHref, icon: ReceiptText },
-    { label: p("nav.messages"), href: paths.messages, icon: MessageCircle },
+    { label: p("nav.messages"), href: paths.messages, icon: MessageCircle, badge: unreadMessages },
     { label: p("nav.favorites"), href: `/${locale}/dashboard#favorites`, icon: Heart },
     { label: p("nav.addresses"), href: `/${locale}/dashboard#addresses`, icon: MapPin },
     { label: p("nav.payments"), href: `/${locale}/dashboard#payments`, icon: CreditCard },
@@ -65,9 +72,9 @@ export default async function DashboardPage() {
     { label: p("nav.dashboard"), href: paths.dashboard, icon: Home, active: true },
     { label: p("nav.products"), href: `/${locale}/seller/products`, icon: Boxes },
     { label: p("nav.orders"), href: `/${locale}/dashboard#recent-orders`, icon: ReceiptText },
-    { label: p("nav.messages"), href: paths.messages, icon: MessageCircle },
-    { label: p("nav.statistics"), href: `/${locale}/dashboard#statistics`, icon: BarChart3 },
-    { label: p("nav.revenue"), href: `/${locale}/dashboard#statistics`, icon: CircleDollarSign },
+    { label: p("nav.messages"), href: paths.messages, icon: MessageCircle, badge: unreadMessages },
+    { label: p("nav.statistics"), href: `/${locale}/dashboard#analytics`, icon: BarChart3 },
+    { label: p("nav.revenue"), href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign },
     { label: p("nav.reviews"), href: user.store ? `/${locale}/store/${user.store.slug}#reviews` : `/${locale}/dashboard`, icon: Star },
     { label: p("nav.store"), href: user.store ? `/${locale}/store/${user.store.slug}` : `/${locale}/seller/create-store`, icon: Store },
     { label: p("nav.settings"), href: `/${locale}/seller/store-settings`, icon: Settings },
@@ -80,9 +87,9 @@ export default async function DashboardPage() {
     const spentByCurrency = orders.filter((order) => buyerPaymentState(order) === "paid").reduce<Record<string, number>>((totals, order) => { totals[order.currency] = (totals[order.currency] ?? 0) + Number(order.total); return totals; }, {});
     const spent = Object.entries(spentByCurrency).map(([currency, total]) => money(locale, total, currency)).join(" · ") || money(locale, 0, "EUR");
     return <main className="premiumDashboard premiumBuyerDashboard">
-      <DashboardSidebar items={buyerNav} homeHref={homeHref} logoutLabel={common("logout")}/>
+      <DashboardSidebar items={buyerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")}/>
       <div className="premiumDashboardMain">
-        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("buyer.eyebrow")} notificationLabel={p("notifications")}/>
+        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("buyer.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/>
         <div className="premiumDashboardContent">
           <section className="premiumWelcomeHero"><div><span>{p("buyer.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{p("buyer.intro")}</p></div><Link href={homeHref}>{p("browseMarketplace")} <ShoppingBag size={18}/></Link></section>
           <section className="premiumStatsGrid">
@@ -106,32 +113,51 @@ export default async function DashboardPage() {
     </main>;
   }
 
-  if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")}/><div className="premiumDashboardContent"><DashboardEmptyState title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
+  if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><DashboardEmptyState title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
 
-  const sellerOrders = await prisma.order.findMany({ where: { items: { some: { product: { store: { ownerId: session.userId } } } } }, include: { items: { include: { product: { select: { name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } });
+  const sellerOrders = await prisma.order.findMany({ where: { items: { some: { product: { store: { ownerId: session.userId } } } } }, include: { buyer: { select: { firstName: true, lastName: true } }, items: { include: { product: { select: { id: true, name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } });
   const paidSellerOrders = sellerOrders.filter((order) => order.paidAt || order.stripePaymentIntentId);
   const revenue = paidSellerOrders.reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
   const customers = new Set(paidSellerOrders.map((order) => order.buyerId)).size;
-  const monthly = Array.from({ length: 6 }, (_, index) => { const date = new Date(); date.setMonth(date.getMonth() - (5 - index)); return { key: `${date.getFullYear()}-${date.getMonth()}`, label: new Intl.DateTimeFormat(locale, { month: "short" }).format(date), value: 0 }; });
-  for (const order of paidSellerOrders) { const key = `${order.createdAt.getFullYear()}-${order.createdAt.getMonth()}`; const point = monthly.find((item) => item.key === key); if (point) point.value += (order.sellerAmount ?? 0) / 100; }
-  const maxRevenue = Math.max(...monthly.map((item) => item.value), 0);
+  const now = new Date();
+  const startToday = new Date(now); startToday.setHours(0, 0, 0, 0);
+  const todayRevenue = paidSellerOrders.filter((order) => (order.paidAt ?? order.createdAt) >= startToday).reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
+  const pendingOrders = sellerOrders.filter((order) => ["PENDING", "PAID", "PROCESSING"].includes(order.status)).length;
+  const firstOrderByBuyer = new Map<string, Date>();
+  for (const order of sellerOrders) { const first = firstOrderByBuyer.get(order.buyerId); if (!first || order.createdAt < first) firstOrderByBuyer.set(order.buyerId, order.createdAt); }
+  const newCustomers = [...firstOrderByBuyer.values()].filter((date) => date >= startToday).length;
+  const profileFields = [user.store.name, user.store.description, user.store.logo, user.store.banner, user.store.city, user.store.country];
+  const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
+  const periods = sellerPeriodMetrics(sellerOrders, now);
+  const comparison = (current: number, previous: number) => { const percent = comparisonPercent(current, previous); return percent == null ? s("noComparison") : s("comparison", { value: percent > 0 ? `+${percent}` : String(percent) }); };
+  const productCurrentStart = new Date(now); productCurrentStart.setDate(productCurrentStart.getDate() - 30);
+  const productPreviousStart = new Date(now); productPreviousStart.setDate(productPreviousStart.getDate() - 60);
+  const [currentProducts, previousProducts, reviewStats] = await Promise.all([
+    prisma.product.count({ where: { storeId: user.store.id, createdAt: { gte: productCurrentStart } } }),
+    prisma.product.count({ where: { storeId: user.store.id, createdAt: { gte: productPreviousStart, lt: productCurrentStart } } }),
+    prisma.review.aggregate({ where: { product: { storeId: user.store.id }, status: "PUBLISHED" }, _avg: { rating: true }, _count: { rating: true } }),
+  ]);
+  const analytics = sellerAnalytics(sellerOrders, locale, now);
+  const analyticsStatuses = analytics.statuses.map((item) => ({ label: ordersText(`status.${item.status}`), value: item.value }));
+  const cancellationRate = sellerOrders.length ? sellerOrders.filter((order) => order.status === "CANCELLED").length / sellerOrders.length * 100 : null;
   return <main className="premiumDashboard premiumSellerDashboard">
-    <DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} seller/>
-    <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")}/><div className="premiumDashboardContent">
-      <section className="premiumWelcomeHero isSeller"><div><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: user.store.name, city: user.store.city, country: user.store.country })}</p></div><Link href={`/${locale}/store/${user.store.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>
-      <section className="premiumStatsGrid"><DashboardStatCard label={p("nav.products")} value={user.store._count.products} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardStatCard label={p("stats.orders")} value={sellerOrders.length} href={`/${locale}/dashboard#recent-orders`} icon={ReceiptText} tone="blue"/><DashboardStatCard label={p("nav.revenue")} value={money(locale, revenue, user.store.currency)} href={`/${locale}/dashboard#statistics`} icon={TrendingUp} tone="mint"/><DashboardStatCard label={p("stats.customers")} value={customers} icon={Users} tone="amber"/></section>
+    <DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
+    <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">
+      <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: user.store.name, city: user.store.city, country: user.store.country })}</p>{profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div><div className="sellerHeroMetrics"><div><small>{s("todayRevenue")}</small><strong>{money(locale, todayRevenue, user.store.currency)}</strong></div><div><small>{s("pendingOrders")}</small><strong>{pendingOrders}</strong></div><div><small>{s("newCustomers")}</small><strong>{newCustomers}</strong></div><div><small>{s("unreadMessages")}</small><strong>{unreadMessages}</strong></div></div><Link href={`/${locale}/store/${user.store.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>
+      <section className="premiumStatsGrid"><DashboardStatCard label={p("nav.products")} value={user.store._count.products} hint={comparison(currentProducts, previousProducts)} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardStatCard label={p("stats.orders")} value={sellerOrders.length} hint={comparison(periods.current.orders, periods.previous.orders)} href={`/${locale}/dashboard#recent-orders`} icon={ReceiptText} tone="blue"/><DashboardStatCard label={p("nav.revenue")} value={money(locale, revenue, user.store.currency)} hint={comparison(periods.current.revenue, periods.previous.revenue)} href={`/${locale}/dashboard#analytics`} icon={TrendingUp} tone="mint"/><DashboardStatCard label={p("stats.customers")} value={customers} hint={comparison(periods.current.customers, periods.previous.customers)} icon={Users} tone="amber"/></section>
       <div className="premiumDashboardColumns sellerColumns"><DashboardSection id="recent-orders" title={p("recentOrders")} description={p("seller.recentDescription")}>
         {sellerOrders.length
-          ? <div className="premiumRecentOrders">{sellerOrders.slice(0, 5).map((order) => <article className="premiumRecentOrder" key={order.id}><div className="premiumRecentImage">{order.items[0]?.product.images[0] ? <Image src={order.items[0].product.images[0]} alt="" width={68} height={68} unoptimized/> : <Package size={26}/>}</div><div className="premiumRecentProduct"><strong>{order.items[0]?.product.name ?? `#${order.id.slice(-8)}`}</strong><span>{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(order.createdAt)}</span></div><DashboardStatusBadge label={ordersText(`status.${order.status}`)} status={order.status}/><strong className="premiumRecentTotal">{money(locale, Number(order.total), order.currency)}</strong></article>)}</div>
+          ? <div className="premiumRecentOrders">{sellerOrders.slice(0, 5).map((order) => <article className="premiumRecentOrder sellerRecentOrder" key={order.id}><div className="premiumRecentImage">{order.items[0]?.product.images[0] ? <Image src={order.items[0].product.images[0]} alt="" width={68} height={68} unoptimized/> : <Package size={26}/>}</div><div className="premiumRecentProduct"><strong>{order.items[0]?.product.name ?? `#${order.id.slice(-8)}`}</strong><span>{order.buyer.firstName} {order.buyer.lastName} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(order.createdAt)}</span></div><div className="sellerOrderStatuses"><DashboardStatusBadge label={buyerPaymentState(order) === "paid" ? ordersText("payment.paid") : ordersText(`payment.${buyerPaymentState(order)}`)} status={buyerPaymentState(order)}/><DashboardStatusBadge label={ordersText(`status.${order.status}`)} status={order.status}/></div><strong className="premiumRecentTotal">{money(locale, Number(order.total), order.currency)}</strong></article>)}</div>
           : <DashboardEmptyState title={p("seller.emptyOrders")} description={p("seller.emptyOrdersText")}/>
         }
-      </DashboardSection><DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new`} icon={Plus} primary/><DashboardQuickAction label={p("viewOrders")} href={`/${locale}/dashboard#recent-orders`} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/><DashboardQuickAction label={p("viewRevenue")} href={`/${locale}/dashboard#statistics`} icon={BarChart3}/></div></DashboardSection></div>
-      <DashboardSection id="statistics" title={p("revenueOverview")} description={p("revenueDescription")}>
-        {maxRevenue > 0
-          ? <div className="premiumRevenueChart" aria-label={p("revenueOverview")}>{monthly.map((point) => <div key={point.key}><span style={{ height: `${Math.max(8, point.value / maxRevenue * 100)}%` }} title={money(locale, point.value, user.store!.currency)}/><small>{point.label}</small></div>)}</div>
+      </DashboardSection><DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new`} icon={Plus} primary/><DashboardQuickAction label={p("viewOrders")} href={`/${locale}/dashboard#recent-orders`} icon={ReceiptText}/><DashboardQuickAction label={t("manageProducts")} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/><DashboardQuickAction label={p("viewRevenue")} href={`/${locale}/dashboard#analytics`} icon={BarChart3}/><DashboardQuickAction label={t("viewShop")} href={`/${locale}/store/${user.store.slug}`} icon={Store}/></div></DashboardSection></div>
+      <DashboardSection id="analytics" title={s("analyticsTitle")} description={s("analyticsDescription")}>
+        {sellerOrders.length
+          ? <SellerAnalytics trends={analytics.trends} products={analytics.products} statuses={analyticsStatuses} currency={user.store.currency} labels={{ revenue: s("revenue30"), orders: s("orders30"), topProducts: s("topProducts"), statuses: s("statusDistribution") }}/>
           : <DashboardEmptyState title={p("noRevenue")} description={p("noRevenueText")}/>
         }
       </DashboardSection>
+      <DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating > 0 && <article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{cancellationRate != null && <article><ReceiptText size={20}/><span>{s("cancellationRate")}</span><strong>{cancellationRate.toFixed(1)}%</strong></article>}{reviewStats._count.rating === 0 && cancellationRate == null && <DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>
       <StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>
     </div></div>
   </main>;

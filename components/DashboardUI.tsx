@@ -1,24 +1,25 @@
 import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
-import { Bell, LogOut, PackageOpen, type LucideProps } from "lucide-react";
+import { Bell, LogOut, Menu, PackageOpen, PanelLeftClose, type LucideProps } from "lucide-react";
 import TodijoLogo from "./TodijoLogo";
 
-export type DashboardNavItem = { label: string; href: string; icon: ComponentType<LucideProps>; active?: boolean };
+export type DashboardNavItem = { label: string; href: string; icon: ComponentType<LucideProps>; active?: boolean; badge?: number };
 
-export function DashboardSidebar({ items, homeHref, logoutLabel, seller = false }: { items: DashboardNavItem[]; homeHref: string; logoutLabel: string; seller?: boolean }) {
+export function DashboardSidebar({ items, homeHref, logoutLabel, menuLabel, collapseLabel, seller = false }: { items: DashboardNavItem[]; homeHref: string; logoutLabel: string; menuLabel?: string; collapseLabel?: string; seller?: boolean }) {
   return <>
     <aside className={`premiumDashboardSidebar${seller ? " isSeller" : ""}`}>
       <TodijoLogo href={homeHref} inverse={seller} />
-      <nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={19} aria-hidden="true"/><span>{label}</span></Link>)}</nav>
+      <details className="premiumSidebarDetails" open><summary aria-label={collapseLabel}><PanelLeftClose size={18}/><span>{collapseLabel}</span></summary><nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={19} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
       <form action="/api/auth/logout" method="post"><button type="submit"><LogOut size={19} aria-hidden="true"/><span>{logoutLabel}</span></button></form>
     </aside>
-    <nav className={`premiumDashboardMobileNav${seller ? " isSeller" : ""}`} aria-label={items[0]?.label}>{items.slice(0, 5).map(({ label, href, icon: Icon, active }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span></Link>)}</nav>
+    <details className="premiumMobileDrawer"><summary><Menu size={20}/><span>{menuLabel}</span></summary><nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={20}/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
+    <nav className={`premiumDashboardMobileNav${seller ? " isSeller" : ""}`} aria-label={items[0]?.label}>{items.slice(0, 5).map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav>
   </>;
 }
 
-export function DashboardHeader({ firstName, lastName, eyebrow, notificationLabel }: { firstName: string; lastName: string; eyebrow: string; notificationLabel: string }) {
+export function DashboardHeader({ firstName, lastName, eyebrow, notificationLabel, notificationCount = 0 }: { firstName: string; lastName: string; eyebrow: string; notificationLabel: string; notificationCount?: number }) {
   const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
-  return <header className="premiumDashboardHeader"><div><span>{eyebrow}</span><strong>{firstName} {lastName}</strong></div><div className="premiumHeaderTools"><Link className="premiumNotificationButton" href="/dashboard#notifications" aria-label={notificationLabel}><Bell size={20}/><i aria-hidden="true" /></Link><div className="premiumAvatar" aria-hidden="true">{initials}</div></div></header>;
+  return <header className="premiumDashboardHeader"><div><span>{eyebrow}</span><strong>{firstName} {lastName}</strong></div><div className="premiumHeaderTools"><Link className="premiumNotificationButton" href="/dashboard#notifications" aria-label={`${notificationLabel}${notificationCount ? ` (${notificationCount})` : ""}`}><Bell size={20}/>{notificationCount > 0 && <b>{notificationCount}</b>}</Link><div className="premiumAvatar" aria-hidden="true">{initials}</div></div></header>;
 }
 
 export function DashboardStatCard({ label, value, hint, href, icon: Icon, tone = "green" }: { label: string; value: string | number; hint?: string; href?: string; icon: ComponentType<LucideProps>; tone?: "green" | "mint" | "blue" | "amber" }) {
