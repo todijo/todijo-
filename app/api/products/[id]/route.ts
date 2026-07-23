@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
-
-function normalizeImages(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter((item) => /^https?:\/\//i.test(item)).slice(0, 10);
-}
+import { validateProductImages } from "@/lib/product-images";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -37,7 +33,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
     const colors = normalizeList(body.colors, 20);
     const sizes = normalizeList(body.sizes, 30);
-    const images = normalizeImages(body.images);
+    const imageValidation = validateProductImages(body.images);
+    if (!imageValidation.ok) return NextResponse.json({ error: "La sélection d’images est invalide ou dépasse la limite de 10 images." }, { status: 400 });
+    const images = imageValidation.images;
 
     if (name.length < 2 || name.length > 120) return NextResponse.json({ error: "Le nom doit contenir entre 2 et 120 caractères." }, { status: 400 });
     if (description.length < 10 || description.length > 5000) return NextResponse.json({ error: "La description doit contenir entre 10 et 5000 caractères." }, { status: 400 });

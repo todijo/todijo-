@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
+import { validateProductImages } from "@/lib/product-images";
 
 function makeSlug(value: string) {
   return value
@@ -12,15 +13,6 @@ function makeSlug(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 70);
-}
-
-function normalizeImages(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => String(item ?? "").trim())
-    .filter((item) => item.length > 0)
-    .filter((item) => /^https?:\/\//i.test(item))
-    .slice(0, 10);
 }
 
 export async function POST(request: Request) {
@@ -43,7 +35,9 @@ export async function POST(request: Request) {
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
     const colors = Array.isArray(body.colors) ? body.colors.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,20) : [];
     const sizes = Array.isArray(body.sizes) ? body.sizes.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,30) : [];
-    const images = normalizeImages(body.images);
+    const imageValidation = validateProductImages(body.images);
+    if (!imageValidation.ok) return NextResponse.json({ error: "La sélection d’images est invalide ou dépasse la limite de 10 images." }, { status: 400 });
+    const images = imageValidation.images;
     const slugBase = makeSlug(name);
 
     if (name.length < 2 || name.length > 120) {
