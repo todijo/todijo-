@@ -20,15 +20,19 @@ export async function POST(request: Request) {
     }
     let customerId = store.stripeCustomerId;
     if (!customerId) {
+      console.info(`[Seller subscription] Creating Stripe customer for store ${store.id}.`);
       customerId = (await createStripeCustomer({ storeId: store.id, userId: session.userId, email: store.contactEmail, name: store.name })).id;
       await prisma.store.update({ where: { id: store.id }, data: { stripeCustomerId: customerId } });
+      console.info(`[Seller subscription] Saved Stripe customer ${customerId} for store ${store.id}.`);
     }
     await prisma.sellerSubscription.upsert({
       where: { storeId: store.id },
       create: { storeId: store.id, stripePriceId: plan.priceId, plan: plan.id, status: "INCOMPLETE" },
       update: { stripePriceId: plan.priceId, plan: plan.id, status: "INCOMPLETE" },
     });
+    console.info(`[Seller subscription] Prepared ${plan.id} subscription record for store ${store.id} with price ${plan.priceId}.`);
     const checkout = await createSellerSubscriptionCheckout({ storeId: store.id, userId: session.userId, customerId, priceId: plan.priceId, plan: plan.id });
+    console.info(`[Seller subscription] Created Checkout session ${checkout.id} for store ${store.id}.`);
     return NextResponse.json({ url: checkout.url });
   } catch (error) {
     console.error("Seller subscription checkout failed", error);

@@ -1,10 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import { locales, rtlLocales, type Locale } from "@/i18n/config";
+
+export const viewport: Viewport = {
+  themeColor: "#063d2d",
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -16,7 +20,6 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: t("title"), template: `%s · ${t("brand")}` },
     description: t("description"),
     metadataBase: new URL(base),
-    themeColor: "#063d2d",
     icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png" },
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Todijo" },
     manifest: "/manifest.webmanifest",

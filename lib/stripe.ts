@@ -3,8 +3,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export type StripeCheckoutSession = {
   id: string;
   mode?: string;
-  customer?: string | null;
-  subscription?: string | null;
+  customer?: string | { id: string } | null;
+  subscription?: string | { id: string } | null;
   payment_intent: string | null;
   payment_status: string;
   client_reference_id: string | null;
@@ -14,13 +14,13 @@ export type StripeCheckoutSession = {
 export type StripeSubscription = {
   id: string;
   object: "subscription";
-  customer: string;
+  customer: string | { id: string };
   status: string;
   metadata?: Record<string, string>;
   cancel_at_period_end?: boolean;
   current_period_start?: number;
   current_period_end?: number;
-  items?: { data?: Array<{ price?: { id?: string } }> };
+  items?: { data?: Array<{ price?: { id?: string }; current_period_start?: number; current_period_end?: number }> };
 };
 
 export type StripeInvoice = {
@@ -102,6 +102,10 @@ export function retrieveConnectedAccount(accountId: string) {
   return stripeRequest<StripeConnectedAccount>(`/accounts/${encodeURIComponent(accountId)}`);
 }
 
+export function retrieveStripeSubscription(subscriptionId: string) {
+  return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
+}
+
 export function connectedAccountStatus(account: StripeConnectedAccount) {
   return { stripeOnboardingComplete: account.details_submitted, stripeChargesEnabled: account.charges_enabled, stripePayoutsEnabled: account.payouts_enabled };
 }
@@ -176,7 +180,7 @@ export async function createSellerSubscriptionCheckout(input: { storeId: string;
     mode: "subscription",
     customer: input.customerId,
     client_reference_id: input.storeId,
-    success_url: `${origin}/seller/subscription?checkout=success`,
+    success_url: `${origin}/seller/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/seller/subscription?checkout=cancelled`,
     "line_items[0][price]": input.priceId,
     "line_items[0][quantity]": "1",

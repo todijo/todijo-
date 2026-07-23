@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
+import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -62,10 +62,27 @@ export async function createCheckout(
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
 }
 
-export async function processStripeEvent(db: PrismaClient, event: StripeEvent) {
+export async function processStripeEvent(
+  db: PrismaClient,
+  event: StripeEvent,
+  retrieveSubscription = retrieveStripeSubscription,
+) {
+  const checkoutSession = event.data.object as StripeCheckoutSession;
+  const sellerCheckout = event.type === "checkout.session.completed"
+    && (checkoutSession.mode === "subscription" || checkoutSession.metadata?.kind === "seller_subscription");
+  let checkoutSubscription: StripeSubscription | null = null;
+  if (sellerCheckout) {
+    const subscriptionId = stripeObjectId(checkoutSession.subscription);
+    if (!subscriptionId) throw new Error(`[Stripe webhook ${event.id}] Subscription Checkout session ${checkoutSession.id} has no subscription ID.`);
+    console.info(`[Stripe webhook ${event.id}] Retrieving subscription ${subscriptionId} for Checkout session ${checkoutSession.id}.`);
+    checkoutSubscription = await retrieveSubscription(subscriptionId);
+    if (!checkoutSubscription?.id) throw new Error(`[Stripe webhook ${event.id}] Stripe returned no subscription for ${subscriptionId}.`);
+  }
+
   try {
     return await db.$transaction(async (tx) => {
       await tx.stripeWebhookEvent.create({ data: { id: event.id, type: event.type } });
+      console.info(`[Stripe webhook ${event.id}] Processing ${event.type}.`);
       if (event.type === "account.updated") {
         const account = event.data.object as StripeConnectedAccount;
         if (account.object !== "account" || !account.id) return { ignored: true };
@@ -74,39 +91,17 @@ export async function processStripeEvent(db: PrismaClient, event: StripeEvent) {
       }
       if (event.type.startsWith("customer.subscription.")) {
         const subscription = event.data.object as StripeSubscription;
-        if (subscription.object !== "subscription") return { ignored: true };
-        const existing = await tx.sellerSubscription.findFirst({
-          where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: subscription.customer } }] },
-          select: { storeId: true, plan: true, stripePriceId: true },
-        });
-        const storeId = subscription.metadata?.storeId ?? existing?.storeId;
-        if (!storeId) return { ignored: true };
-        const ownedStore = await tx.store.findFirst({ where: { id: storeId, stripeCustomerId: subscription.customer }, select: { id: true } });
-        if (!ownedStore) return { ignored: true };
-        const status = localSubscriptionStatus(subscription.status, event.type);
-        const active = status === "ACTIVE" || status === "TRIALING";
-        const priceId = subscription.items?.data?.[0]?.price?.id ?? existing?.stripePriceId;
-        if (!priceId) return { ignored: true };
-        await tx.sellerSubscription.upsert({
-          where: { storeId },
-          create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? "seller", status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart: stripeDate(subscription.current_period_start), currentPeriodEnd: stripeDate(subscription.current_period_end) },
-          update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart: stripeDate(subscription.current_period_start), currentPeriodEnd: stripeDate(subscription.current_period_end) },
-        });
-        await tx.store.update({ where: { id: storeId }, data: { status: active ? "ACTIVE" : undefined } });
-        if (active) {
-          await tx.product.updateMany({ where: { storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } });
-        } else {
-          await tx.product.updateMany({ where: { storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
-        }
-        return { subscriptionUpdated: true };
+        if (subscription.object !== "subscription") throw new Error(`[Stripe webhook ${event.id}] Expected a subscription object.`);
+        const synced = await syncSellerSubscription(tx, subscription, event.type, event.id);
+        return { subscriptionUpdated: true, storeId: synced.storeId, status: synced.status };
       }
       if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
         const invoice = event.data.object as StripeInvoice;
         const invoiceSubscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
-        if (invoice.object !== "invoice" || !invoiceSubscriptionId) return { ignored: true };
+        if (invoice.object !== "invoice" || !invoiceSubscriptionId) throw new Error(`[Stripe webhook ${event.id}] Invoice event has no subscription ID.`);
         const status = event.type === "invoice.paid" ? "ACTIVE" : "PAST_DUE";
         const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true } });
-        if (!existing) return { ignored: true };
+        if (!existing) throw new Error(`[Stripe webhook ${event.id}] No local seller subscription matches invoice subscription ${invoiceSubscriptionId}.`);
         await tx.sellerSubscription.update({ where: { stripeSubscriptionId: invoiceSubscriptionId }, data: { status } });
         if (status === "ACTIVE") {
           await tx.store.update({ where: { id: existing.storeId }, data: { status: "ACTIVE" } });
@@ -114,15 +109,19 @@ export async function processStripeEvent(db: PrismaClient, event: StripeEvent) {
         } else {
           await tx.product.updateMany({ where: { storeId: existing.storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
         }
-        return { subscriptionUpdated: true };
+        console.info(`[Stripe webhook ${event.id}] Invoice updated store ${existing.storeId} subscription to ${status}.`);
+        return { subscriptionUpdated: true, storeId: existing.storeId, status };
       }
       const session = event.data.object as StripeCheckoutSession;
-      if (event.type === "checkout.session.completed" && session.mode === "subscription") {
-        const storeId = session.metadata?.storeId;
-        if (!storeId || !session.subscription) return { ignored: true };
-        await tx.store.updateMany({ where: { id: storeId, ownerId: session.metadata?.userId }, data: { stripeCustomerId: session.customer ?? undefined } });
-        await tx.sellerSubscription.updateMany({ where: { storeId }, data: { stripeSubscriptionId: session.subscription } });
-        return { subscriptionCheckoutCompleted: true };
+      if (sellerCheckout) {
+        if (!checkoutSubscription) throw new Error(`[Stripe webhook ${event.id}] Retrieved subscription is unavailable.`);
+        const synced = await syncSellerSubscription(tx, checkoutSubscription, event.type, event.id, {
+          storeId: session.metadata?.storeId ?? session.client_reference_id ?? undefined,
+          userId: session.metadata?.userId,
+          customerId: stripeObjectId(session.customer),
+          plan: session.metadata?.plan,
+        });
+        return { subscriptionCheckoutCompleted: true, storeId: synced.storeId, status: synced.status };
       }
       const orderId = session.metadata?.orderId ?? session.client_reference_id;
       if (!orderId) return { ignored: true };
@@ -152,8 +151,54 @@ export async function processStripeEvent(db: PrismaClient, event: StripeEvent) {
   }
 }
 
+async function syncSellerSubscription(
+  tx: Prisma.TransactionClient,
+  subscription: StripeSubscription,
+  eventType: string,
+  eventId: string,
+  hint: { storeId?: string; userId?: string; customerId?: string; plan?: string } = {},
+) {
+  const customerId = stripeObjectId(subscription.customer) ?? hint.customerId;
+  if (!customerId) throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} has no customer ID.`);
+  const existing = await tx.sellerSubscription.findFirst({
+    where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: customerId } }, ...(hint.storeId ? [{ storeId: hint.storeId }] : [])] },
+    select: { storeId: true, plan: true, stripePriceId: true },
+  });
+  const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
+  if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);
+  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true } });
+  if (!store) throw new Error(`[Stripe webhook ${eventId}] Store ${storeId} does not exist.`);
+  if (hint.userId && store.ownerId !== hint.userId) throw new Error(`[Stripe webhook ${eventId}] Checkout user does not own store ${storeId}.`);
+  if (store.stripeCustomerId && store.stripeCustomerId !== customerId) throw new Error(`[Stripe webhook ${eventId}] Stripe customer does not match store ${storeId}.`);
+  const priceId = subscription.items?.data?.[0]?.price?.id ?? existing?.stripePriceId;
+  if (!priceId) throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} has no Stripe Price ID.`);
+  const status = localSubscriptionStatus(subscription.status, eventType);
+  const active = status === "ACTIVE" || status === "TRIALING";
+  const item = subscription.items?.data?.[0];
+  const currentPeriodStart = stripeDate(subscription.current_period_start ?? item?.current_period_start);
+  const currentPeriodEnd = stripeDate(subscription.current_period_end ?? item?.current_period_end);
+  if (active && !currentPeriodEnd) throw new Error(`[Stripe webhook ${eventId}] Active subscription ${subscription.id} has no current period end.`);
+
+  console.info(`[Stripe webhook ${eventId}] Updating store ${storeId}: customer=${customerId}, subscription=${subscription.id}, price=${priceId}, status=${status}.`);
+  await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) } });
+  await tx.sellerSubscription.upsert({
+    where: { storeId },
+    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan ?? "seller", status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan, status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+  });
+  const products = active
+    ? await tx.product.updateMany({ where: { storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } })
+    : await tx.product.updateMany({ where: { storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+  console.info(`[Stripe webhook ${eventId}] Saved ${status} subscription for store ${storeId}; updated ${products.count} product(s).`);
+  return { storeId, status };
+}
+
 function stripeDate(value?: number) {
   return value ? new Date(value * 1000) : null;
+}
+
+function stripeObjectId(value: string | { id: string } | null | undefined) {
+  return typeof value === "string" ? value : value?.id;
 }
 
 function localSubscriptionStatus(status: string, eventType: string) {
