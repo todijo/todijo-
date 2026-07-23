@@ -78,10 +78,23 @@ export async function processStripeEvent(
     checkoutSubscription = await retrieveSubscription(subscriptionId);
     if (!checkoutSubscription?.id) throw new Error(`[Stripe webhook ${event.id}] Stripe returned no subscription for ${subscriptionId}.`);
   }
+  const webhookDelegate = (db as PrismaClient & { stripeWebhookEvent?: typeof db.stripeWebhookEvent }).stripeWebhookEvent as (typeof db.stripeWebhookEvent & {
+    findUnique?: (args: { where: { id: string }; select: { id: true } }) => Promise<{ id: string } | null>;
+  }) | undefined;
+  const previouslyProcessed = webhookDelegate?.findUnique
+    ? await webhookDelegate.findUnique({ where: { id: event.id }, select: { id: true } })
+    : null;
+  if (previouslyProcessed && !sellerCheckout) {
+    console.info(`[Stripe webhook ${event.id}] Event was already processed; no repair is required.`);
+    return { duplicate: true };
+  }
+  if (previouslyProcessed && sellerCheckout) {
+    console.warn(`[Stripe webhook ${event.id}] Replaying an existing subscription Checkout event to repair local subscription state.`);
+  }
 
   try {
     return await db.$transaction(async (tx) => {
-      await tx.stripeWebhookEvent.create({ data: { id: event.id, type: event.type } });
+      if (!previouslyProcessed) await tx.stripeWebhookEvent.create({ data: { id: event.id, type: event.type } });
       console.info(`[Stripe webhook ${event.id}] Processing ${event.type}.`);
       if (event.type === "account.updated") {
         const account = event.data.object as StripeConnectedAccount;
@@ -164,6 +177,9 @@ async function syncSellerSubscription(
     where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: customerId } }, ...(hint.storeId ? [{ storeId: hint.storeId }] : [])] },
     select: { storeId: true, plan: true, stripePriceId: true },
   });
+  console.info(`[Stripe webhook ${eventId}] Local subscription lookup result.`, existing
+    ? { found: true, storeId: existing.storeId, plan: existing.plan, stripePriceId: existing.stripePriceId }
+    : { found: false, subscriptionId: subscription.id, customerId, hintedStoreId: hint.storeId ?? null });
   const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
   if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);
   const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true } });
@@ -180,11 +196,20 @@ async function syncSellerSubscription(
   if (active && !currentPeriodEnd) throw new Error(`[Stripe webhook ${eventId}] Active subscription ${subscription.id} has no current period end.`);
 
   console.info(`[Stripe webhook ${eventId}] Updating store ${storeId}: customer=${customerId}, subscription=${subscription.id}, price=${priceId}, status=${status}.`);
-  await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) } });
-  await tx.sellerSubscription.upsert({
+  const storeUpdate = await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) }, select: { id: true, status: true, stripeCustomerId: true } });
+  console.info(`[Stripe webhook ${eventId}] Store database update result.`, storeUpdate);
+  const subscriptionUpdate = await tx.sellerSubscription.upsert({
     where: { storeId },
     create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan ?? "seller", status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
     update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan, status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+  });
+  console.info(`[Stripe webhook ${eventId}] SellerSubscription database update result.`, {
+    id: subscriptionUpdate.id,
+    storeId: subscriptionUpdate.storeId,
+    status: subscriptionUpdate.status,
+    stripeSubscriptionId: subscriptionUpdate.stripeSubscriptionId,
+    stripePriceId: subscriptionUpdate.stripePriceId,
+    currentPeriodEnd: subscriptionUpdate.currentPeriodEnd,
   });
   const products = active
     ? await tx.product.updateMany({ where: { storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } })

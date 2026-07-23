@@ -135,3 +135,32 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
   assert.equal(subscriptionUpsert.update.status, "ACTIVE");
   assert.equal(subscriptionUpsert.update.currentPeriodEnd.toISOString(), new Date(1_800_000_000 * 1000).toISOString());
 });
+
+test("replayed subscription Checkout repairs an incomplete record instead of stopping as duplicate", async () => {
+  let updatedStatus: string | undefined;
+  const tx: any = {
+    stripeWebhookEvent: { create: async () => { throw new Error("event marker must not be recreated"); } },
+    sellerSubscription: {
+      findFirst: async () => ({ storeId: "store_1", plan: "basic", stripePriceId: "price_basic" }),
+      upsert: async (args: any) => { updatedStatus = args.update.status; return { id: "local_sub", storeId: "store_1", ...args.update }; },
+    },
+    store: {
+      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1" }),
+      update: async () => ({ id: "store_1", status: "ACTIVE", stripeCustomerId: "cus_1" }),
+    },
+    product: { updateMany: async () => ({ count: 0 }) },
+  };
+  const db: any = {
+    stripeWebhookEvent: { findUnique: async () => ({ id: "evt_replay" }) },
+    $transaction: async (callback: any) => callback(tx),
+  };
+  const event: StripeEvent = {
+    id: "evt_replay",
+    type: "checkout.session.completed",
+    data: { object: { id: "cs_replay", mode: "subscription", customer: "cus_1", subscription: "sub_1", payment_intent: null, payment_status: "paid", client_reference_id: "store_1", metadata: { kind: "seller_subscription", storeId: "store_1", userId: "seller_1", plan: "basic" } } },
+  };
+  const retrieve = async () => ({ id: "sub_1", object: "subscription" as const, customer: "cus_1", status: "active", metadata: { storeId: "store_1" }, items: { data: [{ price: { id: "price_basic" }, current_period_end: 1_800_000_000 }] } });
+  const result = await processStripeEvent(db, event, retrieve);
+  assert.equal("status" in result ? result.status : undefined, "ACTIVE");
+  assert.equal(updatedStatus, "ACTIVE");
+});
