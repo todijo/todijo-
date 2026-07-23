@@ -9,10 +9,15 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Contact, Store } from "lucide-react";
+import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
 
 type StoreValues = {
   name: string;
   description: string;
+  contactEmail: string;
+  phone: string;
   logo: string;
   banner: string;
   country: string;
@@ -88,6 +93,7 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
 
 export default function StoreSettingsForm({ initialValues }: { initialValues: StoreValues }) {
   const router = useRouter();
+  const t = useTranslations("SellerControl");
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
@@ -147,9 +153,9 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
       const url = await uploadFile(file, kind);
       if (kind === "logo") setLogo(url);
       else setBanner(url);
-      setMessage(kind === "logo" ? "Logo envoyé. Enregistrez les modifications pour le publier." : "Bannière envoyée. Enregistrez les modifications pour la publier.");
+      setMessage(t("mediaUploaded"));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Une erreur est survenue pendant l’envoi.");
+      setMessage(error instanceof Error ? error.message : t("errorGeneric"));
     } finally {
       setUploading(null);
     }
@@ -172,7 +178,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
     setMessage("");
 
     if (uploading) {
-      setMessage("Attendez la fin de l’envoi de l’image.");
+      setMessage(t("waitUpload"));
       return;
     }
 
@@ -184,6 +190,8 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
       body: JSON.stringify({
         name: form.get("name"),
         description: form.get("description"),
+        contactEmail: form.get("contactEmail"),
+        phone: form.get("phone"),
         logo,
         banner,
         country: form.get("country"),
@@ -195,12 +203,12 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
 
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setMessage(data.error ?? "Une erreur est survenue.");
+      setMessage(data.error ?? t("errorGeneric"));
       setSaving(false);
       return;
     }
 
-    setMessage("Les informations de la boutique ont été enregistrées.");
+    setMessage(t("settingsSaved"));
     setSaving(false);
     router.refresh();
   }
@@ -208,7 +216,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
   function MediaUploader({ kind, value }: { kind: MediaKind; value: string }) {
     const isLogo = kind === "logo";
     const inputRef = isLogo ? logoInputRef : bannerInputRef;
-    const title = isLogo ? "Logo de la boutique" : "Bannière de la boutique";
+    const title = isLogo ? t("logo") : t("banner");
     const hint = isLogo ? "Format carré recommandé, minimum 200 × 200 px, maximum 3 Mo." : "Format large recommandé, minimum 800 × 250 px, maximum 8 Mo.";
     const isUploading = uploading === kind;
 
@@ -216,7 +224,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
       <section className={`storeMediaCard ${isLogo ? "logoMediaCard" : "bannerMediaCard"}`}>
         <div className="storeMediaHeading">
           <LabelWithIcon icon="image">{title}</LabelWithIcon>
-          {value && <span className="mediaReadyBadge"><FieldIcon name="check" /> Image prête</span>}
+          {value && <span className="mediaReadyBadge"><FieldIcon name="check" /> {t("imageReady")}</span>}
         </div>
 
         <input
@@ -241,20 +249,20 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
               <img src={value} alt={title} />
             </div>
           ) : (
-            <div className="storeMediaPlaceholder"><FieldIcon name="image" /><strong>Aucune image</strong></div>
+            <div className="storeMediaPlaceholder"><FieldIcon name="image" /><strong>{t("noImage")}</strong></div>
           )}
 
           <div className="storeMediaControls">
             <button className="storeUploadButton" type="button" onClick={() => inputRef.current?.click()} disabled={Boolean(uploading)}>
               <FieldIcon name="upload" />
-              {isUploading ? "Envoi en cours…" : value ? "Remplacer l’image" : "Choisir une image"}
+              {isUploading ? t("uploading") : value ? t("replaceImage") : t("chooseImage")}
             </button>
             {value && (
               <button className="storeRemoveMediaButton" type="button" onClick={() => isLogo ? setLogo("") : setBanner("")} disabled={Boolean(uploading)}>
-                <FieldIcon name="trash" /> Supprimer
+                <FieldIcon name="trash" /> {t("remove")}
               </button>
             )}
-            <p>Glissez-déposez une image ici, ou cliquez sur le bouton.</p>
+            <p>{t("dropImage")}</p>
             <small>{hint} JPG, PNG ou WebP.</small>
           </div>
         </div>
@@ -264,43 +272,44 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
 
   return (
     <form className="storeForm storeSettingsForm" onSubmit={submit}>
-      <section className="storeSettingsSection">
-        <div className="storeSettingsSectionTitle"><FieldIcon name="store" /><div><h2>Identité de la boutique</h2><p>Ces informations seront visibles par tous les visiteurs.</p></div></div>
-        <div className="formField">
-          <label htmlFor="name"><LabelWithIcon icon="store">Nom de la boutique</LabelWithIcon></label>
-          <input id="name" name="name" required minLength={2} maxLength={80} defaultValue={initialValues.name} />
+      <SellerSection id="profile" icon={Store} title={t("storeProfile")} description={t("storeProfileHelp")}>
+        <div className="sellerControlFieldGrid">
+          <SellerFormField label={t("storeName")} htmlFor="name" required><input id="name" name="name" required minLength={2} maxLength={80} defaultValue={initialValues.name} /></SellerFormField>
         </div>
-        <div className="formField">
-          <label htmlFor="description"><LabelWithIcon icon="description">Présentation de la boutique</LabelWithIcon></label>
-          <textarea id="description" name="description" rows={6} maxLength={1000} defaultValue={initialValues.description} placeholder="Présentez votre boutique, votre spécialité et vos engagements." />
-        </div>
-      </section>
+        <SellerFormField label={t("storeDescription")} htmlFor="description"><textarea id="description" name="description" rows={6} maxLength={1000} defaultValue={initialValues.description} placeholder={t("storeDescriptionPlaceholder")} /></SellerFormField>
+      </SellerSection>
 
-      <section className="storeSettingsSection">
-        <div className="storeSettingsSectionTitle"><FieldIcon name="image" /><div><h2>Logo et bannière</h2><p>Téléversez vos images directement depuis votre téléphone ou votre ordinateur.</p></div></div>
+      <SellerSection icon={Contact} title={t("contact")} description={t("contactHelp")}>
+        <div className="sellerControlFieldGrid">
+          <SellerFormField label={t("contactEmail")} htmlFor="contactEmail" required><input id="contactEmail" name="contactEmail" type="email" required defaultValue={initialValues.contactEmail} /></SellerFormField>
+          <SellerFormField label={t("phone")} htmlFor="phone" hint={t("phoneHint")}><input id="phone" name="phone" type="tel" maxLength={30} defaultValue={initialValues.phone} aria-describedby="phone-hint" /></SellerFormField>
+        </div>
+      </SellerSection>
+
+      <section className="storeSettingsSection" id="media">
+        <div className="storeSettingsSectionTitle"><FieldIcon name="image" /><div><h2>{t("media")}</h2><p>{t("mediaHelp")}</p></div></div>
         <div className="storeMediaGrid">
           <MediaUploader kind="logo" value={logo} />
           <MediaUploader kind="banner" value={banner} />
         </div>
       </section>
 
-      <section className="storeSettingsSection">
-        <div className="storeSettingsSectionTitle"><FieldIcon name="location" /><div><h2>Localisation et préférences</h2><p>Aidez les clients à comprendre où se trouve votre boutique et dans quelle devise elle vend.</p></div></div>
+      <section className="storeSettingsSection" id="location">
+        <div className="storeSettingsSectionTitle"><FieldIcon name="location" /><div><h2>{t("address")}</h2><p>{t("addressHelp")}</p></div></div>
         <div className="formRow">
-          <div className="formField"><label htmlFor="country"><LabelWithIcon icon="location">Pays</LabelWithIcon></label><input id="country" name="country" required defaultValue={initialValues.country} /></div>
-          <div className="formField"><label htmlFor="city"><LabelWithIcon icon="city">Ville</LabelWithIcon></label><input id="city" name="city" required defaultValue={initialValues.city} /></div>
+          <div className="formField"><label htmlFor="country"><LabelWithIcon icon="location">{t("country")}</LabelWithIcon></label><input id="country" name="country" required defaultValue={initialValues.country} /></div>
+          <div className="formField"><label htmlFor="city"><LabelWithIcon icon="city">{t("city")}</LabelWithIcon></label><input id="city" name="city" required defaultValue={initialValues.city} /></div>
         </div>
         <div className="formRow">
-          <div className="formField"><label htmlFor="currency"><LabelWithIcon icon="money">Devise</LabelWithIcon></label><select id="currency" name="currency" defaultValue={initialValues.currency}><option value="EUR">EUR — Euro</option><option value="USD">USD — Dollar américain</option><option value="GBP">GBP — Livre sterling</option></select></div>
-          <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">Langue</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="ku">کوردی</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option></select></div>
+          <div className="formField"><label htmlFor="currency"><LabelWithIcon icon="money">{t("currency")}</LabelWithIcon></label><select id="currency" name="currency" defaultValue={initialValues.currency}><option value="EUR">EUR — Euro</option><option value="USD">USD — US Dollar</option><option value="GBP">GBP — Pound Sterling</option></select></div>
+          <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">{t("language")}</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="ku">کوردی</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option></select></div>
         </div>
       </section>
 
-      {message && <p className="authMessage storeSettingsMessage" role="status">{message}</p>}
-      <div className="storeSettingsActions">
-        <button className="authSubmit" type="submit" disabled={saving || Boolean(uploading)}>{saving ? "Enregistrement…" : uploading ? "Envoi de l’image…" : "Enregistrer les modifications"}</button>
-        <a className="secondary" href="/dashboard">Retour au tableau de bord</a>
-      </div>
+      <SellerActionBar status={message && <p className="sellerControlFeedback" role="status">{message}</p>}>
+        <a className="sellerControlButton secondary" href="/dashboard">{t("backDashboard")}</a>
+        <button className="sellerControlButton primary" type="submit" disabled={saving || Boolean(uploading)}>{saving ? t("savingSettings") : uploading ? t("uploadingMedia") : t("saveSettings")}</button>
+      </SellerActionBar>
     </form>
   );
 }

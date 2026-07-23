@@ -138,6 +138,8 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const description = String(body.description ?? "").trim();
+    const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
+    const phone = String(body.phone ?? "").trim();
     const logo = String(body.logo ?? "").trim();
     const banner = String(body.banner ?? "").trim();
     const country = String(body.country ?? "").trim();
@@ -150,6 +152,12 @@ export async function PATCH(request: Request) {
     }
     if (description.length > 1000) {
       return NextResponse.json({ error: "La description est trop longue." }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return NextResponse.json({ error: "A valid contact email is required." }, { status: 400 });
+    }
+    if (phone.length > 30) {
+      return NextResponse.json({ error: "Phone number is too long." }, { status: 400 });
     }
     if (!country || !city) {
       return NextResponse.json({ error: "Le pays et la ville sont obligatoires." }, { status: 400 });
@@ -176,6 +184,8 @@ export async function PATCH(request: Request) {
       data: {
         name,
         description: description || null,
+        contactEmail,
+        phone: phone || null,
         logo: logo || null,
         banner: banner || null,
         country,

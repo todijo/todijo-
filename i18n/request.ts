@@ -7,12 +7,15 @@ export default getRequestConfig(async () => {
   const locale = isLocale(requested) ? requested : defaultLocale;
   const fallback = (await import("../messages/en.json")).default;
   const localized = (await import(`../messages/${locale}.json`)).default;
-  const messages = Object.fromEntries(Object.entries(fallback).map(([namespace, values]) => [namespace, { ...values, ...(localized as Record<string, Record<string, string>>)[namespace] }]));
+  const messages: Record<string, unknown> = Object.fromEntries(Object.entries(fallback).map(([namespace, values]) => [namespace, { ...values, ...(localized as Record<string, Record<string, string>>)[namespace] }]));
   messages.Auth = (await import(`../messages/auth/${locale}.json`)).default;
   messages.Connect = (await import(`../messages/connect/${locale}.json`)).default;
   messages.DashboardPremium = (await import(`../messages/dashboard-premium/${locale}.json`)).default;
   messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
   messages.SellerDashboard = (await import(`../messages/seller-dashboard/${locale}.json`)).default;
+  messages.SellerControl = locale === "fr"
+    ? (await import("../messages/seller-control/fr.json")).default
+    : (await import("../messages/seller-control/en.json")).default;
   messages.HomeHeader = (await import(`../messages/home-header/${locale}.json`)).default;
   messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
