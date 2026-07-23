@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 
 function makeSlug(value: string) {
   return value
@@ -29,14 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }
 
-    const store = await prisma.store.findUnique({
-      where: { ownerId: session.userId },
-      select: { id: true, currency: true },
-    });
-
-    if (!store) {
-      return NextResponse.json({ error: "Créez d’abord votre boutique." }, { status: 403 });
-    }
+    const store = await requirePublishingAccess(prisma, session.userId);
 
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -100,6 +94,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, product });
   } catch (error) {
+    if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }

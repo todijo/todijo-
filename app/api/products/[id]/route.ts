@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 
 function normalizeImages(value: unknown) {
   if (!Array.isArray(value)) return [];
@@ -30,6 +31,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const category = String(body.category ?? "").trim();
     const condition = String(body.condition ?? "NEUF").trim().toUpperCase();
     const status = body.status === "DRAFT" ? "DRAFT" : "PUBLISHED";
+    if (status === "PUBLISHED") await requirePublishingAccess(prisma, session.userId);
     const price = Number(body.price);
     const stock = Number(body.stock);
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
@@ -47,6 +49,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       where: { id },
       data: {
         name, description, category, condition, status,
+        deactivationReason: status === "PUBLISHED" ? "NONE" : "SELLER",
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
         colors, sizes, stock, images,
@@ -55,6 +58,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });
   }

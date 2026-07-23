@@ -15,6 +15,8 @@ export default async function SellerProductsPage() {
     select: {
       name: true,
       slug: true,
+      status: true,
+      subscription: { select: { status: true } },
       products: {
         orderBy: { createdAt: "desc" },
         select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true },
@@ -23,6 +25,7 @@ export default async function SellerProductsPage() {
   });
 
   if (!store) redirect("/seller/create-store");
+  const subscriptionActive = store.status === "ACTIVE" && ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
 
   return (
     <main className="sellerDashboardPage">
@@ -42,8 +45,9 @@ export default async function SellerProductsPage() {
             <h1>{t("myProducts")}</h1>
             <p>{t("manageIntro")}</p>
           </div>
-          <a className="authSubmit dashboardPrimaryAction" href="/seller/products/new">＋ {t("addProduct")}</a>
+          {subscriptionActive ? <a className="authSubmit dashboardPrimaryAction" href="/seller/products/new">＋ {t("addProduct")}</a> : <a className="authSubmit dashboardPrimaryAction" href="/seller/subscription">Choose or renew plan</a>}
         </section>
+        {!subscriptionActive && <section className="subscriptionWarning" role="alert"><strong>Seller subscription inactive</strong><span>Status: {store.subscription?.status ?? "NOT_STARTED"}. Renew your monthly plan to publish or reactivate products.</span><a href="/seller/subscription">View plans</a></section>}
 
         {store.products.length === 0 ? (
           <section className="emptyProductsPanel">

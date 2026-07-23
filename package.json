@@ -8,9 +8,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "prisma db push && next start",
+    "start": "next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

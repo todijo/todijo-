@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent } from "./stripe";
+import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -72,7 +72,58 @@ export async function processStripeEvent(db: PrismaClient, event: StripeEvent) {
         const changed = await tx.user.updateMany({ where: { stripeAccountId: account.id }, data: connectedAccountStatus(account) });
         return changed.count ? { accountUpdated: true } : { ignored: true };
       }
+      if (event.type.startsWith("customer.subscription.")) {
+        const subscription = event.data.object as StripeSubscription;
+        if (subscription.object !== "subscription") return { ignored: true };
+        const existing = await tx.sellerSubscription.findFirst({
+          where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: subscription.customer } }] },
+          select: { storeId: true, plan: true, stripePriceId: true },
+        });
+        const storeId = subscription.metadata?.storeId ?? existing?.storeId;
+        if (!storeId) return { ignored: true };
+        const ownedStore = await tx.store.findFirst({ where: { id: storeId, stripeCustomerId: subscription.customer }, select: { id: true } });
+        if (!ownedStore) return { ignored: true };
+        const status = localSubscriptionStatus(subscription.status, event.type);
+        const active = status === "ACTIVE" || status === "TRIALING";
+        const priceId = subscription.items?.data?.[0]?.price?.id ?? existing?.stripePriceId;
+        if (!priceId) return { ignored: true };
+        await tx.sellerSubscription.upsert({
+          where: { storeId },
+          create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? "seller", status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart: stripeDate(subscription.current_period_start), currentPeriodEnd: stripeDate(subscription.current_period_end) },
+          update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart: stripeDate(subscription.current_period_start), currentPeriodEnd: stripeDate(subscription.current_period_end) },
+        });
+        await tx.store.update({ where: { id: storeId }, data: { status: active ? "ACTIVE" : undefined } });
+        if (active) {
+          await tx.product.updateMany({ where: { storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } });
+        } else {
+          await tx.product.updateMany({ where: { storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+        }
+        return { subscriptionUpdated: true };
+      }
+      if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+        const invoice = event.data.object as StripeInvoice;
+        const invoiceSubscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
+        if (invoice.object !== "invoice" || !invoiceSubscriptionId) return { ignored: true };
+        const status = event.type === "invoice.paid" ? "ACTIVE" : "PAST_DUE";
+        const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true } });
+        if (!existing) return { ignored: true };
+        await tx.sellerSubscription.update({ where: { stripeSubscriptionId: invoiceSubscriptionId }, data: { status } });
+        if (status === "ACTIVE") {
+          await tx.store.update({ where: { id: existing.storeId }, data: { status: "ACTIVE" } });
+          await tx.product.updateMany({ where: { storeId: existing.storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } });
+        } else {
+          await tx.product.updateMany({ where: { storeId: existing.storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+        }
+        return { subscriptionUpdated: true };
+      }
       const session = event.data.object as StripeCheckoutSession;
+      if (event.type === "checkout.session.completed" && session.mode === "subscription") {
+        const storeId = session.metadata?.storeId;
+        if (!storeId || !session.subscription) return { ignored: true };
+        await tx.store.updateMany({ where: { id: storeId, ownerId: session.metadata?.userId }, data: { stripeCustomerId: session.customer ?? undefined } });
+        await tx.sellerSubscription.updateMany({ where: { storeId }, data: { stripeSubscriptionId: session.subscription } });
+        return { subscriptionCheckoutCompleted: true };
+      }
       const orderId = session.metadata?.orderId ?? session.client_reference_id;
       if (!orderId) return { ignored: true };
       if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
@@ -99,6 +150,16 @@ export async function processStripeEvent(db: PrismaClient, event: StripeEvent) {
     if (isPrismaCode(error, "P2002")) return { duplicate: true };
     throw error;
   }
+}
+
+function stripeDate(value?: number) {
+  return value ? new Date(value * 1000) : null;
+}
+
+function localSubscriptionStatus(status: string, eventType: string) {
+  if (eventType === "customer.subscription.deleted") return "CANCELED" as const;
+  const statuses = { active: "ACTIVE", trialing: "TRIALING", past_due: "PAST_DUE", unpaid: "UNPAID", canceled: "CANCELED", incomplete_expired: "EXPIRED", incomplete: "INCOMPLETE" } as const;
+  return statuses[status as keyof typeof statuses] ?? "INCOMPLETE";
 }
 
 function isPrismaCode(error: unknown, code: string): error is { code: string } {

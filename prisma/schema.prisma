@@ -18,6 +18,30 @@ enum ProductStatus {
   PUBLISHED
 }
 
+enum SellerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  CANCELED
+  EXPIRED
+}
+
+enum ProductDeactivationReason {
+  NONE
+  SELLER
+  ADMIN
+  SUBSCRIPTION_INACTIVE
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -75,14 +99,19 @@ model Store {
   banner      String?
   country     String
   city        String
+  contactEmail String
+  phone       String?
   currency    String  @default("EUR")
   language    String  @default("fr")
+  status      SellerStatus @default(PENDING)
+  stripeCustomerId String? @unique
 
   ownerId String @unique
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   products      Product[]
   conversations Conversation[]
+  subscription  SellerSubscription?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,6 +132,7 @@ model Product {
   condition      String
   images         String[]
   status         ProductStatus @default(PUBLISHED)
+  deactivationReason ProductDeactivationReason @default(NONE)
 
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -117,6 +147,24 @@ model Product {
   @@unique([storeId, slug])
   @@index([storeId, status])
   @@index([category])
+}
+
+model SellerSubscription {
+  id                   String             @id @default(cuid())
+  storeId              String             @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String
+  plan                 String
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }
 
 model Conversation {

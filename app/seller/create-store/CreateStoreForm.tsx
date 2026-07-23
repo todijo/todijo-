@@ -42,6 +42,9 @@ export default function CreateStoreForm() {
         name,
         slug: displayedSlug,
         description: form.get("description"),
+        contactEmail: form.get("contactEmail"),
+        phone: form.get("phone"),
+        logo: form.get("logo"),
         country: form.get("country"),
         city: form.get("city"),
         currency: form.get("currency"),
@@ -56,7 +59,7 @@ export default function CreateStoreForm() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/seller/subscription");
     router.refresh();
   }
 
@@ -106,6 +109,12 @@ export default function CreateStoreForm() {
           placeholder="Présentez votre boutique et vos produits."
         />
       </div>
+
+      <div className="formRow">
+        <div className="formField"><label htmlFor="contactEmail">Contact email</label><input id="contactEmail" name="contactEmail" type="email" required /></div>
+        <div className="formField"><label htmlFor="phone">Phone (optional)</label><input id="phone" name="phone" type="tel" maxLength={30} /></div>
+      </div>
+      <div className="formField"><label htmlFor="logo">Store logo URL (optional)</label><input id="logo" name="logo" type="url" maxLength={2000} /></div>
 
       <div className="formRow">
         <div className="formField">

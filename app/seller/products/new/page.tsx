@@ -13,10 +13,11 @@ export default async function NewProductPage() {
 
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
-    select: { name: true, currency: true },
+    select: { name: true, currency: true, status: true, subscription: { select: { status: true } } },
   });
 
   if (!store) redirect("/seller/create-store");
+  if (store.status !== "ACTIVE" || !["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "")) redirect("/seller/subscription");
 
   return (
     <main className="storeSetupPage">

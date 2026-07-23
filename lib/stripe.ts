@@ -2,10 +2,33 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type StripeCheckoutSession = {
   id: string;
+  mode?: string;
+  customer?: string | null;
+  subscription?: string | null;
   payment_intent: string | null;
   payment_status: string;
   client_reference_id: string | null;
   metadata?: Record<string, string>;
+};
+
+export type StripeSubscription = {
+  id: string;
+  object: "subscription";
+  customer: string;
+  status: string;
+  metadata?: Record<string, string>;
+  cancel_at_period_end?: boolean;
+  current_period_start?: number;
+  current_period_end?: number;
+  items?: { data?: Array<{ price?: { id?: string } }> };
+};
+
+export type StripeInvoice = {
+  id: string;
+  object: "invoice";
+  customer?: string;
+  subscription?: string | null;
+  parent?: { subscription_details?: { subscription?: string | null } };
 };
 
 export type StripeConnectedAccount = {
@@ -19,7 +42,7 @@ export type StripeConnectedAccount = {
 export type StripeEvent = {
   id: string;
   type: string;
-  data: { object: (StripeCheckoutSession & { last_payment_error?: { message?: string } }) | StripeConnectedAccount };
+  data: { object: (StripeCheckoutSession & { last_payment_error?: { message?: string } }) | StripeConnectedAccount | StripeSubscription | StripeInvoice };
 };
 
 function stripeSecret() {
@@ -134,6 +157,43 @@ export async function createStripeCheckoutSession(input: {
   const json = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", { method: "POST", idempotencyKey: input.idempotencyKey, body });
   if (!json.id || !json.url) throw new Error("Stripe Checkout session creation failed.");
   return { id: json.id, url: json.url };
+}
+
+export async function createStripeCustomer(input: { storeId: string; userId: string; email: string; name: string }) {
+  return stripeRequest<{ id: string }>("/customers", {
+    method: "POST",
+    idempotencyKey: `seller-customer:${input.storeId}`,
+    body: new URLSearchParams({
+      email: input.email, name: input.name,
+      "metadata[storeId]": input.storeId, "metadata[userId]": input.userId,
+    }),
+  });
+}
+
+export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string }) {
+  const origin = appUrl();
+  const body = new URLSearchParams({
+    mode: "subscription",
+    customer: input.customerId,
+    client_reference_id: input.storeId,
+    success_url: `${origin}/seller/subscription?checkout=success`,
+    cancel_url: `${origin}/seller/subscription?checkout=cancelled`,
+    "line_items[0][price]": input.priceId,
+    "line_items[0][quantity]": "1",
+    "metadata[kind]": "seller_subscription",
+    "metadata[storeId]": input.storeId,
+    "metadata[userId]": input.userId,
+    "metadata[plan]": input.plan,
+    "subscription_data[metadata][kind]": "seller_subscription",
+    "subscription_data[metadata][storeId]": input.storeId,
+    "subscription_data[metadata][userId]": input.userId,
+    "subscription_data[metadata][plan]": input.plan,
+  });
+  const session = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", {
+    method: "POST", idempotencyKey: `seller-subscription:${input.storeId}:${input.priceId}`, body,
+  });
+  if (!session.id || !session.url) throw new Error("Stripe subscription Checkout session creation failed.");
+  return session;
 }
 
 export function verifyStripeWebhook(rawBody: string, signatureHeader: string | null, secret: string, now = Date.now()): StripeEvent {

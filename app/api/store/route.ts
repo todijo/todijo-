@@ -38,6 +38,9 @@ export async function POST(request: Request) {
     const requestedSlug = String(body.slug ?? "").trim();
     const slug = makeSlug(requestedSlug || name);
     const description = String(body.description ?? "").trim();
+    const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
+    const phone = String(body.phone ?? "").trim();
+    const logo = String(body.logo ?? "").trim();
     const country = String(body.country ?? "").trim();
     const city = String(body.city ?? "").trim();
     const currency = String(body.currency ?? "EUR").trim().toUpperCase();
@@ -63,6 +66,12 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return NextResponse.json({ error: "A valid contact email is required." }, { status: 400 });
+    }
+    if (phone.length > 30 || logo.length > 2000 || (logo && !/^https?:\/\//i.test(logo))) {
+      return NextResponse.json({ error: "Invalid phone number or logo URL." }, { status: 400 });
+    }
 
     if (!/^[A-Z]{3}$/.test(currency)) {
       return NextResponse.json({ error: "Devise invalide." }, { status: 400 });
@@ -78,6 +87,9 @@ export async function POST(request: Request) {
           name,
           slug,
           description: description || null,
+          contactEmail,
+          phone: phone || null,
+          logo: logo || null,
           country,
           city,
           currency,
@@ -95,7 +107,7 @@ export async function POST(request: Request) {
       return created;
     });
 
-    return NextResponse.json({ ok: true, store });
+    return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
