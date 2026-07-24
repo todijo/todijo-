@@ -530,3 +530,14 @@ html[dir="rtl"] .marketTopSearch select{border-right:0;border-left:1px solid #dc
 @media(max-width:620px){.sellerProductSummary{gap:9px}.sellerProductSummary article{min-height:102px;padding:14px}.sellerProductSummary strong{font-size:23px}.sellerProductsGridPremium{grid-template-columns:1fr}.sellerProductActions{display:grid;grid-template-columns:1fr 1fr}.sellerEditProductForm .productPhotoPreview{grid-template-columns:repeat(2,minmax(0,1fr))}.productDetailShell{width:min(100% - 24px,1120px);padding-top:22px;gap:18px}.productDetailInfo{padding:20px;border-radius:20px}.productDetailInfo h1{font-size:32px}.premiumStoreHeroPolished{min-height:390px;padding:24px 18px;border-radius:22px}.premiumStoreIdentity{align-items:flex-start}.premiumStoreLogo{width:92px;height:92px;border-radius:23px}.premiumStoreActions{width:100%}}
 @media(max-width:390px){.sellerProductSummary{grid-template-columns:1fr}.sellerEditProductForm .productPhotoPreview{grid-template-columns:1fr}.sellerProductActions{grid-template-columns:1fr}}
 .premiumStoreHeroPolished{position:relative}
+
+/* Accessible foregrounds on light seller subscription surfaces */
+.premiumDashboard .subscriptionWarning{color:#3f3210}
+.premiumDashboard .subscriptionWarning strong{color:#2f2509}
+.premiumDashboard .subscriptionWarning span{color:#514114}
+.premiumDashboard .subscriptionWarning a{color:#174d3d;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+.premiumDashboard .subscriptionWarning a:hover{color:#0b6b4e}
+.premiumDashboard .subscriptionWarning a:focus-visible{color:#063d2d;outline:3px solid rgba(11,107,78,.28);outline-offset:4px;border-radius:4px}
+.premiumDashboard .subscriptionWarning a:active{color:#052f24}
+.sellerControlHero .sellerControlBadge.tone-warning{border-color:#e5cf83;background:#fff4d8;color:#72520d}
+.sellerControlHero .sellerControlBadge.tone-success{border-color:#8ed4bb;background:#e4f7ef;color:#075d43}
