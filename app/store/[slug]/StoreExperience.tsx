@@ -100,7 +100,7 @@ export default function StoreExperience({ store }: Props) {
 
   return (
     <>
-      <section className="premiumStoreHero" style={store.banner ? { backgroundImage: `linear-gradient(100deg, rgba(4,33,26,.88), rgba(4,33,26,.38)), url(${store.banner})` } : undefined}>
+      <section className="premiumStoreHero premiumStoreHeroPolished" style={store.banner ? { backgroundImage: `linear-gradient(100deg, rgba(4,33,26,.88), rgba(4,33,26,.38)), url(${store.banner})` } : undefined}>
         <div className="premiumStoreHeroInner">
           <div className="premiumStoreIdentity">
             <div className="premiumStoreLogo">
@@ -133,7 +133,7 @@ export default function StoreExperience({ store }: Props) {
         </nav>
       </div>
 
-      <div className="premiumStoreLayout">
+      <div className="premiumStoreLayout premiumStoreLayoutPolished">
         <main className="premiumStoreMain">
           {activeTab === "products" && <section className="storeTabPanel">
             <div className="catalogHeader">
