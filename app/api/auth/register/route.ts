@@ -1,10 +1,13 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createSession } from "@/lib/session";
+import { createSession, readSession } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
+    if (await readSession()) {
+      return NextResponse.json({ error: "Une session est déjà active." }, { status: 409 });
+    }
     const body = await request.json();
     const firstName = String(body.firstName ?? "").trim();
     const lastName = String(body.lastName ?? "").trim();

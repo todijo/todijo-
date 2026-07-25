@@ -97,6 +97,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   initialFilters: Filters;
 }) {
   const [locale, setLocale] = useState<Locale>("fr");
+  const [accountName, setAccountName] = useState<string | null>(null);
   const [filters, setFilters] = useState(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const activeLocale = useLocale();
@@ -115,6 +116,15 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
     else if (browser.startsWith("ku")) setLocale("ku");
     else if (browser.startsWith("en")) setLocale("en");
     else setLocale("fr");
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.authenticated && typeof data.name === "string") setAccountName(data.name);
+      })
+      .catch(() => {});
   }, []);
 
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.city, filters.country, filters.minPrice, filters.maxPrice].filter(Boolean).length, [filters]);
@@ -142,7 +152,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         <div className="marketHeaderInner">
           <details className="marketMobileMenu">
             <summary aria-label={h("menu")}><Menu size={22} aria-hidden="true"/></summary>
-            <nav aria-label={h("mobileNavigation")}><a href="/login"><UserRound size={18} aria-hidden="true"/>{t.account}</a><a href={`/${activeLocale}/account/orders`}>{h("orders")}</a><a href="/register?role=seller">{t.sell}</a><LanguageSwitcher className="marketMobileLanguage"/></nav>
+            <nav aria-label={h("mobileNavigation")}><a href={accountName ? "/dashboard" : "/login"}><UserRound size={18} aria-hidden="true"/>{accountName ?? t.account}</a><a href={`/${activeLocale}/account/orders`}>{h("orders")}</a><a href="/register?role=seller">{t.sell}</a><LanguageSwitcher className="marketMobileLanguage"/></nav>
           </details>
           <TodijoLogo href={`/${activeLocale}`} inverse/>
           <div className="marketLocation" aria-label={h("locationLabel")}><MapPin size={20} aria-hidden="true"/><span><small>{h("deliverTo")}</small><strong>{h("marketplace")}</strong></span></div>
@@ -156,11 +166,11 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
           </form>
           <nav className="marketDesktopActions" aria-label={h("accountNavigation")}>
             <LanguageSwitcher className="marketHeaderLanguage"/>
-            <a className="marketAccountAction" href="/login"><UserRound size={20} aria-hidden="true"/><span><small>{h("hello")}</small><strong>{t.account}</strong></span><ChevronDown size={14} aria-hidden="true"/></a>
+            <a className="marketAccountAction" href={accountName ? "/dashboard" : "/login"}><UserRound size={20} aria-hidden="true"/><span><small>{h("hello")}</small><strong>{accountName ?? t.account}</strong></span><ChevronDown size={14} aria-hidden="true"/></a>
             <a className="marketOrdersAction" href={`/${activeLocale}/account/orders`}><small>{h("returns")}</small><strong>{h("orders")}</strong></a>
             <div className="marketCartAction"><ShoppingCart size={25} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div>
           </nav>
-          <div className="marketMobileActions"><a href="/login" aria-label={t.account}><UserRound size={22} aria-hidden="true"/></a><div className="marketCartAction"><ShoppingCart size={23} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div></div>
+          <div className="marketMobileActions"><a href={accountName ? "/dashboard" : "/login"} aria-label={accountName ?? t.account}><UserRound size={22} aria-hidden="true"/></a><div className="marketCartAction"><ShoppingCart size={23} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div></div>
         </div>
         </div>
         <nav className="marketSecondaryNav" aria-label={h("categoryNavigation")}><div className="marketSecondaryInner">

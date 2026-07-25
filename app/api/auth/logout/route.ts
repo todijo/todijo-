@@ -28,8 +28,3 @@ export async function POST() {
   await deleteSession();
   return logoutResponse();
 }
-
-export async function GET() {
-  await deleteSession();
-  return logoutResponse();
-}
