@@ -16,10 +16,9 @@ export function isAdminRole(role: UserRole | string | null | undefined) {
 
 export async function requireAdmin(
   db: Database,
-  session: { userId: string; role: UserRole | string } | null,
+  session: { userId: string; role?: UserRole | string } | null,
 ) {
   if (!session) throw new AdminAccessError("Authentication required.", 401, "AUTH_REQUIRED");
-  if (!isAdminRole(session.role)) throw new AdminAccessError("Administrator access required.", 403, "ADMIN_REQUIRED");
   const user = await db.user.findUnique({ where: { id: session.userId }, select: { id: true, role: true } });
   if (!user || !isAdminRole(user.role)) throw new AdminAccessError("Administrator access required.", 403, "ADMIN_REQUIRED");
   return user;

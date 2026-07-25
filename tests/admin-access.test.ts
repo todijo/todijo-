@@ -16,9 +16,9 @@ test("non-admin and direct non-admin API identity are denied", async () => {
   await assert.rejects(() => requireAdmin(db, { userId: "buyer", role: "CUSTOMER" }), (error: unknown) => error instanceof AdminAccessError && error.status === 403);
 });
 
-test("admin is allowed only when the current database role is ADMIN", async () => {
+test("admin authorization uses the current database role instead of a stale JWT role", async () => {
   const db = { user: { findUnique: async () => ({ id: "admin", role: "ADMIN" }) } } as unknown as Db;
-  assert.deepEqual(await requireAdmin(db, { userId: "admin", role: "ADMIN" }), { id: "admin", role: "ADMIN" });
+  assert.deepEqual(await requireAdmin(db, { userId: "admin", role: "SELLER" }), { id: "admin", role: "ADMIN" });
   const stale = { user: { findUnique: async () => ({ id: "admin", role: "SELLER" }) } } as unknown as Db;
   await assert.rejects(() => requireAdmin(stale, { userId: "admin", role: "ADMIN" }));
 });
