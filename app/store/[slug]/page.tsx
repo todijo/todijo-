@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import CartLink from "@/components/CartLink";
 import StoreExperience from "./StoreExperience";
 import { getLocale, getTranslations } from "next-intl/server";
+import { publicStoreAccessWhere } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,8 @@ function initials(firstName: string, lastName: string) {
 export default async function StorePage({ params }: Props) {
   const common = await getTranslations("Common"); const locale = await getLocale();
   const { slug } = await params;
-  const store = await prisma.store.findUnique({
-    where: { slug },
+  const store = await prisma.store.findFirst({
+    where: { slug, ...publicStoreAccessWhere() },
     select: {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, createdAt: true,
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },

@@ -11,6 +11,7 @@ import AskSellerButton from "@/components/AskSellerButton";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { readSession } from "@/lib/session";
 import { getTranslations } from "next-intl/server";
+import { publicProductAccessWhere } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -21,9 +22,10 @@ export default async function ProductPage({ params }: Props) {
   const productText = await getTranslations("Product");
   const { id } = await params;
   const session = await readSession();
-  const product = await prisma.product.findFirst({ where:{id,status:"PUBLISHED"}, select:{id:true,name:true,description:true,price:true,compareAtPrice:true,currency:true,category:true,condition:true,stock:true,images:true,colors:true,sizes:true,store:{select:{name:true,slug:true,city:true,country:true}}} });
+  const publicAccess = publicProductAccessWhere();
+  const product = await prisma.product.findFirst({ where:{id,status:"PUBLISHED",...publicAccess}, select:{id:true,name:true,description:true,price:true,compareAtPrice:true,currency:true,category:true,condition:true,stock:true,images:true,colors:true,sizes:true,store:{select:{name:true,slug:true,city:true,country:true}}} });
   if (!product) notFound();
-  const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id}},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true} });
+  const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true} });
   const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const discount=compare&&compare>price?Math.round((1-price/compare)*100):null;
   return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell"><div className="productGallery"><ProductGallery images={product.images} productName={product.name}/></div><article className="productDetailInfo">

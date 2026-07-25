@@ -5,14 +5,16 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
+import { publicStoreAccessWhere } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function StoreIndexPage() {
   const locale = await getLocale();
   const t = await getTranslations("HomeDiscovery");
+  const publicAccess = publicStoreAccessWhere();
   const stores = await prisma.store.findMany({
-    where: { products: { some: { status: "PUBLISHED" } } },
+    where: { ...publicAccess, products: { some: { status: "PUBLISHED" } } },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,

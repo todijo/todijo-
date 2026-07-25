@@ -6,6 +6,7 @@ import { sellerPlans } from "@/lib/seller-plans";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
 import NewProductForm from "./NewProductForm";
+import { canPublish } from "@/lib/seller-subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,12 @@ export default async function NewProductPage() {
       name: true, slug: true, currency: true, status: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true, plan: true } },
+      accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
       _count: { select: { products: true } },
     },
   });
   if (!store) redirect("/seller/create-store");
-  if (store.status !== "ACTIVE" || !["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "")) redirect("/seller/subscription");
+  if (!canPublish(store)) redirect("/seller/subscription");
 
   const plan = sellerPlans().find((item) => item.id === store.subscription?.plan);
   const productLimit = plan?.productLimit ?? null;

@@ -35,6 +35,11 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum StoreAccessSource {
+  ADMIN_GRANTED
+  ADMIN_EXEMPT
+}
+
 enum ProductDeactivationReason {
   NONE
   SELLER
@@ -88,6 +93,7 @@ model User {
   orders              Order[]
   reviews             Review[]
   reviewReports       ReviewReport[]
+  accessGrantsCreated StoreAccessGrant[] @relation("AccessGrantAdmin")
 }
 
 model Store {
@@ -112,9 +118,26 @@ model Store {
   products      Product[]
   conversations Conversation[]
   subscription  SellerSubscription?
+  accessGrants  StoreAccessGrant[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model StoreAccessGrant {
+  id          String            @id @default(cuid())
+  storeId     String
+  grantedById String
+  source      StoreAccessSource
+  startsAt    DateTime
+  endsAt      DateTime?
+  createdAt   DateTime          @default(now())
+
+  store     Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  grantedBy User  @relation("AccessGrantAdmin", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@index([storeId, source, endsAt])
+  @@index([grantedById, createdAt])
 }
 
 model Product {

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
+import { canPublish } from "@/lib/seller-subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,13 @@ export default async function SellerProductsPage() {
       name: true, slug: true, currency: true, status: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true } },
+      accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
       products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true } },
     },
   });
   if (!store) redirect("/seller/create-store");
 
-  const subscriptionActive = store.status === "ACTIVE" && ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
+  const subscriptionActive = canPublish(store);
   const published = store.products.filter((product) => product.status === "PUBLISHED").length;
   const lowStock = store.products.filter((product) => product.stock < 5).length;
   const labels = {
