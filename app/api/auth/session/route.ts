@@ -19,7 +19,7 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { authenticated: true, name: `${user.firstName} ${user.lastName}`.trim() },
+    { authenticated: true, userId: session.userId, name: `${user.firstName} ${user.lastName}`.trim() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

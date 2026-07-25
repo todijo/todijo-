@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 export type CartProduct = {
   id: string;
@@ -32,26 +33,50 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const storageKeyRef = useRef<string | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as CartItem[];
-        if (Array.isArray(parsed)) setItems(parsed);
-      }
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
+    let active = true;
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((session) => {
+        if (!active) return;
+        const nextStorageKey = session.authenticated && typeof session.userId === "string"
+          ? `${STORAGE_KEY}:${session.userId}`
+          : STORAGE_KEY;
+        if (nextStorageKey === storageKeyRef.current) return;
+        try {
+          const saved = window.localStorage.getItem(nextStorageKey);
+          const parsed = saved ? JSON.parse(saved) as CartItem[] : [];
+          setItems(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          window.localStorage.removeItem(nextStorageKey);
+          setItems([]);
+        }
+        storageKeyRef.current = nextStorageKey;
+        setStorageKey(nextStorageKey);
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (active) {
+          setItems([]);
+          storageKeyRef.current = null;
+          setStorageKey(null);
+          setHydrated(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [hydrated, items]);
+    if (!hydrated || !storageKey) return;
+    window.localStorage.setItem(storageKey, JSON.stringify(items));
+  }, [hydrated, items, storageKey]);
 
   const value = useMemo<CartContextValue>(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
