@@ -21,7 +21,11 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const eligibleUsers = users.filter((user) => !user.hasStore && (user.role === "SELLER" || user.id === adminId));
+  const currentAdmin = users.find((user) => user.id === adminId && !user.hasStore);
+  const eligibleUsers = [
+    ...(currentAdmin ? [currentAdmin] : []),
+    ...users.filter((user) => !user.hasStore && user.role === "SELLER" && user.id !== adminId),
+  ];
   const sellerStores = stores.filter((store) => store.owner.role === "SELLER");
   const activeCount = stores.filter((store) => store.accessSource !== "NONE").length;
   const formatter = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }), [locale]);
@@ -74,7 +78,7 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
       <section className="adminPanel">
         <div className="adminPanelHeading"><Store/><div><h2>{t("createStore")}</h2><p>{t("createStoreHelp")}</p></div></div>
         <form className="adminForm" onSubmit={createStore}>
-          <label>{t("owner")}<select name="ownerId" required defaultValue=""><option value="" disabled>{t("selectOwner")}</option>{eligibleUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.role}</option>)}</select></label>
+          <label>{t("owner")}<select name="ownerId" required defaultValue={currentAdmin?.id ?? ""}><option value="" disabled>{t("selectOwner")}</option>{eligibleUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.role}</option>)}</select></label>
           <div><label>{t("storeName")}<input name="name" minLength={2} maxLength={80} required/></label><label>{t("storeAddress")}<input name="slug" minLength={3} maxLength={60}/></label></div>
           <label>{t("description")}<textarea name="description" maxLength={1000} rows={3}/></label>
           <div><label>{t("email")}<input name="contactEmail" type="email" required/></label><label>{t("phone")}<input name="phone" maxLength={30}/></label></div>
