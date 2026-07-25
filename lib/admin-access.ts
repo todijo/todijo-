@@ -48,15 +48,16 @@ export function activeAccessSource(store: {
   subscription: { status: string; currentPeriodEnd?: Date | null } | null;
   accessGrants: Array<{ source: StoreAccessSource; startsAt: Date; endsAt: Date | null }>;
 }, now = new Date()) {
-  if (store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status)) {
-    return { source: "STRIPE" as const, expiresAt: store.subscription.currentPeriodEnd ?? null };
-  }
   const active = store.accessGrants
     .filter((grant) => grant.startsAt <= now && (
       (grant.source === "ADMIN_EXEMPT" && grant.endsAt === null)
       || (grant.source === "ADMIN_GRANTED" && grant.endsAt !== null && grant.endsAt > now)
     ))
     .sort((a, b) => (b.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (a.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER))[0];
+  if (active?.source === "ADMIN_EXEMPT") return { source: active.source, expiresAt: null };
+  if (store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status)) {
+    return { source: "STRIPE" as const, expiresAt: store.subscription.currentPeriodEnd ?? null };
+  }
   return active ? { source: active.source, expiresAt: active.endsAt } : { source: "NONE" as const, expiresAt: null };
 }
 
@@ -122,6 +123,30 @@ export async function createManagedStore(db: Database, adminId: string, input: M
     },
     select: { id: true, slug: true },
   });
+}
+
+export async function exemptExistingAdminStore(db: Database, adminId: string, now = new Date()) {
+  const store = await db.store.findUnique({
+    where: { ownerId: adminId },
+    select: {
+      id: true,
+      owner: { select: { role: true } },
+      accessGrants: { where: { source: "ADMIN_EXEMPT" }, take: 1, select: { id: true, endsAt: true } },
+    },
+  });
+  if (!store) throw new AdminAccessError("Create your store first.", 404, "STORE_REQUIRED");
+  if (store.owner.role !== "ADMIN") throw new AdminAccessError("Administrator store ownership is invalid.", 403, "ADMIN_REQUIRED");
+  const existing = store.accessGrants[0];
+  if (existing) {
+    if (existing.endsAt !== null) {
+      await db.storeAccessGrant.update({ where: { id: existing.id }, data: { endsAt: null } });
+    }
+    return { storeId: store.id, created: false };
+  }
+  await db.storeAccessGrant.create({
+    data: { storeId: store.id, grantedById: adminId, source: "ADMIN_EXEMPT", startsAt: now, endsAt: null },
+  });
+  return { storeId: store.id, created: true };
 }
 
 export async function extendManagedAccess(

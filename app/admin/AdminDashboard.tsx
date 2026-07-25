@@ -27,10 +27,11 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
     ...users.filter((user) => !user.hasStore && user.role === "SELLER" && user.id !== adminId),
   ];
   const sellerStores = stores.filter((store) => store.owner.role === "SELLER");
+  const adminStore = stores.find((store) => store.owner.id === adminId);
   const activeCount = stores.filter((store) => store.accessSource !== "NONE").length;
   const formatter = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }), [locale]);
 
-  async function request(method: "POST" | "PATCH", body: Record<string, unknown>) {
+  async function request(method: "POST" | "PUT" | "PATCH", body: Record<string, unknown> = {}) {
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/admin/stores", {
@@ -64,6 +65,11 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
     if (await request("PATCH", { storeIds: selected, months: Number(form.get("months")) })) setSelected([]);
   }
 
+  async function exemptMyStore() {
+    if (!window.confirm(`${t("source.ADMIN_EXEMPT")} · ${adminStore?.name ?? ""}`)) return;
+    await request("PUT");
+  }
+
   return <>
     <section className="adminStats" aria-label={t("summary")}>
       <article><Users/><span>{t("users")}</span><strong>{users.length}</strong></article>
@@ -77,6 +83,7 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
     <div className="adminColumns">
       <section className="adminPanel">
         <div className="adminPanelHeading"><Store/><div><h2>{t("createStore")}</h2><p>{t("createStoreHelp")}</p></div></div>
+        {adminStore && <div className="adminOwnStoreAction"><p>{adminStore.name} · {t("createStoreHelp")}</p><button type="button" onClick={exemptMyStore} disabled={busy || adminStore.accessSource === "ADMIN_EXEMPT"}>{t("source.ADMIN_EXEMPT")}</button></div>}
         <form className="adminForm" onSubmit={createStore}>
           <label>{t("owner")}<select name="ownerId" required defaultValue={currentAdmin?.id ?? ""}><option value="" disabled>{t("selectOwner")}</option>{eligibleUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.role}</option>)}</select></label>
           <div><label>{t("storeName")}<input name="name" minLength={2} maxLength={80} required/></label><label>{t("storeAddress")}<input name="slug" minLength={3} maxLength={60}/></label></div>

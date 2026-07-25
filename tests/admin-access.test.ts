@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AdminAccessError,
+  activeAccessSource,
   calculateGrantPeriod,
   createManagedStore,
   extendManagedAccess,
+  exemptExistingAdminStore,
   publicProductAccessWhere,
   requireAdmin,
 } from "../lib/admin-access";
@@ -98,4 +100,37 @@ test("public product visibility requires Stripe, a live admin grant, or admin ex
       ],
     },
   });
+});
+
+test("existing admin store exemption is permanent, idempotent, and does not touch Stripe", async () => {
+  const created: Array<Record<string, unknown>> = [];
+  let subscriptionTouched = false;
+  const store = { id: "store-admin", owner: { role: "ADMIN" }, accessGrants: [] as Array<{ id: string; endsAt: Date | null }> };
+  const db = {
+    store: { findUnique: async () => store },
+    storeAccessGrant: {
+      create: async (input: { data: Record<string, unknown> }) => {
+        created.push(input.data);
+        store.accessGrants.push({ id: "grant-1", endsAt: input.data.endsAt as Date | null });
+      },
+      update: async () => undefined,
+    },
+    sellerSubscription: { update: async () => { subscriptionTouched = true; } },
+  } as unknown as Db;
+  const first = await exemptExistingAdminStore(db, "admin", new Date("2026-01-01T00:00:00Z"));
+  const second = await exemptExistingAdminStore(db, "admin", new Date("2026-01-02T00:00:00Z"));
+  assert.deepEqual(first, { storeId: "store-admin", created: true });
+  assert.deepEqual(second, { storeId: "store-admin", created: false });
+  assert.equal(created.length, 1);
+  assert.equal(created[0].source, "ADMIN_EXEMPT");
+  assert.equal(created[0].endsAt, null);
+  assert.equal(subscriptionTouched, false);
+});
+
+test("admin exemption is displayed ahead of an active Stripe subscription", () => {
+  const now = new Date("2026-01-01T00:00:00Z");
+  assert.deepEqual(activeAccessSource({
+    subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2026-02-01T00:00:00Z") },
+    accessGrants: [{ source: "ADMIN_EXEMPT", startsAt: now, endsAt: null }],
+  }, now), { source: "ADMIN_EXEMPT", expiresAt: null });
 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { AdminAccessError, createManagedStore, extendManagedAccess, requireAdmin, validGrantMonths } from "@/lib/admin-access";
+import { AdminAccessError, createManagedStore, exemptExistingAdminStore, extendManagedAccess, requireAdmin, validGrantMonths } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 
@@ -62,6 +62,20 @@ export async function PATCH(request: Request) {
     const storeIds = Array.isArray(body.storeIds) ? body.storeIds.map(String) : [];
     const grants = await prisma.$transaction((tx) => extendManagedAccess(tx, admin.id, storeIds, months));
     return NextResponse.json({ ok: true, grants: grants.map((grant) => ({ ...grant, endsAt: grant.endsAt?.toISOString() })) });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function PUT() {
+  try {
+    const session = await readSession();
+    const admin = await requireAdmin(prisma, session);
+    const result = await prisma.$transaction(
+      (tx) => exemptExistingAdminStore(tx, admin.id),
+      { isolationLevel: "Serializable" },
+    );
+    return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     return errorResponse(error);
   }
