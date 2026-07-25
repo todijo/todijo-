@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
+import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { useCart } from "@/components/CartProvider";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -84,6 +85,7 @@ export default function CartPage() {
           </div>
         )}
       </section>
+      <MarketplaceFooter />
     </main>
   );
 }

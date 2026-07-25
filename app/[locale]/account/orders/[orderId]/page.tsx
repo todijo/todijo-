@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { buyerPaymentState, getBuyerOrder } from "@/lib/buyer-orders";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import SiteHeader from "@/components/SiteHeader";
+import MarketplaceFooter from "@/components/MarketplaceFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +30,9 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   const subtotal = order.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
 
   return (
-    <main className="sellerDashboardPage buyerOrdersPage">
-      <div className="sellerDashboardShell">
-        <header className="sellerDashboardHeader">
-          <Link className="authLogo dashboardLogo" href={`/${locale}`}>Todijo<span>.</span></Link>
-          <Link className="dashboardLogout" href={`/${locale}/account/orders`}>{t("backOrders")}</Link>
-        </header>
-
+    <main className="buyerOrdersPage scopedPublicPage">
+      <SiteHeader />
+      <div className="buyerOrdersShell">
         <section className="buyerOrdersHeading buyerOrderDetailsHeading">
           <p className="dashboardBadge">{t("detailsBadge")}</p>
           <h1>{t("detailsTitle")}</h1>
@@ -79,6 +77,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
 
         <Link className="quickActionLink secondary buyerOrdersBack" href={`/${locale}/account/orders`}>← {t("backOrders")}</Link>
       </div>
+      <MarketplaceFooter />
     </main>
   );
 }

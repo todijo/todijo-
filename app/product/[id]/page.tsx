@@ -8,6 +8,7 @@ import ShareButton from "@/components/ShareButton";
 import ProductPurchasePanel from "@/components/ProductPurchasePanel";
 import ReviewSection from "@/components/ReviewSection";
 import AskSellerButton from "@/components/AskSellerButton";
+import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { readSession } from "@/lib/session";
 import { getTranslations } from "next-intl/server";
 
@@ -36,5 +37,5 @@ export default async function ProductPage({ params }: Props) {
     <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
   </article></section>
   {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div>{item.images[0]?<img src={item.images[0]} alt={item.name}/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{Number(item.price).toFixed(2)} {item.currency}</strong></Link>)}</div></section>}
-  <ReviewSection productId={product.id}/></main>;
+  <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }

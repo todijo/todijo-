@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { buyerPaymentState, listBuyerOrders } from "@/lib/buyer-orders";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import SiteHeader from "@/components/SiteHeader";
+import MarketplaceFooter from "@/components/MarketplaceFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +25,9 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
   const date = (value: Date) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
 
   return (
-    <main className="sellerDashboardPage buyerOrdersPage">
-      <div className="sellerDashboardShell">
-        <header className="sellerDashboardHeader">
-          <Link className="authLogo dashboardLogo" href={`/${locale}`}>Todijo<span>.</span></Link>
-          <Link className="dashboardLogout" href={`/${locale}/dashboard`}>{t("backDashboard")}</Link>
-        </header>
-
+    <main className="buyerOrdersPage scopedPublicPage">
+      <SiteHeader />
+      <div className="buyerOrdersShell">
         <section className="buyerOrdersHeading">
           <p className="dashboardBadge">{t("badge")}</p>
           <h1>{t("title")}</h1>
@@ -81,6 +79,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
           </section>
         )}
       </div>
+      <MarketplaceFooter />
     </main>
   );
 }
