@@ -476,6 +476,73 @@ h1 {
 .productAvailability{min-height:24px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}.productAvailability small{color:var(--muted)}.lowStock{color:#9a5b06;font-weight:850}.cardCartButton{min-height:40px;padding:0 11px;border:0;border-radius:11px;background:#087653;color:#fff;display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:11px;font-weight:850;cursor:pointer}.cardCartButton:disabled{background:#dfe7e4;color:#6d7d77;cursor:not-allowed}.availabilityFilter{min-height:44px;grid-template-columns:auto 1fr!important;align-items:center}.availabilityFilter input{width:20px!important;height:20px}.activeFilterChips{margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px}.activeFilterChips a{min-height:34px;padding:0 10px;border:1px solid #cce4da;border-radius:999px;background:#eff8f4;color:#075f45;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800}.activeFilterChips .clearAllChip{border-color:#efd0d0;background:#fff7f7;color:#9c2424}
 @media(max-width:650px){.cardCartButton{width:100%;margin-top:10px}.cardBottom{align-items:stretch!important}.cardCartButton span{display:none}}
 
+/* Mobile marketplace containment and buyer-first polish */
+.cartHeaderLink,.homeCartLink{position:relative;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;isolation:isolate}
+.cartLinkIcon{flex:0 0 auto;pointer-events:none}
+.cartLinkBadge{position:absolute!important;z-index:2;inset-block-start:-3px!important;inset-inline-end:-3px!important;inset-inline-start:auto!important;min-width:20px!important;height:20px!important;padding:0 5px!important;border:2px solid currentColor!important;border-radius:999px;background:var(--green);color:#fff;display:grid!important;place-items:center;font-size:9px!important;line-height:1;pointer-events:none}
+.marketDesktopActions>.homeCartLink{min-width:54px;padding-inline:8px;color:#fff}
+.marketDesktopActions>.homeCartLink .cartLinkBadge{background:#41d59e;color:#05372a;border-color:#07513c!important}
+.marketSecondaryNav,.categoryStripSection{min-width:0;max-width:100%}
+.marketSecondaryInner,.categoryStrip{max-width:100%;overscroll-behavior-inline:contain}
+.categoryStrip button{max-width:min(78vw,280px)}
+.categoryStrip button:not(.active){overflow:hidden;text-overflow:ellipsis}
+.discoveryCard,.discoveryCardBody,.discoveryCardBody h3,.marketplaceStore,.productAvailability,.cardBottom{min-width:0}
+.marketplaceStore,.productAvailability small,.cardBottom strong,.cardBottom del{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+@media(max-width:860px){
+  .marketHeader{position:relative}
+  .marketPrimaryHeader{padding:8px 0 10px}
+  .marketHeaderInner{width:min(100% - 22px,820px);min-width:0;min-height:auto;grid-template-columns:44px minmax(0,1fr) auto;gap:8px}
+  .marketHeaderInner>.todijoBrand{min-width:0}
+  .marketMobileMenu summary{width:44px;height:44px}
+  .marketMobileActions{min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto}
+  .marketMobileActions>a{width:44px;height:44px;flex:0 0 44px}
+  .marketMobileActions>.homeCartLink{width:44px;height:44px;color:#fff;border-radius:10px}
+  .marketMobileActions>.homeCartLink .cartLinkLabel{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .marketMobileActions>.homeCartLink .cartLinkBadge{background:#41d59e;color:#05372a;border-color:#07513c!important}
+  .marketTopSearch{grid-column:1/-1;grid-row:2;width:100%;min-width:0;max-width:100%;height:44px}
+  .marketTopSearch input{width:0;min-width:0}
+  .marketSecondaryNav{overflow:hidden}
+  .marketSecondaryInner{width:100%;padding-inline:11px;overflow-x:auto}
+  .discoveryHero{padding:18px 0 12px}
+  .discoveryHeroGrid{gap:13px}
+  .discoveryHero h1{margin:9px 0 7px;font-size:clamp(31px,9.4vw,42px);line-height:1.03;letter-spacing:-1.7px}
+  .discoveryHero p{font-size:14px;line-height:1.45}
+  .discoveryHeroActions{margin-top:13px}
+  .discoveryHeroActions .discoveryHeroCta{min-height:44px}
+  .discoveryHeroSellerCta{display:none!important}
+  .discoveryHeroVisual{min-height:154px;padding:9px;border-radius:17px}
+  .heroProductCollage,.heroCategoryHighlights,.heroMarketplaceFallback{height:136px;min-height:136px}
+  .heroProductCollage{gap:7px}
+  .heroProductCard>span{padding:24px 8px 7px}
+  .categoryStripSection{padding-top:12px;padding-bottom:2px}
+  .categoryStrip{width:100%;gap:8px;padding:3px 1px 10px;scroll-snap-type:x mandatory;scrollbar-width:none}
+  .categoryStrip::-webkit-scrollbar{display:none}
+  .categoryStrip button{min-height:44px;padding:9px 13px;scroll-snap-align:start}
+  .categoryShowcase{display:none}
+  .marketplaceDiscoverySections>.marketplaceRailSection:first-child{padding-top:8px}
+  .marketplaceProductRail .discoveryCard{flex-basis:min(68vw,250px)}
+  .discoveryCardBody h3{white-space:nowrap}
+  .cardCartButton{min-height:44px}
+}
+
+@media(max-width:440px){
+  .marketHeaderInner{gap:6px}
+  .marketHeader .todijoBrand{gap:5px}
+  .marketHeader .todijoBrandMark{width:30px;height:30px;flex:0 0 30px}
+  .marketHeader .todijoWordmark{font-size:20px;overflow:hidden;text-overflow:ellipsis}
+  .marketMobileActions>a:not(.homeCartLink){display:none}
+  .marketMobileActions>.homeCartLink{display:inline-flex}
+  .marketTopSearch select{width:88px;padding-inline:8px;font-size:10px}
+  .marketTopSearch input{padding-inline:9px;font-size:13px}
+  .marketTopSearch button{min-width:44px;padding-inline:10px}
+  .discoveryHero{padding-top:15px}
+  .discoveryHero h1{font-size:clamp(29px,9.6vw,38px)}
+  .discoveryHeroVisual{min-height:142px}
+  .heroProductCollage,.heroCategoryHighlights,.heroMarketplaceFallback{height:124px;min-height:124px}
+  .marketplaceProductRail .discoveryCard{flex-basis:min(76vw,238px)}
+}
+
 /* Marketplace homepage header */
 .marketHeader{position:sticky;top:0;z-index:100;border:0;background:#073e2f;color:#fff;box-shadow:0 8px 24px rgba(3,35,26,.14);backdrop-filter:none}.marketPrimaryHeader{background:linear-gradient(100deg,#063a2c,#07553e)}.marketHeaderInner{width:min(1580px,calc(100% - 32px));min-height:72px;margin:auto;display:grid;grid-template-columns:auto auto minmax(320px,1fr) auto;align-items:center;gap:18px}.marketHeader .todijoBrand{color:#fff}.marketHeader .todijoBrandMark{width:38px;height:38px}.marketHeader .todijoWordmark{font-size:25px}.marketLocation{min-width:116px;display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.82)}.marketLocation span,.marketAccountAction span,.marketOrdersAction{display:grid}.marketLocation small,.marketAccountAction small,.marketOrdersAction small{font-size:10px;color:rgba(255,255,255,.68);line-height:1.15}.marketLocation strong,.marketAccountAction strong,.marketOrdersAction strong{font-size:12px;line-height:1.25}.marketTopSearch{height:48px;min-width:0;display:flex!important;align-items:stretch;border:2px solid transparent;border-radius:11px;overflow:hidden;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.14);transition:border-color .16s ease,box-shadow .16s ease}.marketTopSearch:focus-within{border-color:#4bd39f;box-shadow:0 0 0 3px rgba(75,211,159,.2)}.marketTopSearch>span{display:none}.marketTopSearch select{width:min(170px,25%);padding:0 34px 0 13px;border:0;border-right:1px solid #dce8e3;background:#f0f5f3;color:#345047;font:inherit;font-size:12px;font-weight:750;cursor:pointer}.marketTopSearch input{min-width:0;flex:1;padding:0 15px;border:0;outline:0;background:#fff;color:#172a24;font:inherit}.marketTopSearch button{min-width:54px;height:auto;padding:0 16px;border:0;background:#19a875;color:#fff;display:flex;align-items:center;justify-content:center;gap:7px;font:inherit;font-weight:850;cursor:pointer;transition:background .16s ease}.marketTopSearch button:hover{background:#12845e}.marketTopSearch button span{font-size:12px}.marketDesktopActions{display:flex;align-items:center;gap:5px}.marketHeaderLanguage select{max-width:92px;padding:9px 6px;border:1px solid rgba(255,255,255,.2);border-radius:9px;background:#0a4937;color:#fff;font-size:11px}.marketHeaderLanguage option{background:#fff;color:#15251f}.marketAccountAction,.marketOrdersAction{min-height:46px;padding:6px 8px;border:1px solid transparent;border-radius:9px;color:#fff;display:flex;align-items:center;gap:7px;white-space:nowrap}.marketOrdersAction{display:grid}.marketAccountAction:hover,.marketOrdersAction:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.07)}.marketCartAction{position:relative;min-height:46px;padding:5px 8px;display:flex;align-items:center;gap:2px;color:#fff}.marketCartAction .homeCartLink{color:#fff;font-size:12px}.marketCartAction .homeCartLink strong{position:absolute;top:0;left:24px;min-width:19px;height:19px;padding:0 4px;background:#41d59e;color:#05372a;border:2px solid #07513c;font-size:9px}.marketMobileMenu,.marketMobileActions{display:none}.marketSecondaryNav{border-top:1px solid rgba(255,255,255,.08);background:#092f25}.marketSecondaryInner{width:min(1580px,calc(100% - 32px));min-height:39px;margin:auto;display:flex;align-items:center;gap:3px;overflow-x:auto;scrollbar-width:none}.marketSecondaryInner::-webkit-scrollbar{display:none}.marketSecondaryInner a,.marketSecondaryInner button{flex:0 0 auto;padding:9px 11px;border:1px solid transparent;border-radius:7px;background:transparent;color:rgba(255,255,255,.84);font:inherit;font-size:12px;font-weight:720;white-space:nowrap;cursor:pointer}.marketSecondaryInner a:hover,.marketSecondaryInner button:hover{border-color:rgba(255,255,255,.22);color:#fff}.marketAllCategories{display:flex;align-items:center;gap:7px;color:#fff!important;font-weight:850!important}.marketSellLink{margin-inline-start:auto;color:#68ddb4!important}.marketHeader a:focus-visible,.marketHeader button:focus-visible,.marketHeader summary:focus-visible,.marketHeader select:focus-visible,.marketHeader input:focus-visible{outline:3px solid #79e3bd;outline-offset:2px}.discoveryHero .discoverySearch{display:none!important}
 @media(max-width:1220px){.marketHeaderInner{grid-template-columns:auto minmax(300px,1fr) auto}.marketLocation{display:none}.marketHeaderLanguage{display:none}.marketDesktopActions{gap:0}.marketTopSearch button span{display:none}.marketTopSearch button{padding:0 14px}}

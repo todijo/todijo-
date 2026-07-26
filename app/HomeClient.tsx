@@ -151,9 +151,9 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             <LanguageSwitcher className="marketHeaderLanguage"/>
             <a className="marketAccountAction" href={accountName ? "/dashboard" : "/login"}><UserRound size={20} aria-hidden="true"/><span><small>{h("hello")}</small><strong>{accountName ?? t.account}</strong></span><ChevronDown size={14} aria-hidden="true"/></a>
             <a className="marketOrdersAction" href={`/${activeLocale}/account/orders`}><small>{h("returns")}</small><strong>{h("orders")}</strong></a>
-            <div className="marketCartAction"><ShoppingCart size={25} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div>
+            <CartLink label={t.cart} className="homeCartLink"/>
           </nav>
-          <div className="marketMobileActions"><a href={accountName ? "/dashboard" : "/login"} aria-label={accountName ?? t.account}><UserRound size={22} aria-hidden="true"/></a><div className="marketCartAction"><ShoppingCart size={23} aria-hidden="true"/><CartLink label={t.cart} className="homeCartLink"/></div></div>
+          <div className="marketMobileActions"><a href={accountName ? "/dashboard" : "/login"} aria-label={accountName ?? t.account}><UserRound size={22} aria-hidden="true"/></a><CartLink label={t.cart} className="homeCartLink"/></div>
         </div>
         </div>
         <nav className="marketSecondaryNav" aria-label={h("categoryNavigation")}><div className="marketSecondaryInner">
