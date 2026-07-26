@@ -157,7 +157,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         </div>
         </div>
         <nav className="marketSecondaryNav" aria-label={h("categoryNavigation")}><div className="marketSecondaryInner">
-          <a className="marketAllCategories" href="#categories"><Menu size={18} aria-hidden="true"/>{h("allCategories")}</a>
+          <a className="marketAllCategories" href="#categories"><Menu size={18} aria-hidden="true"/>{t.categories}</a>
           {categories.slice(0, 5).map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}>{category}</button>)}
           <a href="#products">{h("deals")}</a><a href={buildUrl({ ...filters, sort: "newest" })}>{h("newArrivals")}</a><a href="#products">{h("bestSellers")}</a><a className="marketSellLink" href="/register?role=seller">{t.sell}</a>
         </div></nav>

@@ -23,5 +23,5 @@ test("mobile cart and menu controls keep touch-friendly dimensions", () => {
 test("mobile scrollers are contained instead of widening the page", () => {
   assert.match(styles, /\.marketSecondaryNav\{overflow:hidden\}/);
   assert.match(styles, /\.marketSecondaryInner\{width:100%;padding-inline:11px;overflow-x:auto\}/);
-  assert.match(styles, /\.categoryStrip\{width:100%;gap:8px;[^}]*scroll-snap-type:x mandatory/);
+  assert.match(styles, /\.categoryStrip\{width:100%;gap:6px;[^}]*scroll-snap-type:x mandatory/);
 });
