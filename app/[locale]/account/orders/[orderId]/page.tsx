@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
+import { fulfillmentStepIndex } from "@/lib/order-status";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,13 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   const paymentState = buyerPaymentState(order);
   const store = order.items[0]?.product.store;
   const subtotal = order.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
+  const currentStep = fulfillmentStepIndex(order.status);
+  const timeline = [
+    { key: "PAID", label: t("status.PAID") },
+    { key: "PROCESSING", label: t("status.PROCESSING") },
+    { key: "SHIPPED", label: t("status.SHIPPED") },
+    { key: "DELIVERED", label: t("status.DELIVERED") },
+  ];
 
   return (
     <main className="buyerOrdersPage scopedPublicPage">
@@ -47,6 +55,17 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
               <div><span>{t("orderStatus")}</span><strong>{t(`status.${order.status}`)}</strong></div>
               <div><span>{t("store")}</span><strong>{store?.name ?? t("unknownStore")}</strong></div>
             </div>
+
+            {currentStep >= 0 && (
+              <ol className="orderTimeline" aria-label={t("orderStatus")}>
+                {timeline.map((step, index) => (
+                  <li className={index < currentStep ? "isComplete" : index === currentStep ? "isCurrent" : "isUpcoming"} key={step.key} aria-current={index === currentStep ? "step" : undefined}>
+                    <span aria-hidden="true">{index < currentStep ? "✓" : index + 1}</span>
+                    <strong>{step.label}</strong>
+                  </li>
+                ))}
+              </ol>
+            )}
 
             <h2>{t("products")}</h2>
             <div className="buyerOrderDetailItems">

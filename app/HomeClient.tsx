@@ -10,8 +10,8 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import TodijoLogo from "@/components/TodijoLogo";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
-
-type Locale = "ku" | "en" | "fr" | "ar";
+import { useCart } from "@/components/CartProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 type MarketplaceProduct = {
   id: string;
@@ -39,16 +39,10 @@ type Filters = {
   sort: string;
   minPrice: string;
   maxPrice: string;
+  availability: string;
 };
 
 type MarketplaceStore = { id: string; name: string; slug: string; description: string | null; logo: string | null; city: string; country: string; products: Array<{ id: string; name: string; image: string | null }> };
-
-const translations = {
-  ku: { dir:"rtl", title:"بەرهەمی دڵخوازت بدۆزەرەوە", subtitle:"لە نێوان بەرهەمە ڕاستەقینەکانی فرۆشیارانی Todijo بگەڕێ.", search:"گەڕان بە ناوی بەرهەم، فرۆشیار، شار یان وڵات...", searchButton:"گەڕان", categories:"پۆلەکان", products:"بەرهەمەکان", account:"هەژمار", cart:"سەبەتە", empty:"هیچ بەرهەمێک نەدۆزرایەوە.", stock:"لە کۆگادایە", soldOut:"تەواو بووە", all:"هەموو", filters:"فلتەر", min:"کەمترین نرخ", max:"زۆرترین نرخ", city:"شار", country:"وڵات", condition:"دۆخ", sort:"ڕیزکردن", newest:"نوێترین", oldest:"کۆنترین", low:"هەرزانترین", high:"گرانترین", apply:"جێبەجێکردن", reset:"سڕینەوەی فلتەر", results:"ئەنجام", previous:"پێشوو", next:"دواتر", sell:"فرۆشتن لە Todijo" },
-  en: { dir:"ltr", title:"Find your next favorite product", subtitle:"Search real products published by Todijo sellers.", search:"Search product, seller, city or country...", searchButton:"Search", categories:"Categories", products:"Products", account:"Account", cart:"Cart", empty:"No products found.", stock:"In stock", soldOut:"Sold out", all:"All", filters:"Filters", min:"Minimum price", max:"Maximum price", city:"City", country:"Country", condition:"Condition", sort:"Sort", newest:"Newest", oldest:"Oldest", low:"Lowest price", high:"Highest price", apply:"Apply filters", reset:"Clear filters", results:"results", previous:"Previous", next:"Next", sell:"Sell on Todijo" },
-  fr: { dir:"ltr", title:"Trouvez votre prochain coup de cœur", subtitle:"Recherchez parmi les vrais produits publiés par les vendeurs Todijo.", search:"Produit, vendeur, ville ou pays...", searchButton:"Rechercher", categories:"Catégories", products:"Produits", account:"Compte", cart:"Panier", empty:"Aucun produit trouvé.", stock:"En stock", soldOut:"Épuisé", all:"Tous", filters:"Filtres", min:"Prix minimum", max:"Prix maximum", city:"Ville", country:"Pays", condition:"État", sort:"Trier", newest:"Plus récents", oldest:"Plus anciens", low:"Prix croissant", high:"Prix décroissant", apply:"Appliquer", reset:"Effacer les filtres", results:"résultats", previous:"Précédent", next:"Suivant", sell:"Vendre sur Todijo" },
-  ar: { dir:"rtl", title:"اعثر على منتجك المفضل", subtitle:"ابحث في المنتجات الحقيقية المنشورة من بائعي Todijo.", search:"منتج أو بائع أو مدينة أو دولة...", searchButton:"بحث", categories:"الفئات", products:"المنتجات", account:"الحساب", cart:"السلة", empty:"لم يتم العثور على منتجات.", stock:"متوفر", soldOut:"نفد المخزون", all:"الكل", filters:"التصفية", min:"أقل سعر", max:"أعلى سعر", city:"المدينة", country:"الدولة", condition:"الحالة", sort:"الترتيب", newest:"الأحدث", oldest:"الأقدم", low:"الأرخص", high:"الأغلى", apply:"تطبيق", reset:"مسح الفلاتر", results:"نتيجة", previous:"السابق", next:"التالي", sell:"بع على Todijo" },
-} as const;
 
 const categoryIcons: Record<string, string> = {
   fashion: "👕", mode: "👕", clothing: "👕", electronics: "📱", électronique: "📱", electronique: "📱",
@@ -66,6 +60,11 @@ function buildUrl(filters: Filters, page = 1) {
 }
 
 function MarketplaceProductCard({ product, soldOut }: { product: MarketplaceProduct; soldOut: string }) {
+  const { addItem } = useCart();
+  const locale = useLocale();
+  const productText = useTranslations("Product");
+  const common = useTranslations("Common");
+  const cart = useTranslations("Cart");
   const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
   const price = Number(product.price);
   const discount = oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0;
@@ -76,7 +75,7 @@ function MarketplaceProductCard({ product, soldOut }: { product: MarketplaceProd
       {product.stock <= 0 && <span className="soldOutOverlay">{soldOut}</span>}
     </a>
     <ProductCardWishlist productId={product.id}/>
-    <div className="discoveryCardBody"><a className="marketplaceStore" href={`/store/${product.storeSlug}`}>{product.storeName}</a><h3><a href={`/product/${product.id}`}>{product.name}</a></h3><div className="cardBottom"><div><strong>{product.price} {product.currency}</strong>{oldPrice && oldPrice > price ? <del>{product.compareAtPrice} {product.currency}</del> : null}</div><small>{product.condition}</small></div></div>
+    <div className="discoveryCardBody"><a className="marketplaceStore" href={`/store/${product.storeSlug}`}>{product.storeName}</a><h3><a href={`/product/${product.id}`}>{product.name}</a></h3><div className="productAvailability"><span className={product.stock <= 0 ? "outStock" : product.stock <= 3 ? "lowStock" : "inStock"}>{product.stock <= 0 ? soldOut : product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div><div className="cardBottom"><div><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</div><button type="button" className="cardCartButton" disabled={product.stock <= 0} onClick={() => addItem({id:product.id,name:product.name,price,currency:product.currency,image:product.image ?? undefined,stock:product.stock,storeName:product.storeName,storeSlug:product.storeSlug})} aria-label={`${productText("add")}: ${product.name}`}><ShoppingCart size={17} aria-hidden="true"/><span>{product.stock <= 0 ? productText("unavailable") : productText("add")}</span></button></div></div>
   </article>;
 }
 
@@ -96,7 +95,6 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   pageSize: number;
   initialFilters: Filters;
 }) {
-  const [locale, setLocale] = useState<Locale>("fr");
   const [accountName, setAccountName] = useState<string | null>(null);
   const [filters, setFilters] = useState(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
@@ -109,16 +107,6 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   useEffect(() => {
-    const saved = localStorage.getItem("todijo-locale") as Locale | null;
-    if (saved && translations[saved]) return setLocale(saved);
-    const browser = navigator.language.toLowerCase();
-    if (browser.startsWith("ar")) setLocale("ar");
-    else if (browser.startsWith("ku")) setLocale("ku");
-    else if (browser.startsWith("en")) setLocale("en");
-    else setLocale("fr");
-  }, []);
-
-  useEffect(() => {
     fetch("/api/auth/session", { cache: "no-store" })
       .then((response) => response.json())
       .then((data) => {
@@ -127,14 +115,9 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
       .catch(() => {});
   }, []);
 
-  const activeCount = useMemo(() => [filters.category, filters.condition, filters.city, filters.country, filters.minPrice, filters.maxPrice].filter(Boolean).length, [filters]);
+  const activeCount = useMemo(() => [filters.category, filters.condition, filters.city, filters.country, filters.minPrice, filters.maxPrice, filters.availability].filter(Boolean).length, [filters]);
   const featuredProducts = products.filter((product) => product.image).slice(0, 3);
   const featuredCategories = categories.slice(0, 4);
-
-  function changeLocale(next: Locale) {
-    setLocale(next);
-    localStorage.setItem("todijo-locale", next);
-  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -231,12 +214,14 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             <label>{t.condition}<input value={filters.condition} onChange={(e) => setFilters({ ...filters, condition: e.target.value })} placeholder="NEUF / OCCASION" /></label>
             <label>{t.city}<input value={filters.city} onChange={(e) => setFilters({ ...filters, city: e.target.value })} /></label>
             <label>{t.country}<input value={filters.country} onChange={(e) => setFilters({ ...filters, country: e.target.value })} /></label>
+            <label className="availabilityFilter"><input type="checkbox" checked={filters.availability === "in-stock"} onChange={(e) => setFilters({ ...filters, availability: e.target.checked ? "in-stock" : "" })} />{t.stock}</label>
             <button className="filterApply">{t.apply}</button>
             <a className="filterReset" href="/#products">{t.reset}</a>
           </form>
         </aside>
 
         <div className="resultsArea">
+          {activeCount > 0 && <div className="activeFilterChips" aria-label={t.filters}>{Object.entries(filters).filter(([key,value]) => value && !["q","sort"].includes(key)).map(([key,value]) => <a key={key} href={buildUrl({...filters,[key]:""})}>{key === "availability" ? t.stock : value}<span aria-hidden="true">×</span></a>)}<a className="clearAllChip" href="/#products">{t.reset}</a></div>}
           <div className="resultsToolbar">
             <div><button className="mobileFilterButton" onClick={() => setShowFilters(!showFilters)}>☰ {t.filters}{activeCount ? ` (${activeCount})` : ""}</button><h2>{t.products}</h2><span>{total} {t.results}</span></div>
             <select value={filters.sort} onChange={(e) => window.location.href = buildUrl({ ...filters, sort: e.target.value })} aria-label={t.sort}>

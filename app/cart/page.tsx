@@ -5,14 +5,7 @@ import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { useCart } from "@/components/CartProvider";
 import { useLocale, useTranslations } from "next-intl";
-
-function formatMoney(value: number, currency: string, locale: string) {
-  try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
-}
+import { formatCurrency } from "@/lib/formatters";
 
 export default function CartPage() {
   const { items, subtotal, currency, updateQuantity, removeItem, clearCart } = useCart();
@@ -57,7 +50,7 @@ export default function CartPage() {
                         <Link href={`/product/${item.id}`}><h2>{item.name}</h2></Link>
                         {item.selectedOptions && <p className="cartOptions">{item.selectedOptions}</p>}
                       </div>
-                      <strong>{formatMoney(item.price * item.quantity, item.currency, locale)}</strong>
+                      <strong>{formatCurrency(item.price * item.quantity, item.currency, locale)}</strong>
                     </div>
                     <div className="cartItemBottom">
                       <div className="cartQuantity" aria-label={t("quantity", {name:item.name})}>
@@ -75,9 +68,9 @@ export default function CartPage() {
 
             <aside className="cartSummary">
               <h2>{t("summary")}</h2>
-              <div><span>{t("subtotal")}</span><strong>{formatMoney(subtotal, currency, locale)}</strong></div>
+              <div><span>{t("subtotal")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div>
               <div><span>{t("shipping")}</span><span>{t("shippingNext")}</span></div>
-              <div className="cartTotal"><span>{t("total")}</span><strong>{formatMoney(subtotal, currency, locale)}</strong></div>
+              <div className="cartTotal"><span>{t("total")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div>
               <Link className="authSubmit checkoutLink" href="/checkout">{t("checkout")}</Link>
               <p>{t("secure")}</p>
               <Link href="/">← {t("continue")}</Link>

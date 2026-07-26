@@ -38,6 +38,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const sort = one(params.sort) || "newest";
   const minPrice = Number(one(params.minPrice));
   const maxPrice = Number(one(params.maxPrice));
+  const availability = one(params.availability);
   const page = Math.max(1, Number(one(params.page)) || 1);
   const now = new Date();
   const publicProductAccess = publicProductAccessWhere(now);
@@ -48,6 +49,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     ...publicProductAccess,
     ...(category ? { category } : {}),
     ...(condition ? { condition } : {}),
+    ...(availability === "in-stock" ? { stock: { gt: 0 } } : {}),
     ...(Number.isFinite(minPrice) && minPrice >= 0 ? { price: { gte: minPrice } } : {}),
     ...(Number.isFinite(maxPrice) && maxPrice > 0
       ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } }
@@ -133,7 +135,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       total={total}
       page={page}
       pageSize={PAGE_SIZE}
-      initialFilters={{ q, category, condition, city, country, sort, minPrice: one(params.minPrice), maxPrice: one(params.maxPrice) }}
+      initialFilters={{ q, category, condition, city, country, sort, minPrice: one(params.minPrice), maxPrice: one(params.maxPrice), availability }}
     />
   );
 }
