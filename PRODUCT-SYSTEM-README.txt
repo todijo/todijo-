@@ -10,7 +10,9 @@ Included:
 - Price, stock, category, condition and up to 3 image URLs
 
 Deployment:
-The existing start command runs `prisma db push` before Next.js starts, so the database schema is updated automatically in Coolify.
+Database changes are deployed separately with the checked-in Prisma migrations.
+For an existing database, follow PRISMA-MIGRATION-RUNBOOK.md before running
+`npm run db:migrate`. The application start command does not change the schema.
 
 Images:
 This version accepts secure image URLs (https). Direct uploads will be added later with Cloudinary or S3, without changing the product database model.

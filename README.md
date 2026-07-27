@@ -25,6 +25,10 @@ Open `http://localhost:3000`.
 
 Push all files to GitHub, connect the repository to Coolify, select Dockerfile build, then deploy.
 
+Database deployments use the checked-in Prisma migration chain. Follow
+`PRISMA-MIGRATION-RUNBOOK.md` before the first deployment to an existing
+database, then use `npm run db:migrate` (`prisma migrate deploy`).
+
 ## Authentication UI v1
 
 - `/login` login page
@@ -47,7 +51,8 @@ Required Coolify environment variables:
 - `DATABASE_URL`
 - `SESSION_SECRET` (at least 32 random characters)
 
-The `npm start` script automatically runs `prisma db push` before starting Next.js.
+The `npm start` script starts Next.js and does not change the database schema.
+Apply reviewed migrations separately by following `PRISMA-MIGRATION-RUNBOOK.md`.
 
 
 ### Galerie produit
@@ -62,7 +67,10 @@ The `npm start` script automatically runs `prisma db push` before starting Next.
 
 This version adds a professional responsive header, persistent wishlist, native sharing, product choices, optional compare-at pricing and discount display, related products, buyer protection UI, customer reviews (local-device v1), an improved cart and a complete checkout interface prepared for future Stripe/PayPal keys.
 
-After deployment, `prisma db push` adds the optional `compareAtPrice`, `colors`, and `sizes` fields without deleting existing products.
+These fields are part of the historical baseline. Existing production
+databases must be manually verified and baselined according to
+`PRISMA-MIGRATION-RUNBOOK.md`; new databases are created with
+`prisma migrate deploy`.
 
 ## Product discovery sprint
 

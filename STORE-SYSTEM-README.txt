@@ -13,8 +13,9 @@ Coolify requirements:
 - DATABASE_URL
 - SESSION_SECRET (at least 32 characters)
 
-The start command already runs: prisma db push && next start
-This adds the new Store fields to PostgreSQL during deployment.
+The application start command does not change the database schema. Follow
+PRISMA-MIGRATION-RUNBOOK.md before the first migration deployment to an
+existing database, then run `npm run db:migrate` separately.
 
 STORE MEDIA UPLOAD V2
 - Sellers can upload logo and banner directly from phone/computer.

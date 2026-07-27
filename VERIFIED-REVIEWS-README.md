@@ -15,8 +15,9 @@ Included:
 
 Deployment:
 1. Upload/commit all files.
-2. Redeploy in Coolify.
-3. The current start script runs `prisma db push` automatically.
-4. Check deployment logs for a successful Prisma schema sync.
+2. For an existing database, complete the verification and baseline procedure
+   in `PRISMA-MIGRATION-RUNBOOK.md`.
+3. Run `npm run db:migrate` as a separate deployment step.
+4. Redeploy in Coolify and check migration and application logs.
 
 Important: the current checkout page does not charge customers yet. Reviews become available after the future checkout/payment flow creates an Order and OrderItem with an eligible status.

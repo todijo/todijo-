@@ -14,7 +14,9 @@ This upgrade adds private buyer/seller conversations without exposing email addr
 - Prevention of messaging your own store
 
 ## Deployment
-The existing `start` script runs `prisma db push`, which creates the new tables automatically on Coolify startup.
+Database changes are deployed separately with the checked-in Prisma migration
+chain. Follow `PRISMA-MIGRATION-RUNBOOK.md` before the first migration
+deployment to an existing database, then run `npm run db:migrate`.
 
 Required environment variables remain:
 - `DATABASE_URL`
