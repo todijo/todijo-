@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, localeCookie, locales, type Locale } from "./i18n/config";
+import { canonicalizeNestedLocalePath } from "./lib/locale-routing";
 
 const countryLocales: Record<string, Locale> = { FR: "fr", BE: "fr", CA: "fr", DZ: "ar", MA: "ar", TN: "ar", EG: "ar", IQ: "ar", JO: "ar", SA: "ar", TR: "tr", DE: "de", AT: "de", CH: "de", ES: "es", MX: "es", IT: "it", NL: "nl" };
 
@@ -18,6 +19,13 @@ function detectLocale(request: NextRequest): Locale {
 export function middleware(request: NextRequest) {
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const pathLocale = segments[0];
+  const canonicalPath = canonicalizeNestedLocalePath(request.nextUrl.pathname);
+  if (canonicalPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = canonicalPath;
+    return NextResponse.redirect(url);
+  }
+
   if (!isLocale(pathLocale)) {
     const locale = detectLocale(request);
     const url = request.nextUrl.clone();
