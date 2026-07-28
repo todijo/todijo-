@@ -9,7 +9,16 @@ export type StripeCheckoutSession = {
   payment_status: string;
   client_reference_id: string | null;
   metadata?: Record<string, string>;
+  currency?: string | null;
+  amount_subtotal?: number | null;
+  amount_total?: number | null;
+  total_details?: { amount_shipping?: number; amount_tax?: number } | null;
+  customer_details?: { name?: string | null; email?: string | null; phone?: string | null } | null;
+  shipping_details?: { name?: string | null; phone?: string | null; address?: StripeAddress | null } | null;
+  collected_information?: { shipping_details?: { name?: string | null; phone?: string | null; address?: StripeAddress | null } | null } | null;
 };
+
+export type StripeAddress = { line1?: string | null; line2?: string | null; city?: string | null; postal_code?: string | null; state?: string | null; country?: string | null };
 
 export type StripeSubscription = {
   id: string;
@@ -106,6 +115,10 @@ export function retrieveStripeSubscription(subscriptionId: string) {
   return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
 }
 
+export function retrieveStripeCheckoutSession(sessionId: string) {
+  return stripeRequest<StripeCheckoutSession>(`/checkout/sessions/${encodeURIComponent(sessionId)}`);
+}
+
 export function connectedAccountStatus(account: StripeConnectedAccount) {
   return { stripeOnboardingComplete: account.details_submitted, stripeChargesEnabled: account.charges_enabled, stripePayoutsEnabled: account.payouts_enabled };
 }
@@ -141,6 +154,7 @@ export async function createStripeCheckoutSession(input: {
     client_reference_id: input.orderId,
     customer_email: input.email,
     billing_address_collection: "required",
+    "phone_number_collection[enabled]": "true",
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel?order_id=${encodeURIComponent(input.orderId)}`,
     "metadata[orderId]": input.orderId,

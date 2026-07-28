@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
   items: {
-    include: {
+    select: { id: true, quantity: true, unitPrice: true, lineTotal: true, selectedColor: true, selectedSize: true, productNameSnapshot: true, productImageUrlSnapshot: true,
       product: {
         select: {
           id: true,
@@ -10,8 +10,7 @@ const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
           images: true,
           store: { select: { name: true, slug: true } },
         },
-      },
-    },
+      } },
     orderBy: { createdAt: "asc" },
   },
 });

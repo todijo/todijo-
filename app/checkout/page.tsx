@@ -19,12 +19,12 @@ export default function CheckoutPage() {
 
   async function beginCheckout() {
     setLoading(true); setError("");
-    const cartSignature = items.map(({ id, quantity }) => `${id}:${quantity}`).sort().join("|");
+    const cartSignature = items.map(({ lineKey, quantity }) => `${lineKey}:${quantity}`).sort().join("|");
     const storageKey = `todijo-checkout:${cartSignature}`;
     const requestId = window.localStorage.getItem(storageKey) ?? crypto.randomUUID();
     window.localStorage.setItem(storageKey, requestId);
     try {
-      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, items: items.map((item) => ({ productId: item.id, quantity: item.quantity })) }) });
+      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize })) }) });
       const result = await response.json() as { url?: string; error?: string; code?: string };
       if (!response.ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : t("startError"));
       window.location.assign(result.url);

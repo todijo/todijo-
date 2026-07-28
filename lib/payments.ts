@@ -1,11 +1,12 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
+import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
+import { cartLineKey, normalizeCartOption } from "./cart-line";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 
-type CheckoutItem = { productId: string; quantity: number };
+type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null };
 
 export async function createCheckout(
   db: PrismaClient,
@@ -16,10 +17,13 @@ export async function createCheckout(
 ) {
   if (!/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) throw new CheckoutError("Invalid checkout request ID.");
   if (!Array.isArray(requestedItems) || requestedItems.length === 0 || requestedItems.length > 100) throw new CheckoutError("Your cart is empty or too large.");
-  const quantities = new Map<string, number>();
+  const quantities = new Map<string, CheckoutItem & { lineKey: string }>();
   for (const item of requestedItems) {
     if (typeof item.productId !== "string" || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000) throw new CheckoutError("Invalid cart item.");
-    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+    const selectedColor = normalizeCartOption(item.selectedColor), selectedSize = normalizeCartOption(item.selectedSize);
+    const lineKey = cartLineKey(item.productId, selectedColor, selectedSize);
+    const existingLine = quantities.get(lineKey);
+    quantities.set(lineKey, { productId: item.productId, selectedColor, selectedSize, lineKey, quantity: (existingLine?.quantity ?? 0) + item.quantity });
   }
 
   const existing = await db.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
@@ -28,36 +32,39 @@ export async function createCheckout(
   }
   if (existing && existing.status !== "PENDING") throw new CheckoutError("This checkout request can no longer be reused.", 409);
 
-  const products = await db.product.findMany({ where: { id: { in: [...quantities.keys()] }, status: "PUBLISHED" }, select: { id: true, name: true, price: true, currency: true, stock: true, storeId: true, store: { select: { owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
-  if (products.length !== quantities.size) throw new CheckoutError("One or more products are unavailable.", 409);
+  const lines = [...quantities.values()];
+  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
+  if (products.length !== new Set(lines.map((line) => line.productId)).size) throw new CheckoutError("One or more products are unavailable.", 409);
   const stores = new Set(products.map((product) => product.storeId));
   if (stores.size !== 1) throw new CheckoutError("MULTIPLE_SELLERS", 409);
   const seller = products[0].store.owner;
   if (!seller.stripeAccountId || !seller.stripeOnboardingComplete || !seller.stripeChargesEnabled) throw new CheckoutError("SELLER_STRIPE_NOT_READY", 409);
   const currencies = new Set(products.map((product) => product.currency.toUpperCase()));
   if (currencies.size !== 1) throw new CheckoutError("All products must use the same currency.");
-  for (const product of products) if (product.stock < quantities.get(product.id)!) throw new CheckoutError(`Insufficient stock for ${product.name}.`, 409);
-  const total = products.reduce((sum, product) => sum.add(product.price.mul(quantities.get(product.id)!)), new Prisma.Decimal(0));
+  for (const line of lines) { const product = products.find((candidate) => candidate.id === line.productId)!; if (((product.colors ?? []).length && (!line.selectedColor || !(product.colors ?? []).includes(line.selectedColor))) || ((product.sizes ?? []).length && (!line.selectedSize || !(product.sizes ?? []).includes(line.selectedSize)))) throw new CheckoutError("Selected product options are unavailable.", 409); }
+  for (const product of products) { const quantity = lines.filter((line) => line.productId === product.id).reduce((sum, line) => sum + line.quantity, 0); if (product.stock < quantity) throw new CheckoutError(`Insufficient stock for ${product.name}.`, 409); }
+  const total = lines.reduce((sum, line) => sum.add(products.find((product) => product.id === line.productId)!.price.mul(line.quantity)), new Prisma.Decimal(0));
   const totalAmount = Number(total.mul(100).toFixed(0));
   const platformFeeAmount = Math.round(totalAmount * platformFeePercent() / 100);
   const sellerAmount = totalAmount - platformFeeAmount;
   if (existing) {
-    const sameCart = existing.items.length === quantities.size && existing.items.every((item) => quantities.get(item.productId) === item.quantity && item.unitPrice.equals(products.find((product) => product.id === item.productId)?.price ?? -1));
+    const sameCart = existing.items.length === lines.length && existing.items.every((item) => lines.some((line) => line.productId === item.productId && line.quantity === item.quantity && item.unitPrice.equals(products.find((product) => product.id === item.productId)?.price ?? -1)));
     if (!sameCart || !existing.total.equals(total) || existing.currency !== products[0].currency.toUpperCase() || existing.stripeConnectedAccountId !== seller.stripeAccountId || existing.platformFeeAmount !== platformFeeAmount || existing.sellerAmount !== sellerAmount) throw new CheckoutError("This checkout request belongs to a different cart. Start a new checkout.", 409);
   }
 
+  const buyer = await db.user.findUniqueOrThrow({ where: { id: buyerId }, select: { email: true, firstName: true, lastName: true } });
   let order = existing;
   if (!order) {
     try {
-      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: products.map((product) => ({ productId: product.id, quantity: quantities.get(product.id)!, unitPrice: product.price })) } }, include: { items: true } });
+      const store = products[0].store;
+      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, subtotal: total, shippingCost: new Prisma.Decimal(0), taxTotal: new Prisma.Decimal(0), shippingCurrency: products[0].currency.toUpperCase(), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: lines.map((line) => { const product = products.find((candidate) => candidate.id === line.productId)!; return { productId: product.id, quantity: line.quantity, unitPrice: product.price, lineKey: line.lineKey, productNameSnapshot: product.name, productDescriptionSnapshot: product.description ?? null, productImageUrlSnapshot: product.images?.[0] ?? null, currency: product.currency.toUpperCase(), lineTotal: product.price.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: { color: line.selectedColor, size: line.selectedSize } }; }) } }, include: { items: true } });
     } catch (error) {
       if (!isPrismaCode(error, "P2002")) throw error;
       order = await db.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
       if (order.stripeCheckoutSessionId && order.stripeCheckoutUrl) return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
     }
   }
-  const buyer = await db.user.findUniqueOrThrow({ where: { id: buyerId }, select: { email: true } });
-  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, items: products.map((product) => ({ name: product.name, unitAmount: Number(product.price.mul(100).toFixed(0)), quantity: quantities.get(product.id)!, currency: product.currency })) });
+  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, items: lines.map((line) => { const product = products.find((candidate) => candidate.id === line.productId)!; return { name: [product.name, line.selectedColor, line.selectedSize].filter(Boolean).join(" · "), unitAmount: Number(product.price.mul(100).toFixed(0)), quantity: line.quantity, currency: product.currency }; }) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
 }
@@ -66,8 +73,9 @@ export async function processStripeEvent(
   db: PrismaClient,
   event: StripeEvent,
   retrieveSubscription = retrieveStripeSubscription,
+  retrieveCheckoutSession = retrieveStripeCheckoutSession,
 ) {
-  const checkoutSession = event.data.object as StripeCheckoutSession;
+  let checkoutSession = event.data.object as StripeCheckoutSession;
   const sellerCheckout = event.type === "checkout.session.completed"
     && (checkoutSession.mode === "subscription" || checkoutSession.metadata?.kind === "seller_subscription");
   let checkoutSubscription: StripeSubscription | null = null;
@@ -77,6 +85,9 @@ export async function processStripeEvent(
     console.info(`[Stripe webhook ${event.id}] Retrieving subscription ${subscriptionId} for Checkout session ${checkoutSession.id}.`);
     checkoutSubscription = await retrieveSubscription(subscriptionId);
     if (!checkoutSubscription?.id) throw new Error(`[Stripe webhook ${event.id}] Stripe returned no subscription for ${subscriptionId}.`);
+  }
+  if (process.env.STRIPE_SECRET_KEY && !sellerCheckout && (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded")) {
+    checkoutSession = await retrieveCheckoutSession(checkoutSession.id);
   }
   const webhookDelegate = (db as PrismaClient & { stripeWebhookEvent?: typeof db.stripeWebhookEvent }).stripeWebhookEvent as (typeof db.stripeWebhookEvent & {
     findUnique?: (args: { where: { id: string }; select: { id: true } }) => Promise<{ id: string } | null>;
@@ -125,7 +136,7 @@ export async function processStripeEvent(
         console.info(`[Stripe webhook ${event.id}] Invoice updated store ${existing.storeId} subscription to ${status}.`);
         return { subscriptionUpdated: true, storeId: existing.storeId, status };
       }
-      const session = event.data.object as StripeCheckoutSession;
+      const session = checkoutSession;
       if (sellerCheckout) {
         if (!checkoutSubscription) throw new Error(`[Stripe webhook ${event.id}] Retrieved subscription is unavailable.`);
         const synced = await syncSellerSubscription(tx, checkoutSubscription, event.type, event.id, {
@@ -145,11 +156,16 @@ export async function processStripeEvent(
         if (order.status === "PAID") return { duplicate: true };
         if (order.status !== "PENDING" || (order.stripeCheckoutSessionId && order.stripeCheckoutSessionId !== session.id)) throw new Error("Stripe session does not match the pending order.");
         if (order.stripeConnectedAccountId && session.metadata?.connectedAccountId !== order.stripeConnectedAccountId) throw new Error("Stripe destination account does not match the order.");
+        const expectedAmount = Number(order.total.mul(100).toFixed(0));
+        if (session.amount_total != null && session.amount_total !== expectedAmount) throw new Error("Stripe total does not match the order.");
+        if (session.currency && session.currency.toUpperCase() !== order.currency) throw new Error("Stripe currency does not match the order.");
         for (const item of order.items) {
           const changed = await tx.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
           if (changed.count !== 1) throw new CheckoutError("Insufficient stock while finalizing payment.", 409);
         }
-        await tx.order.update({ where: { id: order.id }, data: { status: "PAID", paidAt: new Date(), stripeCheckoutSessionId: session.id, stripePaymentIntentId: session.payment_intent } });
+        const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
+        const address = shipping?.address;
+        await tx.order.update({ where: { id: order.id }, data: { status: "PAID", paidAt: new Date(), stripeCheckoutSessionId: session.id, stripePaymentIntentId: session.payment_intent, recipientName: shipping?.name ?? session.customer_details?.name ?? null, recipientEmail: session.customer_details?.email ?? null, recipientPhone: shipping?.phone ?? session.customer_details?.phone ?? null, shippingAddressLine1: address?.line1 ?? null, shippingAddressLine2: address?.line2 ?? null, shippingCity: address?.city ?? null, shippingPostalCode: address?.postal_code ?? null, shippingState: address?.state ?? null, shippingCountry: address?.country ?? null, shippingCapturedAt: new Date(), subtotal: session.amount_subtotal != null ? new Prisma.Decimal(session.amount_subtotal).div(100) : order.subtotal, shippingCost: new Prisma.Decimal(session.total_details?.amount_shipping ?? 0).div(100), taxTotal: new Prisma.Decimal(session.total_details?.amount_tax ?? 0).div(100) } });
         return { paid: true };
       }
       if (event.type === "checkout.session.expired" || event.type === "payment_intent.payment_failed") {

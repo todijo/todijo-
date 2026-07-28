@@ -124,6 +124,25 @@ model Store {
   updatedAt DateTime @updatedAt
 }
 
+enum OrderSnapshotSource {
+  CHECKOUT_CAPTURED
+  LEGACY_RECONSTRUCTED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  PACKED
+  SHIPPED
+  DELIVERED
+}
+
+enum FulfillmentEventSource {
+  SYSTEM
+  SELLER
+  ADMIN
+}
+
 model StoreAccessGrant {
   id          String            @id @default(cuid())
   storeId     String
@@ -255,14 +274,47 @@ model Order {
   platformFeeAmount        Int?
   sellerAmount             Int?
   deliveredAt              DateTime?
+  snapshotSource           OrderSnapshotSource?
+  snapshotCapturedAt       DateTime?
+  storeIdSnapshot          String?
+  storeNameSnapshot        String?
+  storeSnapshot            Json?
+  buyerNameSnapshot        String?
+  buyerEmailSnapshot       String?
+  buyerPhoneSnapshot       String?
+  recipientName            String?
+  recipientEmail           String?
+  recipientPhone           String?
+  shippingAddressLine1     String?
+  shippingAddressLine2     String?
+  shippingCity             String?
+  shippingPostalCode       String?
+  shippingState            String?
+  shippingCountry          String?
+  shippingMethod           String?
+  shippingCost             Decimal? @db.Decimal(12, 2)
+  shippingCurrency         String?  @db.VarChar(3)
+  subtotal                 Decimal? @db.Decimal(12, 2)
+  taxTotal                 Decimal? @db.Decimal(12, 2)
+  fulfillmentStatus        FulfillmentStatus?
+  processingAt             DateTime?
+  packedAt                 DateTime?
+  shippedAt                DateTime?
+  trackingCarrier          String?
+  trackingNumber           String?
+  trackingUrl              String?
+  shippingCapturedAt       DateTime?
   createdAt                DateTime    @default(now())
   updatedAt                DateTime    @updatedAt
 
   buyer User        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  items OrderItem[]
+  items             OrderItem[]
+  fulfillmentEvents OrderFulfillmentEvent[]
 
   @@unique([buyerId, checkoutRequestId])
   @@index([buyerId, status, createdAt])
+  @@index([storeIdSnapshot])
+  @@index([fulfillmentStatus])
 }
 
 model StripeWebhookEvent {
@@ -278,13 +330,37 @@ model OrderItem {
   quantity  Int      @default(1)
   unitPrice Decimal  @db.Decimal(12, 2)
   createdAt DateTime @default(now())
+  lineKey                    String?
+  productNameSnapshot        String?
+  productDescriptionSnapshot String? @db.Text
+  productImageUrlSnapshot    String?
+  productSkuSnapshot         String?
+  currency                   String? @db.VarChar(3)
+  lineTotal                  Decimal? @db.Decimal(12, 2)
+  selectedSize               String?
+  selectedColor              String?
+  selectedOptions            Json?
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   review  Review?
 
-  @@unique([orderId, productId])
+  @@unique([orderId, lineKey])
   @@index([productId])
+}
+
+model OrderFulfillmentEvent {
+  id         String                 @id @default(cuid())
+  orderId    String
+  status     FulfillmentStatus
+  source     FulfillmentEventSource
+  actorId    String?
+  occurredAt DateTime               @default(now())
+  metadata   Json?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, occurredAt])
 }
 
 model Review {

@@ -36,7 +36,7 @@ export default function CartPage() {
           <div className="cartLayout">
             <section className="cartItems" aria-label={t("items")}>
               {items.map((item) => (
-                <article className="cartItem" key={item.id}>
+                <article className="cartItem" key={item.lineKey}>
                   <Link href={`/product/${item.id}`} className="cartItemImage">
                     {item.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -54,12 +54,12 @@ export default function CartPage() {
                     </div>
                     <div className="cartItemBottom">
                       <div className="cartQuantity" aria-label={t("quantity", {name:item.name})}>
-                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} aria-label={t("decrease")}>−</button>
+                        <button type="button" onClick={() => updateQuantity(item.lineKey!, item.quantity - 1)} aria-label={t("decrease")}>−</button>
                         <span>{item.quantity}</span>
-                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock} aria-label={t("increase")}>+</button>
+                        <button type="button" onClick={() => updateQuantity(item.lineKey!, item.quantity + 1)} disabled={item.quantity >= item.stock} aria-label={t("increase")}>+</button>
                       </div>
                       <span className="cartStock">{t("stock", {count:item.stock})}</span>
-                      <button className="cartRemoveButton" type="button" onClick={() => removeItem(item.id)}>{t("clear")}</button>
+                      <button className="cartRemoveButton" type="button" onClick={() => removeItem(item.lineKey!)}>{t("clear")}</button>
                     </div>
                   </div>
                 </article>

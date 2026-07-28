@@ -44,7 +44,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
         ) : (
           <section className="buyerOrderList" aria-label={t("title")}>
             {orders.map((order) => {
-              const store = order.items[0]?.product.store;
+              const store = order.storeNameSnapshot ?? order.items[0]?.product.store.name;
               const paymentState = buyerPaymentState(order);
               return (
                 <article className="buyerOrderCard" key={order.id}>
@@ -57,15 +57,15 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
                   </header>
                   <div className="buyerOrderMeta">
                     <span>{t("purchasedOn", { date: date(order.createdAt) })}</span>
-                    <span>{t("store")}: <strong>{store?.name ?? t("unknownStore")}</strong></span>
+                    <span>{t("store")}: <strong>{store ?? t("unknownStore")}</strong></span>
                   </div>
                   <div className="buyerOrderProducts">
                     {order.items.map((item) => (
                       <div className="buyerOrderProduct" key={item.id}>
                         <div className="buyerOrderProductImage">
-                          {item.product.images[0] ? <img src={item.product.images[0]} alt={t("productImageAlt", { name: item.product.name })} /> : <span aria-hidden="true">📦</span>}
+                          {(item.productImageUrlSnapshot ?? item.product.images[0]) ? <img src={item.productImageUrlSnapshot ?? item.product.images[0]} alt={t("productImageAlt", { name: item.productNameSnapshot ?? item.product.name })} /> : <span aria-hidden="true">📦</span>}
                         </div>
-                        <div><strong>{item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>
+                        <div><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>
                       </div>
                     ))}
                   </div>

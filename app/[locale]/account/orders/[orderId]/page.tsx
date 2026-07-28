@@ -27,8 +27,8 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   const money = (amount: number) => new Intl.NumberFormat(locale, { style: "currency", currency: order.currency }).format(amount);
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(order.createdAt);
   const paymentState = buyerPaymentState(order);
-  const store = order.items[0]?.product.store;
-  const subtotal = order.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
+  const store = order.storeNameSnapshot ?? order.items[0]?.product.store.name;
+  const subtotal = Number(order.subtotal ?? order.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0));
   const currentStep = fulfillmentStepIndex(order.status);
   const timeline = [
     { key: "PAID", label: t("status.PAID") },
@@ -53,7 +53,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
               <div><span>{t("orderDate")}</span><strong>{date}</strong></div>
               <div><span>{t("paymentStatus")}</span><strong>{t(`payment.${paymentState}`)}</strong></div>
               <div><span>{t("orderStatus")}</span><strong>{t(`status.${order.status}`)}</strong></div>
-              <div><span>{t("store")}</span><strong>{store?.name ?? t("unknownStore")}</strong></div>
+              <div><span>{t("store")}</span><strong>{store ?? t("unknownStore")}</strong></div>
             </div>
 
             {currentStep >= 0 && (
@@ -74,11 +74,11 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
                 return (
                   <article key={item.id}>
                     <div className="buyerOrderDetailImage">
-                      {item.product.images[0] ? <img src={item.product.images[0]} alt={t("productImageAlt", { name: item.product.name })} /> : <span aria-hidden="true">📦</span>}
+                      {(item.productImageUrlSnapshot ?? item.product.images[0]) ? <img src={item.productImageUrlSnapshot ?? item.product.images[0]} alt={t("productImageAlt", { name: item.productNameSnapshot ?? item.product.name })} /> : <span aria-hidden="true">📦</span>}
                     </div>
-                    <div className="buyerOrderDetailProduct"><strong>{item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>
+                    <div className="buyerOrderDetailProduct"><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>
                     <div><span>{t("unitPrice")}</span><strong>{money(unitPrice)}</strong></div>
-                    <div><span>{t("lineTotal")}</span><strong>{money(unitPrice * item.quantity)}</strong></div>
+                    <div><span>{t("lineTotal")}</span><strong>{money(Number(item.lineTotal ?? unitPrice * item.quantity))}</strong></div>
                   </article>
                 );
               })}

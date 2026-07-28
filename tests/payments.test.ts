@@ -105,6 +105,27 @@ test("webhook signature rejection blocks altered payloads", () => {
   assert.throws(() => verifyStripeWebhook(`${body} `, `t=${timestamp},v1=${signature}`, secret), /Invalid Stripe webhook signature/);
 });
 
+test("verified Checkout data persists recipient details and rejects amount mismatches", async () => {
+  const updates: any[] = [];
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: { findUnique: async () => ({ id: "order_1", status: "PENDING", total: new Prisma.Decimal("12.50"), currency: "EUR", stripeCheckoutSessionId: "cs_1", stripeConnectedAccountId: "acct_1", subtotal: new Prisma.Decimal("12.50"), items: [{ productId: "prod_1", quantity: 1 }] }), update: async (args: any) => { updates.push(args); return {}; } }, product: { updateMany: async () => ({ count: 1 }) } };
+  const db: any = { $transaction: async (callback: any) => callback(tx) };
+  const event: StripeEvent = { id: "evt_shipping", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", payment_status: "paid", client_reference_id: "order_1", metadata: { orderId: "order_1", connectedAccountId: "acct_1" } } } };
+  const session: any = { ...event.data.object, amount_total: 1250, amount_subtotal: 1250, currency: "eur", customer_details: { email: "buyer@example.com", phone: "+33000000000" }, shipping_details: { name: "Recipient", address: { line1: "1 Rue", city: "Paris", postal_code: "75001", country: "FR" } }, total_details: { amount_shipping: 0, amount_tax: 0 } };
+  const previous = process.env.STRIPE_SECRET_KEY; process.env.STRIPE_SECRET_KEY = "sk_test_test";
+  try { assert.deepEqual(await processStripeEvent(db, event, undefined, async () => session), { paid: true }); }
+  finally { if (previous == null) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previous; }
+  assert.equal(updates[0].data.recipientName, "Recipient"); assert.equal(updates[0].data.recipientPhone, "+33000000000");
+});
+
+test("verified Checkout total mismatch blocks payment finalization", async () => {
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: { findUnique: async () => ({ id: "order_1", status: "PENDING", total: new Prisma.Decimal("12.50"), currency: "EUR", stripeCheckoutSessionId: "cs_1", stripeConnectedAccountId: "acct_1", items: [] }) } };
+  const db: any = { $transaction: async (callback: any) => callback(tx) };
+  const event: StripeEvent = { id: "evt_total", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", payment_status: "paid", client_reference_id: "order_1", metadata: { orderId: "order_1", connectedAccountId: "acct_1" } } } };
+  const previous = process.env.STRIPE_SECRET_KEY; process.env.STRIPE_SECRET_KEY = "sk_test_test";
+  try { await assert.rejects(() => processStripeEvent(db, event, undefined, async () => ({ ...event.data.object, amount_total: 1200, currency: "eur" } as any)), /total does not match/); }
+  finally { if (previous == null) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previous; }
+});
+
 test("subscription Checkout retrieves Stripe subscription and activates the local seller", async () => {
   let storeUpdate: any;
   let subscriptionUpsert: any;

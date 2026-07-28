@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { cartLineKey, normalizeCartOption } from "@/lib/cart-line";
 
 export type CartProduct = {
   id: string;
@@ -13,6 +14,9 @@ export type CartProduct = {
   storeName?: string;
   storeSlug?: string;
   selectedOptions?: string;
+  selectedColor?: string | null;
+  selectedSize?: string | null;
+  lineKey?: string;
 };
 
 export type CartItem = CartProduct & { quantity: number };
@@ -23,8 +27,8 @@ type CartContextValue = {
   subtotal: number;
   currency: string;
   addItem: (product: CartProduct, quantity?: number) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  removeItem: (productId: string) => void;
+  updateQuantity: (lineKey: string, quantity: number) => void;
+  removeItem: (lineKey: string) => void;
   clearCart: () => void;
 };
 
@@ -51,7 +55,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         try {
           const saved = window.localStorage.getItem(nextStorageKey);
           const parsed = saved ? JSON.parse(saved) as CartItem[] : [];
-          setItems(Array.isArray(parsed) ? parsed : []);
+          setItems(Array.isArray(parsed) ? parsed.map((item) => ({ ...item, selectedColor: normalizeCartOption(item.selectedColor), selectedSize: normalizeCartOption(item.selectedSize), lineKey: item.lineKey ?? cartLineKey(item.id, item.selectedColor, item.selectedSize) })) : []);
         } catch {
           window.localStorage.removeItem(nextStorageKey);
           setItems([]);
@@ -90,30 +94,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       currency,
       addItem(product, quantity = 1) {
         setItems((current) => {
-          const existing = current.find((item) => item.id === product.id);
+          const lineKey = cartLineKey(product.id, product.selectedColor, product.selectedSize);
+          const existing = current.find((item) => item.lineKey === lineKey);
           if (!existing) {
-            return [...current, { ...product, quantity: Math.min(Math.max(quantity, 1), product.stock) }];
+            return [...current, { ...product, selectedColor: normalizeCartOption(product.selectedColor), selectedSize: normalizeCartOption(product.selectedSize), lineKey, quantity: Math.min(Math.max(quantity, 1), product.stock) }];
           }
           return current.map((item) =>
-            item.id === product.id
+            item.lineKey === lineKey
               ? { ...item, quantity: Math.min(item.quantity + quantity, item.stock) }
               : item
           );
         });
       },
-      updateQuantity(productId, quantity) {
+      updateQuantity(lineKey, quantity) {
         setItems((current) =>
           current
             .map((item) =>
-              item.id === productId
+              item.lineKey === lineKey
                 ? { ...item, quantity: Math.min(Math.max(quantity, 0), item.stock) }
                 : item
             )
             .filter((item) => item.quantity > 0)
         );
       },
-      removeItem(productId) {
-        setItems((current) => current.filter((item) => item.id !== productId));
+      removeItem(lineKey) {
+        setItems((current) => current.filter((item) => item.lineKey !== lineKey));
       },
       clearCart() {
         setItems([]);

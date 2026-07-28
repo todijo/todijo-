@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   try {
-    const body = await request.json() as { requestId?: string; items?: Array<{ productId: string; quantity: number }> };
+    const body = await request.json() as { requestId?: string; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null }> };
     const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? []);
     return NextResponse.json(checkout);
   } catch (error) {

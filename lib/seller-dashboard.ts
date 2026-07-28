@@ -1,4 +1,4 @@
-type SellerOrder = { status: string; buyerId: string; createdAt: Date; paidAt: Date | null; stripePaymentIntentId: string | null; sellerAmount: number | null; items: Array<{ quantity: number; product: { id?: string; name: string } }> };
+type SellerOrder = { status: string; buyerId: string; createdAt: Date; paidAt: Date | null; stripePaymentIntentId: string | null; sellerAmount: number | null; items: Array<{ quantity: number; productNameSnapshot?: string | null; product: { id?: string; name: string } }> };
 
 export function sellerPeriodMetrics(orders: SellerOrder[], now = new Date()) {
   const currentStart = new Date(now); currentStart.setDate(currentStart.getDate() - 30);
@@ -19,7 +19,7 @@ export function sellerAnalytics(orders: SellerOrder[], locale: string, now = new
     statuses.set(order.status, (statuses.get(order.status) ?? 0) + 1);
     const day = days.find((item) => order.createdAt >= item.date && order.createdAt < new Date(item.date.getTime() + 86400000));
     if (day) { day.orders += 1; if (order.paidAt || order.stripePaymentIntentId) day.revenue += (order.sellerAmount ?? 0) / 100; }
-    if (order.paidAt || order.stripePaymentIntentId) for (const item of order.items) { const key = item.product.id ?? item.product.name; const current = products.get(key) ?? { name: item.product.name, quantity: 0 }; current.quantity += item.quantity; products.set(key, current); }
+    if (order.paidAt || order.stripePaymentIntentId) for (const item of order.items) { const name = item.productNameSnapshot ?? item.product.name; const key = item.product.id ?? name; const current = products.get(key) ?? { name, quantity: 0 }; current.quantity += item.quantity; products.set(key, current); }
   }
   return { trends: days.map(({ label, revenue, orders: count }) => ({ label, revenue, orders: count })), products: [...products.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 5), statuses: [...statuses].map(([status, value]) => ({ status, value })) };
 }
