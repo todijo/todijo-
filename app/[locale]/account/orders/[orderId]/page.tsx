@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
-import { fulfillmentStepIndex } from "@/lib/order-status";
+import { fulfillmentStepFor, fulfillmentStepIndex } from "@/lib/order-status";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +30,12 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   const store = order.storeNameSnapshot ?? order.items[0]?.product.store.name;
   const subtotal = Number(order.subtotal ?? order.items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0));
   const currentStep = fulfillmentStepIndex(order.status);
+  const fulfillmentStep = fulfillmentStepFor(order.status);
   const timeline = [
-    { key: "PAID", label: t("status.PAID") },
-    { key: "PROCESSING", label: t("status.PROCESSING") },
-    { key: "SHIPPED", label: t("status.SHIPPED") },
-    { key: "DELIVERED", label: t("status.DELIVERED") },
+    { key: "PAID", label: t("fulfillment.confirmed") },
+    { key: "PROCESSING", label: t("fulfillment.preparing") },
+    { key: "SHIPPED", label: t("fulfillment.shipped") },
+    { key: "DELIVERED", label: t("fulfillment.delivered") },
   ];
 
   return (
@@ -52,7 +53,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
             <div className="buyerOrderDetailSummary">
               <div><span>{t("orderDate")}</span><strong>{date}</strong></div>
               <div><span>{t("paymentStatus")}</span><strong>{t(`payment.${paymentState}`)}</strong></div>
-              <div><span>{t("orderStatus")}</span><strong>{t(`status.${order.status}`)}</strong></div>
+              <div><span>{t("orderStatus")}</span><strong>{fulfillmentStep ? t(`fulfillment.${fulfillmentStep.toLowerCase()}`) : t(`status.${order.status}`)}</strong></div>
               <div><span>{t("store")}</span><strong>{store ?? t("unknownStore")}</strong></div>
             </div>
 
@@ -66,6 +67,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
                 ))}
               </ol>
             )}
+            {(order.trackingCarrier || order.trackingNumber) && <p><strong>{t("fulfillment.tracking")}</strong>{order.trackingCarrier && ` ${order.trackingCarrier}`}{order.trackingCarrier && order.trackingNumber && " · "}{order.trackingNumber}</p>}
 
             <h2>{t("products")}</h2>
             <div className="buyerOrderDetailItems">

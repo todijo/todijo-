@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
+import { fulfillmentStepFor } from "@/lib/order-status";
 
 export const dynamic = "force-dynamic";
 
@@ -46,13 +47,14 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
             {orders.map((order) => {
               const store = order.storeNameSnapshot ?? order.items[0]?.product.store.name;
               const paymentState = buyerPaymentState(order);
+              const fulfillmentStep = fulfillmentStepFor(order.status);
               return (
                 <article className="buyerOrderCard" key={order.id}>
                   <header>
                     <div><span>{t("orderNumber")}</span><strong>#{order.id}</strong></div>
                     <div className="buyerOrderBadges">
                       <span className={`orderBadge payment-${paymentState}`}>{t(`payment.${paymentState}`)}</span>
-                      <span className={`orderBadge status-${order.status.toLowerCase()}`}>{t(`status.${order.status}`)}</span>
+                      <span className={`orderBadge status-${order.status.toLowerCase()}`}>{fulfillmentStep ? t(`fulfillment.${fulfillmentStep.toLowerCase()}`) : t(`status.${order.status}`)}</span>
                     </div>
                   </header>
                   <div className="buyerOrderMeta">

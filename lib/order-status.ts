@@ -25,3 +25,7 @@ export function fulfillmentStepIndex(status: OrderStatus) {
   const step = fulfillmentStepFor(status);
   return step ? fulfillmentSteps.indexOf(step) : -1;
 }
+
+export function sellerFulfillmentActionFor(status: OrderStatus) {
+  return status === "PAID" || status === "PROCESSING" || status === "SHIPPED" ? status : null;
+}

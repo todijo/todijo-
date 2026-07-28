@@ -27,7 +27,7 @@ test("successful payment marks order paid and decrements stock once", async () =
   const tx: any = {
     stripeWebhookEvent: { create: async () => ({}) },
     order: {
-      findUnique: async () => ({ id: "order_1", status: state.status, stripeCheckoutSessionId: "cs_1", items: [{ productId: "prod_1", quantity: 2 }] }),
+      findUnique: async () => ({ id: "order_1", status: state.status, total: new Prisma.Decimal("25.00"), currency: "EUR", stripeCheckoutSessionId: "cs_1", items: [{ productId: "prod_1", quantity: 2 }] }),
       update: async ({ data }: any) => { state.status = data.status; return {}; },
       updateMany: async () => ({ count: 0 }),
     },
