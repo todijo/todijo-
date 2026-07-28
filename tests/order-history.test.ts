@@ -22,6 +22,14 @@ test("seller finds an owned order by full reference with database pagination", a
   assert.deepEqual({ skip: findCalls[0].skip, take: findCalls[0].take }, { skip: 20, take: 20 });
 });
 
+test("seller reference search accepts the displayed optional hash prefix without weakening ownership", async () => {
+  const { db, findCalls } = database();
+  await listSellerOrderHistory(db, "seller_1", "store_1", " #cms1n7dy20001p801f3igscyx ", "1");
+  assert.equal(findCalls[0].where.AND[1].id.contains, "cms1n7dy20001p801f3igscyx");
+  assert.equal(findCalls[0].where.AND[0].OR[0].storeIdSnapshot, "store_1");
+  assert.equal(findCalls[0].where.AND[0].OR[1].items.every.product.store.ownerId, "seller_1");
+});
+
 test("seller includes a legacy order only when all items belong to its store", async () => {
   const { db, findCalls } = database();
   await listSellerOrderHistory(db, "seller_1", "store_1", "85vbi", "1");
@@ -51,6 +59,7 @@ test("blank and invalid search inputs are normalized safely", () => {
   assert.equal(normalizeOrderReferenceSearch("   "), "");
   assert.equal(normalizeOrderReferenceSearch({}), "");
   assert.equal(normalizeOrderReferenceSearch("x".repeat(101)).length, 100);
+  assert.equal(normalizeOrderReferenceSearch("#cms1n7dy20001p801f3igscyx"), "cms1n7dy20001p801f3igscyx");
   assert.equal(normalizeOrderHistoryPage("invalid"), 1);
   assert.equal(normalizeOrderHistoryPage("-1"), 1);
   assert.equal(normalizeOrderHistoryPage("1.5"), 1);

@@ -18,7 +18,7 @@ export type OrderHistoryRow = Prisma.OrderGetPayload<{ include: typeof orderHist
 type OrderHistoryDb = Pick<PrismaClient, "order">;
 
 export function normalizeOrderReferenceSearch(value: unknown) {
-  return typeof value === "string" ? value.trim().slice(0, ORDER_REFERENCE_MAX_LENGTH) : "";
+  return typeof value === "string" ? value.trim().replace(/^#/, "").slice(0, ORDER_REFERENCE_MAX_LENGTH) : "";
 }
 
 export function normalizeOrderHistoryPage(value: unknown) {
