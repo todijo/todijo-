@@ -2,23 +2,33 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { requireAdmin } from "@/lib/admin-access";
+import { adminOrderWhere, adminPage, normalizeAdminSearch, orderStoreNames } from "@/lib/admin-marketplace";
 import { buyerPaymentState } from "@/lib/buyer-orders";
-import { listAdminOrderHistory } from "@/lib/order-history";
 import { fulfillmentStepFor } from "@/lib/order-status";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-function one(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] ?? "" : value ?? ""; }
+const one = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] ?? "" : value ?? "";
 
 export default async function AdminOrdersPage({ searchParams }: { searchParams: SearchParams }) {
-  const [locale, t, session, params] = await Promise.all([getLocale(), getTranslations("Orders"), readSession(), searchParams]);
+  const [locale, t, orders, session, params] = await Promise.all([getLocale(), getTranslations("Admin"), getTranslations("Orders"), readSession(), searchParams]);
   if (!session) redirect(`/${locale}/login`);
   try { await requireAdmin(prisma, session); } catch { redirect(`/${locale}/dashboard`); }
-  const result = await listAdminOrderHistory(prisma, one(params.q), one(params.page));
-  const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
-  const href = (page: number) => `/adm-barewbar-182203/orders?${new URLSearchParams({ ...(result.search ? { q: result.search } : {}), page: String(page) })}`;
+  const search = normalizeAdminSearch(one(params.q));
+  const where = adminOrderWhere(search);
+  const total = await prisma.order.count({ where });
+  const paging = adminPage(total, one(params.page));
+  const rows = await prisma.order.findMany({
+    where, skip: paging.skip, take: paging.take, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, status: true, fulfillmentStatus: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, shippedAt: true, deliveredAt: true, storeIdSnapshot: true, storeNameSnapshot: true,
+      buyer: { select: { firstName: true, lastName: true } },
+      items: { select: { id: true, quantity: true, productNameSnapshot: true, product: { select: { name: true, store: { select: { id: true, name: true } } } } }, orderBy: { createdAt: "asc" } },
+    },
+  });
+  const href = (page: number) => `/adm-barewbar-182203/orders?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(page) })}`;
+  const date = (value: Date | null) => value ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(value) : t("notAvailable");
   const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
-  return <main className="buyerOrdersPage scopedPublicPage"><div className="buyerOrdersShell"><section className="buyerOrdersHeading"><p className="dashboardBadge">{t("history.adminBadge")}</p><h1>{t("history.adminTitle")}</h1></section><form className="buyerOrdersEmpty" action="/adm-barewbar-182203/orders"><label htmlFor="order-reference">{t("history.searchLabel")}</label><input id="order-reference" name="q" defaultValue={result.search} maxLength={100} placeholder={t("history.searchPlaceholder")}/><button className="quickActionLink primary" type="submit">{t("history.searchAction")}</button></form>{result.orders.length ? <section className="buyerOrderList">{result.orders.map((order) => { const step = fulfillmentStepFor(order.status); const buyer = order.recipientName ?? order.buyerNameSnapshot ?? `${order.buyer.firstName} ${order.buyer.lastName}`; return <article className="buyerOrderCard" key={order.id}><header><div><span>{t("orderReference")}</span><strong>#{order.id}</strong></div><div className="buyerOrderBadges"><span className={`orderBadge payment-${buyerPaymentState(order)}`}>{t(`payment.${buyerPaymentState(order)}`)}</span><span className={`orderBadge status-${order.status.toLowerCase()}`}>{step ? t(`fulfillment.${step.toLowerCase()}`) : t(`status.${order.status}`)}</span></div></header><div className="buyerOrderMeta"><span>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(order.createdAt)}</span><span>{buyer}</span></div><div className="buyerOrderProducts">{order.items.map((item) => <div className="buyerOrderProduct" key={item.id}><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>)}</div><footer><div><span>{t("total")}</span><strong>{money(Number(order.total), order.currency)}</strong></div></footer></article>; })}</section> : <section className="buyerOrdersEmpty"><h2>{t("history.noResults")}</h2></section>}<nav className="buyerOrdersBack" aria-label={t("history.pagination")}>{result.page > 1 && <Link className="quickActionLink secondary" href={href(result.page - 1)}>{t("history.previous")}</Link>}<span>{t("history.page", { page: result.page, pages })}</span>{result.page < pages && <Link className="quickActionLink secondary" href={href(result.page + 1)}>{t("history.next")}</Link>}</nav></div></main>;
+  return <main className="adminPage"><section className="adminShell"><header className="adminHero"><div><span>{t("ordersEyebrow")}</span><h1>{t("ordersTitle")}</h1><p>{t("ordersIntro")}</p></div><Link href="/adm-barewbar-182203">{t("backAdmin")}</Link></header><section className="adminPanel adminTablePanel"><form className="adminForm" action="/adm-barewbar-182203/orders"><label>{t("searchOrders")}<input name="q" maxLength={100} defaultValue={search} placeholder={t("searchOrdersPlaceholder")}/></label><button>{t("search")}</button></form><div className="adminTableWrap"><table><thead><tr><th>{t("reference")}</th><th>{t("buyer")}</th><th>{t("store")}</th><th>{t("products")}</th><th>{t("orderDate")}</th><th>{t("shippingDate")}</th><th>{t("deliveryDate")}</th><th>{t("payment")}</th><th>{t("fulfillment")}</th><th>{t("total")}</th></tr></thead><tbody>{rows.map((order) => { const step = fulfillmentStepFor(order.status); return <tr key={order.id}><td><code>{order.id}</code></td><td>{order.buyer.firstName} {order.buyer.lastName}</td><td>{orderStoreNames(order).join(", ") || t("notAvailable")}</td><td>{order.items.map((item) => <small key={item.id}>{item.productNameSnapshot ?? item.product.name} × {item.quantity}</small>)}</td><td>{date(order.createdAt)}</td><td>{date(order.shippedAt)}</td><td>{date(order.deliveredAt)}</td><td>{orders(`payment.${buyerPaymentState(order)}`)}</td><td>{step ? orders(`fulfillment.${step.toLowerCase()}`) : orders(`status.${order.status}`)}</td><td>{money(Number(order.total), order.currency)}</td></tr>; })}</tbody></table></div>{!rows.length && <p>{t("noOrders")}</p>}<nav className="buyerOrdersBack">{paging.page > 1 && <Link href={href(paging.page - 1)}>{t("previous")}</Link>}<span>{t("page", paging)}</span>{paging.page < paging.pages && <Link href={href(paging.page + 1)}>{t("next")}</Link>}</nav></section></section></main>;
 }

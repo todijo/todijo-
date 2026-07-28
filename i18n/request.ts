@@ -19,6 +19,7 @@ export default getRequestConfig(async () => {
   messages.HomeHeader = (await import(`../messages/home-header/${locale}.json`)).default;
   messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
-  messages.Admin = (await import(`../messages/admin/${locale}.json`)).default;
+  const adminLocale = ["en", "fr", "ar", "ku"].includes(locale) ? locale : "en";
+  messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
   return { locale, messages };
 });
