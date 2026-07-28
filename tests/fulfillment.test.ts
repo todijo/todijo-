@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { advanceSellerFulfillment, FulfillmentError } from "../lib/fulfillment";
 
 function database(order: any, stores = [{ id: "store_1" }]) {
   const updates: any[] = [];
   const events: any[] = [];
+  const storeOwners: string[] = [];
   const tx = {
-    store: { findMany: async () => stores },
+    store: { findMany: async ({ where }: any) => { storeOwners.push(where.ownerId); return stores; } },
     order: {
       findFirst: async ({ where }: any) => {
         assert.equal(where.id, "order_1");
@@ -17,11 +20,11 @@ function database(order: any, stores = [{ id: "store_1" }]) {
     },
     orderFulfillmentEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
   };
-  return { db: { $transaction: async (callback: any) => callback(tx) } as any, updates, events };
+  return { db: { $transaction: async (callback: any) => callback(tx) } as any, updates, events, storeOwners };
 }
 
-test("seller can advance only the next forward fulfillment transition with tracking", async () => {
-  const { db, updates, events } = database({ id: "order_1", status: "PROCESSING" });
+test("seller with an owned order can advance only the next forward fulfillment transition with tracking", async () => {
+  const { db, updates, events, storeOwners } = database({ id: "order_1", status: "PROCESSING" });
   const result = await advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingCarrier: "  La Poste  ", trackingNumber: " AB  123 " });
   assert.equal(result.idempotent, false);
   assert.equal(updates.length, 1);
@@ -31,6 +34,14 @@ test("seller can advance only the next forward fulfillment transition with track
   assert.equal(updates[0].trackingNumber, "AB 123");
   assert.equal(events[0].source, "SELLER");
   assert.equal(events[0].status, "SHIPPED");
+  assert.deepEqual(storeOwners, ["seller_1"]);
+});
+
+test("admin with an owned store can use the same owned-order transition", async () => {
+  const { db, updates, storeOwners } = database({ id: "order_1", status: "PAID" });
+  await advanceSellerFulfillment(db, "admin_owner", "order_1", "PAID");
+  assert.equal(updates[0].status, "PROCESSING");
+  assert.deepEqual(storeOwners, ["admin_owner"]);
 });
 
 test("shipping without new tracking preserves previously saved tracking values", async () => {
@@ -55,9 +66,17 @@ test("repeating an already completed transition is idempotent", async () => {
   assert.equal(events.length, 0);
 });
 
-test("an order outside the seller's stores is not updated", async () => {
+test("admin without ownership and a foreign seller are rejected", async () => {
   const { db } = database(null, []);
-  await assert.rejects(async () => advanceSellerFulfillment(db, "seller_2", "order_1", "PAID"), (error: any) => error instanceof FulfillmentError && error.status === 404);
+  for (const userId of ["admin_without_store", "foreign_seller"]) {
+    await assert.rejects(async () => advanceSellerFulfillment(db, userId, "order_1", "PAID"), (error: any) => error instanceof FulfillmentError && error.status === 404);
+  }
+});
+
+test("fulfillment route permits seller-capable sessions but relies on owned-store authorization", () => {
+  const route = readFileSync(join(process.cwd(), "app", "api", "seller", "orders", "[orderId]", "fulfillment", "route.ts"), "utf8");
+  assert.match(route, /\["SELLER", "ADMIN"\]\.includes\(session\.role\)/);
+  assert.match(route, /advanceSellerFulfillment\(prisma, session\.userId/);
 });
 
 test("tracking values are rejected outside the shipping transition", async () => {
