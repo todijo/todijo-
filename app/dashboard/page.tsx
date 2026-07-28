@@ -7,6 +7,7 @@ import { DashboardEmptyState, DashboardHeader, DashboardQuickAction, DashboardSe
 import StripeConnectSection from "@/components/StripeConnectSection";
 import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer-orders";
 import { dashboardAudience, dashboardPaths } from "@/lib/dashboard";
+import { sellerOrderHistoryWhere } from "@/lib/order-history";
 import { prisma } from "@/lib/prisma";
 import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "@/lib/seller-dashboard";
 import { readSession } from "@/lib/session";
@@ -133,7 +134,7 @@ export default async function DashboardPage() {
 
   if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><DashboardEmptyState title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
 
-  const sellerOrders = await dashboardData(prisma.order.findMany({ where: { OR: [{ storeIdSnapshot: user.store.id }, { storeIdSnapshot: null, items: { some: { product: { store: { ownerId: session.userId } } } } }] }, include: { buyer: { select: { firstName: true, lastName: true } }, items: { include: { product: { select: { id: true, name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } }));
+  const sellerOrders = await dashboardData(prisma.order.findMany({ where: sellerOrderHistoryWhere(session.userId, user.store.id, ""), include: { buyer: { select: { firstName: true, lastName: true } }, items: { include: { product: { select: { id: true, name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } }));
   const paidSellerOrders = sellerOrders.filter((order) => order.paidAt || order.stripePaymentIntentId);
   const revenue = paidSellerOrders.reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
   const customers = new Set(paidSellerOrders.map((order) => order.buyerId)).size;

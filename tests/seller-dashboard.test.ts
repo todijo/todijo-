@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "../lib/seller-dashboard";
+import { sellerOrderHistoryWhere } from "../lib/order-history";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -32,4 +33,32 @@ test("seller recent orders prefer snapshots and retain relation fallbacks", () =
   assert.match(source, /productImageUrlSnapshot \?\? item\?\.product\.images\[0\]/);
   assert.match(source, /productNameSnapshot \?\? item\?\.product\.name/);
   assert.match(source, /recipientName \?\? order\.buyerNameSnapshot \?\?/);
+});
+
+test("seller dashboard reuses the strict order ownership filter and retains five recent orders", () => {
+  const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
+  assert.match(source, /where: sellerOrderHistoryWhere\(session\.userId, user\.store\.id, ""\)/);
+  assert.match(source, /sellerOrders\.slice\(0, 5\)/);
+  const branches: any[] = (sellerOrderHistoryWhere("seller_1", "store_1", "") as any).AND[0].OR;
+  assert.deepEqual(branches[0], { storeIdSnapshot: "store_1" });
+  assert.equal(branches[1].storeIdSnapshot, null);
+  assert.equal(branches[1].items.some.product.store.ownerId, "seller_1");
+  assert.equal(branches[1].items.every.product.store.ownerId, "seller_1");
+});
+
+test("seller dashboard scope excludes every legacy multi-store order before rendering", () => {
+  const branches: any[] = (sellerOrderHistoryWhere("seller_1", "store_1", "") as any).AND[0].OR;
+  const legacy = branches[1];
+  const allows = (storeIdSnapshot: string | null, itemOwnerIds: string[]) =>
+    storeIdSnapshot === branches[0].storeIdSnapshot || (
+      storeIdSnapshot === legacy.storeIdSnapshot
+      && itemOwnerIds.some((ownerId) => ownerId === legacy.items.some.product.store.ownerId)
+      && itemOwnerIds.every((ownerId) => ownerId === legacy.items.every.product.store.ownerId)
+    );
+
+  assert.equal(allows(null, ["seller_1", "seller_1"]), true);
+  assert.equal(allows(null, ["seller_1", "foreign_seller"]), false);
+  assert.equal(allows(null, ["foreign_seller", "seller_1"]), false);
+  assert.equal(allows("store_1", ["foreign_seller"]), true);
+  assert.equal(allows("store_2", ["seller_1"]), false);
 });
