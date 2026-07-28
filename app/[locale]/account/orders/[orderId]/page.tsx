@@ -7,6 +7,7 @@ import { readSession } from "@/lib/session";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { fulfillmentStepFor, fulfillmentStepIndex } from "@/lib/order-status";
+import { BuyerRefundRequest } from "@/components/BuyerRefundRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,8 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
             {order.stripePaymentIntentId && <div className="buyerOrderPaymentReference"><span>{t("paymentReference")}</span><code>{order.stripePaymentIntentId}</code></div>}
           </aside>
         </div>
+
+        <BuyerRefundRequest orderId={order.id} eligible={paymentState === "paid" && order.status !== "CANCELLED" && order.status !== "REFUNDED"}/>
 
         <Link className="quickActionLink secondary buyerOrdersBack" href={`/${locale}/account/orders`}>← {t("backOrders")}</Link>
       </div>
