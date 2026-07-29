@@ -93,6 +93,8 @@ model User {
   orders              Order[]
   reviews             Review[]
   reviewReports       ReviewReport[]
+  refundRequests      RefundRequest[] @relation("RefundRequestBuyer")
+  reviewedRefundRequests RefundRequest[] @relation("RefundRequestReviewer")
   accessGrantsCreated StoreAccessGrant[] @relation("AccessGrantAdmin")
 }
 
@@ -141,6 +143,14 @@ enum FulfillmentEventSource {
   SYSTEM
   SELLER
   ADMIN
+}
+
+enum RefundRequestStatus {
+  PENDING
+  SELLER_APPROVED
+  SELLER_REJECTED
+  ADMIN_APPROVED
+  ADMIN_REJECTED
 }
 
 model StoreAccessGrant {
@@ -310,6 +320,7 @@ model Order {
   buyer User        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   items             OrderItem[]
   fulfillmentEvents OrderFulfillmentEvent[]
+  refundRequest      RefundRequest?
 
   @@unique([buyerId, checkoutRequestId])
   @@index([buyerId, status, createdAt])
@@ -347,6 +358,27 @@ model OrderItem {
 
   @@unique([orderId, lineKey])
   @@index([productId])
+}
+
+model RefundRequest {
+  id             String              @id @default(cuid())
+  orderId        String
+  buyerId        String
+  reason         String              @db.VarChar(1000)
+  status         RefundRequestStatus @default(PENDING)
+  reviewedById   String?
+  reviewedAt     DateTime?
+  decisionNote   String?             @db.VarChar(1000)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer      User  @relation("RefundRequestBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("RefundRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([orderId])
+  @@index([buyerId, createdAt])
+  @@index([status, createdAt])
 }
 
 model OrderFulfillmentEvent {
