@@ -29,7 +29,7 @@ export default async function AdminPage() {
   }
 
   const now = new Date();
-  const [users, stores] = await Promise.all([
+  const [users, stores, pendingFinalRefundCount] = await Promise.all([
     prisma.user.findMany({
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
       select: { id: true, firstName: true, lastName: true, email: true, role: true, store: { select: { id: true } } },
@@ -44,6 +44,7 @@ export default async function AdminPage() {
         _count: { select: { products: true } },
       },
     }),
+    prisma.refundRequest.count({ where: { status: "SELLER_REJECTED" } }),
   ]);
   const serializedStores = stores.map((store) => {
     const access = activeAccessSource(store, now);
@@ -62,6 +63,7 @@ export default async function AdminPage() {
         <div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{t("intro")}</p></div>
         <div><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link></div>
       </header>
+      {pendingFinalRefundCount > 0 && <section className="subscriptionWarning adminRefundAlert" role="alert"><strong>{t(pendingFinalRefundCount === 1 ? "pendingFinalRefundSingular" : "pendingFinalRefundPlural", { count: pendingFinalRefundCount })}</strong><Link href="/adm-barewbar-182203/orders">{t("reviewRefundRequests")}</Link></section>}
       <AdminDashboard
         adminId={session.userId}
         locale={locale}

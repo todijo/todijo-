@@ -13,7 +13,7 @@ type RefundRequest = {
   reviewedAt: Date | string | null;
 };
 
-export function AdminRefundReviewControl({ request }: { request: RefundRequest }) {
+export function AdminRefundReviewControl({ request, totalLabel, total }: { request: RefundRequest; totalLabel: string; total: string }) {
   const router = useRouter();
   const t = useTranslations("Orders.refundRequest");
   const [decisionNote, setDecisionNote] = useState("");
@@ -44,5 +44,17 @@ export function AdminRefundReviewControl({ request }: { request: RefundRequest }
     }
   }
 
-  return <div className="adminForm"><small>{t("statusLabel")}: {t(`status.${request.status}`)}</small><small>{t("reasonLabel")}: {request.reason}</small><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}{request.decisionNote && <small>{t("decisionNote")}: {request.decisionNote}</small>}{editable && <><textarea value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><div><button type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}{error && <small role="alert">{error}</small>}</div>;
+  return (
+    <section className="refundReviewPanel adminRefundReviewPanel">
+      <div className="refundReviewMetadata">
+        <div><span>{t("statusLabel")}</span><strong>{t(`status.${request.status}`)}</strong></div>
+        <div><span>{totalLabel}</span><strong>{total}</strong></div>
+      </div>
+      <p className="refundReviewFreeText" dir="auto"><strong>{t("reasonLabel")}</strong> {request.reason}</p>
+      <div className="refundReviewDates"><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}</div>
+      {request.decisionNote && <p className="refundReviewFreeText" dir="auto"><strong>{t("decisionNote")}</strong> {request.decisionNote}</p>}
+      {editable && <><textarea className="refundReviewTextarea" dir="auto" value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><div className="refundReviewActions"><button type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}
+      {error && <small role="alert">{error}</small>}
+    </section>
+  );
 }

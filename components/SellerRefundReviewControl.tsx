@@ -13,7 +13,7 @@ type RefundRequest = {
   reviewedAt: Date | string | null;
 };
 
-export function SellerRefundReviewControl({ request }: { request: RefundRequest }) {
+export function SellerRefundReviewControl({ request, totalLabel, total }: { request: RefundRequest; totalLabel: string; total: string }) {
   const router = useRouter();
   const t = useTranslations("Orders.refundRequest");
   const [decisionNote, setDecisionNote] = useState("");
@@ -44,5 +44,18 @@ export function SellerRefundReviewControl({ request }: { request: RefundRequest 
     }
   }
 
-  return <section className="buyerOrderProducts"><h3>{t("title")}</h3><div className="buyerOrderMeta"><span>{t("statusLabel")}</span><strong>{t(`status.${request.status}`)}</strong></div><p><strong>{t("reasonLabel")}</strong> {request.reason}</p><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}{request.decisionNote && <p><strong>{t("decisionNote")}</strong> {request.decisionNote}</p>}{editable && <><textarea value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><div className="sellerFulfillmentControl"><button className="premiumTextLink" type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button className="premiumTextLink" type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}{error && <p role="alert">{error}</p>}</section>;
+  return (
+    <section className="refundReviewPanel sellerRefundReviewPanel">
+      <h3>{t("title")}</h3>
+      <div className="refundReviewMetadata">
+        <div><span>{t("statusLabel")}</span><strong>{t(`status.${request.status}`)}</strong></div>
+        <div><span>{totalLabel}</span><strong>{total}</strong></div>
+      </div>
+      <p className="refundReviewFreeText" dir="auto"><strong>{t("reasonLabel")}</strong> {request.reason}</p>
+      <div className="refundReviewDates"><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}</div>
+      {request.decisionNote && <p className="refundReviewFreeText" dir="auto"><strong>{t("decisionNote")}</strong> {request.decisionNote}</p>}
+      {editable && <><textarea className="refundReviewTextarea" dir="auto" value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><div className="refundReviewActions"><button className="quickActionLink primary" type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button className="quickActionLink secondary" type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
 }
