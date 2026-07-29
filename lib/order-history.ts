@@ -28,8 +28,23 @@ const sellerOrderHistoryInclude = Prisma.validator<Prisma.OrderInclude>()({
   },
 });
 
+const adminOrderHistoryInclude = Prisma.validator<Prisma.OrderInclude>()({
+  ...orderHistoryInclude,
+  refundRequest: {
+    select: {
+      id: true,
+      reason: true,
+      status: true,
+      decisionNote: true,
+      createdAt: true,
+      reviewedAt: true,
+    },
+  },
+});
+
 export type OrderHistoryRow = Prisma.OrderGetPayload<{ include: typeof orderHistoryInclude }>;
 export type SellerOrderHistoryRow = Prisma.OrderGetPayload<{ include: typeof sellerOrderHistoryInclude }>;
+export type AdminOrderHistoryRow = Prisma.OrderGetPayload<{ include: typeof adminOrderHistoryInclude }>;
 type OrderHistoryDb = Pick<PrismaClient, "order">;
 
 export function normalizeOrderReferenceSearch(value: unknown) {
@@ -85,6 +100,6 @@ export async function listAdminOrderHistory(db: OrderHistoryDb, query: unknown, 
   const total = await db.order.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / ORDER_HISTORY_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
-  const orders = await db.order.findMany({ where, include: orderHistoryInclude, orderBy: { createdAt: "desc" }, ...pageInput(page) });
+  const orders = await db.order.findMany({ where, include: adminOrderHistoryInclude, orderBy: { createdAt: "desc" }, ...pageInput(page) });
   return { orders, total, page, search, pageSize: ORDER_HISTORY_PAGE_SIZE };
 }
