@@ -60,12 +60,13 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
 
             {currentStep >= 0 && (
               <ol className="orderTimeline" aria-label={t("orderStatus")}>
-                {timeline.map((step, index) => (
-                  <li className={index < currentStep ? "isComplete" : index === currentStep ? "isCurrent" : "isUpcoming"} key={step.key} aria-current={index === currentStep ? "step" : undefined}>
-                    <span aria-hidden="true">{index < currentStep ? "✓" : index + 1}</span>
+                {timeline.map((step, index) => {
+                  const isComplete = index < currentStep || (order.status === "DELIVERED" && index === currentStep);
+                  return <li className={isComplete ? "isComplete" : index === currentStep ? "isCurrent" : "isUpcoming"} key={step.key} aria-current={!isComplete && index === currentStep ? "step" : undefined}>
+                    <span aria-hidden="true">{isComplete ? "✓" : index + 1}</span>
                     <strong>{step.label}</strong>
-                  </li>
-                ))}
+                  </li>;
+                })}
               </ol>
             )}
             {(order.trackingCarrier || order.trackingNumber) && <p><strong>{t("fulfillment.tracking")}</strong>{order.trackingCarrier && ` ${order.trackingCarrier}`}{order.trackingCarrier && order.trackingNumber && " · "}{order.trackingNumber}</p>}
