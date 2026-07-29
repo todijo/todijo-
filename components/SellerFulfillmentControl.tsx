@@ -14,8 +14,10 @@ export function SellerFulfillmentControl({ orderId, action }: { orderId: string;
   async function submit() {
     setSaving(true); setError("");
     try {
-      const response = await fetch(`/api/seller/orders/${orderId}/fulfillment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, trackingCarrier: carrier, trackingNumber: tracking }) });
+      const payload = action === "PROCESSING" ? { action, trackingCarrier: carrier, trackingNumber: tracking } : { action };
+      const response = await fetch(`/api/seller/orders/${orderId}/fulfillment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!response.ok) { setError(t("fulfillment.updateError")); return; }
+      if (action === "PROCESSING") { setCarrier(""); setTracking(""); }
       router.refresh();
     } catch {
       setError(t("fulfillment.updateError"));
