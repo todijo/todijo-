@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import SiteHeader from "@/components/SiteHeader";
 import { useCart } from "@/components/CartProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { cartLineKey } from "@/lib/cart-line";
 
 export default function CheckoutPage() {
   const { items, subtotal, currency } = useCart();
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
       const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize })) }) });
       const result = await response.json() as { url?: string; error?: string; code?: string };
       if (!response.ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : t("startError"));
+      window.localStorage.setItem(`todijo-pending-checkout:${requestId}`, JSON.stringify({ requestId, lines: items.map((item) => ({ lineKey: item.lineKey ?? cartLineKey(item.id, item.selectedColor, item.selectedSize), quantity: item.quantity })) }));
       window.location.assign(result.url);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("startError"));

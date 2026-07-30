@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { CheckoutError, createCheckout, processStripeEvent } from "../lib/payments";
+import { CheckoutError, createCheckout, isBuyerCheckoutComplete, processStripeEvent } from "../lib/payments";
 import { verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 function checkoutDb(stock = 5, sellerReady = true) {
@@ -103,6 +103,20 @@ test("webhook signature rejection blocks altered payloads", () => {
   const signature = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
   assert.equal(verifyStripeWebhook(body, `t=${timestamp},v1=${signature}`, secret).id, "evt_1");
   assert.throws(() => verifyStripeWebhook(`${body} `, `t=${timestamp},v1=${signature}`, secret), /Invalid Stripe webhook signature/);
+});
+
+test("only a buyer-owned paid checkout is eligible for cart reconciliation", async () => {
+  let status = "PAID";
+  let where: unknown;
+  const db = { order: { findUnique: async (args: unknown) => { where = args; return { status }; } } } as any;
+  assert.equal(await isBuyerCheckoutComplete(db, "buyer_1", "request_123"), true);
+  assert.equal(await isBuyerCheckoutComplete(db, "buyer_1", "request_123"), true);
+  assert.deepEqual(where, { where: { buyerId_checkoutRequestId: { buyerId: "buyer_1", checkoutRequestId: "request_123" } }, select: { status: true } });
+  status = "PENDING";
+  assert.equal(await isBuyerCheckoutComplete(db, "buyer_1", "request_123"), false);
+  status = "CANCELLED";
+  assert.equal(await isBuyerCheckoutComplete(db, "buyer_1", "request_123"), false);
+  assert.equal(await isBuyerCheckoutComplete(db, "buyer_1", "bad"), false);
 });
 
 test("verified Checkout data persists recipient details and rejects amount mismatches", async () => {

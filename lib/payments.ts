@@ -7,6 +7,13 @@ export class CheckoutError extends Error {
 }
 
 type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null };
+const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
+
+export async function isBuyerCheckoutComplete(db: PrismaClient, buyerId: string, requestId: string) {
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) return false;
+  const order = await db.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, select: { status: true } });
+  return Boolean(order && paidOrderStatuses.has(order.status));
+}
 
 export async function createCheckout(
   db: PrismaClient,

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { cartLineKey, normalizeCartOption } from "@/lib/cart-line";
+import { cartLineKey, normalizeCartOption, removePurchasedCartLines, type CartLineQuantity } from "@/lib/cart-line";
 
 export type CartProduct = {
   id: string;
@@ -33,7 +33,20 @@ type CartContextValue = {
 };
 
 const STORAGE_KEY = "todijo-cart-v1";
+const PENDING_CHECKOUT_PREFIX = "todijo-pending-checkout:";
 const CartContext = createContext<CartContextValue | null>(null);
+
+type PendingCheckout = { requestId: string; lines: CartLineQuantity[] };
+
+function pendingCheckouts() {
+  return Object.keys(window.localStorage).flatMap((key) => {
+    if (!key.startsWith(PENDING_CHECKOUT_PREFIX)) return [];
+    try {
+      const value = JSON.parse(window.localStorage.getItem(key) ?? "") as PendingCheckout;
+      return typeof value.requestId === "string" && Array.isArray(value.lines) ? [{ key, value }] : [];
+    } catch { return []; }
+  });
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -81,6 +94,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated || !storageKey) return;
     window.localStorage.setItem(storageKey, JSON.stringify(items));
   }, [hydrated, items, storageKey]);
+
+  useEffect(() => {
+    if (!hydrated || !storageKey) return;
+    let active = true;
+    let retryTimer: number | undefined;
+    let retryAttempts = 0;
+    const reconcileCompletedCheckouts = async () => {
+      let shouldRetry = false;
+      for (const pending of pendingCheckouts()) {
+        try {
+          const response = await fetch(`/api/checkout?requestId=${encodeURIComponent(pending.value.requestId)}`, { cache: "no-store" });
+          const result = await response.json() as { completed?: boolean };
+          if (!response.ok || result.completed !== true) { shouldRetry = true; continue; }
+          if (!active) return;
+          setItems((current) => removePurchasedCartLines(current, pending.value.lines));
+          window.localStorage.removeItem(pending.key);
+        } catch { shouldRetry = true; }
+      }
+      if (active && shouldRetry && retryAttempts < 10) {
+        retryAttempts += 1;
+        retryTimer = window.setTimeout(() => void reconcileCompletedCheckouts(), 3000);
+      }
+    };
+    void reconcileCompletedCheckouts();
+    return () => { active = false; if (retryTimer) window.clearTimeout(retryTimer); };
+  }, [hydrated, storageKey]);
 
   const value = useMemo<CartContextValue>(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);

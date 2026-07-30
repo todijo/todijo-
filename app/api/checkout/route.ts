@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { CheckoutError, createCheckout } from "@/lib/payments";
+import { CheckoutError, createCheckout, isBuyerCheckoutComplete } from "@/lib/payments";
 import { readSession } from "@/lib/session";
+
+export async function GET(request: Request) {
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const requestId = new URL(request.url).searchParams.get("requestId") ?? "";
+  return NextResponse.json({ completed: await isBuyerCheckoutComplete(prisma, session.userId, requestId) });
+}
 
 export async function POST(request: Request) {
   const session = await readSession();
