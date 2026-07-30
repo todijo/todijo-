@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { listBuyerRefundEvidence, listSellerRefundEvidence, RefundEvidenceError, uploadBuyerRefundEvidence } from "@/lib/refund-evidence";
-import { getSellerRefundRequest, RefundRequestError } from "@/lib/refund-requests";
+import { getAdminRefundRequest, getSellerRefundRequest, RefundRequestError } from "@/lib/refund-requests";
+import { AdminAccessError } from "@/lib/admin-access";
 import { parseEvidenceMultipart } from "@/lib/refund-evidence-multipart";
 import { prisma } from "@/lib/prisma";
 import { r2ObjectStore } from "@/lib/r2";
 import { readSession } from "@/lib/session";
 
 function errorResponse(error: unknown, fallback: string) {
-  const known = error instanceof RefundEvidenceError || error instanceof RefundRequestError;
+  const known = error instanceof RefundEvidenceError || error instanceof RefundRequestError || error instanceof AdminAccessError;
   return NextResponse.json({ error: known ? error.message : fallback }, { status: known ? error.status : 500 });
 }
 
@@ -23,6 +24,10 @@ export async function GET(_request: Request, context: { params: Promise<{ orderI
     }
     const request = await prisma.refundRequest.findFirst({ where: { orderId }, select: { id: true } });
     if (!request) throw new RefundEvidenceError("Refund request not found.", 404);
+    if (session.role === "ADMIN") {
+      await getAdminRefundRequest(prisma, session, request.id);
+      return NextResponse.json(await prisma.refundEvidence.findMany({ where: { refundRequestId: request.id }, select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true }, orderBy: { createdAt: "asc" } }));
+    }
     await getSellerRefundRequest(prisma, session.userId, request.id);
     return NextResponse.json(await listSellerRefundEvidence(prisma, session.userId, orderId, request.id));
   } catch (error) {

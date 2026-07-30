@@ -1,17 +1,41 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 type RefundRequest = {
   id: string;
+  orderId: string;
   reason: string;
   status: "PENDING" | "SELLER_APPROVED" | "SELLER_REJECTED" | "ADMIN_APPROVED" | "ADMIN_REJECTED";
   decisionNote: string | null;
   createdAt: Date | string;
   reviewedAt: Date | string | null;
+  evidence: Array<{
+    id: string;
+    originalFilename: string;
+    mimeType: string;
+    sizeBytes: number;
+    createdAt: Date | string;
+  }>;
 };
+
+function AdminEvidencePreview({ orderId, evidence }: { orderId: string; evidence: RefundRequest["evidence"][number] }) {
+  const t = useTranslations("Orders.refundRequest");
+  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+  const url = `/api/orders/${encodeURIComponent(orderId)}/refund-request/evidence/${encodeURIComponent(evidence.id)}`;
+
+  return <article>
+    {state === "loading" && <small>{t("uploadingEvidence")}</small>}
+    <a href={url} target="_blank" rel="noreferrer">
+      <Image unoptimized src={url} alt={t("evidenceImageAlt", { name: evidence.originalFilename })} width={200} height={200} onLoad={() => setState("loaded")} onError={() => setState("failed")} />
+    </a>
+    <span dir="auto">{evidence.originalFilename}</span>
+    {state === "failed" && <p role="alert">{t("evidenceLoadFailed")}</p>}
+  </article>;
+}
 
 export function AdminRefundReviewControl({ request, totalLabel, total }: { request: RefundRequest; totalLabel: string; total: string }) {
   const router = useRouter();
@@ -53,6 +77,7 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
       <p className="refundReviewFreeText" dir="auto"><strong>{t("reasonLabel")}</strong> {request.reason}</p>
       <div className="refundReviewDates"><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}</div>
       {request.decisionNote && <p className="refundReviewFreeText" dir="auto"><strong>{t("decisionNote")}</strong> {request.decisionNote}</p>}
+      {request.evidence.length > 0 && <div className="buyerRefundEvidence"><h4>{t("evidenceTitle")}</h4><div className="buyerRefundEvidenceGrid">{request.evidence.map((evidence) => <AdminEvidencePreview key={evidence.id} orderId={request.orderId} evidence={evidence} />)}</div></div>}
       {editable && <><textarea className="refundReviewTextarea" dir="auto" value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><div className="refundReviewActions"><button type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}
       {error && <small role="alert">{error}</small>}
     </section>

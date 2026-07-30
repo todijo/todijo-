@@ -27,7 +27,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       id: true, status: true, fulfillmentStatus: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, shippedAt: true, deliveredAt: true, storeIdSnapshot: true, storeNameSnapshot: true,
       buyer: { select: { firstName: true, lastName: true } },
       items: { select: { id: true, quantity: true, productNameSnapshot: true, product: { select: { name: true, store: { select: { id: true, name: true } } } } }, orderBy: { createdAt: "asc" } },
-      refundRequest: { select: { id: true, reason: true, status: true, decisionNote: true, createdAt: true, reviewedAt: true } },
+      refundRequest: { select: { id: true, orderId: true, reason: true, status: true, decisionNote: true, createdAt: true, reviewedAt: true, evidence: { select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true }, orderBy: { createdAt: "asc" } } } },
     },
   });
   const href = (page: number) => `/adm-barewbar-182203/orders?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(page) })}`;
