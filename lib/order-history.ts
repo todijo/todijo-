@@ -19,11 +19,22 @@ const sellerOrderHistoryInclude = Prisma.validator<Prisma.OrderInclude>()({
   refundRequest: {
     select: {
       id: true,
+      orderId: true,
       reason: true,
       status: true,
       decisionNote: true,
       createdAt: true,
       reviewedAt: true,
+      evidence: {
+        select: {
+          id: true,
+          originalFilename: true,
+          mimeType: true,
+          sizeBytes: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   },
 });

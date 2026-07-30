@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
 import { parseEvidenceMultipart, REFUND_EVIDENCE_MULTIPART_MAX_BYTES } from "../lib/refund-evidence-multipart";
-import { getBuyerRefundEvidence, listBuyerRefundEvidence, RefundEvidenceError, type RefundEvidenceDb, uploadBuyerRefundEvidence, validateRefundEvidenceFile } from "../lib/refund-evidence";
+import { getBuyerRefundEvidence, getSellerRefundEvidence, listBuyerRefundEvidence, listSellerRefundEvidence, RefundEvidenceError, type RefundEvidenceDb, uploadBuyerRefundEvidence, validateRefundEvidenceFile } from "../lib/refund-evidence";
 import { R2StorageError, r2ObjectStore } from "../lib/r2";
 import { refundEvidenceContentDisposition } from "../lib/refund-evidence-headers";
 
@@ -88,6 +88,23 @@ test("buyer can list and read only evidence for the owned refund request", async
   assert.equal((await listBuyerRefundEvidence(value.db, "buyer", "request")).length, 1);
   assert.equal((await getBuyerRefundEvidence(value.db, "buyer", "request", "evidence-0")).id, "evidence-0");
   for (const [user, request, evidence] of [["other", "request", "evidence-0"], ["buyer", "other", "evidence-0"], ["buyer", "request", "missing"]] as const) await assert.rejects(() => getBuyerRefundEvidence(value.db, user, request, evidence), (error: unknown) => error instanceof RefundEvidenceError && error.status === 404);
+});
+
+test("owning seller can list and preview evidence without receiving private R2 fields", async () => {
+  const createdAt = new Date();
+  const row = { id: "evidence-1", originalFilename: "proof.jpg", mimeType: "image/jpeg", sizeBytes: jpeg.length, createdAt, storageKey: "refund-evidence/request/private.jpg", contentHash: "a".repeat(64) };
+  const db = {
+    store: { findUnique: async ({ where }: { where: { ownerId: string } }) => where.ownerId === "seller-a" ? { id: "store-a" } : null },
+    refundEvidence: {
+      findMany: async () => [{ id: row.id, originalFilename: row.originalFilename, mimeType: row.mimeType, sizeBytes: row.sizeBytes, createdAt: row.createdAt }],
+      findFirst: async () => row,
+    },
+  };
+  const evidence = await listSellerRefundEvidence(db, "seller-a", "order-a", "request");
+  assert.deepEqual(Object.keys(evidence[0]).sort(), ["createdAt", "id", "mimeType", "originalFilename", "sizeBytes"]);
+  assert.equal((await getSellerRefundEvidence(db, "seller-a", "order-a", row.id)).storageKey, row.storageKey);
+  await assert.rejects(() => listSellerRefundEvidence(db, "seller-b", "order-a", "request"), (error: unknown) => error instanceof RefundEvidenceError && error.status === 404);
+  await assert.rejects(() => getSellerRefundEvidence(db, "seller-b", "order-a", row.id), (error: unknown) => error instanceof RefundEvidenceError && error.status === 404);
 });
 
 test("cleanup failure is logged safely and R2 failures remain sanitized", async () => {
