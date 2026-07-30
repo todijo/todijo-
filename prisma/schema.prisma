@@ -95,6 +95,7 @@ model User {
   reviewReports       ReviewReport[]
   refundRequests      RefundRequest[] @relation("RefundRequestBuyer")
   reviewedRefundRequests RefundRequest[] @relation("RefundRequestReviewer")
+  uploadedRefundEvidence RefundEvidence[] @relation("RefundEvidenceUploader")
   accessGrantsCreated StoreAccessGrant[] @relation("AccessGrantAdmin")
 }
 
@@ -151,6 +152,10 @@ enum RefundRequestStatus {
   SELLER_REJECTED
   ADMIN_APPROVED
   ADMIN_REJECTED
+}
+
+enum RefundEvidenceUploaderRole {
+  BUYER
 }
 
 model StoreAccessGrant {
@@ -375,10 +380,32 @@ model RefundRequest {
   order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   buyer      User  @relation("RefundRequestBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
   reviewedBy User? @relation("RefundRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  evidence   RefundEvidence[]
 
   @@unique([orderId])
   @@index([buyerId, createdAt])
   @@index([status, createdAt])
+}
+
+model RefundEvidence {
+  id               String                     @id @default(cuid())
+  refundRequestId  String
+  uploadedByUserId String
+  uploaderRole     RefundEvidenceUploaderRole
+  storageKey       String
+  contentHash      String                     @db.Char(64)
+  originalFilename String                     @db.VarChar(255)
+  mimeType         String                     @db.VarChar(32)
+  sizeBytes        Int
+  createdAt        DateTime                   @default(now())
+
+  refundRequest RefundRequest @relation(fields: [refundRequestId], references: [id], onDelete: Cascade)
+  uploadedBy    User          @relation("RefundEvidenceUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([refundRequestId, storageKey])
+  @@unique([refundRequestId, contentHash])
+  @@index([refundRequestId, createdAt])
+  @@index([uploadedByUserId, createdAt])
 }
 
 model OrderFulfillmentEvent {
