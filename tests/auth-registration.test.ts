@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { localeFromReferer, localizedHome, postLoginDestination, safeLoginDestination } from "../lib/auth-redirects";
+import { registrationPersistenceData, validateRegistrationInput } from "../lib/auth-registration";
+import { verifyTurnstileTokenWith } from "../lib/turnstile-verification";
+
+const validInput = { firstName: "Ada", lastName: "Lovelace", email: "ADA@EXAMPLE.COM", password: "password-123", confirmPassword: "password-123", role: "buyer", turnstileToken: "token" };
+
+function validationCode(input: unknown) {
+  const result = validateRegistrationInput(input);
+  return result.ok ? undefined : result.code;
+}
+
+test("registration validation requires matching passwords and never persists confirmation or Turnstile data", () => {
+  const result = validateRegistrationInput(validInput);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.role, "CUSTOMER");
+  assert.equal(result.value.email, "ada@example.com");
+  assert.deepEqual(registrationPersistenceData(result.value), { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", role: "CUSTOMER", storeName: null });
+  assert.equal("password" in registrationPersistenceData(result.value), false);
+  assert.equal(validationCode({ ...validInput, confirmPassword: "different" }), "PASSWORD_MISMATCH");
+  assert.equal(validationCode({ ...validInput, confirmPassword: "" }), "INVALID_FIELDS");
+  assert.equal(validationCode({ ...validInput, role: "seller", storeName: "" }), "STORE_NAME_REQUIRED");
+});
+
+test("Turnstile verification fails closed for missing, rejected, malformed, and unavailable verification", async () => {
+  const accepted = await verifyTurnstileTokenWith("token", "secret", async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+  assert.equal(accepted, "success");
+  assert.equal(await verifyTurnstileTokenWith("", "secret", fetch), "missing");
+  assert.equal(await verifyTurnstileTokenWith("token", undefined, fetch), "unavailable");
+  assert.equal(await verifyTurnstileTokenWith("token", "secret", async () => new Response("no", { status: 403 })), "failed");
+  assert.equal(await verifyTurnstileTokenWith("token", "secret", async () => new Response(JSON.stringify({ success: false }), { status: 200 })), "failed");
+  assert.equal(await verifyTurnstileTokenWith("token", "secret", async () => { throw new DOMException("timeout", "AbortError"); }), "failed");
+});
+
+test("buyer and seller login destinations are localized and reject open redirects while admin routing is unchanged", () => {
+  assert.equal(safeLoginDestination(null, "fr"), "/fr");
+  assert.equal(safeLoginDestination("/messages?tab=all", "ku"), "/ku/messages?tab=all");
+  assert.equal(safeLoginDestination("/fr/account/orders#latest", "de"), "/de/account/orders#latest");
+  for (const destination of ["https://example.test", "//example.test", "\\\\example.test", "/api/auth/logout"]) assert.equal(safeLoginDestination(destination, "fr"), "/fr");
+  assert.equal(postLoginDestination("CUSTOMER", null, "fr"), "/fr");
+  assert.equal(postLoginDestination("SELLER", null, "ku"), "/ku");
+  assert.equal(postLoginDestination("ADMIN", "/messages", "fr"), "/dashboard");
+  assert.equal(localizedHome(localeFromReferer("https://todijo.test/fr/dashboard")), "/fr");
+  assert.equal(localizedHome(localeFromReferer("https://todijo.test/ku/seller/orders")), "/ku");
+  assert.equal(localizedHome(localeFromReferer("not a URL")), "/en");
+});

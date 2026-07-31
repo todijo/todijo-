@@ -345,6 +345,7 @@ h1 {
 .authMessage{margin:0;padding:12px 14px;border-radius:10px;background:var(--soft);color:var(--green-dark);font-size:14px;line-height:1.5}
 .roleOptions{display:grid;grid-template-columns:1fr 1fr;gap:12px}.roleCard{position:relative;border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer}.roleCard:has(input:checked){border-color:var(--green);background:var(--soft);box-shadow:0 0 0 3px rgba(15,143,101,.08)}.roleCard input{position:absolute;opacity:0}.roleCard strong,.roleCard span{display:block}.roleCard span{margin-top:5px;color:var(--muted);font-size:13px;line-height:1.4}
 .terms{display:flex;align-items:flex-start;gap:10px;color:var(--muted);font-size:13px;line-height:1.5}.terms input{margin-top:3px;accent-color:var(--green)}
+.turnstileField{display:grid;gap:6px;margin-top:2px}.turnstileField>span{font-size:14px;font-weight:800}.turnstileField>small{color:var(--muted);font-size:13px;line-height:1.5}.turnstileWidget{min-height:65px;max-width:100%;overflow:hidden}.turnstileWidget>div{max-width:100%}
 @media(max-width:850px){.authPage{grid-template-columns:1fr}.authBrand{min-height:290px;padding:28px 22px}.authPitch h1{font-size:42px}.authBenefits{display:none}.authPanel{padding:34px 20px 50px}}
 @media(max-width:520px){.formRow,.roleOptions{grid-template-columns:1fr}.authBox h2{font-size:32px}}
 

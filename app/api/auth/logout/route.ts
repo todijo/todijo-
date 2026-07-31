@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, deleteSession } from "@/lib/session";
+import { localeFromReferer, localizedHome } from "@/lib/auth-redirects";
 
-function logoutResponse() {
+function logoutResponse(locale: string) {
   // Use a relative Location header so the browser stays on the public domain
   // (for example https://todijo.com) instead of Coolify's internal localhost URL.
   const response = new NextResponse(null, {
     status: 303,
     headers: {
-      Location: "/login",
+      Location: localizedHome(locale),
       "Cache-Control": "no-store",
     },
   });
@@ -24,7 +25,7 @@ function logoutResponse() {
   return response;
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   await deleteSession();
-  return logoutResponse();
+  return logoutResponse(localeFromReferer(request.headers.get("referer")));
 }

@@ -1,41 +1,37 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
+import { registrationPersistenceData, validateRegistrationInput } from "@/lib/auth-registration";
 import { prisma } from "@/lib/prisma";
 import { createSession, readSession } from "@/lib/session";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export async function POST(request: Request) {
   try {
-    if (await readSession()) {
-      return NextResponse.json({ error: "Une session est déjà active." }, { status: 409 });
-    }
-    const body = await request.json();
-    const firstName = String(body.firstName ?? "").trim();
-    const lastName = String(body.lastName ?? "").trim();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const password = String(body.password ?? "");
-    const role = body.role === "seller" ? "SELLER" : "CUSTOMER";
-    const storeName = role === "SELLER" ? String(body.storeName ?? "").trim() : null;
+    if (await readSession()) return NextResponse.json({ error: "Une session est déjà active." }, { status: 409 });
 
-    if (!firstName || !lastName || !email || password.length < 8) {
-      return NextResponse.json({ error: "Veuillez compléter tous les champs. Le mot de passe doit contenir au moins 8 caractères." }, { status: 400 });
-    }
-    if (role === "SELLER" && !storeName) {
-      return NextResponse.json({ error: "Le nom de la boutique est obligatoire." }, { status: 400 });
+    const validation = validateRegistrationInput(await request.json());
+    if (!validation.ok) {
+      const error = validation.code === "PASSWORD_MISMATCH"
+        ? "Les mots de passe ne correspondent pas."
+        : validation.code === "STORE_NAME_REQUIRED"
+          ? "Le nom de la boutique est obligatoire."
+          : "Veuillez compléter tous les champs. Le mot de passe doit contenir au moins 8 caractères.";
+      return NextResponse.json({ error, code: validation.code }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail." }, { status: 409 });
+    const input = validation.value;
+    const turnstile = await verifyTurnstileToken(input.turnstileToken);
+    if (turnstile !== "success") {
+      return NextResponse.json({ error: "La vérification humaine a échoué.", code: turnstile === "missing" ? "TURNSTILE_REQUIRED" : "TURNSTILE_FAILED" }, { status: 400 });
     }
+
+    const existing = await prisma.user.findUnique({ where: { email: input.email } });
+    if (existing) return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail." }, { status: 409 });
 
     const user = await prisma.user.create({
       data: {
-        firstName,
-        lastName,
-        email,
-        passwordHash: await hash(password, 12),
-        role,
-        storeName,
+        ...registrationPersistenceData(input),
+        passwordHash: await hash(input.password, 12),
       },
       select: { id: true, role: true },
     });

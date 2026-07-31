@@ -1,0 +1,32 @@
+import { defaultLocale, isLocale, type Locale } from "../i18n/config";
+
+export function localizedHome(locale: string | null | undefined) {
+  return `/${isLocale(locale) ? locale : defaultLocale}`;
+}
+
+export function safeLoginDestination(next: string | null, locale: Locale) {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return localizedHome(locale);
+  try {
+    const url = new URL(next, "https://todijo.invalid");
+    if (url.origin !== "https://todijo.invalid" || url.pathname.startsWith("/api/")) return localizedHome(locale);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const path = isLocale(segments[0]) ? `/${segments.slice(1).join("/")}` : url.pathname;
+    return `${localizedHome(locale)}${path === "/" ? "" : path}${url.search}${url.hash}`;
+  } catch {
+    return localizedHome(locale);
+  }
+}
+
+export function postLoginDestination(role: "CUSTOMER" | "SELLER" | "ADMIN" | undefined, next: string | null, locale: Locale) {
+  return role === "ADMIN" ? "/dashboard" : safeLoginDestination(next, locale);
+}
+
+export function localeFromReferer(referer: string | null) {
+  if (!referer) return defaultLocale;
+  try {
+    const candidate = new URL(referer).pathname.split("/").filter(Boolean)[0];
+    return isLocale(candidate) ? candidate : defaultLocale;
+  } catch {
+    return defaultLocale;
+  }
+}
