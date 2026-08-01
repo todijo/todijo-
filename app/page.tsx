@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import HomeClient from "./HomeClient";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
+import { buyerVisibleVariantWhere, productGenerallyAvailableWhere, resolveProductAvailability } from "@/lib/product-availability";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,14 +12,17 @@ const PAGE_SIZE = 24;
 const productSelect = {
   id: true, name: true, price: true, compareAtPrice: true, currency: true,
   category: true, stock: true, condition: true, images: true, createdAt: true,
+  options: { where: { active: true }, select: { id: true } },
+  variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
   store: { select: { name: true, slug: true, city: true, country: true } },
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 function serializeProduct(p: ProductRow) {
+  const availability = resolveProductAvailability({ stock: p.stock, activeOptionCount: p.options.length, variants: p.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
   return { id: p.id, name: p.name, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
-    currency: p.currency, category: p.category, stock: p.stock, condition: p.condition, image: p.images[0] ?? null,
+    currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
     storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString() };
 }
 
@@ -49,7 +53,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     ...publicProductAccess,
     ...(category ? { category } : {}),
     ...(condition ? { condition } : {}),
-    ...(availability === "in-stock" ? { stock: { gt: 0 } } : {}),
+    ...(availability === "in-stock" ? { AND: [productGenerallyAvailableWhere()] } : {}),
     ...(Number.isFinite(minPrice) && minPrice >= 0 ? { price: { gte: minPrice } } : {}),
     ...(Number.isFinite(maxPrice) && maxPrice > 0
       ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } }

@@ -3,6 +3,26 @@ import assert from "node:assert/strict";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { createProductWithVariants, MAX_OPTION_VALUES, MAX_PRODUCT_OPTIONS, MAX_PRODUCT_VARIANTS, ProductVariantError, productVariantCombinationKey, productVariantDraftKey, saveProductVariants, serializeProductVariantForEditor } from "../lib/product-variants";
 import { productStockForForm } from "../lib/product-variant-form";
+import { isSelectedVariantAvailable, resolveProductAvailability } from "../lib/product-availability";
+
+test("buyer availability uses legacy stock only when no active variants exist", () => {
+  assert.deepEqual(resolveProductAvailability({ stock: 5, activeOptionCount: 0, variants: [] }), { hasActiveVariants: false, isGenerallyAvailable: true, availableVariantCount: 0 });
+  assert.deepEqual(resolveProductAvailability({ stock: 0, activeOptionCount: 0, variants: [] }), { hasActiveVariants: false, isGenerallyAvailable: false, availableVariantCount: 0 });
+});
+
+test("buyer availability derives variant products from active, complete variant stock", () => {
+  assert.equal(resolveProductAvailability({ stock: 0, activeOptionCount: 2, variants: [{ active: true, stock: 1000, valueCount: 2 }, { active: true, stock: 0, valueCount: 2 }] }).isGenerallyAvailable, true);
+  assert.equal(resolveProductAvailability({ stock: 0, activeOptionCount: 2, variants: [{ active: true, stock: 0, valueCount: 2 }] }).isGenerallyAvailable, false);
+  assert.equal(resolveProductAvailability({ stock: 0, activeOptionCount: 2, variants: [{ active: false, stock: 1000, valueCount: 2 }] }).isGenerallyAvailable, false);
+  assert.equal(resolveProductAvailability({ stock: 0, activeOptionCount: 2, variants: [{ active: true, stock: 1000, valueCount: 1 }] }).isGenerallyAvailable, false);
+});
+
+test("selected buyer variant is purchasable only when active and in stock", () => {
+  assert.equal(isSelectedVariantAvailable({ active: true, stock: 1 }), true);
+  assert.equal(isSelectedVariantAvailable({ active: true, stock: 0 }), false);
+  assert.equal(isSelectedVariantAvailable({ active: false, stock: 1 }), false);
+  assert.equal(isSelectedVariantAvailable(null), false);
+});
 
 test("product stock form value is required only without variants and preserves legacy edit stock", () => {
   assert.equal(productStockForForm(false, "12"), 12);

@@ -20,7 +20,8 @@ type MarketplaceProduct = {
   compareAtPrice: string | null;
   currency: string;
   category: string;
-  stock: number;
+  stock: number | null;
+  isGenerallyAvailable: boolean;
   condition: string;
   image: string | null;
   storeName: string;
@@ -72,10 +73,10 @@ function MarketplaceProductCard({ product, soldOut }: { product: MarketplaceProd
     <a className="discoveryImageWrap" href={`/product/${product.id}`} aria-label={product.name}>
       {product.image ? <Image src={product.image} alt={product.name} fill sizes="(max-width: 600px) 72vw, (max-width: 1000px) 34vw, 260px" unoptimized/> : <div className="productImage"><Package size={42} aria-hidden="true"/></div>}
       {discount > 0 && <span className="marketplaceDiscount">-{discount}%</span>}
-      {product.stock <= 0 && <span className="soldOutOverlay">{soldOut}</span>}
+      {!product.isGenerallyAvailable && <span className="soldOutOverlay">{soldOut}</span>}
     </a>
     <ProductCardWishlist productId={product.id}/>
-    <div className="discoveryCardBody"><a className="marketplaceStore" href={`/store/${product.storeSlug}`}>{product.storeName}</a><h3><a href={`/product/${product.id}`}>{product.name}</a></h3><div className="productAvailability"><span className={product.stock <= 0 ? "outStock" : product.stock <= 3 ? "lowStock" : "inStock"}>{product.stock <= 0 ? soldOut : product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div><div className="cardBottom"><div><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</div><button type="button" className="cardCartButton" disabled={product.stock <= 0} onClick={() => addItem({id:product.id,name:product.name,price,currency:product.currency,image:product.image ?? undefined,stock:product.stock,storeName:product.storeName,storeSlug:product.storeSlug})} aria-label={`${productText("add")}: ${product.name}`}><ShoppingCart size={17} aria-hidden="true"/><span>{product.stock <= 0 ? productText("unavailable") : productText("add")}</span></button></div></div>
+    <div className="discoveryCardBody"><a className="marketplaceStore" href={`/store/${product.storeSlug}`}>{product.storeName}</a><h3><a href={`/product/${product.id}`}>{product.name}</a></h3><div className="productAvailability"><span className={!product.isGenerallyAvailable ? "outStock" : product.stock != null && product.stock <= 3 ? "lowStock" : "inStock"}>{!product.isGenerallyAvailable ? soldOut : product.stock != null && product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div><div className="cardBottom"><div><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</div><button type="button" className="cardCartButton" disabled={!product.isGenerallyAvailable || product.stock == null} onClick={() => addItem({id:product.id,name:product.name,price,currency:product.currency,image:product.image ?? undefined,stock:product.stock ?? 0,storeName:product.storeName,storeSlug:product.storeSlug})} aria-label={`${productText("add")}: ${product.name}`}><ShoppingCart size={17} aria-hidden="true"/><span>{!product.isGenerallyAvailable ? productText("unavailable") : productText("add")}</span></button></div></div>
   </article>;
 }
 

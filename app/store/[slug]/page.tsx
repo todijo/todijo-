@@ -4,6 +4,7 @@ import CartLink from "@/components/CartLink";
 import StoreExperience from "./StoreExperience";
 import { getLocale, getTranslations } from "next-intl/server";
 import { publicStoreAccessWhere } from "@/lib/admin-access";
+import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function StorePage({ params }: Props) {
     select: {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, createdAt: true,
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
-      products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true } },
+      products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } } } },
     },
   });
 
@@ -41,7 +42,7 @@ export default async function StorePage({ params }: Props) {
     sellerInitials: initials(store.owner.firstName, store.owner.lastName),
     sellerSince: dateFormat.format(store.owner.createdAt),
     verified: store.owner.emailVerified,
-    products: store.products.map((product) => ({ ...product, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null })),
+    products: store.products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }); return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, images: product.images, stock: availability.hasActiveVariants ? null : product.stock, isGenerallyAvailable: availability.isGenerallyAvailable, condition: product.condition, category: product.category }; }),
   };
 
   return (

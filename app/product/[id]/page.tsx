@@ -12,6 +12,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { readSession } from "@/lib/session";
 import { getTranslations } from "next-intl/server";
 import { publicProductAccessWhere } from "@/lib/admin-access";
+import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -23,17 +24,18 @@ export default async function ProductPage({ params }: Props) {
   const { id } = await params;
   const session = await readSession();
   const publicAccess = publicProductAccessWhere();
-  const product = await prisma.product.findFirst({ where:{id,status:"PUBLISHED",...publicAccess}, select:{id:true,name:true,description:true,price:true,compareAtPrice:true,currency:true,category:true,condition:true,stock:true,images:true,colors:true,sizes:true,options:{where:{active:true},orderBy:{position:"asc"},select:{id:true,name:true,position:true,values:{where:{active:true},orderBy:{position:"asc"},select:{id:true,value:true,position:true}}}},variants:{where:{active:true},select:{id:true,stock:true,active:true,priceOverride:true,values:{select:{optionValue:{select:{id:true,value:true,option:{select:{id:true,name:true,position:true}}}}}}}},store:{select:{name:true,slug:true,city:true,country:true}}} });
+  const product = await prisma.product.findFirst({ where:{id,status:"PUBLISHED",...publicAccess}, select:{id:true,name:true,description:true,price:true,compareAtPrice:true,currency:true,category:true,condition:true,stock:true,images:true,colors:true,sizes:true,options:{where:{active:true},orderBy:{position:"asc"},select:{id:true,name:true,position:true,values:{where:{active:true},orderBy:{position:"asc"},select:{id:true,value:true,position:true}}}},variants:{where:buyerVisibleVariantWhere(),select:{id:true,stock:true,active:true,priceOverride:true,values:{select:{optionValue:{select:{id:true,value:true,option:{select:{id:true,name:true,position:true}}}}}}}},store:{select:{name:true,slug:true,city:true,country:true}}} });
   if (!product) notFound();
   const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true} });
   const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const discount=compare&&compare>price?Math.round((1-price/compare)*100):null;
+  const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell"><div className="productGallery"><ProductGallery images={product.images} productName={product.name}/></div><article className="productDetailInfo">
     <div className="productTopMeta"><p className="dashboardBadge">{product.category}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
     <h1>{product.name}</h1><div className="productPriceRow"><strong className="productDetailPrice">{price.toFixed(2)} {product.currency}</strong>{compare&&<del>{compare.toFixed(2)} {product.currency}</del>}{discount&&<span>-{discount}%</span>}</div>
     <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
     <p className="productDetailDescription">{product.description}</p>
-    <dl className="productFacts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{product.stock>0?`${product.stock} ${common("available")}`:common("soldOut")}</dd></div><div><dt>{productText("contact")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
+    <dl className="productFacts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{productText("contact")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
     <AskSellerButton productId={product.id} loggedIn={Boolean(session)} />
     <ProductPurchasePanel colors={product.colors} sizes={product.sizes} options={product.options} variants={product.variants.map((variant) => ({ ...variant, priceOverride: variant.priceOverride == null ? null : Number(variant.priceOverride) }))} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
     <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>

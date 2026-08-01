@@ -11,7 +11,8 @@ type Product = {
   compareAtPrice: string | null;
   currency: string;
   images: string[];
-  stock: number;
+  stock: number | null;
+  isGenerallyAvailable: boolean;
   condition: string;
   category: string;
 };
@@ -153,7 +154,7 @@ export default function StoreExperience({ store }: Props) {
                   <div className="productBadges">{discount && <span className="saleBadge">-{discount}%</span>}<span className="conditionBadge">{product.condition}</span></div>
                   <ProductCardWishlist productId={product.id} />
                 </a>
-                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.stock > 0 ? "stockDot in" : "stockDot out"}>{product.stock > 0 ? common("available") : common("soldOut")}</span></div></div>
+                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.isGenerallyAvailable ? "stockDot in" : "stockDot out"}>{product.isGenerallyAvailable ? common("available") : common("soldOut")}</span></div></div>
               </article>;
             })}</div>}
           </section>}
