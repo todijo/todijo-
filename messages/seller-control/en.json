@@ -71,6 +71,7 @@
   "cancel": "Cancel",
   "saving": "Saving…",
   "saveProduct": "Save product",
+  "productPublishedSuccess": "Product published successfully. You can now add another product.",
   "editProductTitle": "Edit product",
   "editProductDescription": "Update the listing, images, pricing and inventory while keeping its existing information.",
   "saveChanges": "Save changes",

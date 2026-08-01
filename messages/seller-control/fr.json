@@ -71,6 +71,7 @@
   "cancel": "Annuler",
   "saving": "Enregistrement…",
   "saveProduct": "Enregistrer le produit",
+  "productPublishedSuccess": "Produit publié avec succès. Vous pouvez maintenant ajouter un nouveau produit.",
   "editProductTitle": "Modifier le produit",
   "editProductDescription": "Mettez à jour l’annonce, les images, les prix et le stock tout en conservant ses informations.",
   "saveChanges": "Enregistrer les modifications",

@@ -27,13 +27,17 @@ export default function NewProductForm({ currency, productCount, productLimit }:
   const [variantImages, setVariantImages] = useState<VariantImageAssignment[]>([]);
   const [basePrice, setBasePrice] = useState("");
   const [productStock, setProductStock] = useState("1");
+  const [resetGeneration, setResetGeneration] = useState(0);
+  const [published, setPublished] = useState(false);
   const submitLock = useRef(false);
-  const publicationStatus = useRef<"DRAFT" | "PUBLISHED">("PUBLISHED");
+  const successRef = useRef<HTMLParagraphElement>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (submitLock.current) return; setMessage("");
+    event.preventDefault(); if (submitLock.current) return; setMessage(""); setPublished(false);
     if (uploading) return setMessage(t("waitUpload"));
     if (variantsEnabled && (!variantDraft.options.length || !variantDraft.variants.length || !variantDraft.generated)) return setMessage(t("variantsNeedGeneration"));
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const status: "DRAFT" | "PUBLISHED" = submitter?.value === "DRAFT" ? "DRAFT" : "PUBLISHED";
     submitLock.current = true; setSubmitting(true);
     const form = new FormData(event.currentTarget);
     try { const response = await fetch("/api/products", {
@@ -42,19 +46,23 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         name: form.get("name"), description: form.get("description"), price: form.get("price"), compareAtPrice: form.get("compareAtPrice"),
         colors: String(form.get("colors") || "").split(",").map((value) => value.trim()).filter(Boolean),
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
-        stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status: publicationStatus.current,
+        stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
         images, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [],
       }),
     });
     const data = await response.json() as { error?: string; product?: { id?: string } };
     if (!response.ok) { setMessage(data.error ?? t("errorGeneric")); setSubmitting(false); submitLock.current = false; return; }
-    router.push(data.product?.id ? `/seller/products/${data.product.id}/edit` : "/seller/products"); router.refresh();
+    if (status === "DRAFT") { router.push(data.product?.id ? `/seller/products/${data.product.id}/edit` : "/seller/products"); router.refresh(); return; }
+    setImages([]); setVariantsEnabled(false); setVariantDraft({ options: [], generate: true, variants: [], generated: false }); setVariantImages([]);
+    setBasePrice(""); setProductStock("1"); setUploading(false); setMessage(t("productPublishedSuccess")); setPublished(true); setResetGeneration((value) => value + 1);
+    setSubmitting(false); submitLock.current = false; router.refresh();
+    requestAnimationFrame(() => successRef.current?.focus());
     } catch { setMessage(t("errorGeneric")); setSubmitting(false); submitLock.current = false; }
   }
 
   const disabledByLimit = productLimit !== null && productCount >= productLimit;
-  return <form className="sellerControlForm" onSubmit={submit}>
-    <div className="sellerControlFormGrid">
+  return <form key={resetGeneration} className="sellerControlForm" onSubmit={submit}>
+    <div className={`sellerControlFormGrid${variantsEnabled ? " isSingleColumn" : ""}`}>
       <div className="sellerControlFormMain">
         <SellerSection icon={FileText} title={t("basicInfo")} description={t("basicInfoHelp")}>
           <SellerFormField label={t("productName")} htmlFor="name" hint={t("productNameHint")} required>
@@ -75,12 +83,12 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         <SellerSection icon={Boxes} title={t("productOptions")} description={t("productOptionsHelp")}>
           {!variantsEnabled ? <button className="sellerVariantStartButton" type="button" onClick={() => setVariantsEnabled(true)}>{t("addProductOptions")}</button> : <>
             <div className="sellerVariantOptionToolbar"><p>{t("productOptionsEnabled")}</p><button className="sellerVariantRemoveButton" type="button" onClick={() => setVariantsEnabled(false)}>{t("removeProductOptions")}</button></div>
-            <ProductVariantEditor currency={currency} basePrice={basePrice} onDraftChange={setVariantDraft} embedded />
+            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} onDraftChange={setVariantDraft} embedded />
           </>}
         </SellerSection>
 
         <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
-          <ProductImageManager onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/>
+          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/>
         </SellerSection>
         {variantsEnabled && <SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages}/></SellerSection>}
 
@@ -96,10 +104,10 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         <SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><SellerFormField label={t("stock")} htmlFor="stock" hint={t("stockHint")} required><input id="stock" name="stock" type="number" min="0" max="1000000" step="1" value={productStock} onChange={(event) => setProductStock(event.target.value)} required /></SellerFormField></SellerSection>
       </aside>}
     </div>
-    <SellerActionBar status={message && <p className="sellerControlFeedback" role="alert">{message}</p>}>
+    <SellerActionBar status={message && <p ref={successRef} className={`sellerControlFeedback${published ? " isSuccess" : ""}`} role={published ? "status" : "alert"} tabIndex={published ? -1 : undefined}>{message}</p>}>
       <a className="sellerControlButton secondary" href="/seller/products">{t("cancel")}</a>
-      <button className="sellerControlButton secondary" type="submit" onClick={() => { publicationStatus.current = "DRAFT"; }} disabled={submitting || uploading || disabledByLimit}>{t("saveDraft")}</button>
-      <button className="sellerControlButton primary" type="submit" onClick={() => { publicationStatus.current = "PUBLISHED"; }} disabled={submitting || uploading || disabledByLimit}>{submitting ? t("saving") : t("publishNow")}</button>
+      <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || uploading || disabledByLimit}>{t("saveDraft")}</button>
+      <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || uploading || disabledByLimit}>{submitting ? t("saving") : t("publishNow")}</button>
     </SellerActionBar>
   </form>;
 }
