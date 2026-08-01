@@ -21,6 +21,7 @@ export default async function ProductPage({ params }: Props) {
   const common = await getTranslations("Common");
   const market = await getTranslations("Marketplace");
   const productText = await getTranslations("Product");
+  const detailText = await getTranslations("ProductDetail");
   const { id } = await params;
   const session = await readSession();
   const publicAccess = publicProductAccessWhere();
@@ -45,16 +46,24 @@ export default async function ProductPage({ params }: Props) {
   const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const discount=compare&&compare>price?Math.round((1-price/compare)*100):null;
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
-  return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell"><div className="productGallery"><ProductGallery images={product.images} productName={product.name}/></div><article className="productDetailInfo">
-    <div className="productTopMeta"><p className="dashboardBadge">{product.category}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
-    <h1>{product.name}</h1><div className="productPriceRow"><strong className="productDetailPrice">{price.toFixed(2)} {product.currency}</strong>{compare&&<del>{compare.toFixed(2)} {product.currency}</del>}{discount&&<span>-{discount}%</span>}</div>
-    <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
-    <p className="productDetailDescription">{product.description}</p>
-    <dl className="productFacts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{productText("contact")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
-    <AskSellerButton productId={product.id} loggedIn={Boolean(session)} />
-    <ProductPurchasePanel colors={product.colors} sizes={product.sizes} options={product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))}))} variants={product.variants.map((variant) => ({ ...variant, priceOverride: variant.priceOverride == null ? null : Number(variant.priceOverride) }))} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
-    <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
-  </article></section>
+  return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
+    <div className="productDetailTop">
+      <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
+      <article className="productDetailInfo">
+        <div className="productTopMeta"><p className="dashboardBadge">{product.category}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
+        <h1>{product.name}</h1><div className="productPriceRow"><strong className="productDetailPrice">{price.toFixed(2)} {product.currency}</strong>{compare&&<del>{compare.toFixed(2)} {product.currency}</del>}{discount&&<span>-{discount}%</span>}</div>
+        <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
+        <dl className="productFacts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
+        <ProductPurchasePanel colors={product.colors} sizes={product.sizes} options={product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))}))} variants={product.variants.map((variant) => ({ ...variant, priceOverride: variant.priceOverride == null ? null : Number(variant.priceOverride) }))} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
+        <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
+      </article>
+    </div>
+    <section className="productDetailDescriptionSection" aria-labelledby="product-details-title">
+      <h2 id="product-details-title">{detailText("details")}</h2>
+      <p className="productDetailDescription">{product.description}</p>
+      <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div>
+    </section>
+  </section>
   {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div>{item.images[0]?<img src={item.images[0]} alt={item.name}/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{Number(item.price).toFixed(2)} {item.currency}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }

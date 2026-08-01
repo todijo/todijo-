@@ -1,0 +1,35 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFile } from "node:fs/promises";
+
+test("product detail renders one full description below the bounded gallery grid", async () => {
+  const source = await readFile("app/product/[id]/page.tsx", "utf8");
+  assert.equal(source.match(/productDetailDescription/g)?.length, 2); // section and paragraph class names
+  assert.ok(source.indexOf("productDetailTop") < source.indexOf("productDetailDescriptionSection"));
+  assert.ok(source.indexOf("productGallerySticky") < source.indexOf("productDetailDescriptionSection"));
+  assert.equal(source.match(/\{product\.description\}/g)?.length, 1);
+});
+
+test("shop wording and Ask Seller order match their actions", async () => {
+  const source = await readFile("app/product/[id]/page.tsx", "utf8");
+  assert.match(source, /detailText\("viewShop"\)/);
+  assert.match(source, /href=\{`\/store\/\$\{product\.store\.slug\}`\}/);
+  assert.ok(source.indexOf("productDetailDescription") < source.indexOf("<AskSellerButton"));
+  assert.equal(source.match(/<AskSellerButton/g)?.length, 1);
+});
+
+test("long titles wrap and gallery stickiness is desktop-only", async () => {
+  const css = await readFile("app/globals.css", "utf8");
+  assert.match(css, /\.productDetailInfo h1\{[^}]*font-size:clamp[^}]*overflow-wrap:anywhere/);
+  assert.match(css, /\.productGallerySticky\{position:sticky/);
+  assert.match(css, /@media\(max-width:900px\)[\s\S]*?\.productGallerySticky\{position:static\}/);
+  assert.match(css, /\.productMainImage[^}]*object-fit:contain/);
+});
+
+test("legacy and variant image product detail paths remain present", async () => {
+  const [page, gallery] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
+  assert.match(page, /images: true, colors: true, sizes: true/);
+  assert.match(page, /imageAssignments/);
+  assert.match(gallery, /addEventListener\("todijo:variant-images"/);
+  assert.match(gallery, /variantImages\.length \? variantImages : baseImages/);
+});
