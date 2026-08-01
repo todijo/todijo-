@@ -2,8 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { localizedHome } from "@/lib/auth-redirects";
 
 export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const params = useSearchParams();
@@ -15,6 +16,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const locale = useLocale();
   const t = useTranslations("Auth");
 
   useEffect(() => {
@@ -58,7 +60,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
         else setMessage(data.error ?? t("error"));
         return;
       }
-      router.push(data.role === "SELLER" ? "/seller/create-store" : "/dashboard");
+      router.push(localizedHome(locale));
       router.refresh();
     } catch {
       resetVerification(t("registrationRetry"));
