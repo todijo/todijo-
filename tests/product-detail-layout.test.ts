@@ -20,12 +20,22 @@ test("shop wording and Ask Seller order match their actions", async () => {
 
 test("long titles wrap and gallery stickiness is desktop-only", async () => {
   const css = await readFile("app/globals.css", "utf8");
-  assert.match(css, /\.productDetailInfo h1\{font-size:clamp\(30px,2\.7vw,35px\);line-height:1\.1\}/);
-  assert.match(css, /@media\(max-width:620px\)[^\n]*\.productDetailInfo h1\{font-size:clamp\(24px,6\.8vw,28px\)/);
+  assert.match(css, /\.productDetailInfo h1\{font-size:clamp\(28px,2\.35vw,30px\);line-height:1\.1\}/);
+  assert.match(css, /@media\(max-width:620px\)[^\n]*\.productDetailInfo h1\{font-size:clamp\(22px,6vw,24px\)/);
   assert.match(css, /\.productGallerySticky\{position:sticky/);
   assert.match(css, /@media\(max-width:900px\)[\s\S]*?\.productGallerySticky\{position:static\}/);
   assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{[^}]*width:100%;height:auto;[^}]*object-fit:contain/);
   assert.doesNotMatch(css, /\.productMainImage\.productMainImageIntrinsic\{[^}]*height:(?:clamp|[0-9]+px)/);
+});
+
+test("product detail price and lightbox close behavior stay scoped", async () => {
+  const [css, gallery] = await Promise.all([readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
+  assert.match(css, /\.productDetailPrice\{font-size:clamp\(26px,2\.25vw,30px\)\}/);
+  assert.match(css, /\.productLightboxToolbar \.productLightboxClose\{[^}]*position:fixed;[^}]*z-index:10001;[^}]*width:48px;height:48px/);
+  assert.match(gallery, /aria-label=\{locale === "fr" \? "Fermer" : "Close"\}/);
+  assert.match(gallery, /event\.key === "Escape"\) closeGallery\(\)/);
+  assert.match(gallery, /requestAnimationFrame\(\(\) => openerRef\.current\?\.focus\(\)\)/);
+  assert.match(gallery, /document\.body\.style\.overflow = "hidden"/);
 });
 
 test("legacy and variant image product detail paths remain present", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocale } from "next-intl";
 
 type ProductGalleryProps = {
   images: string[];
@@ -8,6 +9,7 @@ type ProductGalleryProps = {
 };
 
 export default function ProductGallery({ images, productName }: ProductGalleryProps) {
+  const locale = useLocale();
   const baseImages = useMemo(() => images.filter(Boolean), [images]);
   const [variantImages, setVariantImages] = useState<string[]>([]);
   const cleanImages = variantImages.length ? variantImages : baseImages;
@@ -15,6 +17,12 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeGallery = useCallback(() => {
+    setIsOpen(false);
+    requestAnimationFrame(() => openerRef.current?.focus());
+  }, []);
 
   useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, []);
 
@@ -37,7 +45,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
     if (!isOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
+      if (event.key === "Escape") closeGallery();
       if (event.key === "ArrowLeft") showPrevious();
       if (event.key === "ArrowRight") showNext();
     };
@@ -50,7 +58,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [isOpen, showNext, showPrevious]);
+  }, [closeGallery, isOpen, showNext, showPrevious]);
 
   if (!hasImages) {
     return <div className="productMainPlaceholder">📦</div>;
@@ -77,7 +85,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         <button
           type="button"
           className="productMainImageButton"
-          onClick={() => setIsOpen(true)}
+          onClick={(event) => { openerRef.current = event.currentTarget; setIsOpen(true); }}
           aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -112,7 +120,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           aria-modal="true"
           aria-label={`Galerie de ${productName}`}
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setIsOpen(false);
+            if (event.target === event.currentTarget) closeGallery();
           }}
         >
           <div className="productLightboxToolbar">
@@ -121,7 +129,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
               <button type="button" onClick={() => setIsZoomed((value) => !value)} aria-label="Zoomer ou dézoomer">
                 {isZoomed ? "−" : "+"}
               </button>
-              <button type="button" onClick={() => setIsOpen(false)} aria-label="Fermer la galerie">✕</button>
+              <button type="button" className="productLightboxClose" onClick={closeGallery} aria-label={locale === "fr" ? "Fermer" : "Close"}>×</button>
             </div>
           </div>
 
