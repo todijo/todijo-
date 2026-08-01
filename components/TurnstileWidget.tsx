@@ -12,10 +12,9 @@ declare global {
   }
 }
 
-export function TurnstileWidget({ onTokenChange, onExpired, onError, resetKey }: { onTokenChange: (token: string) => void; onExpired: () => void; onError: () => void; resetKey: number }) {
+export function TurnstileWidget({ siteKey, onTokenChange, onExpired, onError, resetKey }: { siteKey: string; onTokenChange: (token: string) => void; onExpired: () => void; onError: () => void; resetKey: number }) {
   const container = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | undefined>(undefined);
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
     if (!siteKey || !container.current || !window.turnstile || widgetId.current) return;

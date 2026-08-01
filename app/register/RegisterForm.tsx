@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 
-export default function RegisterForm() {
+export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const params = useSearchParams();
   const router = useRouter();
   const [role, setRole] = useState<"customer" | "seller">("customer");
@@ -86,7 +86,7 @@ export default function RegisterForm() {
         <div className="formField"><label htmlFor="password">{t("password")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
         <div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && password !== confirmPassword)} aria-describedby={confirmPassword && password !== confirmPassword ? "password-mismatch" : undefined} required /></div>
         {confirmPassword && password !== confirmPassword && <p className="authMessage" id="password-mismatch" role="alert">{t("passwordMismatch")}</p>}
-        <div className="turnstileField"><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
+        <div className="turnstileField"><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
         <label className="terms"><input type="checkbox" required /><span>{t("terms")}</span></label>
         {message && <p className="authMessage" role="alert">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
