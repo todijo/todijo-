@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocale } from "next-intl";
 
 type ProductGalleryProps = {
@@ -113,7 +114,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         )}
       </div>
 
-      {isOpen && (
+      {isOpen && createPortal((
         <div
           className="productLightbox"
           role="dialog"
@@ -168,7 +169,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
             </div>
           )}
         </div>
-      )}
+      ), document.body)}
     </>
   );
 }
