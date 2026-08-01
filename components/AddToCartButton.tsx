@@ -4,13 +4,13 @@ import { useState } from "react";
 import { CartProduct, useCart } from "./CartProvider";
 import { useTranslations } from "next-intl";
 
-export default function AddToCartButton({ product }: { product: CartProduct }) {
+export default function AddToCartButton({ product, quantity = 1 }: { product: CartProduct; quantity?: number }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
   const t = useTranslations("Product");
 
   function handleAdd() {
-    addItem(product);
+    addItem(product, quantity);
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   }

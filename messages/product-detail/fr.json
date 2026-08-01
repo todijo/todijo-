@@ -1,4 +1,12 @@
 {
   "viewShop": "Voir la boutique",
-  "details": "Détails du produit"
+  "details": "Détails du produit",
+  "description": "Description",
+  "reviews": "Avis",
+  "pageSections": "Sections de la fiche produit",
+  "purchaseOptions": "Options d’achat",
+  "chooseCombination": "Choisissez les options",
+  "quantity": "Quantité",
+  "decreaseQuantity": "Réduire la quantité",
+  "increaseQuantity": "Augmenter la quantité"
 }

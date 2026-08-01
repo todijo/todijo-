@@ -28,6 +28,16 @@ test("long titles wrap and gallery stickiness is desktop-only", async () => {
   assert.doesNotMatch(css, /\.productMainImage\.productMainImageIntrinsic\{[^}]*height:(?:clamp|[0-9]+px)/);
 });
 
+test("product detail uses three marketplace areas and stacks without fixed mobile cards", async () => {
+  const [page, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.match(page, /productGallery productGallerySticky/);
+  assert.match(page, /productDetailInfo/);
+  assert.match(page, /productPurchaseColumn/);
+  assert.match(css, /\.productDetailTop\{grid-template-columns:minmax\(0,1\.16fr\) minmax\(300px,\.9fr\) minmax\(280px,\.72fr\)/);
+  assert.match(css, /@media\(max-width:1100px\)[^\n]*\.productGallerySticky,\.productPurchaseColumn\{position:static\}/);
+  assert.match(css, /@media\(max-width:760px\)[^\n]*\.productDetailTop\{grid-template-columns:minmax\(0,1fr\)/);
+});
+
 test("product detail price and lightbox close behavior stay scoped", async () => {
   const [css, gallery] = await Promise.all([readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
   assert.match(css, /\.productDetailPrice\{font-size:clamp\(24px,2vw,26px\)\}/);
@@ -47,4 +57,12 @@ test("legacy and variant image product detail paths remain present", async () =>
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
   assert.match(gallery, /variantImages\.length \? variantImages : baseImages/);
   assert.match(gallery, /productMainImage productMainImageIntrinsic/);
+});
+
+test("selected variant price has one live product-detail location", async () => {
+  const [page, price, purchase] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/product/[id]/ProductDetailPrice.tsx", "utf8"), readFile("components/ProductPurchasePanel.tsx", "utf8")]);
+  assert.match(page, /<ProductDetailPrice/);
+  assert.match(price, /addEventListener\("todijo:variant-price"/);
+  assert.match(purchase, /new CustomEvent\("todijo:variant-price"/);
+  assert.doesNotMatch(purchase, /className="variantPrice"/);
 });

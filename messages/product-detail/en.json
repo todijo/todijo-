@@ -1,4 +1,12 @@
 {
   "viewShop": "View shop",
-  "details": "Product details"
+  "details": "Product details",
+  "description": "Description",
+  "reviews": "Reviews",
+  "pageSections": "Product page sections",
+  "purchaseOptions": "Purchase options",
+  "chooseCombination": "Choose options",
+  "quantity": "Quantity",
+  "decreaseQuantity": "Decrease quantity",
+  "increaseQuantity": "Increase quantity"
 }

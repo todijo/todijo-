@@ -28,5 +28,14 @@ test("buyer option selection emits gallery image changes", async () => {
   const purchase = await fs.readFile("components/ProductPurchasePanel.tsx", "utf8");
   const gallery = await fs.readFile("app/product/[id]/ProductGallery.tsx", "utf8");
   assert.match(purchase, /todijo:variant-images/);
+  assert.match(purchase, /className=\{`\$\{image \? "optionImageChoice"/);
+  assert.match(purchase, /disabled=\{!valueAvailable\}/);
+  assert.match(purchase, /useState<Record<string, string>>\(\{\}\)/);
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
+});
+
+test("product detail translations keep English and French parity", async () => {
+  const fs = await import("node:fs/promises");
+  const [english, french] = await Promise.all([fs.readFile("messages/product-detail/en.json", "utf8"), fs.readFile("messages/product-detail/fr.json", "utf8")]);
+  assert.deepEqual(Object.keys(JSON.parse(french)).sort(), Object.keys(JSON.parse(english)).sort());
 });
