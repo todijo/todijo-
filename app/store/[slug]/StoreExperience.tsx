@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
+import ProductCardAction from "@/components/ProductCardAction";
 import { useTranslations } from "next-intl";
 
 type Product = {
@@ -12,6 +13,7 @@ type Product = {
   currency: string;
   images: string[];
   stock: number | null;
+  hasActiveVariants: boolean;
   isGenerallyAvailable: boolean;
   condition: string;
   category: string;
@@ -154,7 +156,7 @@ export default function StoreExperience({ store }: Props) {
                   <div className="productBadges">{discount && <span className="saleBadge">-{discount}%</span>}<span className="conditionBadge">{product.condition}</span></div>
                   <ProductCardWishlist productId={product.id} />
                 </a>
-                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.isGenerallyAvailable ? "stockDot in" : "stockDot out"}>{product.isGenerallyAvailable ? common("available") : common("soldOut")}</span></div></div>
+                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.isGenerallyAvailable ? "stockDot in" : "stockDot out"}>{product.isGenerallyAvailable ? common("available") : common("soldOut")}</span></div><ProductCardAction className="premiumProductAction" product={{ ...product, price, image: product.images[0], storeName: store.name, storeSlug: store.slug }}/></div>
               </article>;
             })}</div>}
           </section>}

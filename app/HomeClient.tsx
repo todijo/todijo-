@@ -3,15 +3,15 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, ChevronDown, Languages, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, ShoppingBag, ShoppingCart, Store, UserRound } from "lucide-react";
+import { ArrowRight, ChevronDown, Languages, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, ShoppingBag, Store, UserRound } from "lucide-react";
 import CartLink from "@/components/CartLink";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import TodijoLogo from "@/components/TodijoLogo";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
-import { useCart } from "@/components/CartProvider";
 import { formatCurrency } from "@/lib/formatters";
+import ProductCardAction from "@/components/ProductCardAction";
 
 type MarketplaceProduct = {
   id: string;
@@ -21,6 +21,7 @@ type MarketplaceProduct = {
   currency: string;
   category: string;
   stock: number | null;
+  hasActiveVariants: boolean;
   isGenerallyAvailable: boolean;
   condition: string;
   image: string | null;
@@ -61,9 +62,7 @@ function buildUrl(filters: Filters, page = 1) {
 }
 
 function MarketplaceProductCard({ product, soldOut }: { product: MarketplaceProduct; soldOut: string }) {
-  const { addItem } = useCart();
   const locale = useLocale();
-  const productText = useTranslations("Product");
   const common = useTranslations("Common");
   const cart = useTranslations("Cart");
   const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
@@ -76,7 +75,7 @@ function MarketplaceProductCard({ product, soldOut }: { product: MarketplaceProd
       {!product.isGenerallyAvailable && <span className="soldOutOverlay">{soldOut}</span>}
     </a>
     <ProductCardWishlist productId={product.id}/>
-    <div className="discoveryCardBody"><a className="marketplaceStore" href={`/store/${product.storeSlug}`}>{product.storeName}</a><h3><a href={`/product/${product.id}`}>{product.name}</a></h3><div className="productAvailability"><span className={!product.isGenerallyAvailable ? "outStock" : product.stock != null && product.stock <= 3 ? "lowStock" : "inStock"}>{!product.isGenerallyAvailable ? soldOut : product.stock != null && product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div><div className="cardBottom"><div><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</div><button type="button" className="cardCartButton" disabled={!product.isGenerallyAvailable || product.stock == null} onClick={() => addItem({id:product.id,name:product.name,price,currency:product.currency,image:product.image ?? undefined,stock:product.stock ?? 0,storeName:product.storeName,storeSlug:product.storeSlug})} aria-label={`${productText("add")}: ${product.name}`}><ShoppingCart size={17} aria-hidden="true"/><span>{!product.isGenerallyAvailable ? productText("unavailable") : productText("add")}</span></button></div></div>
+    <div className="discoveryCardBody"><a className="marketplaceStore" href={`/store/${product.storeSlug}`}>{product.storeName}</a><h3><a href={`/product/${product.id}`}>{product.name}</a></h3><div className="productAvailability"><span className={!product.isGenerallyAvailable ? "outStock" : product.stock != null && product.stock <= 3 ? "lowStock" : "inStock"}>{!product.isGenerallyAvailable ? soldOut : product.stock != null && product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div><div className="cardBottom"><div><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div></div>
   </article>;
 }
 

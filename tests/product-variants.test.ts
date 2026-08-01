@@ -4,6 +4,15 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { createProductWithVariants, MAX_OPTION_VALUES, MAX_PRODUCT_OPTIONS, MAX_PRODUCT_VARIANTS, ProductVariantError, productVariantCombinationKey, productVariantDraftKey, saveProductVariants, serializeProductVariantForEditor } from "../lib/product-variants";
 import { productStockForForm } from "../lib/product-variant-form";
 import { isSelectedVariantAvailable, resolveProductAvailability } from "../lib/product-availability";
+import { productCardOptionHref, resolveProductCardAction } from "../lib/product-card-action";
+
+test("product cards require option selection only for available variant products", () => {
+  assert.equal(resolveProductCardAction({ hasActiveVariants: false, isGenerallyAvailable: true }), "ADD_TO_CART");
+  assert.equal(resolveProductCardAction({ hasActiveVariants: false, isGenerallyAvailable: false }), "SOLD_OUT");
+  assert.equal(resolveProductCardAction({ hasActiveVariants: true, isGenerallyAvailable: true }), "CHOOSE_OPTIONS");
+  assert.equal(resolveProductCardAction({ hasActiveVariants: true, isGenerallyAvailable: false }), "SOLD_OUT");
+  assert.equal(productCardOptionHref("product_1", "fr"), "/fr/product/product_1");
+});
 
 test("buyer availability uses legacy stock only when no active variants exist", () => {
   assert.deepEqual(resolveProductAvailability({ stock: 5, activeOptionCount: 0, variants: [] }), { hasActiveVariants: false, isGenerallyAvailable: true, availableVariantCount: 0 });

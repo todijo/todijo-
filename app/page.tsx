@@ -22,7 +22,7 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 function serializeProduct(p: ProductRow) {
   const availability = resolveProductAvailability({ stock: p.stock, activeOptionCount: p.options.length, variants: p.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
   return { id: p.id, name: p.name, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
-    currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
+    currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
     storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString() };
 }
 
