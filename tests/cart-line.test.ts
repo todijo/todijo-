@@ -7,7 +7,8 @@ test("cart line identity separates variants and normalizes optional values", () 
   assert.equal(normalizeCartOption("  "), null);
   assert.equal(cartLineKey("product", "red", "M"), cartLineKey("product", " red ", "M"));
   assert.notEqual(cartLineKey("product", "red", "M"), cartLineKey("product", "blue", "M"));
-  assert.equal(cartLineKey("product"), JSON.stringify(["product", null, null]));
+  assert.equal(cartLineKey("product"), JSON.stringify(["product", null, null, null]));
+  assert.notEqual(cartLineKey("product", null, null, "variant_black_m"), cartLineKey("product", null, null, "variant_white_m"));
 });
 
 test("completed checkout removes only purchased quantities and preserves unrelated cart lines", () => {

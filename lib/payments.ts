@@ -6,7 +6,7 @@ export class CheckoutError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 
-type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null };
+type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
 
 export async function isBuyerCheckoutComplete(db: PrismaClient, buyerId: string, requestId: string) {
@@ -27,10 +27,10 @@ export async function createCheckout(
   const quantities = new Map<string, CheckoutItem & { lineKey: string }>();
   for (const item of requestedItems) {
     if (typeof item.productId !== "string" || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000) throw new CheckoutError("Invalid cart item.");
-    const selectedColor = normalizeCartOption(item.selectedColor), selectedSize = normalizeCartOption(item.selectedSize);
-    const lineKey = cartLineKey(item.productId, selectedColor, selectedSize);
+    const selectedColor = normalizeCartOption(item.selectedColor), selectedSize = normalizeCartOption(item.selectedSize), variantId = normalizeCartOption(item.variantId);
+    const lineKey = cartLineKey(item.productId, selectedColor, selectedSize, variantId);
     const existingLine = quantities.get(lineKey);
-    quantities.set(lineKey, { productId: item.productId, selectedColor, selectedSize, lineKey, quantity: (existingLine?.quantity ?? 0) + item.quantity });
+    quantities.set(lineKey, { productId: item.productId, selectedColor, selectedSize, variantId, lineKey, quantity: (existingLine?.quantity ?? 0) + item.quantity });
   }
 
   const existing = await db.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
@@ -40,7 +40,7 @@ export async function createCheckout(
   if (existing && existing.status !== "PENDING") throw new CheckoutError("This checkout request can no longer be reused.", 409);
 
   const lines = [...quantities.values()];
-  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
+  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
   if (products.length !== new Set(lines.map((line) => line.productId)).size) throw new CheckoutError("One or more products are unavailable.", 409);
   const stores = new Set(products.map((product) => product.storeId));
   if (stores.size !== 1) throw new CheckoutError("MULTIPLE_SELLERS", 409);
@@ -48,14 +48,29 @@ export async function createCheckout(
   if (!seller.stripeAccountId || !seller.stripeOnboardingComplete || !seller.stripeChargesEnabled) throw new CheckoutError("SELLER_STRIPE_NOT_READY", 409);
   const currencies = new Set(products.map((product) => product.currency.toUpperCase()));
   if (currencies.size !== 1) throw new CheckoutError("All products must use the same currency.");
-  for (const line of lines) { const product = products.find((candidate) => candidate.id === line.productId)!; if (((product.colors ?? []).length && (!line.selectedColor || !(product.colors ?? []).includes(line.selectedColor))) || ((product.sizes ?? []).length && (!line.selectedSize || !(product.sizes ?? []).includes(line.selectedSize)))) throw new CheckoutError("Selected product options are unavailable.", 409); }
-  for (const product of products) { const quantity = lines.filter((line) => line.productId === product.id).reduce((sum, line) => sum + line.quantity, 0); if (product.stock < quantity) throw new CheckoutError(`Insufficient stock for ${product.name}.`, 409); }
-  const total = lines.reduce((sum, line) => sum.add(products.find((product) => product.id === line.productId)!.price.mul(line.quantity)), new Prisma.Decimal(0));
+  const resolvedLines = lines.map((line) => {
+    const product = products.find((candidate) => candidate.id === line.productId)!;
+    const variants = product.variants ?? [];
+    if (variants.length) {
+      const variant = line.variantId ? variants.find((candidate) => candidate.id === line.variantId && candidate.active) : null;
+      if (!variant) throw new CheckoutError("Selected product variant is unavailable.", 409);
+      const selectedOptions = variant.values.sort((a, b) => a.optionValue.option.position - b.optionValue.option.position).map(({ optionValue }) => ({ name: optionValue.option.name, value: optionValue.value }));
+      return { ...line, product, variant, unitPrice: variant.priceOverride ?? product.price, selectedOptions };
+    }
+    if (line.variantId || ((product.colors ?? []).length && (!line.selectedColor || !(product.colors ?? []).includes(line.selectedColor))) || ((product.sizes ?? []).length && (!line.selectedSize || !(product.sizes ?? []).includes(line.selectedSize)))) throw new CheckoutError("Selected product options are unavailable.", 409);
+    return { ...line, product, variant: null, unitPrice: product.price, selectedOptions: { color: line.selectedColor, size: line.selectedSize } };
+  });
+  for (const line of resolvedLines) {
+    const available = line.variant?.stock ?? line.product.stock;
+    const requested = resolvedLines.filter((candidate) => line.variant ? candidate.variant?.id === line.variant.id : !candidate.variant && candidate.product.id === line.product.id).reduce((sum, candidate) => sum + candidate.quantity, 0);
+    if (available < requested) throw new CheckoutError(`Insufficient stock for ${line.product.name}.`, 409);
+  }
+  const total = resolvedLines.reduce((sum, line) => sum.add(line.unitPrice.mul(line.quantity)), new Prisma.Decimal(0));
   const totalAmount = Number(total.mul(100).toFixed(0));
   const platformFeeAmount = Math.round(totalAmount * platformFeePercent() / 100);
   const sellerAmount = totalAmount - platformFeeAmount;
   if (existing) {
-    const sameCart = existing.items.length === lines.length && existing.items.every((item) => lines.some((line) => line.productId === item.productId && line.quantity === item.quantity && item.unitPrice.equals(products.find((product) => product.id === item.productId)?.price ?? -1)));
+    const sameCart = existing.items.length === resolvedLines.length && existing.items.every((item) => resolvedLines.some((line) => line.productId === item.productId && line.quantity === item.quantity && item.variantId === line.variant?.id && item.unitPrice.equals(line.unitPrice)));
     if (!sameCart || !existing.total.equals(total) || existing.currency !== products[0].currency.toUpperCase() || existing.stripeConnectedAccountId !== seller.stripeAccountId || existing.platformFeeAmount !== platformFeeAmount || existing.sellerAmount !== sellerAmount) throw new CheckoutError("This checkout request belongs to a different cart. Start a new checkout.", 409);
   }
 
@@ -64,14 +79,14 @@ export async function createCheckout(
   if (!order) {
     try {
       const store = products[0].store;
-      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, subtotal: total, shippingCost: new Prisma.Decimal(0), taxTotal: new Prisma.Decimal(0), shippingCurrency: products[0].currency.toUpperCase(), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: lines.map((line) => { const product = products.find((candidate) => candidate.id === line.productId)!; return { productId: product.id, quantity: line.quantity, unitPrice: product.price, lineKey: line.lineKey, productNameSnapshot: product.name, productDescriptionSnapshot: product.description ?? null, productImageUrlSnapshot: product.images?.[0] ?? null, currency: product.currency.toUpperCase(), lineTotal: product.price.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: { color: line.selectedColor, size: line.selectedSize } }; }) } }, include: { items: true } });
+      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, subtotal: total, shippingCost: new Prisma.Decimal(0), taxTotal: new Prisma.Decimal(0), shippingCurrency: products[0].currency.toUpperCase(), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: line.product.currency.toUpperCase(), lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null })) } }, include: { items: true } });
     } catch (error) {
       if (!isPrismaCode(error, "P2002")) throw error;
       order = await db.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
       if (order.stripeCheckoutSessionId && order.stripeCheckoutUrl) return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
     }
   }
-  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, items: lines.map((line) => { const product = products.find((candidate) => candidate.id === line.productId)!; return { name: [product.name, line.selectedColor, line.selectedSize].filter(Boolean).join(" · "), unitAmount: Number(product.price.mul(100).toFixed(0)), quantity: line.quantity, currency: product.currency }; }) });
+  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: Number(line.unitPrice.mul(100).toFixed(0)), quantity: line.quantity, currency: line.product.currency })) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
 }
@@ -167,7 +182,9 @@ export async function processStripeEvent(
         if (session.amount_total != null && session.amount_total !== expectedAmount) throw new Error("Stripe total does not match the order.");
         if (session.currency && session.currency.toUpperCase() !== order.currency) throw new Error("Stripe currency does not match the order.");
         for (const item of order.items) {
-          const changed = await tx.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
+          const changed = item.variantId
+            ? await tx.productVariant.updateMany({ where: { id: item.variantId, productId: item.productId, active: true, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } })
+            : await tx.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
           if (changed.count !== 1) throw new CheckoutError("Insufficient stock while finalizing payment.", 409);
         }
         const shipping = session.collected_information?.shipping_details ?? session.shipping_details;

@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
   items: {
-    select: { id: true, quantity: true, unitPrice: true, lineTotal: true, selectedColor: true, selectedSize: true, productNameSnapshot: true, productImageUrlSnapshot: true,
+    select: { id: true, quantity: true, unitPrice: true, lineTotal: true, selectedColor: true, selectedSize: true, selectedOptions: true, productNameSnapshot: true, productImageUrlSnapshot: true,
       product: {
         select: {
           id: true,

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { validateProductImages } from "@/lib/product-images";
+import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
 
 function makeSlug(value: string) {
   return value
@@ -33,8 +34,13 @@ export async function POST(request: Request) {
     const price = Number(body.price);
     const stock = Number(body.stock);
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
-    const colors = Array.isArray(body.colors) ? body.colors.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,20) : [];
-    const sizes = Array.isArray(body.sizes) ? body.sizes.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,30) : [];
+    const variantsEnabled = body.variantsEnabled === true;
+    const variantInput = variantsEnabled ? body.variants as ProductVariantsInput : undefined;
+    if (variantsEnabled && (!variantInput || !Array.isArray(variantInput.options) || variantInput.options.length === 0)) {
+      return NextResponse.json({ error: "Configure at least one product option." }, { status: 400 });
+    }
+    const colors = variantsEnabled ? [] : Array.isArray(body.colors) ? body.colors.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,20) : [];
+    const sizes = variantsEnabled ? [] : Array.isArray(body.sizes) ? body.sizes.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,30) : [];
     const imageValidation = validateProductImages(body.images);
     if (!imageValidation.ok) return NextResponse.json({ error: "La sélection d’images est invalide ou dépasse la limite de 10 images." }, { status: 400 });
     const images = imageValidation.images;
@@ -66,8 +72,7 @@ export async function POST(request: Request) {
       suffix += 1;
     }
 
-    const product = await prisma.product.create({
-      data: {
+    const product = await createProductWithVariants(prisma, {
         name,
         slug,
         description,
@@ -82,13 +87,12 @@ export async function POST(request: Request) {
         images,
         currency: store.currency,
         storeId: store.id,
-      },
-      select: { id: true },
-    });
+      }, variantInput);
 
     return NextResponse.json({ ok: true, product });
   } catch (error) {
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
+    if (error instanceof ProductVariantError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }

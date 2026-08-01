@@ -19,6 +19,13 @@ function detectLocale(request: NextRequest): Locale {
 export function middleware(request: NextRequest) {
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const pathLocale = segments[0];
+  const localRewriteLocale = request.nextUrl.searchParams.get("__todijo_local_locale");
+  if (process.env.NODE_ENV !== "production" && isLocale(localRewriteLocale)) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-todijo-locale", localRewriteLocale);
+    requestHeaders.set("x-todijo-pathname", `/${localRewriteLocale}${request.nextUrl.pathname}`);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
   const canonicalPath = canonicalizeNestedLocalePath(request.nextUrl.pathname);
   if (canonicalPath) {
     const url = request.nextUrl.clone();
@@ -35,6 +42,7 @@ export function middleware(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   url.pathname = `/${segments.slice(1).join("/")}`;
+  if (process.env.NODE_ENV !== "production") url.searchParams.set("__todijo_local_locale", pathLocale);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-todijo-locale", pathLocale);
   requestHeaders.set("x-todijo-pathname", request.nextUrl.pathname);

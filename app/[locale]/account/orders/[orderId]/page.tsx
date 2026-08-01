@@ -11,6 +11,11 @@ import { BuyerRefundRequest } from "@/components/BuyerRefundRequest";
 
 export const dynamic = "force-dynamic";
 
+function optionSummary(value: unknown, selectedColor?: string | null, selectedSize?: string | null) {
+  if (Array.isArray(value)) return value.flatMap((entry) => entry && typeof entry === "object" && typeof (entry as { name?: unknown }).name === "string" && typeof (entry as { value?: unknown }).value === "string" ? [`${(entry as { name: string }).name}: ${(entry as { value: string }).value}`] : []).join(" · ");
+  return [selectedColor, selectedSize].filter(Boolean).join(" · ");
+}
+
 export default async function BuyerOrderDetailsPage({ params }: { params: Promise<{ locale: string; orderId: string }> }) {
   const { locale, orderId } = await params;
   const session = await readSession();
@@ -80,7 +85,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
                     <div className="buyerOrderDetailImage">
                       {(item.productImageUrlSnapshot ?? item.product.images[0]) ? <img src={item.productImageUrlSnapshot ?? item.product.images[0]} alt={t("productImageAlt", { name: item.productNameSnapshot ?? item.product.name })} /> : <span aria-hidden="true">📦</span>}
                     </div>
-                    <div className="buyerOrderDetailProduct"><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>
+                    <div className="buyerOrderDetailProduct"><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span>{optionSummary(item.selectedOptions, item.selectedColor, item.selectedSize) && <span>{optionSummary(item.selectedOptions, item.selectedColor, item.selectedSize)}</span>}</div>
                     <div><span>{t("unitPrice")}</span><strong>{money(unitPrice)}</strong></div>
                     <div><span>{t("lineTotal")}</span><strong>{money(Number(item.lineTotal ?? unitPrice * item.quantity))}</strong></div>
                   </article>

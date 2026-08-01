@@ -16,6 +16,7 @@ export type CartProduct = {
   selectedOptions?: string;
   selectedColor?: string | null;
   selectedSize?: string | null;
+  variantId?: string | null;
   lineKey?: string;
 };
 
@@ -68,7 +69,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         try {
           const saved = window.localStorage.getItem(nextStorageKey);
           const parsed = saved ? JSON.parse(saved) as CartItem[] : [];
-          setItems(Array.isArray(parsed) ? parsed.map((item) => ({ ...item, selectedColor: normalizeCartOption(item.selectedColor), selectedSize: normalizeCartOption(item.selectedSize), lineKey: item.lineKey ?? cartLineKey(item.id, item.selectedColor, item.selectedSize) })) : []);
+          setItems(Array.isArray(parsed) ? parsed.map((item) => ({ ...item, selectedColor: normalizeCartOption(item.selectedColor), selectedSize: normalizeCartOption(item.selectedSize), variantId: normalizeCartOption(item.variantId), lineKey: cartLineKey(item.id, item.selectedColor, item.selectedSize, item.variantId) })) : []);
         } catch {
           window.localStorage.removeItem(nextStorageKey);
           setItems([]);
@@ -133,10 +134,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       currency,
       addItem(product, quantity = 1) {
         setItems((current) => {
-          const lineKey = cartLineKey(product.id, product.selectedColor, product.selectedSize);
+          const lineKey = cartLineKey(product.id, product.selectedColor, product.selectedSize, product.variantId);
           const existing = current.find((item) => item.lineKey === lineKey);
           if (!existing) {
-            return [...current, { ...product, selectedColor: normalizeCartOption(product.selectedColor), selectedSize: normalizeCartOption(product.selectedSize), lineKey, quantity: Math.min(Math.max(quantity, 1), product.stock) }];
+            return [...current, { ...product, selectedColor: normalizeCartOption(product.selectedColor), selectedSize: normalizeCartOption(product.selectedSize), variantId: normalizeCartOption(product.variantId), lineKey, quantity: Math.min(Math.max(quantity, 1), product.stock) }];
           }
           return current.map((item) =>
             item.lineKey === lineKey
