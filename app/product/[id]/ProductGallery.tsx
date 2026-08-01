@@ -8,11 +8,15 @@ type ProductGalleryProps = {
 };
 
 export default function ProductGallery({ images, productName }: ProductGalleryProps) {
-  const cleanImages = useMemo(() => images.filter(Boolean), [images]);
+  const baseImages = useMemo(() => images.filter(Boolean), [images]);
+  const [variantImages, setVariantImages] = useState<string[]>([]);
+  const cleanImages = variantImages.length ? variantImages : baseImages;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const touchStartX = useRef<number | null>(null);
+
+  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, []);
 
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];

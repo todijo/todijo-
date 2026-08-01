@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { validateProductImages } from "@/lib/product-images";
+import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -43,20 +44,21 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!Number.isFinite(price) || price <= 0 || price > 1000000) return NextResponse.json({ error: "Le prix est invalide." }, { status: 400 });
     if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) return NextResponse.json({ error: "Le stock est invalide." }, { status: 400 });
 
-    await prisma.product.update({
-      where: { id },
-      data: {
+    await prisma.$transaction(async (tx) => {
+      await tx.product.update({ where: { id }, data: {
         name, description, category, condition, status,
         deactivationReason: status === "PUBLISHED" ? "NONE" : "SELLER",
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
         colors, sizes, stock, images,
-      },
+      } });
+      await replaceProductVariantImages(tx, id, images, body.variantImages);
     });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
+    if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });
   }

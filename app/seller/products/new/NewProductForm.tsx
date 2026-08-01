@@ -7,6 +7,7 @@ import { Boxes, FileText, ImagePlus, Shapes, Tag } from "lucide-react";
 import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
 import ProductImageManager from "@/components/ProductImageManager";
 import ProductVariantEditor, { type ProductVariantsDraft } from "@/components/ProductVariantEditor";
+import VariantImageManager, { type VariantImageAssignment } from "@/components/VariantImageManager";
 import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
 import { productStockForForm } from "@/lib/product-variant-form";
 
@@ -23,6 +24,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
   const [images, setImages] = useState<string[]>([]);
   const [variantsEnabled, setVariantsEnabled] = useState(false);
   const [variantDraft, setVariantDraft] = useState<ProductVariantsDraft>({ options: [], generate: true, variants: [], generated: false });
+  const [variantImages, setVariantImages] = useState<VariantImageAssignment[]>([]);
   const [basePrice, setBasePrice] = useState("");
   const [productStock, setProductStock] = useState("1");
   const submitLock = useRef(false);
@@ -41,7 +43,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         colors: String(form.get("colors") || "").split(",").map((value) => value.trim()).filter(Boolean),
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status: publicationStatus.current,
-        images, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined,
+        images, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [],
       }),
     });
     const data = await response.json() as { error?: string; product?: { id?: string } };
@@ -80,6 +82,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
           <ProductImageManager onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/>
         </SellerSection>
+        {variantsEnabled && <SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages}/></SellerSection>}
 
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
           <div className="sellerControlFieldGrid">

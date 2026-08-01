@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { isSelectedVariantAvailable } from "@/lib/product-availability";
 
 type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
-type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number }> };
+type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[] }> };
 
 export default function ProductPurchasePanel({ product, colors, sizes, options = [], variants = [] }: { product: CartProduct; colors: string[]; sizes: string[]; options?: Option[]; variants?: Variant[] }) {
   const t = useTranslations("Product");
@@ -19,13 +19,19 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const activeVariants = variants.filter((variant) => variant.active);
   const matches = (variant: Variant, next: Record<string, string>) => Object.entries(next).every(([optionId, valueId]) => !valueId || variant.values.some(({ optionValue }) => optionValue.option.id === optionId && optionValue.id === valueId));
   const selectedVariant = isVariantProduct ? activeVariants.find((variant) => matches(variant, selection) && variant.values.length === genericOptions.length) ?? null : null;
+  function selectOption(optionId: string, valueId: string) {
+    const next = { ...selection, [optionId]: valueId }; setSelection(next);
+    const selectedValue = genericOptions.flatMap((option) => option.values).find((value) => value.id === valueId);
+    const fallback = genericOptions.flatMap((option) => option.values.map((value) => ({ ...value, optionId: option.id }))).find((value) => next[value.optionId] === value.id && value.imageUrls?.length);
+    window.dispatchEvent(new CustomEvent("todijo:variant-images", { detail: { images: selectedValue?.imageUrls?.length ? selectedValue.imageUrls : fallback?.imageUrls ?? [] } }));
+  }
   if (isVariantProduct) {
     const labels = selectedVariant?.values.slice().sort((a, b) => a.optionValue.option.position - b.optionValue.option.position).map(({ optionValue }) => `${optionValue.option.name}: ${optionValue.value}`) ?? [];
     const stock = selectedVariant?.stock ?? 0;
     return <div className="purchasePanel variantPurchasePanel">{genericOptions.map((option) => <div className="optionGroup" key={option.id}><span>{option.name}</span><div>{option.values.sort((a, b) => a.position - b.position).map((value) => {
       const next = { ...selection, [option.id]: value.id };
       const available = activeVariants.some((variant) => matches(variant, next) && variant.stock > 0);
-      return <button key={value.id} className={selection[option.id] === value.id ? "selected" : ""} disabled={!available} onClick={() => setSelection(next)} type="button">{value.value}</button>;
+      return <button key={value.id} className={selection[option.id] === value.id ? "selected" : ""} disabled={!available} onClick={() => selectOption(option.id, value.id)} type="button">{value.value}</button>;
     })}</div></div>)}
       <p className="selectedOptions">{t("selection", { value: labels.join(" · ") })}</p>
       {selectedVariant?.priceOverride != null && <strong className="variantPrice">{selectedVariant.priceOverride.toFixed(2)} {product.currency}</strong>}

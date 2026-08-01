@@ -202,6 +202,7 @@ model Product {
   reviews       Review[]
   options       ProductOption[]
   variants      ProductVariant[]
+  imageRecords  ProductImage[]
 
   @@unique([storeId, slug])
   @@index([storeId, status])
@@ -400,10 +401,40 @@ model ProductOptionValue {
 
   option        ProductOption        @relation(fields: [optionId], references: [id], onDelete: Cascade)
   variantValues ProductVariantValue[]
+  imageAssignments ProductOptionValueImage[]
 
   @@unique([optionId, value])
   @@unique([optionId, position])
   @@index([optionId, position])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  url       String
+  position  Int
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionValueImages ProductOptionValueImage[]
+
+  @@unique([productId, position])
+  @@index([productId, position])
+  @@index([productId, url])
+}
+
+model ProductOptionValueImage {
+  optionValueId String
+  imageId       String
+  position      Int
+  isPrimary     Boolean @default(false)
+
+  optionValue ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+  image       ProductImage       @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@id([optionValueId, imageId])
+  @@unique([optionValueId, position])
+  @@index([imageId])
 }
 
 model ProductVariant {

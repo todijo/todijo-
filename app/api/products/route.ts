@@ -4,6 +4,7 @@ import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
+import { ProductVariantImageError } from "@/lib/product-variant-images";
 
 function makeSlug(value: string) {
   return value
@@ -87,12 +88,13 @@ export async function POST(request: Request) {
         images,
         currency: store.currency,
         storeId: store.id,
-      }, variantInput);
+      }, variantInput, body.variantImages);
 
     return NextResponse.json({ ok: true, product });
   } catch (error) {
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     if (error instanceof ProductVariantError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }
