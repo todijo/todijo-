@@ -81,7 +81,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="productMainImage" src={selectedImage} alt={`${productName} — image ${selectedIndex + 1}`} />
+          <img className="productMainImage productMainImageIntrinsic" src={selectedImage} alt={`${productName} — image ${selectedIndex + 1}`} />
           <span className="productZoomHint">⛶ Agrandir</span>
         </button>
 

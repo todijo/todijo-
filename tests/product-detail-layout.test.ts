@@ -20,10 +20,12 @@ test("shop wording and Ask Seller order match their actions", async () => {
 
 test("long titles wrap and gallery stickiness is desktop-only", async () => {
   const css = await readFile("app/globals.css", "utf8");
-  assert.match(css, /\.productDetailInfo h1\{[^}]*font-size:clamp[^}]*overflow-wrap:anywhere/);
+  assert.match(css, /\.productDetailInfo h1\{font-size:clamp\(30px,2\.7vw,35px\);line-height:1\.1\}/);
+  assert.match(css, /@media\(max-width:620px\)[^\n]*\.productDetailInfo h1\{font-size:clamp\(24px,6\.8vw,28px\)/);
   assert.match(css, /\.productGallerySticky\{position:sticky/);
   assert.match(css, /@media\(max-width:900px\)[\s\S]*?\.productGallerySticky\{position:static\}/);
-  assert.match(css, /\.productMainImage[^}]*object-fit:contain/);
+  assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{[^}]*width:100%;height:auto;[^}]*object-fit:contain/);
+  assert.doesNotMatch(css, /\.productMainImage\.productMainImageIntrinsic\{[^}]*height:(?:clamp|[0-9]+px)/);
 });
 
 test("legacy and variant image product detail paths remain present", async () => {
@@ -32,4 +34,5 @@ test("legacy and variant image product detail paths remain present", async () =>
   assert.match(page, /imageAssignments/);
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
   assert.match(gallery, /variantImages\.length \? variantImages : baseImages/);
+  assert.match(gallery, /productMainImage productMainImageIntrinsic/);
 });
