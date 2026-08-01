@@ -64,8 +64,6 @@
   "sizes": "Tailles ou modèles",
   "sizesPlaceholder": "S, M, L",
   "sizesHint": "Séparez les valeurs par des virgules.",
-  "publishing": "Paramètres de publication",
-  "publishingHelp": "Publiez maintenant ou conservez l’annonce en brouillon privé.",
   "publishNow": "Publier le produit",
   "saveDraft": "Enregistrer comme brouillon",
   "cancel": "Annuler",

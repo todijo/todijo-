@@ -64,8 +64,6 @@
   "sizes": "Sizes or models",
   "sizesPlaceholder": "S, M, L",
   "sizesHint": "Separate values with commas.",
-  "publishing": "Publishing settings",
-  "publishingHelp": "Publish now or keep the listing private as a draft.",
   "publishNow": "Publish now",
   "saveDraft": "Save as draft",
   "cancel": "Cancel",

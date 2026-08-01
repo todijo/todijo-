@@ -15,7 +15,8 @@ test("new product publish stays on the form and resets all state only after succ
 test("edit product preserves status and has no duplicate publication controls", async () => {
   const source = await readFile("app/seller/products/[id]/edit/EditProductForm.tsx", "utf8");
   assert.match(source, /status:product\.status/);
-  assert.doesNotMatch(source, /sellerPublishChoices|t\("publishing"\)|name="status"/);
+  assert.doesNotMatch(source, /sellerPublishChoices|t\("publishing"\)|name="status"|sellerControlFormAside|<aside/);
+  assert.match(source, /sellerControlFormGrid isSingleColumn/);
 });
 
 test("publish success translation has English and French parity", async () => {
