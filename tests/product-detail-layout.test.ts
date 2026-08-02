@@ -90,13 +90,14 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
 });
 
-test("Product Detail uses the shared mobile shell and a bounded natural gallery", async () => {
+test("Product Detail uses the shared mobile shell and a panoramic mobile gallery", async () => {
   const [page, siteHeader, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
   assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
-  assert.match(css, /\.productMainImageSlide\{[^}]*height:auto/);
-  assert.match(css, /\.productMainImageSlide \.productMainImageIntrinsic\{[^}]*width:100%;height:auto;max-height:min\(64svh,560px\)/);
+  assert.match(css, /\.productMainImageTrack\{[^}]*aspect-ratio:21\/9;max-height:none/);
+  assert.match(css, /\.productMainImageSlide\{[^}]*height:100%;[^}]*overflow:hidden/);
+  assert.match(css, /\.productMainImageSlide \.productMainImageIntrinsic\{[^}]*width:100%;height:100%;min-height:0;max-height:none;[^}]*object-fit:cover/);
   assert.match(css, /\.productGalleryBack\{display:none!important\}/);
   assert.match(css, /\.productLightbox\{z-index:9999\}/);
 });
@@ -116,7 +117,7 @@ test("mobile gallery removes the shell gap and uses a horizontal snap track", as
   assert.match(gallery, /onPointerDown=/);
   assert.match(gallery, /Math\.abs\(event\.clientX - start\.x\) > 12/);
   assert.doesNotMatch(css, /height:clamp\(340px,52svh,520px\)/);
-  assert.match(css, /\.productMainImageTrack\{width:100%;height:var\(--active-gallery-height,auto\);max-height:min\(64svh,560px\);margin-inline:0/);
+  assert.match(css, /\.productMainImageTrack\{width:100%;height:auto;aspect-ratio:21\/9;max-height:none;margin-inline:0/);
   assert.match(css, /\.productZoomHint\{display:none\}/);
   assert.match(css, /\.productMobileSecondaryActions \.productIconButton\{min-width:44px;min-height:44px/);
 });
