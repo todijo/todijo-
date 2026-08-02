@@ -17,6 +17,8 @@ test("mobile header has a direct cart link, menu trigger, and second-row search"
   assert.match(homeSource, /className="marketTopSearch"/);
   assert.match(homeSource, /className="marketSearchClear"/);
   assert.match(styles, /\.marketHeaderInner\{grid-template-columns:44px minmax\(0,1fr\) auto;grid-template-rows:auto auto\}/);
+  assert.match(styles, /\.marketHeader\{position:sticky;top:0\}/);
+  assert.match(styles, /\.marketPrimaryHeader\{padding-top:calc\(9px \+ env\(safe-area-inset-top\)\)\}/);
 });
 
 test("mobile drawer supports explicit, backdrop, and keyboard closing with focus return", () => {
@@ -47,12 +49,13 @@ test("mobile categories and product grids stay contained in two columns", () => 
 });
 
 test("mobile product cards are compact with prominent images and accessible actions", () => {
-  assert.match(styles, /\.discoveryImageWrap\{aspect-ratio:6\/5\}/);
-  assert.match(styles, /\.discoveryCardBody\{padding:8px\}/);
-  assert.match(styles, /\.discoveryCardBody h3\{min-height:32px;max-height:32px;margin:2px 0 4px;[^}]*line-height:1\.2\}/);
-  assert.match(styles, /\.productAvailability\{min-height:18px;margin-bottom:2px/);
-  assert.match(styles, /\.cardBottom\{padding-top:4px\}/);
-  assert.match(styles, /\.cardCartButton\{min-height:44px;margin-top:5px/);
+  assert.match(styles, /\.discoveryImageWrap\{aspect-ratio:11\/10\}/);
+  assert.match(styles, /\.discoveryCardBody\{padding:6px\}/);
+  assert.match(styles, /\.discoveryCardBody h3\{min-height:30px;max-height:30px;margin:1px 0 2px;[^}]*line-height:1\.15\}/);
+  assert.match(styles, /\.productAvailability\{min-height:16px;margin-bottom:0/);
+  assert.match(styles, /\.discoveryCardBody \.cardBottom\{margin-top:0\}/);
+  assert.match(styles, /\.cardBottom\{padding-top:0\}/);
+  assert.match(styles, /\.cardCartButton\{min-height:44px;margin-top:3px/);
   assert.match(styles, /\.cardWishlist\{width:44px;height:44px;border:0;background:transparent/);
   assert.match(styles, /\.cardWishlist::before\{content:"";[^}]*inset:3px/);
 });
