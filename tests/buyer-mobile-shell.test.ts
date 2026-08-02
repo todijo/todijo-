@@ -37,10 +37,20 @@ test("shared drawer and live bottom navigation remain accessible across routes",
   assert.match(navigation, /href=\{`\$\{homeHref\}#categories`\}/);
 });
 
+test("shared mobile header shows locale-safe Back navigation only away from Home", () => {
+  assert.match(header, /const isRootHome = pathname === "\/" \|\| pathname === homeHref/);
+  assert.match(header, /const showBack = !isRootHome \|\| Boolean\(homeLocationSuffix\)/);
+  assert.match(header, /className="buyerMobileBackButton"[^>]*onClick=\{goBack\}[^>]*aria-label=\{common\("back"\)\}/);
+  assert.match(header, /window\.history\.length > 1 && sameOriginReferrer/);
+  assert.match(header, /else router\.push\(homeHref\)/);
+  assert.match(header, /<BuyerMobileNavigation accountName=\{accountName\}\/>/);
+});
+
 test("mobile shell offsets content and preserves desktop headers", () => {
   assert.match(css, /\.buyerMobileShellHeader\{display:none\}/);
   assert.match(css, /@media\(max-width:860px\)[\s\S]*?\.buyerMobileShellHeader\{position:sticky;z-index:1000;top:0/);
-  assert.match(css, /\.buyerMobileShellTop\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 44px/);
+  assert.match(css, /\.buyerMobileShellTop\{[^}]*grid-template-columns:auto minmax\(0,1fr\) 44px/);
+  assert.match(css, /\.buyerMobileBackButton\{width:44px;height:44px/);
   assert.match(css, /body:has\(\.buyerMobileBottomNav\)\{padding-bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\)\}/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader,\.buyerMobileShellHeader~\.premiumStoreHeader\{display:none\}/);
   assert.match(css, /\.productLightbox\{z-index:9999\}/);

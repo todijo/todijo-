@@ -704,7 +704,9 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
   body:has(.buyerMobileBottomNav){padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   body:has(.buyerMobileShellHeader){overflow-x:clip}
   .buyerMobileShellHeader{position:sticky;z-index:1000;top:0;padding:calc(7px + env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) 9px max(8px,env(safe-area-inset-left));background:linear-gradient(100deg,#063a2c,#07553e);color:#fff;display:grid;gap:7px;box-shadow:0 8px 24px rgba(3,35,26,.16)}
-  .buyerMobileShellTop{min-width:0;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:7px}
+  .buyerMobileShellTop{min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) 44px;align-items:center;gap:7px}
+  .buyerMobileShellLeading{display:flex;align-items:center;gap:5px}
+  .buyerMobileBackButton{width:44px;height:44px;padding:0;border:1px solid rgba(255,255,255,.24);border-radius:11px;background:rgba(255,255,255,.06);color:#fff;display:grid;place-items:center;cursor:pointer}
   .buyerMobileShellTop .todijoBrand{min-width:0;justify-self:start;color:#fff}
   .buyerMobileShellTop .todijoBrandMark{width:30px;height:30px;flex:0 0 30px}
   .buyerMobileShellTop .todijoWordmark{font-size:20px}
@@ -716,6 +718,7 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
   .buyerMobileShellSearch button{width:48px;min-width:48px;height:44px;padding:0;border:0;background:#19a875;color:#fff;display:grid;place-items:center;cursor:pointer}
   .buyerMobileShellSearch:focus-within{box-shadow:0 0 0 3px rgba(121,227,189,.28)}
   .buyerMobileShellHeader a:focus-visible,.buyerMobileShellHeader button:focus-visible,.buyerMobileShellHeader input:focus-visible{outline:3px solid #79e3bd;outline-offset:2px}
+  html[dir="rtl"] .buyerMobileBackButton svg{transform:rotate(180deg)}
   .buyerMobileShellHeader~.marketHeader,.buyerMobileShellHeader~.siteHeader,.buyerMobileShellHeader~.premiumStoreHeader{display:none}
   .buyerHomePage{padding-bottom:0}
   .buyerMobileBottomNav{z-index:900}
@@ -737,6 +740,7 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
   .productDetailTop{margin-top:0}
   .productGallery{top:auto;margin-top:0}
   .productGalleryInteractive{position:relative;top:auto;width:100%;max-width:none;overflow:hidden}
+  .productGalleryInteractive>.productThumbs{display:none}
   .productMainImageTrack{width:100%;height:var(--active-gallery-height,auto);min-height:min(72vw,340px);max-height:min(68svh,560px);margin-inline:0;display:flex;align-items:center;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-inline:contain;touch-action:pan-y pinch-zoom;border-radius:16px;background:#f4f8f6;transition:height .18s ease}
   .productMainImageTrack::-webkit-scrollbar{display:none}
   .productMainImageSlide{flex:0 0 100%;width:100%;height:auto;min-height:0;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:always;border-radius:16px;background:#f4f8f6;box-shadow:none;overflow:hidden}

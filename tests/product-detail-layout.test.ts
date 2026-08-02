@@ -68,12 +68,15 @@ test("selected variant price has one live product-detail location", async () => 
 });
 
 test("mobile product gallery has no floating actions and keeps a live counter", async () => {
-  const [page, gallery] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
+  const [page, gallery, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
   assert.ok(page.indexOf("productGallery productGallerySticky") < page.indexOf("productDetailInfo"));
   assert.doesNotMatch(page, /className="productGalleryActions"/);
   assert.match(page, /<WishlistButton productId=\{product\.id\}/);
   assert.match(page, /<ShareButton title=\{product\.name\}/);
   assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedIndex \+ 1\} \/ \{cleanImages\.length\}/);
+  assert.match(gallery, /!isMobileGallery && cleanImages\.length > 1/);
+  assert.match(gallery, /window\.matchMedia\("\(max-width: 860px\)"\)/);
+  assert.match(css, /\.productGalleryInteractive>\.productThumbs\{display:none\}/);
   assert.match(gallery, /openerRef\.current = event\.currentTarget;[\s\S]*?setIsOpen\(true\)/);
   assert.match(page, /className="productMobileSecondaryActions"><ShareButton title=\{product\.name\}/);
   assert.doesNotMatch(page, /productMobileSecondaryActions[^\n]*WishlistButton/);

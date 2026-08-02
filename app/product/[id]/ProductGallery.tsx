@@ -17,6 +17,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [isMobileGallery, setIsMobileGallery] = useState(false);
   const [trackHeight, setTrackHeight] = useState<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -46,6 +47,14 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
 
   useEffect(() => () => { if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current); }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 860px)");
+    const update = () => setIsMobileGallery(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];
@@ -146,7 +155,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         </div>
         <span className="productGalleryCounter" aria-live="polite">{selectedIndex + 1} / {cleanImages.length}</span>
 
-        {cleanImages.length > 1 && (
+        {!isMobileGallery && cleanImages.length > 1 && (
           <div className="productThumbs" aria-label="Photos du produit">
             {cleanImages.map((image, index) => (
               <button

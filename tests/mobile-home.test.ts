@@ -17,7 +17,7 @@ test("mobile header has a direct cart link, menu trigger, and second-row search"
   assert.match(homeSource, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(mobileHeader, /className="buyerMobileShellSearch"/);
   assert.match(mobileHeader, /className="buyerMobileShellCart"/);
-  assert.match(styles, /\.buyerMobileShellTop\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 44px/);
+  assert.match(styles, /\.buyerMobileShellTop\{[^}]*grid-template-columns:auto minmax\(0,1fr\) 44px/);
   assert.match(styles, /\.buyerMobileShellHeader\{position:sticky;z-index:1000;top:0/);
   assert.match(styles, /safe-area-inset-top/);
 });
