@@ -87,6 +87,17 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
   assert.match(css, /\.mobilePurchaseBar\{position:fixed;[^}]*bottom:0;[^}]*safe-area-inset-bottom/);
   assert.match(css, /\.productDetailPage\{[^}]*padding-bottom:calc\(86px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /\.mobilePurchaseBar \.addCartButton\{min-height:52px/);
+  assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
+});
+
+test("Product Detail uses the shared mobile shell and a bounded natural gallery", async () => {
+  const [page, siteHeader, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
+  assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
+  assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
+  assert.match(css, /max-height:min\(48svh,480px\)/);
+  assert.match(css, /\.productGalleryBack\{display:none!important\}/);
+  assert.match(css, /\.productLightbox\{z-index:9999\}/);
 });
 
 test("mobile product sections remain contained while desktop composition is unchanged", async () => {

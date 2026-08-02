@@ -5,10 +5,13 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import BuyerMobileHeader from "@/components/BuyerMobileHeader";
+import { usePathname } from "next/navigation";
 
-export default function SiteHeader({ storeName, storeSlug }: { storeName?: string; storeSlug?: string }) {
+export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeName?: string; storeSlug?: string; buyerMobile?: boolean }) {
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
+  const pathname = usePathname();
   const t = useTranslations("Common");
 
   useEffect(() => {
@@ -27,7 +30,8 @@ export default function SiteHeader({ storeName, storeSlug }: { storeName?: strin
     if (query.trim()) window.location.href = `/?q=${encodeURIComponent(query.trim())}#products`;
   }
 
-  return (
+  return <>
+    {buyerMobile && !pathname.startsWith("/seller") && !pathname.startsWith("/adm-barewbar-182203") ? <BuyerMobileHeader accountName={accountName}/> : null}
     <header className="siteHeader">
       <div className="siteHeaderInner">
         <Link className="authLogo dashboardLogo" href="/">Todijo<span>.</span></Link>
@@ -46,5 +50,5 @@ export default function SiteHeader({ storeName, storeSlug }: { storeName?: strin
         </nav>
       </div>
     </header>
-  );
+  </>;
 }

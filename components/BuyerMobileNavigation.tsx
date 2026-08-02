@@ -56,6 +56,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const accountHref = accountName ? "/dashboard" : "/login";
   const focusSearch = () => requestAnimationFrame(() => document.getElementById("market-search")?.focus());
   const isHome = (pathname === "/" || pathname === homeHref) && !hash;
+  const showBottomNavigation = !pathname.startsWith("/checkout");
 
   const drawer = open && typeof document !== "undefined" ? createPortal(<div className="buyerMobileDrawerLayer">
     <button className="buyerMobileDrawerBackdrop" type="button" onClick={closeDrawer} aria-label={product("close")} />
@@ -63,9 +64,9 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
       <div className="buyerMobileDrawerHeader"><div><UserRound size={22} aria-hidden="true"/><span><small>{header("hello")}</small><strong>{accountName ?? common("account")}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
       <nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer}><Home size={20} aria-hidden="true"/>{common("home")}</a>
-        <a href="#categories" onClick={closeDrawer}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</a>
+        <a href={`${homeHref}#categories`} onClick={closeDrawer}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</a>
         <a href={`/?sort=newest#products`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("newArrivals")}</a>
-        <a href="#best-sellers" onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
+        <a href={`${homeHref}#best-sellers`} onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
         <a href={`/${locale}/account/orders`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
         <a href="/messages" onClick={closeDrawer}><MessageCircle size={20} aria-hidden="true"/>{common("messages")}</a>
         <a href={accountHref} onClick={closeDrawer}><UserRound size={20} aria-hidden="true"/>{common("account")}</a>
@@ -79,12 +80,12 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   return <>
     <button ref={triggerRef} className="buyerMobileMenuButton" type="button" onClick={() => setOpen(true)} aria-label={header("menu")} aria-expanded={open} aria-controls="buyer-mobile-drawer"><Menu size={23} aria-hidden="true"/></button>
     {drawer}
-    <nav className="buyerMobileBottomNav" aria-label={header("mobileNavigation")}>
+    {showBottomNavigation ? <nav className="buyerMobileBottomNav" aria-label={header("mobileNavigation")}>
       <a className={isHome ? "active" : ""} href={homeHref} aria-current={isHome ? "page" : undefined}><Home size={21} aria-hidden="true"/><span>{common("home")}</span></a>
-      <a className={hash === "#categories" ? "active" : ""} href="#categories"><Grid2X2 size={21} aria-hidden="true"/><span>{common("categories")}</span></a>
-      <a className={hash === "#market-search" ? "active" : ""} href="#market-search" onClick={focusSearch}><Search size={21} aria-hidden="true"/><span>{common("search")}</span></a>
+      <a className={isHome && hash === "#categories" ? "active" : ""} href={`${homeHref}#categories`}><Grid2X2 size={21} aria-hidden="true"/><span>{common("categories")}</span></a>
+      <a className={isHome && hash === "#market-search" ? "active" : ""} href="#market-search" onClick={focusSearch}><Search size={21} aria-hidden="true"/><span>{common("search")}</span></a>
       <Link className={pathname === "/cart" ? "active" : ""} href="/cart"><ShoppingCart size={21} aria-hidden="true"/><span>{common("cart")}</span>{totalItems > 0 ? <strong>{totalItems > 99 ? "99+" : totalItems}</strong> : null}</Link>
       <a className={["/login", "/dashboard"].includes(pathname) ? "active" : ""} href={accountHref}><UserRound size={21} aria-hidden="true"/><span>{common("account")}</span></a>
-    </nav>
+    </nav> : null}
   </>;
 }

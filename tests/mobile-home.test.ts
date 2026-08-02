@@ -7,18 +7,19 @@ const root = process.cwd();
 const cartLinkSource = readFileSync(join(root, "components", "CartLink.tsx"), "utf8");
 const homeSource = readFileSync(join(root, "app", "HomeClient.tsx"), "utf8");
 const mobileNavigation = readFileSync(join(root, "components", "BuyerMobileNavigation.tsx"), "utf8");
+const mobileHeader = readFileSync(join(root, "components", "BuyerMobileHeader.tsx"), "utf8");
 const cardAction = readFileSync(join(root, "components", "ProductCardAction.tsx"), "utf8");
 const styles = readFileSync(join(root, "app", "globals.css"), "utf8");
 
 test("mobile header has a direct cart link, menu trigger, and second-row search", () => {
   assert.match(cartLinkSource, /<Link className=\{className\} href="\/cart"/);
   assert.match(cartLinkSource, /<ShoppingCart className="cartLinkIcon"/);
-  assert.match(homeSource, /<BuyerMobileNavigation accountName=\{accountName\}\/>/);
-  assert.match(homeSource, /className="marketTopSearch"/);
-  assert.match(homeSource, /className="marketSearchClear"/);
-  assert.match(styles, /\.marketHeaderInner\{grid-template-columns:44px minmax\(0,1fr\) auto;grid-template-rows:auto auto\}/);
-  assert.match(styles, /\.marketHeader\{position:sticky;top:0\}/);
-  assert.match(styles, /\.marketPrimaryHeader\{padding-top:calc\(9px \+ env\(safe-area-inset-top\)\)\}/);
+  assert.match(homeSource, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
+  assert.match(mobileHeader, /className="buyerMobileShellSearch"/);
+  assert.match(mobileHeader, /className="buyerMobileShellCart"/);
+  assert.match(styles, /\.buyerMobileShellTop\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 44px/);
+  assert.match(styles, /\.buyerMobileShellHeader\{position:sticky;z-index:1000;top:0/);
+  assert.match(styles, /safe-area-inset-top/);
 });
 
 test("mobile drawer supports explicit, backdrop, and keyboard closing with focus return", () => {
@@ -34,7 +35,7 @@ test("mobile drawer supports explicit, backdrop, and keyboard closing with focus
 test("buyer bottom navigation is mobile-only with active state and safe-area clearance", () => {
   assert.match(styles, /\.buyerMobileMenuButton,\.buyerMobileBottomNav\{display:none\}/);
   assert.match(styles, /\.buyerMobileBottomNav\{position:fixed;[^}]*grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
-  assert.match(styles, /\.buyerHomePage\{overflow-x:clip;padding-bottom:calc\(76px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(styles, /body:has\(\.buyerMobileBottomNav\)\{padding-bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\)\}/);
   assert.match(mobileNavigation, /aria-current=\{isHome \? "page" : undefined\}/);
   assert.match(mobileNavigation, /totalItems > 0/);
 });

@@ -12,7 +12,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
 import { formatCurrency } from "@/lib/formatters";
 import ProductCardAction from "@/components/ProductCardAction";
-import BuyerMobileNavigation from "@/components/BuyerMobileNavigation";
+import BuyerMobileHeader from "@/components/BuyerMobileHeader";
 
 type MarketplaceProduct = {
   id: string;
@@ -133,19 +133,19 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
 
   return (
     <main className="buyerHomePage" dir={t.dir}>
+      <BuyerMobileHeader accountName={accountName}/>
       <header className="marketHeader">
         <div className="marketPrimaryHeader">
         <div className="marketHeaderInner">
-          <BuyerMobileNavigation accountName={accountName}/>
           <TodijoLogo href={`/${activeLocale}`} inverse/>
           <div className="marketLocation" aria-label={h("locationLabel")}><MapPin size={20} aria-hidden="true"/><span><small>{h("deliverTo")}</small><strong>{h("marketplace")}</strong></span></div>
           <form className="marketTopSearch" onSubmit={submit}>
             <span aria-hidden>⌕</span>
             <label className="srOnly" htmlFor="market-category">{h("searchCategory")}</label>
             <select id="market-category" value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">{t.all}</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select>
-            <label className="srOnly" htmlFor="market-search">{t.search}</label>
-            <input id="market-search" type="search" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
-            {filters.q ? <button className="marketSearchClear" type="button" onClick={() => { setFilters({ ...filters, q: "" }); document.getElementById("market-search")?.focus(); }} aria-label={`${c("remove")}: ${filters.q}`}><X size={18} aria-hidden="true"/></button> : null}
+            <label className="srOnly" htmlFor="desktop-market-search">{t.search}</label>
+            <input id="desktop-market-search" type="search" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
+            {filters.q ? <button className="marketSearchClear" type="button" onClick={() => { setFilters({ ...filters, q: "" }); document.getElementById("desktop-market-search")?.focus(); }} aria-label={`${c("remove")}: ${filters.q}`}><X size={18} aria-hidden="true"/></button> : null}
             <button className="marketSearchSubmit" type="submit" disabled={isSearching} aria-label={isSearching ? c("loading") : t.searchButton}>{isSearching ? <LoaderCircle className="marketSearchSpinner" size={20} aria-hidden="true"/> : <Search size={21} aria-hidden="true"/>}<span>{isSearching ? c("loading") : t.searchButton}</span></button>
           </form>
           <nav className="marketDesktopActions" aria-label={h("accountNavigation")}>

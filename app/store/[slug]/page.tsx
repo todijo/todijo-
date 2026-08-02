@@ -5,6 +5,7 @@ import StoreExperience from "./StoreExperience";
 import { getLocale, getTranslations } from "next-intl/server";
 import { publicStoreAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
+import BuyerMobileHeader from "@/components/BuyerMobileHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function StorePage({ params }: Props) {
 
   return (
     <main className="publicStorePage premiumStorePage">
+      <BuyerMobileHeader />
       <header className="publicStoreHeader premiumStoreHeader">
         <a className="authLogo dashboardLogo" href="/">Todijo<span>.</span></a>
         <nav className="storeTopNav">

@@ -1,0 +1,55 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = process.cwd();
+const read = (path: string) => readFileSync(join(root, path), "utf8");
+const header = read("components/BuyerMobileHeader.tsx");
+const navigation = read("components/BuyerMobileNavigation.tsx");
+const siteHeader = read("components/SiteHeader.tsx");
+const home = read("app/HomeClient.tsx");
+const product = read("app/product/[id]/page.tsx");
+const store = read("app/store/[slug]/page.tsx");
+const css = read("app/globals.css");
+
+test("buyer routes share one mobile header with menu, logo, cart, and search", () => {
+  assert.match(header, /<BuyerMobileNavigation accountName=\{accountName\}/);
+  assert.match(header, /<TodijoLogo href=\{`\/\$\{locale\}`\} inverse/);
+  assert.match(header, /<CartLink label=\{common\("cart"\)\} className="buyerMobileShellCart"/);
+  assert.match(header, /className="buyerMobileShellSearch" role="search"/);
+  assert.match(home, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
+  assert.doesNotMatch(home, /<BuyerMobileNavigation accountName=/);
+  assert.match(siteHeader, /buyerMobile[\s\S]+\? <BuyerMobileHeader accountName=\{accountName\}\/> : null/);
+  assert.match(store, /<BuyerMobileHeader \/>/);
+  assert.match(product, /<SiteHeader storeName=/);
+});
+
+test("shared drawer and live bottom navigation remain accessible across routes", () => {
+  assert.match(navigation, /className="buyerMobileMenuButton"/);
+  assert.match(navigation, /className="buyerMobileDrawerBackdrop"[^>]*onClick=\{closeDrawer\}/);
+  assert.match(navigation, /event\.key === "Escape"/);
+  assert.match(navigation, /event\.key !== "Tab"/);
+  assert.match(navigation, /triggerRef\.current\?\.focus\(\)/);
+  assert.match(navigation, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(navigation, /totalItems > 0/);
+  assert.match(navigation, /showBottomNavigation = !pathname\.startsWith\("\/checkout"\)/);
+  assert.match(navigation, /href=\{`\$\{homeHref\}#categories`\}/);
+});
+
+test("mobile shell offsets content and preserves desktop headers", () => {
+  assert.match(css, /\.buyerMobileShellHeader\{display:none\}/);
+  assert.match(css, /@media\(max-width:860px\)[\s\S]*?\.buyerMobileShellHeader\{position:sticky;z-index:1000;top:0/);
+  assert.match(css, /\.buyerMobileShellTop\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 44px/);
+  assert.match(css, /body:has\(\.buyerMobileBottomNav\)\{padding-bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader,\.buyerMobileShellHeader~\.premiumStoreHeader\{display:none\}/);
+  assert.match(css, /\.productLightbox\{z-index:9999\}/);
+});
+
+test("Product Detail gallery and purchase action fit around persistent navigation", () => {
+  assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{width:auto;max-width:100%;height:auto;max-height:min\(48svh,480px\);object-fit:contain\}/);
+  assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
+  assert.match(css, /\.productDetailPage\{padding-bottom:calc\(86px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(css, /\.productGalleryBack\{display:none!important\}/);
+  assert.match(css, /body:has\(\.buyerMobileShellHeader\)\{overflow-x:clip\}/);
+});
