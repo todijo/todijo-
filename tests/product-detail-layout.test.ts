@@ -92,14 +92,14 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
 });
 
-test("Product Detail uses the shared mobile shell and a natural-height mobile gallery", async () => {
+test("Product Detail uses the shared mobile shell and a square mobile gallery", async () => {
   const [page, siteHeader, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
   assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
-  assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
+  assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:1\/1;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
   assert.match(css, /\.productMobileImageSlide\{[^}]*flex:0 0 100%;[^}]*height:100%;[^}]*justify-content:center;[^}]*overflow:hidden/);
-  assert.match(css, /\.productMobileImageSlide img\{[^}]*width:100%;height:auto;[^}]*object-fit:contain/);
+  assert.match(css, /\.productMobileImageSlide img\{[^}]*width:100%;height:100%;[^}]*object-fit:contain/);
   assert.doesNotMatch(css, /\.productMobileImageTrack\{[^}]*min-height:/);
   assert.match(css, /\.productGalleryBack\{display:none!important\}/);
   assert.match(css, /\.productLightbox\{z-index:9999\}/);
@@ -118,6 +118,11 @@ test("mobile gallery removes the shell gap and uses a horizontal snap track", as
   assert.match(gallery, /className="productMobileImageSlide"/);
   assert.match(gallery, /onScroll=\{\(\) =>/);
   assert.match(gallery, /Math\.round\(track\.scrollLeft \/ track\.clientWidth\)/);
+  assert.match(gallery, /\[cleanImages\[cleanImages\.length - 1\], \.\.\.cleanImages, cleanImages\[0\]\]/);
+  assert.match(gallery, /physicalIndex === cleanImages\.length \+ 1/);
+  assert.match(gallery, /const destination = physicalIndex === 0 \? cleanImages\.length : 1/);
+  assert.match(gallery, /track\.style\.scrollBehavior = "auto"/);
+  assert.match(gallery, /jumpToPhysicalIndex\(destination\)/);
   assert.doesNotMatch(gallery, /onPointerDown=/);
   assert.doesNotMatch(css, /height:clamp\(340px,52svh,520px\)/);
   assert.doesNotMatch(css, /--active-gallery-height/);
@@ -132,12 +137,15 @@ test("gallery index, counter, and thumbnails stay synchronized", async () => {
   assert.match(gallery, /index === selectedIndex \? " isActive" : ""/);
   assert.match(gallery, /setSelectedIndex\(index\); scrollToIndex\(index\)/);
   assert.match(gallery, /requestAnimationFrame\(\(\) => scrollToIndex\(0, "auto"\)\)/);
-  assert.match(gallery, /image\?\.naturalWidth && image\.naturalHeight && width/);
-  assert.match(gallery, /width \* image\.naturalHeight \/ image\.naturalWidth/);
-  assert.match(gallery, /requestAnimationFrame\(\(\) => \{\s*requestAnimationFrame/);
-  assert.match(gallery, /new ResizeObserver\(\(\) => syncMobileTrackHeight\(selectedIndex\)\)/);
-  assert.match(gallery, /setTrackHeight\(width \* image\.naturalHeight \/ image\.naturalWidth\)/);
-  assert.match(gallery, /setTrackHeight\(null\);[\s\S]*?setVariantImages/);
+  assert.match(gallery, /setVariantImages\(Array\.isArray\(next\) \? next\.filter\(Boolean\) : \[\]\); setSelectedIndex\(0\)/);
+  assert.doesNotMatch(gallery, /setTrackHeight|ResizeObserver|active-gallery-height/);
+});
+
+test("mobile product info starts with compact title and price", async () => {
+  const css = await readFile("app/globals.css", "utf8");
+  assert.match(css, /@media\(max-width:860px\)\{\.productSellerLink,\.productTopMeta\{display:none\}/);
+  assert.match(css, /\.productDetailInfo h1\{margin:0 0 7px;font-size:clamp\(20px,5\.5vw,22px\);line-height:1\.1\}/);
+  assert.match(css, /\.productDetailPrice\{font-size:clamp\(22px,6vw,25px\)\}/);
 });
 
 test("mobile product sections remain contained while desktop composition is unchanged", async () => {

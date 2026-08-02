@@ -737,12 +737,13 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
   .productDetailTop{margin-top:0}
   .productGallery{top:auto;margin-top:0}
   .productGalleryInteractive{position:relative;top:auto;width:100%;max-width:none;overflow:hidden}
-  .productMobileImageTrack{display:flex;width:100%;margin:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-inline:contain;touch-action:pan-x pan-y}
+  .productMobileImageTrack{display:flex;width:100%;aspect-ratio:1/1;margin:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-inline:contain;touch-action:pan-x pan-y}
   .productMobileImageTrack::-webkit-scrollbar{display:none}
   .productMobileImageSlide{flex:0 0 100%;width:100%;height:100%;min-height:0;padding:0;border:0;border-radius:16px;background:transparent;display:flex;align-items:flex-start;justify-content:center;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always;cursor:zoom-in}
-  .productMobileImageSlide img{display:block;width:100%;height:auto;margin:0;border:0;border-radius:16px;object-fit:contain;user-select:none}
+  .productMobileImageSlide img{display:block;width:100%;height:100%;margin:0;border:0;border-radius:16px;object-fit:contain;user-select:none}
   .productMobileImageSlide:focus-visible{outline:3px solid rgba(22,163,74,.45);outline-offset:-3px}
-  .productGalleryCounter{position:absolute}
+  .productGalleryCounter{position:absolute;z-index:5;right:12px;bottom:12px;min-height:30px;padding:0 10px;border-radius:999px;background:rgba(8,41,31,.78);color:#fff;display:flex;align-items:center;font-size:12px;font-weight:850;pointer-events:none}
   .productZoomHint{display:none}
 }
+@media(max-width:860px){.productSellerLink,.productTopMeta{display:none}.productDetailInfo h1{margin:0 0 7px;font-size:clamp(20px,5.5vw,22px);line-height:1.1}.productDetailPrice{font-size:clamp(22px,6vw,25px)}}
 @media(max-width:760px){.productMobileSecondaryActions{display:flex;justify-content:flex-end;margin:0 0 10px}.productMobileSecondaryActions .productIconButton{min-width:44px;min-height:44px;padding:8px 12px}}

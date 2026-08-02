@@ -18,38 +18,39 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isMobileGallery, setIsMobileGallery] = useState(false);
-  const [trackHeight, setTrackHeight] = useState<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
-  const mobileImageRefs = useRef<Array<HTMLImageElement | null>>([]);
+  const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
+
+  const jumpToPhysicalIndex = useCallback((physicalIndex: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const previousBehavior = track.style.scrollBehavior;
+    track.style.scrollBehavior = "auto";
+    track.scrollLeft = physicalIndex * track.clientWidth;
+    requestAnimationFrame(() => { track.style.scrollBehavior = previousBehavior; });
+  }, []);
 
   const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = "smooth") => {
     const track = trackRef.current;
-    if (track) track.scrollTo({ left: index * track.clientWidth, behavior });
-  }, []);
-
-  const syncMobileTrackHeight = useCallback((index: number) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const image = mobileImageRefs.current[index];
-        const width = trackRef.current?.getBoundingClientRect().width;
-        if (image?.naturalWidth && image.naturalHeight && width) {
-          setTrackHeight(width * image.naturalHeight / image.naturalWidth);
-        }
-      });
-    });
-  }, []);
+    if (!track) return;
+    if (behavior === "auto") jumpToPhysicalIndex(index + 1);
+    else track.scrollTo({ left: (index + 1) * track.clientWidth, behavior });
+  }, [jumpToPhysicalIndex]);
 
   const closeGallery = useCallback(() => {
     setIsOpen(false);
     requestAnimationFrame(() => openerRef.current?.focus());
   }, []);
 
-  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setTrackHeight(null); setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
+  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
 
-  useEffect(() => () => { if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current); }, []);
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+    if (scrollEndTimerRef.current !== null) clearTimeout(scrollEndTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 860px)");
@@ -64,12 +65,8 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
   useEffect(() => {
     if (!isMobileGallery) return;
-    syncMobileTrackHeight(selectedIndex);
-    const track = trackRef.current;
-    const observer = new ResizeObserver(() => syncMobileTrackHeight(selectedIndex));
-    if (track) observer.observe(track);
-    return () => observer.disconnect();
-  }, [cleanImages, isMobileGallery, selectedIndex, syncMobileTrackHeight]);
+    requestAnimationFrame(() => scrollToIndex(0, "auto"));
+  }, [cleanImages, isMobileGallery, scrollToIndex]);
 
   const showPrevious = useCallback(() => {
     if (cleanImages.length < 2) return;
@@ -106,6 +103,10 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
     return <div className="productMainPlaceholder">📦</div>;
   }
 
+  const mobileSlides = cleanImages.length > 1
+    ? [cleanImages[cleanImages.length - 1], ...cleanImages, cleanImages[0]]
+    : cleanImages;
+
   const handleTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
   };
@@ -128,40 +129,62 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           <div
             className="productMobileImageTrack"
             ref={trackRef}
-            style={trackHeight ? { height: `${trackHeight}px` } : undefined}
             onScroll={() => {
               if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
               scrollFrameRef.current = requestAnimationFrame(() => {
                 const track = trackRef.current;
                 if (!track?.clientWidth) return;
-                const next = Math.max(0, Math.min(cleanImages.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+                const physicalIndex = Math.round(track.scrollLeft / track.clientWidth);
+                const next = cleanImages.length === 1
+                  ? 0
+                  : physicalIndex === 0
+                    ? cleanImages.length - 1
+                    : physicalIndex === cleanImages.length + 1
+                      ? 0
+                      : physicalIndex - 1;
                 setSelectedIndex((current) => current === next ? current : next);
+                if (scrollEndTimerRef.current !== null) clearTimeout(scrollEndTimerRef.current);
+                if (cleanImages.length > 1 && (physicalIndex === 0 || physicalIndex === cleanImages.length + 1)) {
+                  scrollEndTimerRef.current = setTimeout(() => {
+                    const currentTrack = trackRef.current;
+                    if (!currentTrack) return;
+                    const destination = physicalIndex === 0 ? cleanImages.length : 1;
+                    jumpToPhysicalIndex(destination);
+                  }, 90);
+                }
               });
             }}
             aria-label="Photos du produit"
           >
-            {cleanImages.map((image, index) => (
-              <button
-                type="button"
-                className="productMobileImageSlide"
-                onClick={(event) => {
-                  openerRef.current = event.currentTarget;
-                  setSelectedIndex(index);
-                  setIsOpen(true);
-                }}
-                aria-label={`Agrandir l'image ${index + 1} de ${productName}`}
-                key={`mobile-${image}-${index}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  ref={(element) => { mobileImageRefs.current[index] = element; }}
-                  src={image}
-                  alt={`${productName} — image ${index + 1}`}
-                  draggable={false}
-                  onLoad={() => { if (index === selectedIndex) syncMobileTrackHeight(index); }}
-                />
-              </button>
-            ))}
+            {mobileSlides.map((image, physicalIndex) => {
+              const index = cleanImages.length === 1
+                ? 0
+                : physicalIndex === 0
+                  ? cleanImages.length - 1
+                  : physicalIndex === cleanImages.length + 1
+                    ? 0
+                    : physicalIndex - 1;
+              return (
+                <button
+                  type="button"
+                  className="productMobileImageSlide"
+                  onClick={(event) => {
+                    openerRef.current = event.currentTarget;
+                    setSelectedIndex(index);
+                    setIsOpen(true);
+                  }}
+                  aria-label={`Agrandir l'image ${index + 1} de ${productName}`}
+                  key={`mobile-${physicalIndex}-${image}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image}
+                    alt={`${productName} — image ${index + 1}`}
+                    draggable={false}
+                  />
+                </button>
+              );
+            })}
           </div>
         ) : (
           <button
