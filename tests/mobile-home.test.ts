@@ -49,14 +49,14 @@ test("mobile categories and product grids stay contained in two columns", () => 
 });
 
 test("mobile product cards are compact with prominent images and accessible actions", () => {
-  assert.match(styles, /\.discoveryImageWrap\{aspect-ratio:1\}/);
-  assert.match(styles, /\.marketplaceProductRail \.discoveryCardBody\{padding:5px\}/);
+  assert.match(styles, /\.discoveryImageWrap\{aspect-ratio:4\/5\}/);
+  assert.match(styles, /\.marketplaceProductRail \.discoveryCardBody\{display:block;padding:4px\}/);
   assert.match(styles, /\.marketplaceProductRail \.discoveryCardBody h3\{margin:1px 0 2px\}/);
   assert.match(styles, /\.discoveryCard\{align-self:start\}/);
-  assert.match(styles, /\.discoveryCardBody\{flex:0 0 auto;padding:5px\}/);
+  assert.match(styles, /\.discoveryCardBody\{display:block;flex:none;padding:4px\}/);
   assert.doesNotMatch(styles, /\.discoveryCardBody\{[^}]*justify-content:space-between/);
-  assert.match(styles, /\.discoveryCardBody h3\{min-height:0;max-height:30px;margin:1px 0 2px;[^}]*line-height:1\.15\}/);
-  assert.match(styles, /\.productAvailability\{min-height:16px;margin-bottom:0/);
+  assert.match(styles, /\.discoveryCardBody h3\{min-height:0;max-height:none;margin:1px 0 2px;[^}]*line-height:1\.15\}/);
+  assert.match(styles, /\.productAvailability\{display:none\}/);
   assert.match(styles, /\.discoveryCardBody \.cardBottom\{margin-top:0\}/);
   assert.match(styles, /\.cardBottom\{padding-top:0\}/);
   assert.match(styles, /\.cardCartButton\{min-height:44px;margin-top:3px/);
