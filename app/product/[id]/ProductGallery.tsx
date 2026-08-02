@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocale } from "next-intl";
 
@@ -22,9 +22,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
-  const draggedRef = useRef(false);
-  const slideRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const mobileImageRefs = useRef<Array<HTMLImageElement | null>>([]);
   const openerRef = useRef<HTMLButtonElement | null>(null);
 
   const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = "smooth") => {
@@ -32,10 +30,15 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
     if (track) track.scrollTo({ left: index * track.clientWidth, behavior });
   }, []);
 
-  const syncTrackHeight = useCallback((index: number) => {
+  const syncMobileTrackHeight = useCallback((index: number) => {
     requestAnimationFrame(() => {
-      const height = slideRefs.current[index]?.offsetHeight;
-      if (height) setTrackHeight(height);
+      requestAnimationFrame(() => {
+        const image = mobileImageRefs.current[index];
+        const width = trackRef.current?.getBoundingClientRect().width;
+        if (image?.naturalWidth && image.naturalHeight && width) {
+          setTrackHeight(width * image.naturalHeight / image.naturalWidth);
+        }
+      });
     });
   }, []);
 
@@ -44,7 +47,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
     requestAnimationFrame(() => openerRef.current?.focus());
   }, []);
 
-  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
+  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setTrackHeight(null); setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
 
   useEffect(() => () => { if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current); }, []);
 
@@ -59,7 +62,14 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];
 
-  useEffect(() => { syncTrackHeight(selectedIndex); }, [cleanImages, selectedIndex, syncTrackHeight]);
+  useEffect(() => {
+    if (!isMobileGallery) return;
+    syncMobileTrackHeight(selectedIndex);
+    const track = trackRef.current;
+    const observer = new ResizeObserver(() => syncMobileTrackHeight(selectedIndex));
+    if (track) observer.observe(track);
+    return () => observer.disconnect();
+  }, [cleanImages, isMobileGallery, selectedIndex, syncMobileTrackHeight]);
 
   const showPrevious = useCallback(() => {
     if (cleanImages.length < 2) return;
@@ -114,45 +124,60 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   return (
     <>
       <div className="productGalleryInteractive">
-        <div
-          className="productMainImageTrack"
-          ref={trackRef}
-          style={{ "--active-gallery-height": trackHeight ? `${trackHeight}px` : "auto" } as CSSProperties}
-          onScroll={() => {
-            if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
-            scrollFrameRef.current = requestAnimationFrame(() => {
-              const track = trackRef.current;
-              if (!track?.clientWidth) return;
-              const next = Math.max(0, Math.min(cleanImages.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
-              setSelectedIndex((current) => current === next ? current : next);
-            });
-          }}
-          onPointerDown={(event) => { pointerStartRef.current = { x: event.clientX, y: event.clientY }; draggedRef.current = false; }}
-          onPointerUp={(event) => {
-            const start = pointerStartRef.current;
-            if (start) draggedRef.current = Math.abs(event.clientX - start.x) > 12 && Math.abs(event.clientX - start.x) > Math.abs(event.clientY - start.y);
-            pointerStartRef.current = null;
-          }}
-          aria-label="Photos du produit"
-        >
-          {cleanImages.map((image, index) => <button
+        {isMobileGallery ? (
+          <div
+            className="productMobileImageTrack"
+            ref={trackRef}
+            style={trackHeight ? { height: `${trackHeight}px` } : undefined}
+            onScroll={() => {
+              if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+              scrollFrameRef.current = requestAnimationFrame(() => {
+                const track = trackRef.current;
+                if (!track?.clientWidth) return;
+                const next = Math.max(0, Math.min(cleanImages.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+                setSelectedIndex((current) => current === next ? current : next);
+              });
+            }}
+            aria-label="Photos du produit"
+          >
+            {cleanImages.map((image, index) => (
+              <button
+                type="button"
+                className="productMobileImageSlide"
+                onClick={(event) => {
+                  openerRef.current = event.currentTarget;
+                  setSelectedIndex(index);
+                  setIsOpen(true);
+                }}
+                aria-label={`Agrandir l'image ${index + 1} de ${productName}`}
+                key={`mobile-${image}-${index}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  ref={(element) => { mobileImageRefs.current[index] = element; }}
+                  src={image}
+                  alt={`${productName} — image ${index + 1}`}
+                  draggable={false}
+                  onLoad={() => { if (index === selectedIndex) syncMobileTrackHeight(index); }}
+                />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
             type="button"
-            ref={(element) => { slideRefs.current[index] = element; }}
-            className={`productMainImageButton productMainImageSlide${index === selectedIndex ? " isActive" : ""}`}
+            className="productMainImageButton"
             onClick={(event) => {
-              if (draggedRef.current) { draggedRef.current = false; return; }
               openerRef.current = event.currentTarget;
-              setSelectedIndex(index);
               setIsOpen(true);
             }}
-            aria-label={`Agrandir l'image ${index + 1} de ${productName}`}
-            key={`main-${image}-${index}`}
+            aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="productMainImage productMainImageIntrinsic" src={image} alt={`${productName} — image ${index + 1}`} draggable={false} onLoad={() => { if (index === selectedIndex) syncTrackHeight(index); }}/>
+            <img className="productMainImage productMainImageIntrinsic" src={selectedImage} alt={`${productName} — image ${selectedIndex + 1}`} draggable={false} />
             <span className="productZoomHint">⛶ Agrandir</span>
-          </button>)}
-        </div>
+          </button>
+        )}
         <span className="productGalleryCounter" aria-live="polite">{selectedIndex + 1} / {cleanImages.length}</span>
 
         {!isMobileGallery && cleanImages.length > 1 && (

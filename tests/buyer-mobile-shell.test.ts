@@ -57,7 +57,7 @@ test("mobile shell offsets content and preserves desktop headers", () => {
 });
 
 test("Product Detail gallery and purchase action fit around persistent navigation", () => {
-  assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{width:auto;max-width:100%;height:auto;max-height:min\(48svh,480px\);object-fit:contain\}/);
+  assert.match(css, /\.productMobileImageSlide img\{[^}]*width:100%;height:auto;[^}]*object-fit:contain/);
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
   assert.match(css, /\.productDetailPage\{padding-bottom:calc\(86px \+ env\(safe-area-inset-bottom\)\)\}/);
   assert.match(css, /\.productGalleryBack\{display:none!important\}/);
