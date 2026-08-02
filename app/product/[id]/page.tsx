@@ -55,17 +55,18 @@ export default async function ProductPage({ params }: Props) {
         <h1>{product.name}</h1><ProductDetailPrice price={price} compareAtPrice={compare} currency={product.currency}/>
         <div className="productMobileSecondaryActions"><ShareButton title={product.name}/></div>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
-        <dl className="productFacts" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
+        <dl className="productFacts productFactsDesktop" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
       </article>
       <div className="productPurchaseColumn">
         <ProductPurchasePanel availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))}))} variants={product.variants.map((variant) => ({ ...variant, priceOverride: variant.priceOverride == null ? null : Number(variant.priceOverride) }))} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
         <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
       </div>
     </div>
-    <nav className="productDetailSections" aria-label={detailText("pageSections")}><a href="#description">{detailText("description")}</a><a href="#product-facts">{detailText("details")}</a><a href="#reviews">{detailText("reviews")}</a></nav>
+    <nav className="productDetailSections" aria-label={detailText("pageSections")}><a href="#description">{detailText("description")}</a><a className="productFactsDesktopLink" href="#product-facts">{detailText("details")}</a><a className="productFactsMobileLink" href="#product-facts-mobile">{detailText("details")}</a><a href="#reviews">{detailText("reviews")}</a></nav>
     <section className="productDetailDescriptionSection" id="description" aria-labelledby="product-details-title">
       <h2 id="product-details-title">{detailText("description")}</h2>
       <p className="productDetailDescription">{product.description}</p>
+      <dl className="productFacts productFactsMobile" id="product-facts-mobile"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
     </section>
     <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div>
   </section>

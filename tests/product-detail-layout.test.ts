@@ -92,12 +92,12 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
 });
 
-test("Product Detail uses the shared mobile shell and a square mobile gallery", async () => {
+test("Product Detail uses the shared mobile shell and a portrait mobile gallery", async () => {
   const [page, siteHeader, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
   assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
-  assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:1\/1;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
+  assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:4\/5;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
   assert.match(css, /\.productMobileImageSlide\{[^}]*flex:0 0 100%;[^}]*height:100%;[^}]*justify-content:center;[^}]*overflow:hidden/);
   assert.match(css, /\.productMobileImageSlide img\{[^}]*width:100%;height:100%;[^}]*object-fit:contain/);
   assert.doesNotMatch(css, /\.productMobileImageTrack\{[^}]*min-height:/);
@@ -143,9 +143,18 @@ test("gallery index, counter, and thumbnails stay synchronized", async () => {
 
 test("mobile product info starts with compact title and price", async () => {
   const css = await readFile("app/globals.css", "utf8");
-  assert.match(css, /@media\(max-width:860px\)\{\.productSellerLink,\.productTopMeta\{display:none\}/);
+  assert.match(css, /@media\(max-width:860px\)\{\.productSellerLink,\.productTopMeta,\.productFactsDesktop,\.productFactsDesktopLink\{display:none\}/);
   assert.match(css, /\.productDetailInfo h1\{margin:0 0 7px;font-size:clamp\(20px,5\.5vw,22px\);line-height:1\.1\}/);
   assert.match(css, /\.productDetailPrice\{font-size:clamp\(22px,6vw,25px\)\}/);
+});
+
+test("mobile product facts follow Description while desktop facts keep their original placement", async () => {
+  const [page, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.ok(page.indexOf("productFactsDesktop") < page.indexOf("productDetailDescriptionSection"));
+  assert.ok(page.indexOf("productDetailDescription") < page.indexOf("productFacts productFactsMobile"));
+  assert.ok(page.indexOf("productFacts productFactsMobile") < page.indexOf("<AskSellerButton"));
+  assert.match(css, /\.productFactsMobile,\.productFactsMobileLink\{display:none\}/);
+  assert.match(css, /@media\(max-width:860px\)\{\.productSellerLink,\.productTopMeta,\.productFactsDesktop,\.productFactsDesktopLink\{display:none\}\.productFactsMobile,\.productFactsMobileLink\{display:flex\}/);
 });
 
 test("mobile product sections remain contained while desktop composition is unchanged", async () => {
