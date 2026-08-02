@@ -7,6 +7,7 @@ import { readSession } from "@/lib/session";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerSection, SellerStatusBadge } from "@/components/SellerControlPanel";
 import StoreSettingsForm from "./StoreSettingsForm";
+import { canPublish } from "@/lib/seller-subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,11 @@ export default async function StoreSettingsPage() {
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
     select: {
-      name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true,
+      name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true,
       contactEmail: true, phone: true, currency: true, language: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { plan: true, status: true, currentPeriodEnd: true } },
+      accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
     },
   });
   if (!store) redirect("/seller/create-store");
@@ -34,10 +36,10 @@ export default async function StoreSettingsPage() {
     dashboard: p("nav.dashboard"), products: p("nav.products"), orders: p("nav.orders"), messages: p("nav.messages"),
     statistics: p("nav.statistics"), revenue: p("nav.revenue"), reviews: p("nav.reviews"), store: p("nav.store"),
     settings: p("nav.settings"), notifications: p("notifications"), eyebrow: p("seller.eyebrow"), logout: common("logout"),
-    menu: dashboardText("menu"), collapse: dashboardText("collapse"),
+    menu: dashboardText("menu"), collapse: dashboardText("collapse"), addProduct: p("nav.addProduct"),
   };
 
-  return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} labels={labels} active="settings">
+  return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} labels={labels} active="settings" canAddProduct={canPublish(store)}>
     <SellerPageHeader
       eyebrow={t("sellerWorkspace")}
       title={t("settingsTitle")}

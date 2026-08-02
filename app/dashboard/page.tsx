@@ -14,6 +14,7 @@ import { readSession } from "@/lib/session";
 import SellerAnalytics from "@/components/SellerAnalytics";
 import { SellerFulfillmentControl } from "@/components/SellerFulfillmentControl";
 import { fulfillmentStepFor, sellerFulfillmentActionFor } from "@/lib/order-status";
+import { canPublish } from "@/lib/seller-subscription";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -63,7 +64,7 @@ export default async function DashboardPage() {
     select: {
       firstName: true, lastName: true, email: true, role: true,
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
-      store: { select: { id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, currency: true, status: true, subscription: { select: { status: true, cancelAtPeriodEnd: true } }, _count: { select: { products: true } } } },
+      store: { select: { id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, currency: true, status: true, subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, _count: { select: { products: true } } } },
       _count: { select: { orders: true, buyerConversations: true, reviews: true } },
     },
   }));
@@ -98,6 +99,10 @@ export default async function DashboardPage() {
     { label: p("nav.store"), href: user.store ? `/${locale}/store/${user.store.slug}` : `/${locale}/seller/create-store`, icon: Store },
     { label: p("nav.settings"), href: `/${locale}/seller/store-settings`, icon: Settings },
   ];
+  const sellerCanAddProduct = Boolean(user.store && canPublish(user.store));
+  const sellerMobileNav = sellerCanAddProduct
+    ? [sellerNav[0], { label: p("nav.addProduct"), href: `/${locale}/seller/products/new`, icon: Plus }, ...sellerNav.slice(1)]
+    : sellerNav;
 
   if (!isSeller) {
     const orders = await dashboardData(listBuyerOrders(prisma, session.userId));
@@ -108,7 +113,7 @@ export default async function DashboardPage() {
     return <main className="premiumDashboard premiumBuyerDashboard">
       <DashboardSidebar items={buyerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")}/>
       <div className="premiumDashboardMain">
-        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("buyer.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/>
+        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("buyer.eyebrow")} homeHref={homeHref} notificationLabel={p("notifications")} notificationCount={notificationCount}/>
         <div className="premiumDashboardContent">
           <section className="premiumWelcomeHero"><div><span>{p("buyer.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{p("buyer.intro")}</p></div><Link href={homeHref}>{p("browseMarketplace")} <ShoppingBag size={18}/></Link></section>
           <section className="premiumStatsGrid">
@@ -132,7 +137,7 @@ export default async function DashboardPage() {
     </main>;
   }
 
-  if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><DashboardEmptyState title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
+  if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><DashboardEmptyState title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
 
   const sellerOrdersWhere = sellerOrderHistoryWhere(session.userId, user.store.id, "");
   const [sellerOrders, pendingRefundCount] = await dashboardData(Promise.all([
@@ -163,10 +168,10 @@ export default async function DashboardPage() {
   const analytics = sellerAnalytics(sellerOrders, locale, now);
   const analyticsStatuses = analytics.statuses.map((item) => ({ label: ordersText(`status.${item.status}`), value: item.value }));
   const cancellationRate = sellerOrders.length ? sellerOrders.filter((order) => order.status === "CANCELLED").length / sellerOrders.length * 100 : null;
-  const subscriptionActive = user.store.status === "ACTIVE" && ["ACTIVE", "TRIALING"].includes(user.store.subscription?.status ?? "");
+  const subscriptionActive = sellerCanAddProduct;
   return <main className="premiumDashboard premiumSellerDashboard">
-    <DashboardSidebar items={sellerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
-    <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">
+    <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
+    <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">
       {!subscriptionActive && <section className="subscriptionWarning" role="alert"><strong>Seller subscription inactive</strong><span>Status: {user.store.subscription?.status ?? "NOT_STARTED"}. Your products and history are safe, but publishing is paused.</span><Link href="/seller/subscription">Choose or renew a plan</Link></section>}
       {pendingRefundCount > 0 && <section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount === 1 ? "pendingRefundRequestSingular" : "pendingRefundRequestPlural", { count: pendingRefundCount })}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: user.store.name, city: user.store.city, country: user.store.country })}</p>{profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div><div className="sellerHeroMetrics"><div><small>{s("todayRevenue")}</small><strong>{money(locale, todayRevenue, user.store.currency)}</strong></div><div><small>{s("pendingOrders")}</small><strong>{pendingOrders}</strong></div><div><small>{s("newCustomers")}</small><strong>{newCustomers}</strong></div><div><small>{s("unreadMessages")}</small><strong>{unreadMessages}</strong></div></div><Link href={`/${locale}/store/${user.store.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>

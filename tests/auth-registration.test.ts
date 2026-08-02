@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { localeFromReferer, localizedHome, postLoginDestination, safeLoginDestination } from "../lib/auth-redirects";
 import { registrationPersistenceData, validateRegistrationInput } from "../lib/auth-registration";
@@ -45,4 +46,18 @@ test("buyer and seller login destinations are localized and reject open redirect
   assert.equal(localizedHome(localeFromReferer("https://todijo.test/fr/dashboard")), "/fr");
   assert.equal(localizedHome(localeFromReferer("https://todijo.test/ku/seller/orders")), "/ku");
   assert.equal(localizedHome(localeFromReferer("not a URL")), "/en");
+});
+
+test("login and registration entry points send buyer and seller sessions to localized Home", () => {
+  const loginPage = readFileSync("app/login/page.tsx", "utf8");
+  const loginLayout = readFileSync("app/login/layout.tsx", "utf8");
+  const registerForm = readFileSync("app/register/RegisterForm.tsx", "utf8");
+  const registerPage = readFileSync("app/register/page.tsx", "utf8");
+
+  assert.match(loginPage, /postLoginDestination\(data\.role, params\.get\("next"\), locale as Locale\)/);
+  assert.match(loginLayout, /redirect\(localizedHome\(await getLocale\(\)\)\)/);
+  assert.match(registerForm, /router\.push\(localizedHome\(locale\)\)/);
+  assert.match(registerPage, /redirect\(localizedHome\(await getLocale\(\)\)\)/);
+  assert.doesNotMatch(loginLayout, /redirect\("\/dashboard"\)/);
+  assert.doesNotMatch(registerPage, /redirect\("\/dashboard"\)/);
 });
