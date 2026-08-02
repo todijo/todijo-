@@ -39,10 +39,22 @@ test("buyer bottom navigation is mobile-only with active state and safe-area cle
 
 test("mobile categories and product grids stay contained in two columns", () => {
   assert.match(styles, /\.categoryStrip\{width:100%;gap:6px;[^}]*scroll-snap-type:x mandatory/);
+  assert.match(styles, /\.categoryStrip\{gap:4px\}/);
   assert.match(styles, /\.marketplaceProductRail\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles, /\.discoveryProductGrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles, /\.discoveryCardBody h3\{display:-webkit-box;[^}]*-webkit-line-clamp:2/);
   assert.match(styles, /\.marketplaceProductRail\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+});
+
+test("mobile product cards are compact with prominent images and accessible actions", () => {
+  assert.match(styles, /\.discoveryImageWrap\{aspect-ratio:6\/5\}/);
+  assert.match(styles, /\.discoveryCardBody\{padding:8px\}/);
+  assert.match(styles, /\.discoveryCardBody h3\{min-height:32px;max-height:32px;margin:2px 0 4px;[^}]*line-height:1\.2\}/);
+  assert.match(styles, /\.productAvailability\{min-height:18px;margin-bottom:2px/);
+  assert.match(styles, /\.cardBottom\{padding-top:4px\}/);
+  assert.match(styles, /\.cardCartButton\{min-height:44px;margin-top:5px/);
+  assert.match(styles, /\.cardWishlist\{width:44px;height:44px;border:0;background:transparent/);
+  assert.match(styles, /\.cardWishlist::before\{content:"";[^}]*inset:3px/);
 });
 
 test("product-card actions preserve variant, legacy, and sold-out behavior", () => {
