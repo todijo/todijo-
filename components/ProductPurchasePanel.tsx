@@ -63,5 +63,6 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
       </div>
       <AddToCartButton quantity={quantity} product={{ ...product, price: selectedPrice, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
     </div>
+    <div className="mobilePurchaseBar"><span aria-live="polite">{selectedOptions || detail("chooseCombination")}</span><AddToCartButton quantity={quantity} product={{ ...product, price: selectedPrice, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
   </aside>;
 }

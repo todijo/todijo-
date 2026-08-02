@@ -12,5 +12,5 @@ export default function ShareButton({ title }: { title: string }) {
       else { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800); }
     } catch {}
   }
-  return <button type="button" className="productIconButton" onClick={share}>↗<span>{copied ? t("copied") : t("share")}</span></button>;
+  return <button type="button" className="productIconButton" onClick={share} aria-label={copied ? t("copied") : t("share")}>↗<span>{copied ? t("copied") : t("share")}</span></button>;
 }

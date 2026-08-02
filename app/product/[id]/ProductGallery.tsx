@@ -89,6 +89,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           onClick={(event) => { openerRef.current = event.currentTarget; setIsOpen(true); }}
           aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
         >
+          <span className="productGalleryCounter" aria-live="polite">{selectedIndex + 1} / {cleanImages.length}</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="productMainImage productMainImageIntrinsic" src={selectedImage} alt={`${productName} — image ${selectedIndex + 1}`} />
           <span className="productZoomHint">⛶ Agrandir</span>

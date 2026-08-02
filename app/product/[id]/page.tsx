@@ -48,7 +48,7 @@ export default async function ProductPage({ params }: Props) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
-      <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
+      <div className="productGallery productGallerySticky"><div className="productGalleryActions"><Link className="productGalleryBack" href="/" aria-label={common("back")}>&larr;</Link><div><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div><ProductGallery images={product.images} productName={product.name}/></div>
       <article className="productDetailInfo">
         <Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link>
         <div className="productTopMeta"><p className="dashboardBadge">{product.category}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>

@@ -32,6 +32,7 @@ test("buyer option selection emits gallery image changes", async () => {
   assert.match(purchase, /disabled=\{!valueAvailable\}/);
   assert.match(purchase, /useState<Record<string, string>>\(\{\}\)/);
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
+  assert.match(gallery, /setSelectedIndex\(0\)/);
 });
 
 test("product detail translations keep English and French parity", async () => {

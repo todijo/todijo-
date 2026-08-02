@@ -66,3 +66,45 @@ test("selected variant price has one live product-detail location", async () => 
   assert.match(purchase, /new CustomEvent\("todijo:variant-price"/);
   assert.doesNotMatch(purchase, /className="variantPrice"/);
 });
+
+test("mobile product gallery is first with accessible overlay actions and a live counter", async () => {
+  const [page, gallery, css] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.ok(page.indexOf("productGallery productGallerySticky") < page.indexOf("productDetailInfo"));
+  assert.match(page, /className="productGalleryActions"/);
+  assert.match(page, /className="productGalleryBack"[^>]*aria-label=\{common\("back"\)\}/);
+  assert.match(page, /<WishlistButton productId=\{product\.id\}/);
+  assert.match(page, /<ShareButton title=\{product\.name\}/);
+  assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedIndex \+ 1\} \/ \{cleanImages\.length\}/);
+  assert.match(css, /@media\(max-width:760px\)[^\n]*\.productGalleryActions\{position:absolute;[^}]*display:flex/);
+  assert.match(css, /\.productGalleryActions a,\.productGalleryActions button\{[^}]*width:44px;height:44px/);
+});
+
+test("mobile purchase bar keeps one visible primary action and safe content clearance", async () => {
+  const [purchase, css] = await Promise.all([readFile("components/ProductPurchasePanel.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.match(purchase, /className="mobilePurchaseBar"/);
+  assert.match(purchase, /selectedOptions \|\| detail\("chooseCombination"\)/);
+  assert.match(css, /\.variantPurchasePanel>\.addCartButton\{display:none\}/);
+  assert.match(css, /\.mobilePurchaseBar\{position:fixed;[^}]*bottom:0;[^}]*safe-area-inset-bottom/);
+  assert.match(css, /\.productDetailPage\{[^}]*padding-bottom:calc\(86px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.mobilePurchaseBar \.addCartButton\{min-height:52px/);
+});
+
+test("mobile product sections remain contained while desktop composition is unchanged", async () => {
+  const css = await readFile("app/globals.css", "utf8");
+  assert.match(css, /\.productDetailShell\{width:100%;padding:0 0 32px\}/);
+  assert.match(css, /\.optionGroup>div\{max-width:100%;[^}]*overflow-x:auto/);
+  assert.match(css, /\.reviewsGrid\{grid-template-columns:1fr;gap:12px\}/);
+  assert.match(css, /\.relatedGrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:9px\}/);
+  assert.match(css, /\.productDetailTop\{grid-template-columns:minmax\(0,1\.16fr\) minmax\(300px,\.9fr\) minmax\(280px,\.72fr\)/);
+  assert.match(css, /\.productDetailPage\{overflow-x:clip/);
+});
+
+test("quantity and review states retain their real-data boundaries", async () => {
+  const [purchase, reviews, page] = await Promise.all([readFile("components/ProductPurchasePanel.tsx", "utf8"), readFile("components/ReviewSection.tsx", "utf8"), readFile("app/product/[id]/page.tsx", "utf8")]);
+  assert.match(purchase, /Math\.max\(1, value - 1\)/);
+  assert.match(purchase, /Math\.min\(stock, value \+ 1\)/);
+  assert.match(purchase, /disabled=\{!available \|\| quantity >= stock\}/);
+  assert.match(reviews, /data\.reviews\.length===0/);
+  assert.match(reviews, /data\.reviews\.map/);
+  assert.match(page, /category:product\.category,id:\{not:product\.id\}/);
+});
