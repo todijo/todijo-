@@ -48,11 +48,12 @@ export default async function ProductPage({ params }: Props) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
-      <div className="productGallery productGallerySticky"><div className="productGalleryActions"><Link className="productGalleryBack" href="/" aria-label={common("back")}>&larr;</Link><div><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div><ProductGallery images={product.images} productName={product.name}/></div>
+      <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
       <article className="productDetailInfo">
         <Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link>
         <div className="productTopMeta"><p className="dashboardBadge">{product.category}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
         <h1>{product.name}</h1><ProductDetailPrice price={price} compareAtPrice={compare} currency={product.currency}/>
+        <div className="productMobileSecondaryActions"><ShareButton title={product.name}/></div>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
         <dl className="productFacts" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
       </article>

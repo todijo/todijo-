@@ -731,16 +731,18 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
 }
 
 /* Mobile Product Detail gallery: align with the 860px buyer-shell breakpoint. */
+.productMobileSecondaryActions{display:none}
 @media(max-width:860px){
   .productDetailShell{margin-top:0;padding-top:0}
   .productDetailTop{margin-top:0}
   .productGallery{top:auto;margin-top:0}
   .productGalleryInteractive{position:relative;top:auto;width:100%;max-width:none;overflow:hidden}
-  .productMainImageTrack{width:calc(100% - 16px);height:var(--active-gallery-height,auto);max-height:min(56svh,480px);margin-inline:8px;display:flex;align-items:flex-start;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-inline:contain;touch-action:pan-y pinch-zoom;border-radius:18px}
+  .productMainImageTrack{width:100%;height:var(--active-gallery-height,auto);max-height:min(64svh,560px);margin-inline:0;display:flex;align-items:flex-start;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-inline:contain;touch-action:pan-y pinch-zoom;border-radius:18px}
   .productMainImageTrack::-webkit-scrollbar{display:none}
   .productMainImageSlide{flex:0 0 100%;width:100%;height:auto;min-height:0;display:block;scroll-snap-align:start;scroll-snap-stop:always;border-radius:18px;background:#f7fbf9;box-shadow:none}
-  .productMainImageSlide .productMainImageIntrinsic{display:block;width:100%;height:auto;max-height:min(56svh,480px);border:0;border-radius:18px;object-fit:contain}
+  .productMainImageSlide .productMainImageIntrinsic{display:block;width:100%;height:auto;max-height:min(64svh,560px);border:0;border-radius:18px;object-fit:contain}
   .productGalleryCounter{position:absolute}
-  .productZoomHint{pointer-events:none}
+  .productZoomHint{display:none}
 }
+@media(max-width:760px){.productMobileSecondaryActions{display:flex;justify-content:flex-end;margin:0 0 10px}.productMobileSecondaryActions .productIconButton{min-width:44px;min-height:44px;padding:8px 12px}}
 @media(min-width:861px){.productMainImageTrack{overflow:visible}.productMainImageSlide{display:none}.productMainImageSlide.isActive{display:block}}
