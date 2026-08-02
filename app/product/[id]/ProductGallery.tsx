@@ -18,29 +18,40 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const touchStartX = useRef<number | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const draggedRef = useRef(false);
   const openerRef = useRef<HTMLButtonElement | null>(null);
+
+  const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = "smooth") => {
+    const track = trackRef.current;
+    if (track) track.scrollTo({ left: index * track.clientWidth, behavior });
+  }, []);
 
   const closeGallery = useCallback(() => {
     setIsOpen(false);
     requestAnimationFrame(() => openerRef.current?.focus());
   }, []);
 
-  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, []);
+  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
+
+  useEffect(() => () => { if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current); }, []);
 
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];
 
   const showPrevious = useCallback(() => {
     if (cleanImages.length < 2) return;
-    setSelectedIndex((index) => (index - 1 + cleanImages.length) % cleanImages.length);
+    setSelectedIndex((index) => { const next = (index - 1 + cleanImages.length) % cleanImages.length; scrollToIndex(next); return next; });
     setIsZoomed(false);
-  }, [cleanImages.length]);
+  }, [cleanImages.length, scrollToIndex]);
 
   const showNext = useCallback(() => {
     if (cleanImages.length < 2) return;
-    setSelectedIndex((index) => (index + 1) % cleanImages.length);
+    setSelectedIndex((index) => { const next = (index + 1) % cleanImages.length; scrollToIndex(next); return next; });
     setIsZoomed(false);
-  }, [cleanImages.length]);
+  }, [cleanImages.length, scrollToIndex]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -83,17 +94,44 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   return (
     <>
       <div className="productGalleryInteractive">
-        <button
-          type="button"
-          className="productMainImageButton"
-          onClick={(event) => { openerRef.current = event.currentTarget; setIsOpen(true); }}
-          aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
+        <div
+          className="productMainImageTrack"
+          ref={trackRef}
+          onScroll={() => {
+            if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+            scrollFrameRef.current = requestAnimationFrame(() => {
+              const track = trackRef.current;
+              if (!track?.clientWidth) return;
+              const next = Math.max(0, Math.min(cleanImages.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+              setSelectedIndex((current) => current === next ? current : next);
+            });
+          }}
+          onPointerDown={(event) => { pointerStartRef.current = { x: event.clientX, y: event.clientY }; draggedRef.current = false; }}
+          onPointerUp={(event) => {
+            const start = pointerStartRef.current;
+            if (start) draggedRef.current = Math.abs(event.clientX - start.x) > 12 && Math.abs(event.clientX - start.x) > Math.abs(event.clientY - start.y);
+            pointerStartRef.current = null;
+          }}
+          aria-label="Photos du produit"
         >
-          <span className="productGalleryCounter" aria-live="polite">{selectedIndex + 1} / {cleanImages.length}</span>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="productMainImage productMainImageIntrinsic" src={selectedImage} alt={`${productName} — image ${selectedIndex + 1}`} />
-          <span className="productZoomHint">⛶ Agrandir</span>
-        </button>
+          {cleanImages.map((image, index) => <button
+            type="button"
+            className={`productMainImageButton productMainImageSlide${index === selectedIndex ? " isActive" : ""}`}
+            onClick={(event) => {
+              if (draggedRef.current) { draggedRef.current = false; return; }
+              openerRef.current = event.currentTarget;
+              setSelectedIndex(index);
+              setIsOpen(true);
+            }}
+            aria-label={`Agrandir l'image ${index + 1} de ${productName}`}
+            key={`main-${image}-${index}`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="productMainImage productMainImageIntrinsic" src={image} alt={`${productName} — image ${index + 1}`} draggable={false}/>
+            <span className="productZoomHint">⛶ Agrandir</span>
+          </button>)}
+        </div>
+        <span className="productGalleryCounter" aria-live="polite">{selectedIndex + 1} / {cleanImages.length}</span>
 
         {cleanImages.length > 1 && (
           <div className="productThumbs" aria-label="Photos du produit">
@@ -101,7 +139,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
               <button
                 type="button"
                 className={`productThumbButton${index === selectedIndex ? " isActive" : ""}`}
-                onClick={() => setSelectedIndex(index)}
+                onClick={() => { setSelectedIndex(index); scrollToIndex(index); }}
                 aria-label={`Afficher l'image ${index + 1}`}
                 aria-current={index === selectedIndex ? "true" : undefined}
                 key={`${image}-${index}`}
