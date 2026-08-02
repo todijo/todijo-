@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, ChevronDown, Languages, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, ShoppingBag, Store, UserRound } from "lucide-react";
+import { ArrowRight, ChevronDown, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, ShoppingBag, Store, UserRound, X } from "lucide-react";
 import CartLink from "@/components/CartLink";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -12,6 +12,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
 import { formatCurrency } from "@/lib/formatters";
 import ProductCardAction from "@/components/ProductCardAction";
+import BuyerMobileNavigation from "@/components/BuyerMobileNavigation";
 
 type MarketplaceProduct = {
   id: string;
@@ -79,9 +80,9 @@ function MarketplaceProductCard({ product, soldOut }: { product: MarketplaceProd
   </article>;
 }
 
-function ProductRail({ title, products, soldOut, viewAll }: { title: string; products: MarketplaceProduct[]; soldOut: string; viewAll: string }) {
+function ProductRail({ id, title, products, soldOut, viewAll }: { id?: string; title: string; products: MarketplaceProduct[]; soldOut: string; viewAll: string }) {
   if (!products.length) return null;
-  return <section className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2>{title}</h2><a href="#products">{viewAll}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
+  return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2>{title}</h2><a href="#products">{viewAll}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
 }
 
 export default function HomeClient({ products, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters }: {
@@ -98,6 +99,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const [accountName, setAccountName] = useState<string | null>(null);
   const [filters, setFilters] = useState(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const activeLocale = useLocale();
   const m = useTranslations("Marketplace");
   const c = useTranslations("Common");
@@ -121,6 +123,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    setIsSearching(true);
     window.location.href = buildUrl(filters);
   }
 
@@ -129,14 +132,11 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   }
 
   return (
-    <main dir={t.dir}>
+    <main className="buyerHomePage" dir={t.dir}>
       <header className="marketHeader">
         <div className="marketPrimaryHeader">
         <div className="marketHeaderInner">
-          <details className="marketMobileMenu">
-            <summary aria-label={h("menu")}><Menu size={22} aria-hidden="true"/></summary>
-            <nav aria-label={h("mobileNavigation")}><a href={accountName ? "/dashboard" : "/login"}><UserRound size={18} aria-hidden="true"/>{accountName ?? t.account}</a><a href={`/${activeLocale}/account/orders`}>{h("orders")}</a><a href="/register?role=seller">{t.sell}</a><LanguageSwitcher className="marketMobileLanguage"/></nav>
-          </details>
+          <BuyerMobileNavigation accountName={accountName}/>
           <TodijoLogo href={`/${activeLocale}`} inverse/>
           <div className="marketLocation" aria-label={h("locationLabel")}><MapPin size={20} aria-hidden="true"/><span><small>{h("deliverTo")}</small><strong>{h("marketplace")}</strong></span></div>
           <form className="marketTopSearch" onSubmit={submit}>
@@ -145,7 +145,8 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             <select id="market-category" value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">{t.all}</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select>
             <label className="srOnly" htmlFor="market-search">{t.search}</label>
             <input id="market-search" type="search" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
-            <button type="submit" aria-label={t.searchButton}><Search size={21} aria-hidden="true"/><span>{t.searchButton}</span></button>
+            {filters.q ? <button className="marketSearchClear" type="button" onClick={() => { setFilters({ ...filters, q: "" }); document.getElementById("market-search")?.focus(); }} aria-label={`${c("remove")}: ${filters.q}`}><X size={18} aria-hidden="true"/></button> : null}
+            <button className="marketSearchSubmit" type="submit" disabled={isSearching} aria-label={isSearching ? c("loading") : t.searchButton}>{isSearching ? <LoaderCircle className="marketSearchSpinner" size={20} aria-hidden="true"/> : <Search size={21} aria-hidden="true"/>}<span>{isSearching ? c("loading") : t.searchButton}</span></button>
           </form>
           <nav className="marketDesktopActions" aria-label={h("accountNavigation")}>
             <LanguageSwitcher className="marketHeaderLanguage"/>
@@ -202,7 +203,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         <ProductRail title={h("newArrivals")} products={newArrivals} soldOut={t.soldOut} viewAll={h("viewAll")}/>
         <aside className="container discoveryPromoBanner"><div><span>{d("discoverLabel")}</span><h2>{d("discoverTitle")}</h2><p>{d("discoverText")}</p></div><a href="#categories">{d("discoverCta")}<ArrowRight size={17} aria-hidden="true"/></a><ShoppingBag size={82} aria-hidden="true"/></aside>
         {stores.length > 0 && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading"><div><span>{d("storesLabel")}</span><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></div></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={52} height={52} unoptimized/> : <span><Store size={24} aria-hidden="true"/></span>}<div><h3><a href={`/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="90px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
-        <ProductRail title={h("bestSellers")} products={bestSellers} soldOut={t.soldOut} viewAll={h("viewAll")}/>
+        <ProductRail id="best-sellers" title={h("bestSellers")} products={bestSellers} soldOut={t.soldOut} viewAll={h("viewAll")}/>
       </div>
 
       <section id="products" className="container discoveryLayout">
