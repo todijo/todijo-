@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useLocale } from "next-intl";
 
@@ -17,16 +17,25 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [trackHeight, setTrackHeight] = useState<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const draggedRef = useRef(false);
+  const slideRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const openerRef = useRef<HTMLButtonElement | null>(null);
 
   const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = "smooth") => {
     const track = trackRef.current;
     if (track) track.scrollTo({ left: index * track.clientWidth, behavior });
+  }, []);
+
+  const syncTrackHeight = useCallback((index: number) => {
+    requestAnimationFrame(() => {
+      const height = slideRefs.current[index]?.offsetHeight;
+      if (height) setTrackHeight(height);
+    });
   }, []);
 
   const closeGallery = useCallback(() => {
@@ -40,6 +49,8 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];
+
+  useEffect(() => { syncTrackHeight(selectedIndex); }, [cleanImages, selectedIndex, syncTrackHeight]);
 
   const showPrevious = useCallback(() => {
     if (cleanImages.length < 2) return;
@@ -97,6 +108,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         <div
           className="productMainImageTrack"
           ref={trackRef}
+          style={{ "--active-gallery-height": trackHeight ? `${trackHeight}px` : "auto" } as CSSProperties}
           onScroll={() => {
             if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
             scrollFrameRef.current = requestAnimationFrame(() => {
@@ -116,6 +128,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         >
           {cleanImages.map((image, index) => <button
             type="button"
+            ref={(element) => { slideRefs.current[index] = element; }}
             className={`productMainImageButton productMainImageSlide${index === selectedIndex ? " isActive" : ""}`}
             onClick={(event) => {
               if (draggedRef.current) { draggedRef.current = false; return; }
@@ -127,7 +140,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
             key={`main-${image}-${index}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="productMainImage productMainImageIntrinsic" src={image} alt={`${productName} — image ${index + 1}`} draggable={false}/>
+            <img className="productMainImage productMainImageIntrinsic" src={image} alt={`${productName} — image ${index + 1}`} draggable={false} onLoad={() => { if (index === selectedIndex) syncTrackHeight(index); }}/>
             <span className="productZoomHint">⛶ Agrandir</span>
           </button>)}
         </div>

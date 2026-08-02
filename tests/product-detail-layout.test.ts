@@ -95,7 +95,8 @@ test("Product Detail uses the shared mobile shell and a bounded natural gallery"
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
   assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
-  assert.match(css, /\.productMainImageSlide\{[^}]*height:clamp\(340px,52svh,520px\)/);
+  assert.match(css, /\.productMainImageSlide\{[^}]*height:auto/);
+  assert.match(css, /\.productMainImageSlide \.productMainImageIntrinsic\{[^}]*width:100%;height:auto;max-height:min\(56svh,480px\)/);
   assert.match(css, /\.productGalleryBack\{display:none!important\}/);
   assert.match(css, /\.productLightbox\{z-index:9999\}/);
 });
@@ -103,6 +104,8 @@ test("Product Detail uses the shared mobile shell and a bounded natural gallery"
 test("mobile gallery removes the shell gap and uses a horizontal snap track", async () => {
   const [gallery, css] = await Promise.all([readFile("app/product/[id]/ProductGallery.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
   assert.match(css, /@media\(max-width:860px\)\{[\s\S]*?\.productDetailShell\{margin-top:0;padding-top:0\}/);
+  assert.match(css, /\.productGallery\{top:auto;margin-top:0\}/);
+  assert.match(css, /\.productGalleryInteractive\{position:relative;top:auto;/);
   assert.match(css, /\.productMainImageTrack\{[^}]*display:flex;[^}]*overflow-x:auto;[^}]*scroll-snap-type:x mandatory/);
   assert.match(css, /touch-action:pan-y pinch-zoom/);
   assert.match(css, /\.productMainImageSlide\{[^}]*flex:0 0 100%;[^}]*scroll-snap-align:start;scroll-snap-stop:always/);
@@ -112,6 +115,8 @@ test("mobile gallery removes the shell gap and uses a horizontal snap track", as
   assert.match(gallery, /Math\.round\(track\.scrollLeft \/ track\.clientWidth\)/);
   assert.match(gallery, /onPointerDown=/);
   assert.match(gallery, /Math\.abs\(event\.clientX - start\.x\) > 12/);
+  assert.doesNotMatch(css, /height:clamp\(340px,52svh,520px\)/);
+  assert.match(css, /height:var\(--active-gallery-height,auto\);max-height:min\(56svh,480px\)/);
 });
 
 test("gallery index, counter, and thumbnails stay synchronized", async () => {
@@ -121,6 +126,8 @@ test("gallery index, counter, and thumbnails stay synchronized", async () => {
   assert.match(gallery, /index === selectedIndex \? " isActive" : ""/);
   assert.match(gallery, /setSelectedIndex\(index\); scrollToIndex\(index\)/);
   assert.match(gallery, /requestAnimationFrame\(\(\) => scrollToIndex\(0, "auto"\)\)/);
+  assert.match(gallery, /slideRefs\.current\[index\]\?\.offsetHeight/);
+  assert.match(gallery, /--active-gallery-height/);
 });
 
 test("mobile product sections remain contained while desktop composition is unchanged", async () => {
