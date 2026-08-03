@@ -14,6 +14,7 @@ import { readSession } from "@/lib/session";
 import { getTranslations } from "next-intl/server";
 import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
+import { categoryLabel } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -23,6 +24,7 @@ export default async function ProductPage({ params }: Props) {
   const market = await getTranslations("Marketplace");
   const productText = await getTranslations("Product");
   const detailText = await getTranslations("ProductDetail");
+  const categoryText = await getTranslations("Categories");
   const { id } = await params;
   const session = await readSession();
   const publicAccess = publicProductAccessWhere();
@@ -51,7 +53,7 @@ export default async function ProductPage({ params }: Props) {
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
       <article className="productDetailInfo">
         <Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link>
-        <div className="productTopMeta"><p className="dashboardBadge">{product.category}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
+        <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
         <h1>{product.name}</h1><ProductDetailPrice price={price} compareAtPrice={compare} currency={product.currency}/>
         <div className="productMobileSecondaryActions"><ShareButton title={product.name}/></div>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>

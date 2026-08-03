@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
 import ProductCardAction from "@/components/ProductCardAction";
 import { useTranslations } from "next-intl";
+import { categoryLabel } from "@/lib/categories";
 
 type Product = {
   id: string;
@@ -72,6 +73,7 @@ const tabs = [
 
 export default function StoreExperience({ store }: Props) {
   const common = useTranslations("Common"); const market = useTranslations("Marketplace"); const seller = useTranslations("Seller"); const productText = useTranslations("Product");
+  const categoryText = useTranslations("Categories");
   const [activeTab, setActiveTab] = useState("products");
   const [followed, setFollowed] = useState(false);
   const [query, setQuery] = useState("");
@@ -156,7 +158,7 @@ export default function StoreExperience({ store }: Props) {
                   <div className="productBadges">{discount && <span className="saleBadge">-{discount}%</span>}<span className="conditionBadge">{product.condition}</span></div>
                   <ProductCardWishlist productId={product.id} />
                 </a>
-                <div className="premiumProductBody"><span className="productCategory">{product.category}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.isGenerallyAvailable ? "stockDot in" : "stockDot out"}>{product.isGenerallyAvailable ? common("available") : common("soldOut")}</span></div><ProductCardAction className="premiumProductAction" product={{ ...product, price, image: product.images[0], storeName: store.name, storeSlug: store.slug }}/></div>
+                <div className="premiumProductBody"><span className="productCategory">{categoryLabel(product.category, (key) => categoryText(key))}</span><a href={`/product/${product.id}`}><h3>{product.name}</h3></a><div className="premiumProductFooter"><div><strong>{price.toFixed(2)} {product.currency}</strong>{oldPrice && <del>{oldPrice.toFixed(2)} {product.currency}</del>}</div><span className={product.isGenerallyAvailable ? "stockDot in" : "stockDot out"}>{product.isGenerallyAvailable ? common("available") : common("soldOut")}</span></div><ProductCardAction className="premiumProductAction" product={{ ...product, price, image: product.images[0], storeName: store.name, storeSlug: store.slug }}/></div>
               </article>;
             })}</div>}
           </section>}

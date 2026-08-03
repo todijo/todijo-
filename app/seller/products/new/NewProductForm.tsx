@@ -11,14 +11,11 @@ import VariantImageManager, { type VariantImageAssignment } from "@/components/V
 import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
 import { productStockForForm } from "@/lib/product-variant-form";
 import { useToast } from "@/components/ToastProvider";
-
-const categories = [
-  ["Mode", "fashion"], ["Électronique", "electronics"], ["Maison", "home"], ["Beauté", "beauty"], ["Sports", "sports"],
-  ["Livres", "books"], ["Enfants", "children"], ["Auto", "auto"], ["Artisanat", "crafts"], ["Autre", "other"],
-] as const;
+import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
 export default function NewProductForm({ currency, productCount, productLimit }: { currency: string; productCount: number; productLimit: number | null }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
+  const categoryText = useTranslations("Categories");
   const { showToast } = useToast();
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -96,7 +93,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
 
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
           <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("category")} htmlFor="category" required><select id="category" name="category" required defaultValue=""><option value="" disabled>{t("chooseCategory")}</option>{categories.map(([value, key]) => <option key={value} value={value}>{t(`categories.${key}`)}</option>)}</select></SellerFormField>
+            <SellerFormField label={t("category")} htmlFor="category" required><select id="category" name="category" required defaultValue=""><option value="" disabled>{t("chooseCategory")}</option>{PRODUCT_CATEGORIES.map(({ value }) => <option key={value} value={value}>{categoryLabel(value, (key) => categoryText(key))}</option>)}</select></SellerFormField>
             <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
           </div>
         </SellerSection>

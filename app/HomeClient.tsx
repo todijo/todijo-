@@ -15,6 +15,7 @@ import ProductCardAction from "@/components/ProductCardAction";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
 import { EmptyState } from "@/components/FeedbackState";
 import { clearMarketplaceFilters, marketplaceUrl, type MarketplaceFilters, type MarketplaceSort } from "@/lib/marketplace-search";
+import { categoryKey, categoryLabel } from "@/lib/categories";
 
 type MarketplaceProduct = {
   id: string;
@@ -88,6 +89,8 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const c = useTranslations("Common");
   const h = useTranslations("HomeHeader");
   const d = useTranslations("HomeDiscovery");
+  const categoryText = useTranslations("Categories");
+  const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
   const t = { dir: ["ar", "ku"].includes(activeLocale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
@@ -145,7 +148,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
           <form className="marketTopSearch" onSubmit={submit}>
             <span aria-hidden>⌕</span>
             <label className="srOnly" htmlFor="market-category">{h("searchCategory")}</label>
-            <select id="market-category" value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">{t.all}</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select>
+            <select id="market-category" value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">{t.all}</option>{categories.map((category) => <option key={category} value={category}>{displayCategory(category)}</option>)}</select>
             <label className="srOnly" htmlFor="desktop-market-search">{t.search}</label>
             <input id="desktop-market-search" type="search" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
             {filters.q ? <button className="marketSearchClear" type="button" onClick={() => { setFilters({ ...filters, q: "" }); document.getElementById("desktop-market-search")?.focus(); }} aria-label={`${c("remove")}: ${filters.q}`}><X size={18} aria-hidden="true"/></button> : null}
@@ -162,7 +165,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         </div>
         <nav className="marketSecondaryNav" aria-label={h("categoryNavigation")}><div className="marketSecondaryInner">
           <a className="marketAllCategories" href="#categories"><Menu size={18} aria-hidden="true"/>{t.categories}</a>
-          {categories.slice(0, 5).map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}>{category}</button>)}
+          {categories.slice(0, 5).map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}>{displayCategory(category)}</button>)}
           <a href="#products">{h("deals")}</a><a href={buildUrl({ ...filters, sort: "newest" })}>{h("newArrivals")}</a><a href="#products">{h("bestSellers")}</a><a className="marketSellLink" href={`/${activeLocale}/register?role=seller`}>{t.sell}</a>
         </div></nav>
       </header>
@@ -183,7 +186,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
               </a>)}
             </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
               <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>
-              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><Package size={18} aria-hidden="true"/>{category}</button>)}
+              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><Package size={18} aria-hidden="true"/>{displayCategory(category)}</button>)}
             </div> : <div className="heroMarketplaceFallback"><Store size={54} aria-hidden="true"/><strong>Todijo Marketplace</strong><span>{h("marketplaceVisual")}</span></div>}
           </div>
         </div>
@@ -193,13 +196,13 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         <div className="sectionTitle"><h2>{t.categories}</h2></div>
         <div className="categoryStrip">
           <button className={!filters.category ? "active" : ""} onClick={() => chooseCategory("")}><span>🛍️</span>{t.all}</button>
-          {categories.map((name) => <button className={filters.category === name ? "active" : ""} key={name} onClick={() => chooseCategory(name)}><span>{categoryIcons[name.toLowerCase()] || "📦"}</span>{name}</button>)}
+          {categories.map((name) => <button className={filters.category === name ? "active" : ""} key={name} onClick={() => chooseCategory(name)}><span>{categoryIcons[categoryKey(name) ?? name.toLowerCase()] || "📦"}</span>{displayCategory(name)}</button>)}
         </div>
       </section>
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>
-        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}><span className={`categoryShowcaseIcon tone-${index % 4}`}><Package size={24} aria-hidden="true"/></span><strong>{category}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
+        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}><span className={`categoryShowcaseIcon tone-${index % 4}`}><Package size={24} aria-hidden="true"/></span><strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
       </section>}
 
       <div className="marketplaceDiscoverySections">
@@ -227,9 +230,9 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         </aside>
 
         <div className="resultsArea">
-          {activeCount > 0 && <div className="activeFilterChips" aria-label={t.filters}>{Object.entries(filters).filter(([key,value]) => value && !["q","sort"].includes(key)).map(([key,value]) => { const label = key === "availability" ? t.stock : String(value); return <a key={key} href={buildUrl({...filters,[key]:""})} aria-label={`${c("remove")}: ${label}`}>{label}<span aria-hidden="true">×</span></a>; })}<a className="clearAllChip" href={buildUrl(clearMarketplaceFilters(filters))}>{t.reset}</a></div>}
+          {activeCount > 0 && <div className="activeFilterChips" aria-label={t.filters}>{Object.entries(filters).filter(([key,value]) => value && !["q","sort"].includes(key)).map(([key,value]) => { const label = key === "availability" ? t.stock : key === "category" ? displayCategory(String(value)) : String(value); return <a key={key} href={buildUrl({...filters,[key]:""})} aria-label={`${c("remove")}: ${label}`}>{label}<span aria-hidden="true">×</span></a>; })}<a className="clearAllChip" href={buildUrl(clearMarketplaceFilters(filters))}>{t.reset}</a></div>}
           <div className="resultsToolbar">
-            <div><button ref={filterTriggerRef} className="mobileFilterButton" type="button" aria-expanded={showFilters} aria-controls="filter-panel" onClick={() => setShowFilters(true)}><Menu size={18} aria-hidden="true"/> {t.filters}{activeCount ? ` (${activeCount})` : ""}</button><h2 tabIndex={-1}>{filters.q ? `${t.products}: “${filters.q}”` : filters.category ? `${t.products}: ${filters.category}` : t.products}</h2><span aria-live="polite">{total} {t.results}</span></div>
+            <div><button ref={filterTriggerRef} className="mobileFilterButton" type="button" aria-expanded={showFilters} aria-controls="filter-panel" onClick={() => setShowFilters(true)}><Menu size={18} aria-hidden="true"/> {t.filters}{activeCount ? ` (${activeCount})` : ""}</button><h2 tabIndex={-1}>{filters.q ? `${t.products}: “${filters.q}”` : filters.category ? `${t.products}: ${displayCategory(filters.category)}` : t.products}</h2><span aria-live="polite">{total} {t.results}</span></div>
             <select value={filters.sort} onChange={(e) => window.location.href = buildUrl({ ...filters, sort: e.target.value as MarketplaceSort })} aria-label={t.sort}>
               <option value="newest">{t.newest}</option><option value="oldest">{t.oldest}</option><option value="price-asc">{t.low}</option><option value="price-desc">{t.high}</option>
             </select>
