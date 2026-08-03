@@ -197,7 +197,17 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
             aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="productMainImage productMainImageIntrinsic" src={selectedImage} alt={`${productName} — image ${selectedIndex + 1}`} draggable={false} />
+            <img
+              key={selectedImage}
+              className="productMainImage productMainImageIntrinsic"
+              src={selectedImage}
+              alt={`${productName} — image ${selectedIndex + 1}`}
+              draggable={false}
+              onLoad={(event) => {
+                const image = event.currentTarget;
+                image.dataset.orientation = image.naturalWidth >= image.naturalHeight ? "landscape" : "portrait";
+              }}
+            />
             <span className="productZoomHint">⛶ Agrandir</span>
           </button>
         )}
