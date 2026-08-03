@@ -50,6 +50,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
           password,
           confirmPassword,
           turnstileToken,
+          locale,
         }),
       });
       const data: { error?: string; code?: string; role?: "CUSTOMER" | "SELLER" } = await response.json().catch(() => ({}));

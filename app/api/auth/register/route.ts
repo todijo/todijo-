@@ -4,12 +4,18 @@ import { registrationPersistenceData, validateRegistrationInput } from "@/lib/au
 import { prisma } from "@/lib/prisma";
 import { createSession, readSession } from "@/lib/session";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { issueEmailVerificationToken } from "@/lib/auth-tokens";
+import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email/send";
+import { safeEmailError } from "@/lib/email/config";
+import { defaultLocale, isLocale } from "@/i18n/config";
 
 export async function POST(request: Request) {
   try {
     if (await readSession()) return NextResponse.json({ error: "Une session est déjà active." }, { status: 409 });
 
-    const validation = validateRegistrationInput(await request.json());
+    const body = await request.json();
+    const locale = isLocale(body?.locale) ? body.locale : defaultLocale;
+    const validation = validateRegistrationInput(body);
     if (!validation.ok) {
       const error = validation.code === "PASSWORD_MISMATCH"
         ? "Les mots de passe ne correspondent pas."
@@ -33,8 +39,21 @@ export async function POST(request: Request) {
         ...registrationPersistenceData(input),
         passwordHash: await hash(input.password, 12),
       },
-      select: { id: true, role: true },
+      select: { id: true, role: true, email: true, firstName: true },
     });
+
+    try {
+      const rawToken = await issueEmailVerificationToken(user.id);
+      const deliveries = await Promise.allSettled([
+        sendWelcomeEmail({ to: user.email, firstName: user.firstName, locale }),
+        ...(rawToken ? [sendVerificationEmail({ to: user.email, firstName: user.firstName, locale, rawToken })] : []),
+      ]);
+      for (const delivery of deliveries) {
+        if (delivery.status === "rejected") console.error("Registration email delivery failed.", safeEmailError(delivery.reason));
+      }
+    } catch (emailError) {
+      console.error("Registration email preparation failed.", safeEmailError(emailError));
+    }
 
     await createSession({ userId: user.id, role: user.role });
     return NextResponse.json({ ok: true, role: user.role });
