@@ -26,7 +26,7 @@ export default function SellerDashboardLayout({ children, locale, storeSlug, fir
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={items} mobileMenuItems={mobileMenuItems} homeHref={`/${locale}`} logoutLabel={labels.logout} menuLabel={labels.menu} collapseLabel={labels.collapse} seller/>
     <div className="premiumDashboardMain">
-      <DashboardHeader firstName={firstName} lastName={lastName} eyebrow={labels.eyebrow} homeHref={`/${locale}`} notificationLabel={labels.notifications}/>
+      <DashboardHeader firstName={firstName} lastName={lastName} eyebrow={labels.eyebrow} homeHref={`/${locale}`} notificationHref={`/${locale}/seller/store-settings#notifications`} notificationLabel={labels.notifications}/>
       <div className="premiumDashboardContent sellerControlContent">{children}</div>
     </div>
   </main>;

@@ -477,6 +477,12 @@ h1 {
 .productAvailability{min-height:24px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}.productAvailability small{color:var(--muted)}.lowStock{color:#9a5b06;font-weight:850}.cardCartButton{min-height:40px;padding:0 11px;border:0;border-radius:11px;background:#087653;color:#fff;display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:11px;font-weight:850;cursor:pointer;text-decoration:none}.cardCartButton:disabled{background:#dfe7e4;color:#6d7d77;cursor:not-allowed}.premiumProductAction{width:100%;margin-top:14px}.availabilityFilter{min-height:44px;grid-template-columns:auto 1fr!important;align-items:center}.availabilityFilter input{width:20px!important;height:20px}.activeFilterChips{margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px}.activeFilterChips a{min-height:34px;padding:0 10px;border:1px solid #cce4da;border-radius:999px;background:#eff8f4;color:#075f45;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800}.activeFilterChips .clearAllChip{border-color:#efd0d0;background:#fff7f7;color:#9c2424}
 @media(max-width:650px){.cardCartButton{width:100%;margin-top:10px}.cardBottom{align-items:stretch!important}.cardCartButton span{display:none}.cardChooseOptionsButton span{display:inline}}
 
+/* Dashboard Phase 1.3A accessibility and bidirectional containment */
+.sellerProductActions a,.sellerProductActions span{min-height:44px}
+.premiumEmptyState h1{margin:14px 0 6px;font-size:clamp(30px,4vw,44px)}
+@media(max-width:780px){.premiumMobileDrawer{left:auto;inset-inline-start:12px}}
+@media(max-width:480px){.premiumDashboardMobileNav a span{max-width:64px;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:anywhere}}
+
 /* Mobile marketplace containment and buyer-first polish */
 .cartHeaderLink,.homeCartLink{position:relative;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;isolation:isolate}
 .cartLinkIcon{flex:0 0 auto;pointer-events:none}

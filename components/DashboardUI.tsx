@@ -17,9 +17,9 @@ export function DashboardSidebar({ items, mobileMenuItems = items, homeHref, log
   </>;
 }
 
-export function DashboardHeader({ firstName, lastName, eyebrow, homeHref, notificationLabel, notificationCount = 0 }: { firstName: string; lastName: string; eyebrow: string; homeHref: string; notificationLabel: string; notificationCount?: number }) {
+export function DashboardHeader({ firstName, lastName, eyebrow, homeHref, notificationHref, notificationLabel, notificationCount = 0 }: { firstName: string; lastName: string; eyebrow: string; homeHref: string; notificationHref: string; notificationLabel: string; notificationCount?: number }) {
   const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
-  return <header className="premiumDashboardHeader"><TodijoLogo href={homeHref}/><div className="premiumDashboardIdentity"><span>{eyebrow}</span><strong>{firstName} {lastName}</strong></div><div className="premiumHeaderTools"><Link className="premiumNotificationButton" href="/dashboard#notifications" aria-label={`${notificationLabel}${notificationCount ? ` (${notificationCount})` : ""}`}><Bell size={20}/>{notificationCount > 0 && <b>{notificationCount}</b>}</Link><div className="premiumAvatar" aria-hidden="true">{initials}</div></div></header>;
+  return <header className="premiumDashboardHeader"><TodijoLogo href={homeHref}/><div className="premiumDashboardIdentity"><span>{eyebrow}</span><strong>{firstName} {lastName}</strong></div><div className="premiumHeaderTools"><Link className="premiumNotificationButton" href={notificationHref} aria-label={`${notificationLabel}${notificationCount ? ` (${notificationCount})` : ""}`}><Bell size={20} aria-hidden="true"/>{notificationCount > 0 && <b>{notificationCount}</b>}</Link><div className="premiumAvatar" aria-hidden="true">{initials}</div></div></header>;
 }
 
 export function DashboardStatCard({ label, value, hint, href, icon: Icon, tone = "green" }: { label: string; value: string | number; hint?: string; href?: string; icon: ComponentType<LucideProps>; tone?: "green" | "mint" | "blue" | "amber" }) {
@@ -35,8 +35,9 @@ export function DashboardQuickAction({ label, description, href, icon: Icon, pri
   return <Link className={`premiumQuickAction${primary ? " isPrimary" : ""}`} href={href}><span><Icon size={21} aria-hidden="true"/></span><div><strong>{label}</strong>{description && <small>{description}</small>}</div></Link>;
 }
 
-export function DashboardEmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
-  return <div className="premiumEmptyState"><span><PackageOpen size={30} aria-hidden="true"/></span><h3>{title}</h3><p>{description}</p>{action}</div>;
+export function DashboardEmptyState({ title, description, action, headingLevel = "h3" }: { title: string; description: string; action?: ReactNode; headingLevel?: "h1" | "h2" | "h3" }) {
+  const Heading = headingLevel;
+  return <div className="premiumEmptyState"><span><PackageOpen size={30} aria-hidden="true"/></span><Heading>{title}</Heading><p>{description}</p>{action}</div>;
 }
 
 export function DashboardStatusBadge({ label, status }: { label: string; status: string }) {
