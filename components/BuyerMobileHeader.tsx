@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import BuyerMobileNavigation from "@/components/BuyerMobileNavigation";
 import CartLink from "@/components/CartLink";
 import TodijoLogo from "@/components/TodijoLogo";
+import { localizedPath, navigationBackFallback, pathWithoutLocale } from "@/lib/navigation";
 
 export default function BuyerMobileHeader({ accountName: initialAccountName }: { accountName?: string | null }) {
   const locale = useLocale();
@@ -38,20 +39,20 @@ export default function BuyerMobileHeader({ accountName: initialAccountName }: {
     return () => { window.removeEventListener("hashchange", updateLocationSuffix); window.removeEventListener("popstate", updateLocationSuffix); };
   }, [pathname]);
 
-  const homeHref = `/${locale}`;
-  const isRootHome = pathname === "/" || pathname === homeHref;
+  const homeHref = localizedPath(locale);
+  const isRootHome = pathWithoutLocale(pathname) === "/";
   const showBack = !isRootHome || Boolean(homeLocationSuffix);
 
   function goBack() {
     const sameOriginReferrer = (() => { try { return Boolean(document.referrer) && new URL(document.referrer).origin === window.location.origin; } catch { return false; } })();
     if (window.history.length > 1 && sameOriginReferrer) router.back();
-    else router.push(homeHref);
+    else router.push(navigationBackFallback(pathname, locale));
   }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
     const value = query.trim();
-    window.location.href = value ? `/${locale}?q=${encodeURIComponent(value)}#products` : `/${locale}#products`;
+    window.location.href = value ? `${homeHref}?q=${encodeURIComponent(value)}#products` : `${homeHref}#products`;
   }
 
   return <header className="buyerMobileShellHeader">
@@ -60,7 +61,7 @@ export default function BuyerMobileHeader({ accountName: initialAccountName }: {
         {showBack ? <button className="buyerMobileBackButton" type="button" onClick={goBack} aria-label={common("back")}><ArrowLeft size={22} aria-hidden="true"/></button> : null}
         <BuyerMobileNavigation accountName={accountName}/>
       </div>
-      <TodijoLogo href={`/${locale}`} inverse/>
+      <TodijoLogo href={homeHref} inverse/>
       <CartLink label={common("cart")} className="buyerMobileShellCart"/>
     </div>
     <form className="buyerMobileShellSearch" role="search" onSubmit={submit}>

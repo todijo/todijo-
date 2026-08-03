@@ -15,7 +15,7 @@ const css = read("app/globals.css");
 
 test("buyer routes share one mobile header with menu, logo, cart, and search", () => {
   assert.match(header, /<BuyerMobileNavigation accountName=\{accountName\}/);
-  assert.match(header, /<TodijoLogo href=\{`\/\$\{locale\}`\} inverse/);
+  assert.match(header, /<TodijoLogo href=\{homeHref\} inverse/);
   assert.match(header, /<CartLink label=\{common\("cart"\)\} className="buyerMobileShellCart"/);
   assert.match(header, /className="buyerMobileShellSearch" role="search"/);
   assert.match(home, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
@@ -33,16 +33,16 @@ test("shared drawer and live bottom navigation remain accessible across routes",
   assert.match(navigation, /triggerRef\.current\?\.focus\(\)/);
   assert.match(navigation, /document\.body\.style\.overflow = "hidden"/);
   assert.match(navigation, /totalItems > 0/);
-  assert.match(navigation, /showBottomNavigation = !pathname\.startsWith\("\/checkout"\)/);
+  assert.match(navigation, /showBottomNavigation = !currentPath\.startsWith\("\/checkout"\)/);
   assert.match(navigation, /href=\{`\$\{homeHref\}#categories`\}/);
 });
 
 test("shared mobile header shows locale-safe Back navigation only away from Home", () => {
-  assert.match(header, /const isRootHome = pathname === "\/" \|\| pathname === homeHref/);
+  assert.match(header, /const isRootHome = pathWithoutLocale\(pathname\) === "\/"/);
   assert.match(header, /const showBack = !isRootHome \|\| Boolean\(homeLocationSuffix\)/);
   assert.match(header, /className="buyerMobileBackButton"[^>]*onClick=\{goBack\}[^>]*aria-label=\{common\("back"\)\}/);
   assert.match(header, /window\.history\.length > 1 && sameOriginReferrer/);
-  assert.match(header, /else router\.push\(homeHref\)/);
+  assert.match(header, /else router\.push\(navigationBackFallback\(pathname, locale\)\)/);
   assert.match(header, /<BuyerMobileNavigation accountName=\{accountName\}\/>/);
 });
 

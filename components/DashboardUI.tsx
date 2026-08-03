@@ -9,11 +9,11 @@ export function DashboardSidebar({ items, mobileMenuItems = items, homeHref, log
   return <>
     <aside className={`premiumDashboardSidebar${seller ? " isSeller" : ""}`}>
       <TodijoLogo href={homeHref} inverse={seller} />
-      <details className="premiumSidebarDetails" open><summary aria-label={collapseLabel}><PanelLeftClose size={18}/><span>{collapseLabel}</span></summary><nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={19} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
+      <details className="premiumSidebarDetails" open><summary aria-label={collapseLabel}><PanelLeftClose size={18}/><span>{collapseLabel}</span></summary><nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={19} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
       <form action="/api/auth/logout" method="post"><button type="submit"><LogOut size={19} aria-hidden="true"/><span>{logoutLabel}</span></button></form>
     </aside>
     <details className="premiumMobileDrawer"><summary><Menu size={20}/><span>{menuLabel}</span></summary><nav aria-label={mobileMenuItems[0]?.label}>{mobileMenuItems.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
-    <nav className={`premiumDashboardMobileNav${seller ? " isSeller" : ""}`} aria-label={items[0]?.label}>{items.slice(0, 5).map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav>
+    <nav className={`premiumDashboardMobileNav${seller ? " isSeller" : ""}`} aria-label={items[0]?.label}>{items.slice(0, 5).map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav>
   </>;
 }
 

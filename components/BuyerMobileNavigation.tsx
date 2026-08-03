@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useCart } from "@/components/CartProvider";
+import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
   const locale = useLocale();
@@ -52,25 +53,30 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
     return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", onKeyDown); };
   }, [closeDrawer, open]);
 
-  const homeHref = `/${locale}`;
-  const accountHref = accountName ? "/dashboard" : "/login";
+  const homeHref = localizedPath(locale);
+  const accountHref = localizedPath(locale, accountName ? "/dashboard" : "/login");
   const focusSearch = () => requestAnimationFrame(() => document.getElementById("market-search")?.focus());
-  const isHome = (pathname === "/" || pathname === homeHref) && !hash;
-  const showBottomNavigation = !pathname.startsWith("/checkout");
+  const currentPath = pathWithoutLocale(pathname);
+  const isHome = isNavigationActive(pathname, homeHref) && !hash;
+  const showBottomNavigation = !currentPath.startsWith("/checkout");
+  const ordersHref = localizedPath(locale, "/account/orders");
+  const messagesHref = localizedPath(locale, "/messages");
+  const cartHref = localizedPath(locale, "/cart");
+  const sellerHref = `${localizedPath(locale, "/register")}?role=seller`;
 
   const drawer = open && typeof document !== "undefined" ? createPortal(<div className="buyerMobileDrawerLayer">
     <button className="buyerMobileDrawerBackdrop" type="button" onClick={closeDrawer} aria-label={product("close")} />
     <aside id="buyer-mobile-drawer" className="buyerMobileDrawer" ref={drawerRef} role="dialog" aria-modal="true" aria-label={header("mobileNavigation")}>
       <div className="buyerMobileDrawerHeader"><div><UserRound size={22} aria-hidden="true"/><span><small>{header("hello")}</small><strong>{accountName ?? common("account")}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
       <nav aria-label={header("mobileNavigation")}>
-        <a href={homeHref} onClick={closeDrawer}><Home size={20} aria-hidden="true"/>{common("home")}</a>
-        <a href={`${homeHref}#categories`} onClick={closeDrawer}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</a>
-        <a href={`/?sort=newest#products`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("newArrivals")}</a>
+        <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>
+        <a href={`${homeHref}#categories`} onClick={closeDrawer} className={isHome && hash === "#categories" ? "active" : ""} aria-current={isHome && hash === "#categories" ? "page" : undefined}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</a>
+        <a href={`${homeHref}?sort=newest#products`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("newArrivals")}</a>
         <a href={`${homeHref}#best-sellers`} onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
-        <a href={`/${locale}/account/orders`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
-        <a href="/messages" onClick={closeDrawer}><MessageCircle size={20} aria-hidden="true"/>{common("messages")}</a>
-        <a href={accountHref} onClick={closeDrawer}><UserRound size={20} aria-hidden="true"/>{common("account")}</a>
-        <a href="/register?role=seller" onClick={closeDrawer}><Store size={20} aria-hidden="true"/>{common("sell")}</a>
+        <a href={ordersHref} onClick={closeDrawer} className={isNavigationActive(pathname, ordersHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, ordersHref, true) ? "page" : undefined}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
+        <a href={messagesHref} onClick={closeDrawer} className={isNavigationActive(pathname, messagesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, messagesHref, true) ? "page" : undefined}><MessageCircle size={20} aria-hidden="true"/>{common("messages")}</a>
+        <a href={accountHref} onClick={closeDrawer} className={isNavigationActive(pathname, accountHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, accountHref, true) ? "page" : undefined}><UserRound size={20} aria-hidden="true"/>{common("account")}</a>
+        <a href={sellerHref} onClick={closeDrawer}><Store size={20} aria-hidden="true"/>{common("sell")}</a>
       </nav>
       <LanguageSwitcher className="buyerMobileDrawerLanguage"/>
       {accountName ? <form action="/api/auth/logout" method="post"><button type="submit">{common("logout")}</button></form> : null}
@@ -84,8 +90,8 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
       <a className={isHome ? "active" : ""} href={homeHref} aria-current={isHome ? "page" : undefined}><Home size={21} aria-hidden="true"/><span>{common("home")}</span></a>
       <a className={isHome && hash === "#categories" ? "active" : ""} href={`${homeHref}#categories`}><Grid2X2 size={21} aria-hidden="true"/><span>{common("categories")}</span></a>
       <a className={isHome && hash === "#market-search" ? "active" : ""} href="#market-search" onClick={focusSearch}><Search size={21} aria-hidden="true"/><span>{common("search")}</span></a>
-      <Link className={pathname === "/cart" ? "active" : ""} href="/cart"><ShoppingCart size={21} aria-hidden="true"/><span>{common("cart")}</span>{totalItems > 0 ? <strong>{totalItems > 99 ? "99+" : totalItems}</strong> : null}</Link>
-      <a className={["/login", "/dashboard"].includes(pathname) ? "active" : ""} href={accountHref}><UserRound size={21} aria-hidden="true"/><span>{common("account")}</span></a>
+      <Link className={isNavigationActive(pathname, cartHref) ? "active" : ""} href={cartHref} aria-current={isNavigationActive(pathname, cartHref) ? "page" : undefined}><ShoppingCart size={21} aria-hidden="true"/><span>{common("cart")}</span>{totalItems > 0 ? <strong>{totalItems > 99 ? "99+" : totalItems}</strong> : null}</Link>
+      <a className={isNavigationActive(pathname, accountHref, true) ? "active" : ""} href={accountHref} aria-current={isNavigationActive(pathname, accountHref, true) ? "page" : undefined}><UserRound size={21} aria-hidden="true"/><span>{common("account")}</span></a>
     </nav> : null}
   </>;
 }

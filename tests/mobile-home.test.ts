@@ -12,7 +12,7 @@ const cardAction = readFileSync(join(root, "components", "ProductCardAction.tsx"
 const styles = readFileSync(join(root, "app", "globals.css"), "utf8");
 
 test("mobile header has a direct cart link, menu trigger, and second-row search", () => {
-  assert.match(cartLinkSource, /<Link className=\{className\} href="\/cart"/);
+  assert.match(cartLinkSource, /<Link className=\{className\} href=\{localizedPath\(locale, "\/cart"\)\}/);
   assert.match(cartLinkSource, /<ShoppingCart className="cartLinkIcon"/);
   assert.match(homeSource, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(mobileHeader, /className="buyerMobileShellSearch"/);

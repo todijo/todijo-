@@ -752,3 +752,7 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
 .premiumDashboardHeader>.todijoBrand{display:none}.premiumDashboardIdentity{min-width:0;flex:1}.premiumDashboardIdentity span,.premiumDashboardIdentity strong{display:block}.premiumDashboardIdentity span{color:var(--dash-muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.premiumDashboardIdentity strong{margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:780px){.premiumDashboardHeader{position:sticky;z-index:70;top:0}.premiumDashboardHeader>.todijoBrand{min-width:44px;min-height:44px;display:inline-flex}.premiumDashboardHeader>.todijoBrand .todijoBrandMark{width:34px;height:34px;flex:0 0 34px}.premiumDashboardHeader>.todijoBrand .todijoWordmark{font-size:21px}.premiumDashboardIdentity{margin-inline-start:auto}}
 @media(max-width:480px){.premiumDashboardIdentity{display:none}.premiumDashboardHeader{gap:10px}.premiumHeaderTools{margin-inline-start:auto}}
+
+/* Active navigation is identifiable without relying on color alone. */
+.buyerMobileDrawer nav a.active{background:#eaf7f2;color:#075f45;box-shadow:inset 4px 0 0 #087653}
+html[dir="rtl"] .buyerMobileDrawer nav a.active{box-shadow:inset -4px 0 0 #087653}
