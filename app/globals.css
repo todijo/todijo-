@@ -483,6 +483,11 @@ h1 {
 @media(max-width:780px){.premiumMobileDrawer{left:auto;inset-inline-start:12px}}
 @media(max-width:480px){.premiumDashboardMobileNav a span{max-width:64px;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:anywhere}}
 
+/* Search and filters Phase 1.3B */
+.filterClose,.filterBackdrop{display:none}.filterValidation{margin:0;padding:9px 11px;border-radius:10px;background:#fff4e5;color:#8a4b08;font-size:12px;font-weight:800}.resultsToolbar h2{max-width:min(680px,70vw);overflow-wrap:anywhere}.activeFilterChips a{min-height:44px;overflow-wrap:anywhere}.pagination a{min-height:44px;display:inline-flex;align-items:center}.pagination a:last-child{justify-self:end}.filterForm input,.filterForm button,.filterForm a,.resultsToolbar select{min-height:44px}
+@media(max-width:1000px){.filterBackdrop{position:fixed;z-index:1040;inset:0;display:block;border:0;background:rgba(3,22,16,.56)}.filterPanel.show{position:fixed;z-index:1050;inset-block:0;inset-inline-start:0;width:min(88vw,360px);padding:calc(18px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));overflow-y:auto;border:0;border-radius:0;box-shadow:24px 0 60px rgba(0,0,0,.26)}.filterClose{width:44px;height:44px;margin-inline-start:auto;padding:0;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--green-dark);display:grid;place-items:center}.filterHeading{gap:10px}.filterHeading h2{flex:1}.filterForm{padding-bottom:calc(72px + env(safe-area-inset-bottom))}.filterApply{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));box-shadow:0 8px 22px rgba(3,51,37,.2)}.mobileFilterButton{align-items:center;gap:7px}.resultsToolbar h2{max-width:100%}}
+@media(prefers-color-scheme:dark){.filterPanel.show,.filterClose{background:var(--dash-surface);color:var(--dash-text)}.filterValidation{background:#3b2c16;color:#f6cd8b}.activeFilterChips a{background:#123b2d;color:#a5e8cd;border-color:#2c6650}.activeFilterChips .clearAllChip{background:#421f24;color:#ffc5ca;border-color:#744047}}
+
 /* Mobile marketplace containment and buyer-first polish */
 .cartHeaderLink,.homeCartLink{position:relative;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;isolation:isolate}
 .cartLinkIcon{flex:0 0 auto;pointer-events:none}

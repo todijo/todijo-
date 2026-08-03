@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import HomeClient from "./HomeClient";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, productGenerallyAvailableWhere, resolveProductAvailability } from "@/lib/product-availability";
+import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -28,22 +29,12 @@ function serializeProduct(p: ProductRow) {
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-function one(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
-}
-
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const q = one(params.q).trim();
-  const category = one(params.category).trim();
-  const condition = one(params.condition).trim();
-  const city = one(params.city).trim();
-  const country = one(params.country).trim();
-  const sort = one(params.sort) || "newest";
-  const minPrice = Number(one(params.minPrice));
-  const maxPrice = Number(one(params.maxPrice));
-  const availability = one(params.availability);
-  const page = Math.max(1, Number(one(params.page)) || 1);
+  const { filters, page, invalidPriceRange } = normalizeMarketplaceSearch(params);
+  const { q, category, condition, city, country, sort, availability } = filters;
+  const minPrice = Number(filters.minPrice);
+  const maxPrice = Number(filters.maxPrice);
   const now = new Date();
   const publicProductAccess = publicProductAccessWhere(now);
   const publicStoreAccess = publicStoreAccessWhere(now);
@@ -54,8 +45,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     ...(category ? { category } : {}),
     ...(condition ? { condition } : {}),
     ...(availability === "in-stock" ? { AND: [productGenerallyAvailableWhere()] } : {}),
-    ...(Number.isFinite(minPrice) && minPrice >= 0 ? { price: { gte: minPrice } } : {}),
-    ...(Number.isFinite(maxPrice) && maxPrice > 0
+    ...(!invalidPriceRange && filters.minPrice ? { price: { gte: minPrice } } : {}),
+    ...(!invalidPriceRange && filters.maxPrice
       ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } }
       : {}),
     ...(city || country
@@ -84,7 +75,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       : {}),
   };
 
-  const orderBy: Prisma.ProductOrderByWithRelationInput =
+  const primaryOrder: Prisma.ProductOrderByWithRelationInput =
     sort === "price-asc"
       ? { price: "asc" }
       : sort === "price-desc"
@@ -92,8 +83,9 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         : sort === "oldest"
           ? { createdAt: "asc" }
           : { createdAt: "desc" };
+  const orderBy: Prisma.ProductOrderByWithRelationInput[] = [primaryOrder, { id: "asc" }];
 
-  const [rows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows] = await Promise.all([
+  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy,
@@ -122,6 +114,11 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
     }),
   ]);
+  const availablePages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const normalizedPage = Math.min(page, availablePages);
+  const rows = normalizedPage === page ? initialRows : await prisma.product.findMany({
+    where, orderBy, skip: (normalizedPage - 1) * PAGE_SIZE, take: PAGE_SIZE, select: productSelect,
+  });
 
   const bestSellerIds = bestSellerCounts.map((item) => item.productId);
   const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED", ...publicProductAccess }, select: productSelect }) : [];
@@ -137,9 +134,9 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: product.name, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
-      page={page}
+      page={normalizedPage}
       pageSize={PAGE_SIZE}
-      initialFilters={{ q, category, condition, city, country, sort, minPrice: one(params.minPrice), maxPrice: one(params.maxPrice), availability }}
+      initialFilters={filters}
     />
   );
 }

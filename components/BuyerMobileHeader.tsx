@@ -32,7 +32,10 @@ export default function BuyerMobileHeader({ accountName: initialAccountName }: {
   const accountName = initialAccountName ?? fetchedAccountName;
 
   useEffect(() => {
-    const updateLocationSuffix = () => setHomeLocationSuffix(`${window.location.search}${window.location.hash}`);
+    const updateLocationSuffix = () => {
+      setHomeLocationSuffix(`${window.location.search}${window.location.hash}`);
+      setQuery(new URLSearchParams(window.location.search).get("q") ?? "");
+    };
     updateLocationSuffix();
     window.addEventListener("hashchange", updateLocationSuffix);
     window.addEventListener("popstate", updateLocationSuffix);

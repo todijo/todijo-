@@ -19,6 +19,10 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
   const homeHref = localizedPath(locale);
 
   useEffect(() => {
+    setQuery(new URLSearchParams(window.location.search).get("q") ?? "");
+  }, [pathname]);
+
+  useEffect(() => {
     let active = true;
     fetch("/api/auth/session", { cache: "no-store" })
       .then((response) => response.json())
@@ -31,7 +35,8 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (query.trim()) window.location.href = `${homeHref}?q=${encodeURIComponent(query.trim())}#products`;
+    const value = query.trim();
+    window.location.href = value ? `${homeHref}?q=${encodeURIComponent(value)}#products` : `${homeHref}#products`;
   }
 
   return <>
