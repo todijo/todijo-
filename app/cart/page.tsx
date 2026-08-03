@@ -6,6 +6,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { useCart } from "@/components/CartProvider";
 import { useLocale, useTranslations } from "next-intl";
 import { formatCurrency } from "@/lib/formatters";
+import CartRecommendations from "@/components/CartRecommendations";
 
 export default function CartPage() {
   const { items, subtotal, currency, updateQuantity, removeItem, clearCart } = useCart();
@@ -75,6 +76,7 @@ export default function CartPage() {
               <p>{t("secure")}</p>
               <Link href="/">← {t("continue")}</Link>
             </aside>
+            <CartRecommendations productIds={items.map((item) => item.id)}/>
           </div>
         )}
       </section>

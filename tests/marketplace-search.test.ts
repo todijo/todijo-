@@ -30,12 +30,13 @@ test("search UI uses one locale-safe URL builder, accessible mobile dialog, and 
   const home = readFileSync("app/HomeClient.tsx", "utf8");
   const server = readFileSync("app/page.tsx", "utf8");
   const mobile = readFileSync("components/BuyerMobileHeader.tsx", "utf8");
+  const productCard = readFileSync("components/MarketplaceProductCard.tsx", "utf8");
   assert.match(home, /marketplaceUrl\(activeLocale, nextFilters, nextPage\)/);
   assert.match(home, /role=\{showFilters \? "dialog" : undefined\}/);
   assert.match(home, /aria-modal=\{showFilters \|\| undefined\}/);
   assert.match(home, /event\.key === "Escape"/);
   assert.match(home, /filterTriggerRef\.current\?\.focus\(\)/);
-  assert.match(home, /href=\{`\/\$\{locale\}\/product\/\$\{product\.id\}`\}/);
+  assert.match(productCard, /href=\{`\/\$\{locale\}\/product\/\$\{product\.id\}`\}/);
   assert.match(mobile, /new URLSearchParams\(window\.location\.search\)\.get\("q"\)/);
   assert.match(server, /const orderBy:[^=]+ = \[primaryOrder, \{ id: "asc" \}\]/);
   assert.match(server, /const normalizedPage = Math\.min\(page, availablePages\)/);

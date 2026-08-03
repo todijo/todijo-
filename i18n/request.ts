@@ -11,6 +11,7 @@ export default getRequestConfig(async () => {
   messages.Auth = (await import(`../messages/auth/${locale}.json`)).default;
   messages.Connect = (await import(`../messages/connect/${locale}.json`)).default;
   messages.Categories = (await import(`../messages/categories/${locale}.json`)).default;
+  messages.CartRecommendations = (await import(`../messages/cart-recommendations/${locale}.json`)).default;
   messages.DashboardPremium = (await import(`../messages/dashboard-premium/${locale}.json`)).default;
   messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
   messages.SellerDashboard = (await import(`../messages/seller-dashboard/${locale}.json`)).default;
