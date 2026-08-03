@@ -65,11 +65,18 @@ test("registration remains successful when email preparation or SMTP delivery fa
 
 test("shared Todijo email template escapes names and URLs and includes text fallback", () => {
   assert.equal(escapeEmailHtml('<script>"x"</script>'), "&lt;script&gt;&quot;x&quot;&lt;/script&gt;");
-  const message = todijoEmailTemplate({ preview:"Preview",heading:"Hello <buyer>",greeting:"Hi A&B",body:"Body",ctaLabel:"Continue",ctaUrl:"https://todijo.com/?x=1&y=2",fallbackLabel:"Fallback",securityNote:"Security",supportLabel:"Support",copyright:"Copyright" });
+  const message = todijoEmailTemplate({ direction:"ltr",preview:"Preview",heading:"Hello <buyer>",greeting:"Hi A&B",body:"Body",ctaLabel:"Continue",ctaUrl:"https://todijo.com/?x=1&y=2",fallbackLabel:"Fallback",securityNote:"Security",supportLabel:"Need help? Contact",transactional:"This transactional message was sent by Todijo.",copyright:"© 2026 Todijo" });
   assert.doesNotMatch(message.html, /<buyer>/);
   assert.match(message.html, /A&amp;B/);
   assert.match(message.text, /https:\/\/todijo\.com/);
   assert.match(message.html, /mailto:support@todijo\.com/);
+  assert.match(message.text, /support@todijo\.com/);
+  assert.match(message.html, /<meta charset="utf-8">/);
+  assert.match(message.html, /prefers-color-scheme:dark/);
+  assert.match(message.html, /role="presentation"/);
+  assert.match(message.html, /\[if mso\]/);
+  assert.match(message.html, /overflow-wrap:anywhere/);
+  assert.match(message.html, /@media only screen and \(max-width:480px\)/);
 });
 
 test("all authentication locales have exact translation parity and localized recovery routes", () => {
@@ -77,8 +84,29 @@ test("all authentication locales have exact translation parity and localized rec
   const messages = locales.map((locale) => JSON.parse(readFileSync(`messages/auth/${locale}.json`, "utf8")) as Record<string, string>);
   const keys = Object.keys(messages[2]).sort();
   for (const message of messages) assert.deepEqual(Object.keys(message).sort(), keys);
+  assert.equal(messages[4].verificationTitle, "Vérification de l’e-mail");
+  assert.equal(messages[4].verificationSuccessResult, "Votre e-mail a été vérifié avec succès.");
+  const corruption = /ï¿½|Ãƒ|Ã¢|â€™|�|\?{2,}|[A-Za-zÀ-ÿ]\?[A-Za-zÀ-ÿ]/;
+  for (const message of messages) {
+    for (const value of Object.values(message)) assert.doesNotMatch(value, corruption);
+  }
   assert.match(readFileSync("app/login/page.tsx", "utf8"), /localizedHome\(locale\)\}\/forgot-password/);
   assert.match(readFileSync("app/reset-password/page.tsx", "utf8"), /localizedHome\(locale\)\}\/login\?reset=success/);
+});
+
+test("localized email copy provides polished subjects, footer copy, current year, and RTL output", () => {
+  const source = readFileSync("lib/email/messages.ts", "utf8");
+  for (const key of ["welcomeSubject", "verifySubject", "resetSubject"]) {
+    assert.equal((source.match(new RegExp(`${key}:`, "g")) ?? []).length, 10);
+  }
+  assert.equal((source.match(/transactional:/g) ?? []).length, 10);
+  assert.match(source, /Bienvenue sur Todijo — votre compte est prêt/);
+  assert.match(source, /Vérifiez votre e-mail Todijo/);
+  assert.match(source, /Réinitialisez votre mot de passe Todijo/);
+  assert.match(source, /getUTCFullYear\(\)/);
+  const rtl = todijoEmailTemplate({ direction:"rtl",preview:"معاينة",heading:"العنوان",greeting:"مرحبًا",body:"المحتوى",ctaLabel:"متابعة",ctaUrl:"https://todijo.com/ar",fallbackLabel:"الرابط",securityNote:"تنبيه",supportLabel:"للمساعدة",transactional:"رسالة من Todijo",copyright:"© 2026 Todijo" });
+  assert.match(rtl.html, /<html dir="rtl">/);
+  assert.match(rtl.html, /class="email-content" dir="rtl"/);
 });
 
 test("schema and migration are additive and keep verification non-blocking", () => {

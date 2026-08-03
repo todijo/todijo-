@@ -1,5 +1,6 @@
 import "server-only";
 import { localizedHome } from "../auth-redirects";
+import { isLocale, rtlLocales } from "../../i18n/config";
 import { publicAppUrl } from "./config";
 import { emailCopy, emailGreeting } from "./messages";
 import { todijoEmailTemplate } from "./template";
@@ -7,7 +8,7 @@ import { sendTodijoMail } from "./transport";
 
 function layout(locale: string, firstName: string, values: { preview: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }) {
   const common = emailCopy(locale);
-  return todijoEmailTemplate({ ...values, greeting: emailGreeting(locale, firstName), fallbackLabel: common.fallback, securityNote: common.security, supportLabel: common.support, copyright: common.copyright });
+  return todijoEmailTemplate({ ...values, direction: isLocale(locale) && rtlLocales.has(locale) ? "rtl" : "ltr", greeting: emailGreeting(locale, firstName), fallbackLabel: common.fallback, securityNote: common.security, supportLabel: common.support, transactional: common.transactional, copyright: common.copyright });
 }
 
 export async function sendWelcomeEmail(input: { to: string; firstName: string; locale: string }) {
