@@ -31,8 +31,8 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (password !== confirmPassword) return setMessage(t("passwordMismatch"));
-    if (!turnstileToken) return setMessage(t("verificationRequired"));
+    if (password !== confirmPassword) { setMessage(t("passwordMismatch")); document.getElementById("confirmPassword")?.focus(); return; }
+    if (!turnstileToken) { setMessage(t("verificationRequired")); document.querySelector<HTMLElement>(".turnstileField")?.focus(); return; }
 
     setLoading(true);
     setMessage("");
@@ -78,7 +78,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
     </section>
     <section className="authPanel"><div className="authBox">
       <a className="authBack" href={localizedHome(locale)}>← {t("back")}</a><h2>{t("create")}</h2>
-      <form className="authForm" onSubmit={submit}>
+      <form className="authForm" onSubmit={submit} aria-busy={loading}>
         <div className="roleOptions">
           <label className="roleCard"><input type="radio" name="role" checked={role === "customer"} onChange={() => setRole("customer")} /><strong>🛍️ {t("buyer")}</strong><span>{t("buyerHelp")}</span></label>
           <label className="roleCard"><input type="radio" name="role" checked={role === "seller"} onChange={() => setRole("seller")} /><strong>🏪 {t("seller")}</strong><span>{t("sellerHelp")}</span></label>
@@ -89,10 +89,10 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
         <div className="formField"><label htmlFor="password">{t("password")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
         <div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && password !== confirmPassword)} aria-describedby={confirmPassword && password !== confirmPassword ? "password-mismatch" : undefined} required /></div>
         {confirmPassword && password !== confirmPassword && <p className="authMessage" id="password-mismatch" role="alert">{t("passwordMismatch")}</p>}
-        <div className="turnstileField"><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
+        <div className="turnstileField" tabIndex={-1}><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
         <label className="terms"><input type="checkbox" required /><span>{t("terms")}</span></label>
         {message && <p className="authMessage" role="alert">{message}</p>}
-        <button className="authSubmit" type="submit" disabled={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
+        <button className="authSubmit" type="submit" disabled={loading} aria-busy={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
       </form>
       <p className="authSwitch">{t("hasAccount")} <a href={`${localizedHome(locale)}/login`}>{t("login")}</a></p>
     </div></section>

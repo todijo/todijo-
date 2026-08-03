@@ -35,36 +35,17 @@ export default function CreateStoreForm({ locale }: { locale: string }) {
     setSubmitting(true);
 
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/store", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        slug: displayedSlug,
-        description: form.get("description"),
-        contactEmail: form.get("contactEmail"),
-        phone: form.get("phone"),
-        logo: form.get("logo"),
-        country: form.get("country"),
-        city: form.get("city"),
-        currency: form.get("currency"),
-        language: form.get("language"),
-      }),
-    });
-
-    const data = (await response.json()) as { error?: string };
-    if (!response.ok) {
-      setMessage(data.error ?? "Une erreur est survenue.");
-      setSubmitting(false);
-      return;
-    }
-
-    router.push(`/${locale}/seller/subscription`);
-    router.refresh();
+    try {
+      const response = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug: displayedSlug, description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo: form.get("logo"), country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language") }) });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) { setMessage(data.error ?? "Une erreur est survenue. Please try again."); return; }
+      router.push(`/${locale}/seller/subscription`); router.refresh();
+    } catch { setMessage("The shop could not be created. Check your connection and try again."); }
+    finally { setSubmitting(false); }
   }
 
   return (
-    <form className="storeForm" onSubmit={submit}>
+    <form className="storeForm" onSubmit={submit} aria-busy={submitting}>
       <div className="formField">
         <label htmlFor="name">{t("shopName")}</label>
         <input
@@ -152,9 +133,9 @@ export default function CreateStoreForm({ locale }: { locale: string }) {
         </div>
       </div>
 
-      {message && <p className="authMessage storeError">{message}</p>}
+      {message && <p className="authMessage storeError" role="alert">{message}</p>}
 
-      <button className="authSubmit" type="submit" disabled={submitting}>
+      <button className="authSubmit" type="submit" disabled={submitting} aria-busy={submitting}>
         {submitting ? t("saveChanges") : t("createShop")}
       </button>
     </form>

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, ChevronDown, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, ShoppingBag, Store, UserRound, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, SearchX, ShoppingBag, Store, UserRound, X } from "lucide-react";
 import CartLink from "@/components/CartLink";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -13,6 +13,7 @@ import MobileAppPromotion from "@/components/MobileAppPromotion";
 import { formatCurrency } from "@/lib/formatters";
 import ProductCardAction from "@/components/ProductCardAction";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
+import { EmptyState } from "@/components/FeedbackState";
 
 type MarketplaceProduct = {
   id: string;
@@ -230,7 +231,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             </select>
           </div>
 
-          {products.length === 0 ? <div className="marketplaceEmpty"><span>🔎</span><h3>{t.empty}</h3><a href="/#products">{t.reset}</a></div> : <div className="discoveryProductGrid">
+          {products.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={t.subtitle} action={<a className="primary" href={`/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">
             {products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
           </div>}
 

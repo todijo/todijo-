@@ -44,12 +44,12 @@ export default function LoginPage() {
     </section>
     <section className="authPanel"><div className="authBox">
       <a className="authBack" href={localizedHome(locale)}>← {t("back")}</a><h2>{t("login")}</h2><p className="authIntro">{t("loginIntro")}</p>
-      <form className="authForm" onSubmit={submit}>
+      <form className="authForm" onSubmit={submit} aria-busy={loading}>
         <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></div>
         <div className="formField"><div className="passwordLine"><label htmlFor="password">{t("password")}</label><a href={`${localizedHome(locale)}/forgot-password`}>{t("forgot")}</a></div><input id="password" name="password" type="password" autoComplete="current-password" minLength={8} required /></div>
         {resetSucceeded && <p className="authMessage isSuccess" role="status">{t("resetSuccess")}</p>}
         {message && <p className="authMessage" role="alert">{message}</p>}
-        <button className="authSubmit" type="submit" disabled={loading}>{loading ? t("signingIn") : t("login")}</button>
+        <button className="authSubmit" type="submit" disabled={loading} aria-busy={loading}>{loading ? t("signingIn") : t("login")}</button>
       </form>
       <p className="authSwitch">{t("noAccount")} <a href={`${localizedHome(locale)}/register`}>{t("create")}</a></p>
     </div></section>

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Contact, Store } from "lucide-react";
 import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
+import { useToast } from "@/components/ToastProvider";
 
 type StoreValues = {
   name: string;
@@ -94,9 +95,11 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
 export default function StoreSettingsForm({ initialValues }: { initialValues: StoreValues }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
+  const { showToast } = useToast();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
+  const [messageError, setMessageError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<MediaKind | null>(null);
   const [logo, setLogo] = useState(initialValues.logo);
@@ -147,15 +150,18 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
 
   async function processFile(file: File | undefined, kind: MediaKind) {
     if (!file) return;
-    setMessage("");
+    setMessage(""); setMessageError(false);
     setUploading(kind);
     try {
       const url = await uploadFile(file, kind);
       if (kind === "logo") setLogo(url);
       else setBanner(url);
       setMessage(t("mediaUploaded"));
+      setMessageError(false);
+      showToast({ message: t("mediaUploaded"), tone: "success" });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : t("errorGeneric"));
+      const text = error instanceof Error ? error.message : t("errorGeneric");
+      setMessage(text); setMessageError(true); showToast({ message: text, tone: "error" });
     } finally {
       setUploading(null);
     }
@@ -175,42 +181,23 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("");
+    setMessage(""); setMessageError(false);
 
     if (uploading) {
       setMessage(t("waitUpload"));
+      setMessageError(true);
       return;
     }
 
     setSaving(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/store", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.get("name"),
-        description: form.get("description"),
-        contactEmail: form.get("contactEmail"),
-        phone: form.get("phone"),
-        logo,
-        banner,
-        country: form.get("country"),
-        city: form.get("city"),
-        currency: form.get("currency"),
-        language: form.get("language"),
-      }),
-    });
-
-    const data = (await response.json()) as { error?: string };
-    if (!response.ok) {
-      setMessage(data.error ?? t("errorGeneric"));
-      setSaving(false);
-      return;
-    }
-
-    setMessage(t("settingsSaved"));
-    setSaving(false);
-    router.refresh();
+    try {
+      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language") }) });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); setMessageError(true); showToast({ message: text, tone: "error" }); return; }
+      setMessage(t("settingsSaved")); setMessageError(false); showToast({ message: t("settingsSaved"), tone: "success" }); router.refresh();
+    } catch { setMessage(t("errorGeneric")); setMessageError(true); showToast({ message: t("errorGeneric"), tone: "error" }); }
+    finally { setSaving(false); }
   }
 
   function MediaUploader({ kind, value }: { kind: MediaKind; value: string }) {
@@ -306,9 +293,9 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
         </div>
       </section>
 
-      <SellerActionBar status={message && <p className="sellerControlFeedback" role="status">{message}</p>}>
+      <SellerActionBar status={message && <p className={`sellerControlFeedback${messageError ? "" : " isSuccess"}`} role={messageError ? "alert" : "status"}>{message}</p>}>
         <a className="sellerControlButton secondary" href="/dashboard">{t("backDashboard")}</a>
-        <button className="sellerControlButton primary" type="submit" disabled={saving || Boolean(uploading)}>{saving ? t("savingSettings") : uploading ? t("uploadingMedia") : t("saveSettings")}</button>
+        <button className="sellerControlButton primary" type="submit" disabled={saving || Boolean(uploading)} aria-busy={saving}>{saving ? t("savingSettings") : uploading ? t("uploadingMedia") : t("saveSettings")}</button>
       </SellerActionBar>
     </form>
   );

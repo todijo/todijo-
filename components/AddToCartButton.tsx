@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { CartProduct, useCart } from "./CartProvider";
 import { useTranslations } from "next-intl";
+import { useToast } from "./ToastProvider";
 
 export default function AddToCartButton({ product, quantity = 1 }: { product: CartProduct; quantity?: number }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
   const t = useTranslations("Product");
+  const { showToast } = useToast();
 
   function handleAdd() {
     addItem(product, quantity);
     setAdded(true);
+    showToast({ message: t("added"), tone: "success" });
     window.setTimeout(() => setAdded(false), 1600);
   }
 

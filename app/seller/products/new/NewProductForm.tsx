@@ -10,6 +10,7 @@ import ProductVariantEditor, { type ProductVariantsDraft } from "@/components/Pr
 import VariantImageManager, { type VariantImageAssignment } from "@/components/VariantImageManager";
 import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
 import { productStockForForm } from "@/lib/product-variant-form";
+import { useToast } from "@/components/ToastProvider";
 
 const categories = [
   ["Mode", "fashion"], ["Électronique", "electronics"], ["Maison", "home"], ["Beauté", "beauty"], ["Sports", "sports"],
@@ -18,6 +19,7 @@ const categories = [
 export default function NewProductForm({ currency, productCount, productLimit }: { currency: string; productCount: number; productLimit: number | null }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
+  const { showToast } = useToast();
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -51,13 +53,13 @@ export default function NewProductForm({ currency, productCount, productLimit }:
       }),
     });
     const data = await response.json() as { error?: string; product?: { id?: string } };
-    if (!response.ok) { setMessage(data.error ?? t("errorGeneric")); setSubmitting(false); submitLock.current = false; return; }
+    if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); showToast({ message: text, tone: "error" }); setSubmitting(false); submitLock.current = false; return; }
     if (status === "DRAFT") { router.push(data.product?.id ? `/seller/products/${data.product.id}/edit` : "/seller/products"); router.refresh(); return; }
     setImages([]); setVariantsEnabled(false); setVariantDraft({ options: [], generate: true, variants: [], generated: false }); setVariantImages([]);
-    setBasePrice(""); setProductStock("1"); setUploading(false); setMessage(t("productPublishedSuccess")); setPublished(true); setResetGeneration((value) => value + 1);
+    setBasePrice(""); setProductStock("1"); setUploading(false); setMessage(t("productPublishedSuccess")); showToast({ message: t("productPublishedSuccess"), tone: "success" }); setPublished(true); setResetGeneration((value) => value + 1);
     setSubmitting(false); submitLock.current = false; router.refresh();
     requestAnimationFrame(() => successRef.current?.focus());
-    } catch { setMessage(t("errorGeneric")); setSubmitting(false); submitLock.current = false; }
+    } catch { setMessage(t("errorGeneric")); showToast({ message: t("errorGeneric"), tone: "error" }); setSubmitting(false); submitLock.current = false; }
   }
 
   const disabledByLimit = productLimit !== null && productCount >= productLimit;
@@ -106,8 +108,8 @@ export default function NewProductForm({ currency, productCount, productLimit }:
     </div>
     <SellerActionBar status={message && <p ref={successRef} className={`sellerControlFeedback${published ? " isSuccess" : ""}`} role={published ? "status" : "alert"} tabIndex={published ? -1 : undefined}>{message}</p>}>
       <a className="sellerControlButton secondary" href="/seller/products">{t("cancel")}</a>
-      <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || uploading || disabledByLimit}>{t("saveDraft")}</button>
-      <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || uploading || disabledByLimit}>{submitting ? t("saving") : t("publishNow")}</button>
+      <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{t("saveDraft")}</button>
+      <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
     </SellerActionBar>
   </form>;
 }

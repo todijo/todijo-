@@ -1,0 +1,13 @@
+const copy = {
+  en: { errorTitle: "We couldn’t load this page", errorText: "Your information is safe. Check your connection and try again.", retry: "Try again", home: "Go to Home", notFound: "Page not found", notFoundText: "The page may have moved or the link may be outdated." },
+  fr: { errorTitle: "Impossible de charger cette page", errorText: "Vos informations sont en sécurité. Vérifiez votre connexion et réessayez.", retry: "Réessayer", home: "Retour à l’accueil", notFound: "Page introuvable", notFoundText: "La page a peut-être été déplacée ou le lien n’est plus à jour." },
+  de: { errorTitle: "Diese Seite konnte nicht geladen werden", errorText: "Ihre Daten sind sicher. Prüfen Sie die Verbindung und versuchen Sie es erneut.", retry: "Erneut versuchen", home: "Zur Startseite", notFound: "Seite nicht gefunden", notFoundText: "Die Seite wurde möglicherweise verschoben oder der Link ist veraltet." },
+  es: { errorTitle: "No pudimos cargar esta página", errorText: "Tu información está segura. Comprueba la conexión e inténtalo de nuevo.", retry: "Reintentar", home: "Ir al inicio", notFound: "Página no encontrada", notFoundText: "Puede que la página se haya movido o que el enlace esté desactualizado." },
+  it: { errorTitle: "Impossibile caricare questa pagina", errorText: "Le tue informazioni sono al sicuro. Controlla la connessione e riprova.", retry: "Riprova", home: "Vai alla Home", notFound: "Pagina non trovata", notFoundText: "La pagina potrebbe essere stata spostata o il link non è più aggiornato." },
+  nl: { errorTitle: "Deze pagina kon niet worden geladen", errorText: "Je gegevens zijn veilig. Controleer je verbinding en probeer opnieuw.", retry: "Opnieuw proberen", home: "Naar Home", notFound: "Pagina niet gevonden", notFoundText: "De pagina is mogelijk verplaatst of de link is verouderd." },
+  tr: { errorTitle: "Bu sayfa yüklenemedi", errorText: "Bilgileriniz güvende. Bağlantınızı kontrol edip tekrar deneyin.", retry: "Tekrar dene", home: "Ana sayfaya git", notFound: "Sayfa bulunamadı", notFoundText: "Sayfa taşınmış veya bağlantı güncelliğini yitirmiş olabilir." },
+  ar: { errorTitle: "تعذّر تحميل هذه الصفحة", errorText: "معلوماتك آمنة. تحقّق من اتصالك وحاول مرة أخرى.", retry: "حاول مرة أخرى", home: "العودة إلى الرئيسية", notFound: "الصفحة غير موجودة", notFoundText: "ربما نُقلت الصفحة أو لم يعد الرابط صالحًا." },
+  ku: { errorTitle: "ئەم پەڕەیە بار نەکرا", errorText: "زانیارییەکانت پارێزراون. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.", retry: "دووبارە هەوڵدانەوە", home: "گەڕانەوە بۆ سەرەکی", notFound: "پەڕەکە نەدۆزرایەوە", notFoundText: "لەوانەیە پەڕەکە گوازرابێتەوە یان بەستەرەکە کۆن بێت." },
+} as const;
+
+export function feedbackCopy(locale: string) { return copy[locale as keyof typeof copy] ?? copy.en; }
