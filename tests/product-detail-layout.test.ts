@@ -146,7 +146,7 @@ test("desktop gallery uses a large image with a vertical thumbnail rail and resp
   assert.match(css, /@media\(min-width:1101px\)[\s\S]*?\.productGalleryInteractive\{display:grid;grid-template-columns:88px minmax\(0,1fr\);grid-template-rows:minmax\(560px,640px\)/);
   assert.match(css, /@media\(min-width:1101px\)[\s\S]*?\.productThumbs\{grid-column:1;grid-row:1;[^}]*flex-direction:column;[^}]*overflow-y:auto/);
   assert.match(css, /\.productMainImageButton\{grid-column:2;grid-row:1;position:relative;width:100%;height:100%;min-height:0;[^}]*border-radius:24px;[^}]*overflow:hidden/);
-  assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{display:block;width:100%;height:100%;max-height:none;margin:0;object-fit:cover;object-position:center\}/);
+  assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{display:block;width:100%;height:100%;max-height:none;margin:0;object-fit:contain;object-position:center\}/);
   assert.match(css, /@media\(min-width:861px\) and \(max-width:1100px\)[\s\S]*?\.productThumbs\{display:flex;[^}]*overflow-x:auto;overflow-y:hidden/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.productThumbButton\{transition:none\}\}/);
   assert.match(gallery, /index === selectedIndex \? " isActive" : ""/);
