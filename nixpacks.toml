@@ -1,3 +1,6 @@
 [variables]
 NIXPACKS_NODE_VERSION = "22.13.0"
 NODE_EXTRA_CA_CERTS = "/etc/ssl/certs/ca-certificates.crt"
+
+[start]
+cmd = "npx prisma migrate deploy && npm run start"
