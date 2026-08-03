@@ -141,6 +141,17 @@ test("gallery index, counter, and thumbnails stay synchronized", async () => {
   assert.doesNotMatch(gallery, /setTrackHeight|ResizeObserver|active-gallery-height/);
 });
 
+test("desktop gallery uses a large image with a vertical thumbnail rail and responsive fallback", async () => {
+  const [gallery, css] = await Promise.all([readFile("app/product/[id]/ProductGallery.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.match(css, /@media\(min-width:1101px\)[\s\S]*?\.productGalleryInteractive\{display:grid;grid-template-columns:88px minmax\(0,1fr\);grid-template-rows:minmax\(560px,640px\)/);
+  assert.match(css, /@media\(min-width:1101px\)[\s\S]*?\.productThumbs\{grid-column:1;grid-row:1;[^}]*flex-direction:column;[^}]*overflow-y:auto/);
+  assert.match(css, /\.productMainImageButton\{grid-column:2;grid-row:1;height:100%;min-height:560px/);
+  assert.match(css, /@media\(min-width:861px\) and \(max-width:1100px\)[\s\S]*?\.productThumbs\{display:flex;[^}]*overflow-x:auto;overflow-y:hidden/);
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.productThumbButton\{transition:none\}\}/);
+  assert.match(gallery, /index === selectedIndex \? " isActive" : ""/);
+  assert.match(gallery, /onClick=\{\(\) => \{ setSelectedIndex\(index\); scrollToIndex\(index\); \}\}/);
+});
+
 test("mobile product info starts with compact title and price", async () => {
   const css = await readFile("app/globals.css", "utf8");
   assert.match(css, /@media\(max-width:860px\)\{\.productSellerLink,\.productTopMeta,\.productFactsDesktop,\.productFactsDesktopLink\{display:none\}/);

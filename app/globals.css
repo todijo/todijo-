@@ -759,6 +759,26 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
 @media(max-width:860px){.productSellerLink,.productTopMeta,.productFactsDesktop,.productFactsDesktopLink{display:none}.productFactsMobile,.productFactsMobileLink{display:flex}.productFactsMobile{margin:16px 0 0;padding:12px 0 0;border-top:1px solid var(--line);border-radius:0;flex-direction:column}.productDetailInfo h1{margin:0 0 7px;font-size:clamp(20px,5.5vw,22px);line-height:1.1}.productDetailPrice{font-size:clamp(22px,6vw,25px)}}
 @media(max-width:760px){.productMobileSecondaryActions{display:flex;justify-content:flex-end;margin:0 0 10px}.productMobileSecondaryActions .productIconButton{min-width:44px;min-height:44px;padding:8px 12px}}
 
+/* Product detail desktop gallery: a larger canvas with a contained thumbnail rail. */
+@media(min-width:1101px){
+  .productDetailShell{width:min(1500px,calc(100% - 32px))}
+  .productDetailTop{grid-template-columns:minmax(560px,1.5fr) minmax(300px,.8fr) minmax(280px,.66fr);gap:22px}
+  .productGalleryInteractive{display:grid;grid-template-columns:88px minmax(0,1fr);grid-template-rows:minmax(560px,640px);gap:14px;align-items:stretch}
+  .productMainImageButton{grid-column:2;grid-row:1;height:100%;min-height:560px;border:1px solid var(--line);background:#fff}
+  .productMainImage.productMainImageIntrinsic{width:100%;height:100%;max-height:none;object-fit:contain}
+  .productThumbs{grid-column:1;grid-row:1;display:flex;min-width:0;margin:0;padding:3px;gap:10px;flex-direction:column;align-self:stretch;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;overscroll-behavior:contain}
+  .productThumbButton{flex:0 0 88px;width:100%;min-height:88px;scroll-snap-align:start}
+  .productThumbButton img{height:84px}
+  .productGalleryInteractive>.productGalleryCounter{grid-column:2;grid-row:1;align-self:end;justify-self:end;margin:0 14px 14px 0}
+}
+@media(min-width:861px) and (max-width:1100px){
+  .productGalleryInteractive{display:block}
+  .productThumbs{display:flex;max-width:100%;margin-top:10px;padding:2px 0 5px;gap:9px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;scrollbar-width:thin}
+  .productThumbButton{flex:0 0 82px;width:82px;min-height:82px;scroll-snap-align:start}
+  .productThumbButton img{height:78px}
+}
+@media(prefers-reduced-motion:reduce){.productThumbButton{transition:none}}
+
 /* Dashboard marketplace return link: mobile-only without changing desktop navigation. */
 .premiumDashboardHeader>.todijoBrand{display:none}.premiumDashboardIdentity{min-width:0;flex:1}.premiumDashboardIdentity span,.premiumDashboardIdentity strong{display:block}.premiumDashboardIdentity span{color:var(--dash-muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.premiumDashboardIdentity strong{margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:780px){.premiumDashboardHeader{position:sticky;z-index:70;top:0}.premiumDashboardHeader>.todijoBrand{min-width:44px;min-height:44px;display:inline-flex}.premiumDashboardHeader>.todijoBrand .todijoBrandMark{width:34px;height:34px;flex:0 0 34px}.premiumDashboardHeader>.todijoBrand .todijoWordmark{font-size:21px}.premiumDashboardIdentity{margin-inline-start:auto}}
