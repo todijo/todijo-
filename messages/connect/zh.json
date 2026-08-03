@@ -1,0 +1,17 @@
+{
+  "title": "连接 Stripe",
+  "description": "完成 Stripe 的安全开户流程，以接收市场款项。",
+  "notConnected": "未连接",
+  "pending": "等待验证",
+  "complete": "验证完成",
+  "chargesEnabled": "已启用收款",
+  "payoutsEnabled": "已启用提现",
+  "start": "连接 Stripe",
+  "resume": "继续开户",
+  "refresh": "刷新状态",
+  "refreshing": "刷新中…",
+  "loading": "正在打开 Stripe…",
+  "error": "无法连接 Stripe。",
+  "multipleSellers": "来自不同卖家的商品目前需要分别结账。",
+  "sellerNotReady": "此卖家暂时无法接收 Stripe 付款。"
+}

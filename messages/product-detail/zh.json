@@ -1,0 +1,12 @@
+{
+  "viewShop": "查看店铺",
+  "details": "商品详情",
+  "description": "描述",
+  "reviews": "评价",
+  "pageSections": "商品页面分区",
+  "purchaseOptions": "购买选项",
+  "chooseCombination": "选择选项",
+  "quantity": "数量",
+  "decreaseQuantity": "减少数量",
+  "increaseQuantity": "增加数量"
+}

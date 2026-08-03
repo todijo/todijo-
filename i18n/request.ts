@@ -13,16 +13,16 @@ export default getRequestConfig(async () => {
   messages.DashboardPremium = (await import(`../messages/dashboard-premium/${locale}.json`)).default;
   messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
   messages.SellerDashboard = (await import(`../messages/seller-dashboard/${locale}.json`)).default;
-  messages.SellerControl = locale === "fr"
-    ? (await import("../messages/seller-control/fr.json")).default
+  messages.SellerControl = ["fr", "zh"].includes(locale)
+    ? (await import(`../messages/seller-control/${locale}.json`)).default
     : (await import("../messages/seller-control/en.json")).default;
   messages.HomeHeader = (await import(`../messages/home-header/${locale}.json`)).default;
   messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
-  messages.ProductDetail = locale === "fr"
-    ? (await import("../messages/product-detail/fr.json")).default
+  messages.ProductDetail = ["fr", "zh"].includes(locale)
+    ? (await import(`../messages/product-detail/${locale}.json`)).default
     : (await import("../messages/product-detail/en.json")).default;
-  const adminLocale = ["en", "fr", "ar", "ku"].includes(locale) ? locale : "en";
+  const adminLocale = ["en", "fr", "ar", "ku", "zh"].includes(locale) ? locale : "en";
   messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
   return { locale, messages };
 });

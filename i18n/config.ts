@@ -1,4 +1,4 @@
-export const locales = ["en", "fr", "ar", "ku", "tr", "de", "es", "it", "nl"] as const;
+export const locales = ["en", "fr", "ar", "ku", "tr", "de", "es", "it", "nl", "zh"] as const;
 export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = "en";
 export const localeCookie = "TODIJO_LOCALE";

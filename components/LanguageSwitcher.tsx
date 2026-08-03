@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { localeCookie, locales, type Locale } from "@/i18n/config";
 import { buildLocalizedPath } from "@/lib/locale-routing";
 
-const names: Record<Locale, string> = { en: "English", fr: "Français", ar: "العربية", ku: "کوردی", tr: "Türkçe", de: "Deutsch", es: "Español", it: "Italiano", nl: "Nederlands" };
+const names: Record<Locale, string> = { en: "English", fr: "Français", ar: "العربية", ku: "کوردی", tr: "Türkçe", de: "Deutsch", es: "Español", it: "Italiano", nl: "Nederlands", zh: "简体中文" };
 
 export default function LanguageSwitcher({ className = "languageSwitcher" }: { className?: string }) {
   const locale = useLocale() as Locale;

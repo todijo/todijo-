@@ -29,9 +29,9 @@ export default function MarketplaceFooter() {
       { label: t("safety"), href: info("safety") },
     ] },
     { title: t("sellTitle"), links: [
-      { label: t("becomeSeller"), href: "/register?role=seller" },
-      { label: t("sellerDashboard"), href: "/dashboard" },
-      { label: t("createStore"), href: "/seller/create-store" },
+      { label: t("becomeSeller"), href: `/${locale}/register?role=seller` },
+      { label: t("sellerDashboard"), href: `/${locale}/dashboard` },
+      { label: t("createStore"), href: `/${locale}/seller/create-store` },
       { label: t("sellerGuide"), href: info("seller-guide") },
     ] },
     { title: t("contactTitle"), links: [

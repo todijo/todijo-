@@ -5,6 +5,7 @@ import { compare, hash } from "bcryptjs";
 import { allowAuthRequest } from "../lib/auth-rate-limit";
 import { authTokenState, generateRawAuthToken, hashAuthToken, validRawAuthToken } from "../lib/auth-token-crypto";
 import { escapeEmailHtml, todijoEmailTemplate } from "../lib/email/template";
+import { locales } from "../i18n/config";
 
 test("authentication tokens are cryptographically random and only their SHA-256 hashes are storage-safe", () => {
   const first = generateRawAuthToken();
@@ -97,9 +98,9 @@ test("all authentication locales have exact translation parity and localized rec
 test("localized email copy provides polished subjects, footer copy, current year, and RTL output", () => {
   const source = readFileSync("lib/email/messages.ts", "utf8");
   for (const key of ["welcomeSubject", "verifySubject", "resetSubject"]) {
-    assert.equal((source.match(new RegExp(`${key}:`, "g")) ?? []).length, 10);
+    assert.equal((source.match(new RegExp(`${key}:`, "g")) ?? []).length, locales.length + 1);
   }
-  assert.equal((source.match(/transactional:/g) ?? []).length, 10);
+  assert.equal((source.match(/transactional:/g) ?? []).length, locales.length + 1);
   assert.match(source, /Bienvenue sur Todijo — votre compte est prêt/);
   assert.match(source, /Vérifiez votre e-mail Todijo/);
   assert.match(source, /Réinitialisez votre mot de passe Todijo/);

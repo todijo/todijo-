@@ -1,0 +1,22 @@
+{
+  "menu": "打开菜单",
+  "mobileNavigation": "移动端导航",
+  "accountNavigation": "账户导航",
+  "categoryNavigation": "市场导航",
+  "locationLabel": "市场位置",
+  "deliverTo": "配送至",
+  "marketplace": "你的市场",
+  "hello": "你好，请登录",
+  "returns": "退货与",
+  "orders": "订单",
+  "searchCategory": "搜索分类",
+  "allCategories": "所有分类",
+  "deals": "优惠活动",
+  "newArrivals": "新品上架",
+  "bestSellers": "畅销商品",
+  "exploreProducts": "浏览商品",
+  "sellerCta": "开始销售",
+  "viewAll": "查看全部",
+  "marketplaceVisual": "发现 Todijo 独立店铺的商品",
+  "discoverCategories": "浏览市场分类"
+}
