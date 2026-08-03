@@ -28,6 +28,19 @@ test("mobile buyer and seller dashboards expose one localized Todijo Home logo",
   assert.match(css, /premiumDashboardHeader\{position:sticky;z-index:70;top:0\}/);
 });
 
+test("seller onboarding keeps Home and redirects inside the active locale", () => {
+  const createStorePage = readFileSync("app/seller/create-store/page.tsx", "utf8");
+  const createStoreForm = readFileSync("app/seller/create-store/CreateStoreForm.tsx", "utf8");
+  const subscriptionPage = readFileSync("app/seller/subscription/page.tsx", "utf8");
+
+  assert.match(createStorePage, /href=\{`\/\$\{locale\}`\}/);
+  assert.match(createStorePage, /redirect\(`\/\$\{locale\}\/login`\)/);
+  assert.match(createStorePage, /redirect\(`\/\$\{locale\}\/dashboard`\)/);
+  assert.match(createStoreForm, /router\.push\(`\/\$\{locale\}\/seller\/subscription`\)/);
+  assert.match(subscriptionPage, /href=\{`\/\$\{locale\}\/dashboard`\}/);
+  assert.match(subscriptionPage, /redirect\(`\/\$\{locale\}\/seller\/create-store`\)/);
+});
+
 test("seller mobile drawer adds the authorized localized product-create destination without changing desktop items", () => {
   const ui = readFileSync("components/DashboardUI.tsx", "utf8");
   const sellerLayout = readFileSync("components/SellerDashboardLayout.tsx", "utf8");

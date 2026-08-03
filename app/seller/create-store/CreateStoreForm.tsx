@@ -15,7 +15,7 @@ function slugify(value: string) {
     .slice(0, 60);
 }
 
-export default function CreateStoreForm() {
+export default function CreateStoreForm({ locale }: { locale: string }) {
   const router = useRouter();
   const t = useTranslations("Seller");
   const [name, setName] = useState("");
@@ -59,7 +59,7 @@ export default function CreateStoreForm() {
       return;
     }
 
-    router.push("/seller/subscription");
+    router.push(`/${locale}/seller/subscription`);
     router.refresh();
   }
 
