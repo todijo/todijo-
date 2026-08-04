@@ -92,14 +92,13 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
 });
 
-test("Product Detail uses the shared mobile shell and an orientation-aware mobile gallery", async () => {
+test("Product Detail uses the shared mobile shell and a responsive square mobile gallery", async () => {
   const [page, siteHeader, css, gallery] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
   assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
   assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:4\/5;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
-  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageTrack\{width:100%;height:auto;min-height:0;max-height:none;aspect-ratio:var\(--mobile-gallery-aspect,1\)/);
-  assert.match(css, /\.productMobileImageTrack\[data-orientation="portrait"\]\{max-height:70dvh\}/);
+  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageTrack\{width:min\(100%,398px\);height:auto;min-height:0;max-height:none;margin-inline:auto;aspect-ratio:1/);
   assert.match(css, /\.productMobileImageSlide\{[^}]*flex:0 0 100%;[^}]*height:100%;[^}]*justify-content:center;[^}]*overflow:hidden/);
   assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
   assert.doesNotMatch(css, /height:clamp\(340px,52svh,520px\)/);
@@ -127,7 +126,7 @@ test("mobile gallery keeps the header in flow, its counter attached and respects
   assert.doesNotMatch(css, /\.productDetailPage>\.buyerMobileShellHeader \.buyerMobileShellSearch\{display:none\}/);
   assert.match(css, /\.productDetailInfo\{position:relative;[^}]*padding-inline-end:72px/);
   assert.match(css, /\.productMobileSecondaryActions\{position:absolute;top:15px;inset-inline-end:16px;margin:0\}/);
-  assert.match(css, /\.productMobileImageTrack\{width:100%;height:auto;min-height:0;max-height:none;aspect-ratio:var\(--mobile-gallery-aspect,1\)/);
+  assert.match(css, /\.productMobileImageTrack\{width:min\(100%,398px\);height:auto;min-height:0;max-height:none;margin-inline:auto;aspect-ratio:1/);
   assert.match(css, /\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
   assert.doesNotMatch(css, /productMobileImageBackdrop|blur\(22px\)/);
   assert.doesNotMatch(gallery, /productMobileImageBackdrop/);
