@@ -99,10 +99,18 @@ test("Product Detail uses the shared mobile shell and a portrait mobile gallery"
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
   assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:4\/5;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
   assert.match(css, /\.productMobileImageSlide\{[^}]*flex:0 0 100%;[^}]*height:100%;[^}]*justify-content:center;[^}]*overflow:hidden/);
-  assert.match(css, /\.productMobileImageSlide img\{[^}]*width:100%;height:100%;[^}]*object-fit:cover;object-position:center/);
+  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageSlide img\{width:100%;height:100%;object-fit:contain;object-position:center\}/);
   assert.doesNotMatch(css, /\.productMobileImageTrack\{[^}]*min-height:/);
   assert.match(css, /\.productGalleryBack\{display:none!important\}/);
   assert.match(css, /\.productLightbox\{z-index:9999\}/);
+});
+
+test("mobile fullscreen maximizes the image without changing its aspect ratio", async () => {
+  const css = await readFile("app/globals.css", "utf8");
+  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productLightbox\{grid-template-rows:minmax\(0,1fr\) auto;[^}]*safe-area-inset-top/);
+  assert.match(css, /\.productLightboxToolbar\{position:absolute;z-index:10000;[^}]*safe-area-inset-top/);
+  assert.match(css, /\.productLightboxImageWrap\{width:100%;height:100%;padding:4px;overflow:hidden\}/);
+  assert.match(css, /\.productLightboxImageWrap img\{width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;object-position:center\}/);
 });
 
 test("mobile gallery removes the shell gap and uses a horizontal snap track", async () => {
