@@ -824,8 +824,6 @@ html[dir="rtl"] .buyerMobileDrawer nav a.active{box-shadow:inset -4px 0 0 #08765
 
 /* Mobile Product Detail composition: image-first and compact, without copying marketplace branding. */
 @media(max-width:760px){
-  .productDetailPage>.buyerMobileShellHeader{position:absolute;z-index:20;inset:0 0 auto;padding-bottom:8px;background:linear-gradient(180deg,rgba(4,48,36,.82),rgba(4,48,36,.42) 68%,transparent);box-shadow:none}
-  .productDetailPage>.buyerMobileShellHeader .buyerMobileShellSearch{display:none}
   .productDetailTop{gap:0}
   .productGalleryInteractive{background:#f4f8f6}
   .productMobileImageTrack{width:100%;height:auto;min-height:0;max-height:none;aspect-ratio:var(--mobile-gallery-aspect,1);background:#f4f8f6}
@@ -833,10 +831,10 @@ html[dir="rtl"] .buyerMobileDrawer nav a.active{box-shadow:inset -4px 0 0 #08765
   .productMobileImageSlide{border-radius:0;display:grid;place-items:center}
   .productMobileImageSlide img{width:100%;height:100%;max-width:100%;max-height:100%;border-radius:0;object-fit:contain;object-position:center}
   .productGalleryCounter{inset-inline-end:10px;right:auto;bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
-  .productDetailInfo{margin:0;padding:15px 16px 16px;border-inline:0;border-radius:0;background:#fff}
+  .productDetailInfo{position:relative;margin:0;padding:15px 16px 16px;padding-inline-end:72px;border-inline:0;border-radius:0;background:#fff}
   .productDetailInfo h1{margin:4px 0 8px}
   .productPriceRow{margin:4px 0 8px}
-  .productMobileSecondaryActions{margin-bottom:5px}
+  .productMobileSecondaryActions{position:absolute;top:15px;inset-inline-end:16px;margin:0}
   .productPurchaseColumn{margin:8px 12px 0}
 }
 .feedbackErrorPage{min-height:100vh;padding:32px;background:#f6faf8;display:grid;place-items:center;align-content:center;text-align:center}.feedbackErrorPage>span{width:70px;height:70px;border-radius:22px;background:#fff0e6;color:#ad4e1c;display:grid;place-items:center}.feedbackErrorPage h1{max-width:700px;margin:18px 0 8px;font-size:clamp(30px,5vw,52px)}.feedbackErrorPage p{max-width:560px;margin:0;color:var(--muted);line-height:1.65}.feedbackErrorPage>div{margin-top:24px;display:flex;justify-content:center;flex-wrap:wrap;gap:10px}.feedbackErrorPage button,.feedbackErrorPage a{min-height:46px;padding:0 17px;border:1px solid #b9dace;border-radius:11px;background:#fff;color:#075f45;display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-weight:850;cursor:pointer}.feedbackErrorPage button{border-color:var(--green);background:var(--green);color:#fff}

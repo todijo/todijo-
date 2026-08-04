@@ -119,12 +119,14 @@ test("mobile fullscreen maximizes the image without changing its aspect ratio", 
   assert.match(css, /\.productLightboxImageWrap img\{width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;object-position:center\}/);
 });
 
-test("mobile gallery keeps its counter attached and respects reduced motion", async () => {
+test("mobile gallery keeps the header in flow, its counter attached and respects reduced motion", async () => {
   const [css, gallery] = await Promise.all([readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
   assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productGalleryCounter\{bottom:10px;right:10px\}/);
   assert.match(css, /@media\(max-width:760px\) and \(prefers-reduced-motion:reduce\)\{\.productMobileImageTrack\{transition:none\}\}/);
-  assert.match(css, /\.productDetailPage>\.buyerMobileShellHeader\{position:absolute;[^}]*background:linear-gradient/);
-  assert.match(css, /\.productDetailPage>\.buyerMobileShellHeader \.buyerMobileShellSearch\{display:none\}/);
+  assert.doesNotMatch(css, /\.productDetailPage>\.buyerMobileShellHeader\{position:absolute/);
+  assert.doesNotMatch(css, /\.productDetailPage>\.buyerMobileShellHeader \.buyerMobileShellSearch\{display:none\}/);
+  assert.match(css, /\.productDetailInfo\{position:relative;[^}]*padding-inline-end:72px/);
+  assert.match(css, /\.productMobileSecondaryActions\{position:absolute;top:15px;inset-inline-end:16px;margin:0\}/);
   assert.match(css, /\.productMobileImageTrack\{width:100%;height:auto;min-height:0;max-height:none;aspect-ratio:var\(--mobile-gallery-aspect,1\)/);
   assert.match(css, /\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
   assert.doesNotMatch(css, /productMobileImageBackdrop|blur\(22px\)/);
