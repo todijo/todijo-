@@ -100,7 +100,7 @@ test("Product Detail uses the shared mobile shell and a responsive square mobile
   assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:4\/5;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
   assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageTrack\{width:min\(100%,398px\);height:auto;min-height:0;max-height:none;margin-inline:auto;aspect-ratio:1/);
   assert.match(css, /\.productMobileImageSlide\{[^}]*flex:0 0 100%;[^}]*height:100%;[^}]*justify-content:center;[^}]*overflow:hidden/);
-  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
+  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:cover;object-position:center\}/);
   assert.doesNotMatch(css, /height:clamp\(340px,52svh,520px\)/);
   assert.match(gallery, /data-orientation=\{selectedMobileMetrics\.orientation\}/);
   assert.match(gallery, /"--mobile-gallery-aspect": selectedMobileMetrics\.aspectRatio/);
@@ -127,7 +127,7 @@ test("mobile gallery keeps the header in flow, its counter attached and respects
   assert.match(css, /\.productDetailInfo\{position:relative;[^}]*padding-inline-end:72px/);
   assert.match(css, /\.productMobileSecondaryActions\{position:absolute;top:15px;inset-inline-end:16px;margin:0\}/);
   assert.match(css, /\.productMobileImageTrack\{width:min\(100%,398px\);height:auto;min-height:0;max-height:none;margin-inline:auto;aspect-ratio:1/);
-  assert.match(css, /\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
+  assert.match(css, /\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:cover;object-position:center\}/);
   assert.doesNotMatch(css, /productMobileImageBackdrop|blur\(22px\)/);
   assert.doesNotMatch(gallery, /productMobileImageBackdrop/);
 });
