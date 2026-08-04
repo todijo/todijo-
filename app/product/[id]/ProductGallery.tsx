@@ -9,6 +9,11 @@ type ProductGalleryProps = {
   productName: string;
 };
 
+type MobileImageMetrics = {
+  aspectRatio: number;
+  orientation: "landscape" | "square" | "portrait";
+};
+
 export default function ProductGallery({ images, productName }: ProductGalleryProps) {
   const locale = useLocale();
   const baseImages = useMemo(() => images.filter(Boolean), [images]);
@@ -18,7 +23,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isMobileGallery, setIsMobileGallery] = useState(false);
-  const [imageAspectRatios, setImageAspectRatios] = useState<Record<string, number>>({});
+  const [mobileImageMetrics, setMobileImageMetrics] = useState<Record<string, MobileImageMetrics>>({});
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -63,7 +68,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];
-  const mobileAspectRatio = imageAspectRatios[selectedImage] ?? 1;
+  const selectedMobileMetrics = mobileImageMetrics[selectedImage] ?? { aspectRatio: 1, orientation: "square" as const };
 
   useEffect(() => {
     if (!isMobileGallery) return;
@@ -131,7 +136,8 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           <div
             className="productMobileImageTrack"
             ref={trackRef}
-            style={{ "--mobile-gallery-aspect": mobileAspectRatio } as React.CSSProperties}
+            data-orientation={selectedMobileMetrics.orientation}
+            style={{ "--mobile-gallery-aspect": selectedMobileMetrics.aspectRatio } as React.CSSProperties}
             onScroll={() => {
               if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
               scrollFrameRef.current = requestAnimationFrame(() => {
@@ -188,9 +194,16 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
                       const loadedImage = event.currentTarget;
                       if (!loadedImage.naturalWidth || !loadedImage.naturalHeight) return;
                       const aspectRatio = loadedImage.naturalWidth / loadedImage.naturalHeight;
-                      setImageAspectRatios((current) => current[image] === aspectRatio
-                        ? current
-                        : { ...current, [image]: aspectRatio });
+                      const orientation: MobileImageMetrics["orientation"] = aspectRatio > 1.1
+                        ? "landscape"
+                        : aspectRatio < 0.9
+                          ? "portrait"
+                          : "square";
+                      setMobileImageMetrics((current) => {
+                        const existing = current[image];
+                        if (existing?.aspectRatio === aspectRatio && existing.orientation === orientation) return current;
+                        return { ...current, [image]: { aspectRatio, orientation } };
+                      });
                     }}
                   />
                 </button>

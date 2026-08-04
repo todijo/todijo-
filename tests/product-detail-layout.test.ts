@@ -92,19 +92,21 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
 });
 
-test("Product Detail uses the shared mobile shell and an adaptive mobile gallery", async () => {
+test("Product Detail uses the shared mobile shell and an orientation-aware mobile gallery", async () => {
   const [page, siteHeader, css, gallery] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
   assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
   assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:4\/5;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
-  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageTrack\{height:auto;min-height:220px;max-height:70dvh;aspect-ratio:var\(--mobile-gallery-aspect,1\)/);
+  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageTrack\{width:100%;height:auto;min-height:0;max-height:none;aspect-ratio:var\(--mobile-gallery-aspect,1\)/);
+  assert.match(css, /\.productMobileImageTrack\[data-orientation="portrait"\]\{max-height:70dvh\}/);
   assert.match(css, /\.productMobileImageSlide\{[^}]*flex:0 0 100%;[^}]*height:100%;[^}]*justify-content:center;[^}]*overflow:hidden/);
-  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageSlide img\{width:100%;height:100%;object-fit:contain;object-position:center\}/);
+  assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
   assert.doesNotMatch(css, /height:clamp\(340px,52svh,520px\)/);
-  assert.match(gallery, /style=\{\{ "--mobile-gallery-aspect": mobileAspectRatio \} as React\.CSSProperties\}/);
+  assert.match(gallery, /data-orientation=\{selectedMobileMetrics\.orientation\}/);
+  assert.match(gallery, /"--mobile-gallery-aspect": selectedMobileMetrics\.aspectRatio/);
   assert.match(gallery, /loadedImage\.naturalWidth \/ loadedImage\.naturalHeight/);
-  assert.match(gallery, /setImageAspectRatios/);
+  assert.match(gallery, /aspectRatio > 1\.1[\s\S]*?"landscape"[\s\S]*?aspectRatio < 0\.9[\s\S]*?"portrait"[\s\S]*?"square"/);
   assert.match(css, /\.productGalleryBack\{display:none!important\}/);
   assert.match(css, /\.productLightbox\{z-index:9999\}/);
 });
@@ -118,9 +120,15 @@ test("mobile fullscreen maximizes the image without changing its aspect ratio", 
 });
 
 test("mobile gallery keeps its counter attached and respects reduced motion", async () => {
-  const css = await readFile("app/globals.css", "utf8");
+  const [css, gallery] = await Promise.all([readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
   assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productGalleryCounter\{bottom:10px;right:10px\}/);
   assert.match(css, /@media\(max-width:760px\) and \(prefers-reduced-motion:reduce\)\{\.productMobileImageTrack\{transition:none\}\}/);
+  assert.match(css, /\.productDetailPage>\.buyerMobileShellHeader\{position:absolute;[^}]*background:linear-gradient/);
+  assert.match(css, /\.productDetailPage>\.buyerMobileShellHeader \.buyerMobileShellSearch\{display:none\}/);
+  assert.match(css, /\.productMobileImageTrack\{width:100%;height:auto;min-height:0;max-height:none;aspect-ratio:var\(--mobile-gallery-aspect,1\)/);
+  assert.match(css, /\.productMobileImageSlide img\{width:100%;height:100%;[^}]*object-fit:contain;object-position:center\}/);
+  assert.doesNotMatch(css, /productMobileImageBackdrop|blur\(22px\)/);
+  assert.doesNotMatch(gallery, /productMobileImageBackdrop/);
 });
 
 test("mobile gallery removes the shell gap and uses a horizontal snap track", async () => {
