@@ -18,6 +18,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isMobileGallery, setIsMobileGallery] = useState(false);
+  const [imageAspectRatios, setImageAspectRatios] = useState<Record<string, number>>({});
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -62,6 +63,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
   const hasImages = cleanImages.length > 0;
   const selectedImage = cleanImages[selectedIndex];
+  const mobileAspectRatio = imageAspectRatios[selectedImage] ?? 1;
 
   useEffect(() => {
     if (!isMobileGallery) return;
@@ -129,6 +131,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           <div
             className="productMobileImageTrack"
             ref={trackRef}
+            style={{ "--mobile-gallery-aspect": mobileAspectRatio } as React.CSSProperties}
             onScroll={() => {
               if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
               scrollFrameRef.current = requestAnimationFrame(() => {
@@ -181,6 +184,14 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
                     src={image}
                     alt={`${productName} — image ${index + 1}`}
                     draggable={false}
+                    onLoad={(event) => {
+                      const loadedImage = event.currentTarget;
+                      if (!loadedImage.naturalWidth || !loadedImage.naturalHeight) return;
+                      const aspectRatio = loadedImage.naturalWidth / loadedImage.naturalHeight;
+                      setImageAspectRatios((current) => current[image] === aspectRatio
+                        ? current
+                        : { ...current, [image]: aspectRatio });
+                    }}
                   />
                 </button>
               );
