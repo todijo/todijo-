@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { defaultLocale, isLocale, localeCookie, locales, type Locale } from "./i18n/config";
+import { defaultLocale, isLocale, localeCookie, type Locale } from "./i18n/config";
 import { canonicalizeNestedLocalePath } from "./lib/locale-routing";
 
-const countryLocales: Record<string, Locale> = { FR: "fr", BE: "fr", CA: "fr", DZ: "ar", MA: "ar", TN: "ar", EG: "ar", IQ: "ar", JO: "ar", SA: "ar", TR: "tr", DE: "de", AT: "de", CH: "de", ES: "es", MX: "es", IT: "it", NL: "nl" };
+const countryLocales: Record<string, Locale> = { FR: "fr", BE: "fr", CA: "fr", DZ: "ar", MA: "ar", TN: "ar", EG: "ar", IQ: "ar", JO: "ar", SA: "ar", TR: "tr", DE: "de", AT: "de", CH: "de", ES: "es", MX: "es", IT: "it", NL: "nl", IR: "fa", IN: "hi", PT: "pt", BR: "pt", RU: "ru" };
 
 function detectLocale(request: NextRequest): Locale {
   const remembered = request.cookies.get(localeCookie)?.value;

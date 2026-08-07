@@ -1,0 +1,17 @@
+{
+  "title": "Ligar Stripe",
+  "description": "Conclua o onboarding seguro da Stripe para receber pagamentos do marketplace.",
+  "notConnected": "Não ligado",
+  "pending": "Verificação pendente",
+  "complete": "Verificação concluída",
+  "chargesEnabled": "Cobranças ativadas",
+  "payoutsEnabled": "Pagamentos ativados",
+  "start": "Ligar Stripe",
+  "resume": "Retomar onboarding",
+  "refresh": "Atualizar estado",
+  "refreshing": "A atualizar…",
+  "loading": "A abrir Stripe…",
+  "error": "Não foi possível ligar o Stripe.",
+  "multipleSellers": "Por agora, artigos de vendedores diferentes requerem checkouts separados.",
+  "sellerNotReady": "Este vendedor ainda não pode receber pagamentos Stripe."
+}

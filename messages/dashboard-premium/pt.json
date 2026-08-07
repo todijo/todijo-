@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "dashboard": "Painel",
+    "orders": "Encomendas",
+    "messages": "Mensagens",
+    "favorites": "Favoritos",
+    "addresses": "Moradas",
+    "payments": "Pagamentos",
+    "reviews": "Avaliações",
+    "settings": "Definições",
+    "products": "Produtos",
+    "statistics": "Estatísticas",
+    "revenue": "Receita",
+    "store": "Loja",
+    "addProduct": "Adicionar um produto"
+  },
+  "notifications": "Notificações",
+  "welcome": "Bem-vindo de volta, {name}",
+  "browseMarketplace": "Explorar marketplace",
+  "browseProducts": "Explorar produtos",
+  "myOrders": "As minhas encomendas",
+  "myMessages": "As minhas mensagens",
+  "myCart": "O meu carrinho",
+  "quickActions": "Ações rápidas",
+  "recentOrders": "Encomendas recentes",
+  "viewAll": "Ver tudo",
+  "viewOrders": "Ver encomendas",
+  "viewRevenue": "Ver receita",
+  "exploreNow": "Explorar agora",
+  "discoverBadge": "Destaques do marketplace",
+  "discoverTitle": "Algo excecional está à sua espera",
+  "discoverText": "Descubra lojas independentes e produtos cuidadosamente selecionados em todo o Todijo.",
+  "stats": {
+    "totalOrders": "Total de encomendas",
+    "pendingOrders": "Em curso",
+    "deliveredOrders": "Entregue",
+    "totalSpent": "Total gasto",
+    "orders": "Encomendas",
+    "customers": "Clientes"
+  },
+  "buyer": {
+    "eyebrow": "Espaço do comprador",
+    "badge": "O seu espaço Todijo",
+    "intro": "Tudo o que precisa para acompanhar compras e descobrir o seu próximo produto favorito.",
+    "recentDescription": "As suas compras mais recentes, atualizadas com dados reais das encomendas.",
+    "emptyOrders": "A sua primeira encomenda começa aqui",
+    "emptyOrdersText": "Explore o marketplace e apoie lojas independentes do Todijo."
+  },
+  "seller": {
+    "eyebrow": "Espaço do vendedor",
+    "badge": "Centro de comando da loja",
+    "recentDescription": "As encomendas mais recentes feitas na sua loja.",
+    "emptyOrders": "Ainda não há encomendas na loja",
+    "emptyOrdersText": "As encomendas aparecerão aqui assim que os clientes concluírem o checkout."
+  },
+  "revenueOverview": "Visão geral da receita",
+  "revenueDescription": "Receita real do vendedor nos últimos seis meses.",
+  "noRevenue": "Ainda não existem dados de receita",
+  "noRevenueText": "Um gráfico aparecerá quando a sua loja receber encomendas pagas."
+}

@@ -90,7 +90,7 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
           <label>{t("description")}<textarea name="description" maxLength={1000} rows={3}/></label>
           <div><label>{t("email")}<input name="contactEmail" type="email" required/></label><label>{t("phone")}<input name="phone" maxLength={30}/></label></div>
           <div><label>{t("country")}<input name="country" required/></label><label>{t("city")}<input name="city" required/></label></div>
-          <div><label>{t("currency")}<select name="currency" defaultValue="EUR"><option>EUR</option><option>USD</option><option>GBP</option></select></label><label>{t("language")}<select name="language" defaultValue={locale}>{["en","fr","ar","ku","tr","de","es","it","nl"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
+          <div><label>{t("currency")}<select name="currency" defaultValue="EUR"><option>EUR</option><option>USD</option><option>GBP</option></select></label><label>{t("language")}<select name="language" defaultValue={locale}>{["en","fr","ar","ku","tr","de","es","it","nl","fa","hi","pt","ru"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
           <label>{t("initialAccess")}<select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
           <button disabled={busy || !eligibleUsers.length}>{busy ? t("working") : t("createStoreAction")}</button>
         </form>

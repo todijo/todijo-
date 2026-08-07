@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "orders": "ऑर्डर",
+    "messages": "संदेश",
+    "favorites": "पसंदीदा",
+    "addresses": "पते",
+    "payments": "भुगतान",
+    "reviews": "समीक्षाएँ",
+    "settings": "सेटिंग्स",
+    "products": "उत्पाद",
+    "statistics": "आँकड़े",
+    "revenue": "राजस्व",
+    "store": "स्टोर",
+    "addProduct": "उत्पाद जोड़ें"
+  },
+  "notifications": "सूचनाएँ",
+  "welcome": "वापसी पर स्वागत है, {name}",
+  "browseMarketplace": "मार्केटप्लेस देखें",
+  "browseProducts": "उत्पाद देखें",
+  "myOrders": "मेरे ऑर्डर",
+  "myMessages": "मेरे संदेश",
+  "myCart": "मेरी कार्ट",
+  "quickActions": "त्वरित कार्रवाइयाँ",
+  "recentOrders": "हाल के ऑर्डर",
+  "viewAll": "सभी देखें",
+  "viewOrders": "ऑर्डर देखें",
+  "viewRevenue": "राजस्व देखें",
+  "exploreNow": "अभी खोजें",
+  "discoverBadge": "मार्केटप्लेस चयन",
+  "discoverTitle": "कुछ खास आपका इंतज़ार कर रहा है",
+  "discoverText": "Todijo पर स्वतंत्र स्टोर और सावधानी से चुने गए उत्पाद खोजें।",
+  "stats": {
+    "totalOrders": "कुल ऑर्डर",
+    "pendingOrders": "प्रगति में",
+    "deliveredOrders": "डिलीवर किया गया",
+    "totalSpent": "कुल खर्च",
+    "orders": "ऑर्डर",
+    "customers": "ग्राहक"
+  },
+  "buyer": {
+    "eyebrow": "खरीदार कार्यक्षेत्र",
+    "badge": "आपका Todijo स्पेस",
+    "intro": "अपनी खरीदारी ट्रैक करने और अगला पसंदीदा उत्पाद खोजने के लिए आवश्यक सब कुछ।",
+    "recentDescription": "आपकी नवीनतम खरीदारी, वास्तविक ऑर्डर डेटा से अपडेट।",
+    "emptyOrders": "पहला ऑर्डर यहीं से शुरू होता है",
+    "emptyOrdersText": "मार्केटप्लेस देखें और स्वतंत्र Todijo स्टोर का समर्थन करें।"
+  },
+  "seller": {
+    "eyebrow": "विक्रेता कार्यक्षेत्र",
+    "badge": "स्टोर कमांड सेंटर",
+    "recentDescription": "आपके स्टोर में किए गए नवीनतम ऑर्डर।",
+    "emptyOrders": "अभी तक कोई स्टोर ऑर्डर नहीं",
+    "emptyOrdersText": "ग्राहक चेकआउट पूरा करते ही ऑर्डर यहाँ दिखाई देंगे।"
+  },
+  "revenueOverview": "राजस्व अवलोकन",
+  "revenueDescription": "पिछले छह महीनों की वास्तविक विक्रेता आय।",
+  "noRevenue": "अभी राजस्व डेटा नहीं है",
+  "noRevenueText": "आपके स्टोर को भुगतान किए गए ऑर्डर मिलने पर चार्ट दिखाई देगा।"
+}

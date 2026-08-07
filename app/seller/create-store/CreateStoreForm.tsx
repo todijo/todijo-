@@ -129,6 +129,10 @@ export default function CreateStoreForm({ locale }: { locale: string }) {
             <option value="es">Español</option>
             <option value="it">Italiano</option>
             <option value="nl">Nederlands</option>
+            <option value="fa">فارسی</option>
+            <option value="hi">हिन्दी</option>
+            <option value="pt">Português</option>
+            <option value="ru">Русский</option>
           </select>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, ChevronDown, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, SearchX, ShoppingBag, Store, UserRound, X } from "lucide-react";
 import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { rtlLocales, type Locale } from "@/i18n/config";
 import TodijoLogo from "@/components/TodijoLogo";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
@@ -58,7 +59,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const d = useTranslations("HomeDiscovery");
   const categoryText = useTranslations("Categories");
   const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
-  const t = { dir: ["ar", "ku"].includes(activeLocale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
+  const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
 

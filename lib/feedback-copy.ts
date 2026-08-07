@@ -8,6 +8,10 @@ const copy = {
   tr: { errorTitle: "Bu sayfa yüklenemedi", errorText: "Bilgileriniz güvende. Bağlantınızı kontrol edip tekrar deneyin.", retry: "Tekrar dene", home: "Ana sayfaya git", notFound: "Sayfa bulunamadı", notFoundText: "Sayfa taşınmış veya bağlantı güncelliğini yitirmiş olabilir." },
   ar: { errorTitle: "تعذّر تحميل هذه الصفحة", errorText: "معلوماتك آمنة. تحقّق من اتصالك وحاول مرة أخرى.", retry: "حاول مرة أخرى", home: "العودة إلى الرئيسية", notFound: "الصفحة غير موجودة", notFoundText: "ربما نُقلت الصفحة أو لم يعد الرابط صالحًا." },
   ku: { errorTitle: "ئەم پەڕەیە بار نەکرا", errorText: "زانیارییەکانت پارێزراون. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.", retry: "دووبارە هەوڵدانەوە", home: "گەڕانەوە بۆ سەرەکی", notFound: "پەڕەکە نەدۆزرایەوە", notFoundText: "لەوانەیە پەڕەکە گوازرابێتەوە یان بەستەرەکە کۆن بێت." },
+  fa: { errorTitle: "این صفحه بارگیری نشد", errorText: "اطلاعات شما امن است. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.", retry: "تلاش دوباره", home: "رفتن به صفحه اصلی", notFound: "صفحه پیدا نشد", notFoundText: "ممکن است صفحه منتقل شده باشد یا پیوند قدیمی باشد." },
+  hi: { errorTitle: "यह पेज लोड नहीं हो सका", errorText: "आपकी जानकारी सुरक्षित है। अपना कनेक्शन जाँचें और फिर से कोशिश करें।", retry: "फिर से कोशिश करें", home: "होम पेज पर जाएँ", notFound: "पेज नहीं मिला", notFoundText: "हो सकता है पेज स्थानांतरित हो गया हो या लिंक पुराना हो।" },
+  pt: { errorTitle: "Não foi possível carregar esta página", errorText: "As suas informações estão seguras. Verifique a ligação e tente novamente.", retry: "Tentar novamente", home: "Ir para o início", notFound: "Página não encontrada", notFoundText: "A página pode ter sido movida ou o link pode estar desatualizado." },
+  ru: { errorTitle: "Не удалось загрузить страницу", errorText: "Ваши данные в безопасности. Проверьте подключение и повторите попытку.", retry: "Повторить", home: "На главную", notFound: "Страница не найдена", notFoundText: "Возможно, страница была перемещена или ссылка устарела." },
 } as const;
 
 export function feedbackCopy(locale: string) { return copy[locale as keyof typeof copy] ?? copy.en; }

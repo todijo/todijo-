@@ -289,7 +289,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
         </div>
         <div className="formRow">
           <div className="formField"><label htmlFor="currency"><LabelWithIcon icon="money">{t("currency")}</LabelWithIcon></label><select id="currency" name="currency" defaultValue={initialValues.currency}><option value="EUR">EUR — Euro</option><option value="USD">USD — US Dollar</option><option value="GBP">GBP — Pound Sterling</option></select></div>
-          <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">{t("language")}</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="ku">کوردی</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option></select></div>
+          <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">{t("language")}</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="ku">کوردی</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option><option value="fa">فارسی</option><option value="hi">हिन्दी</option><option value="pt">Português</option><option value="ru">Русский</option></select></div>
         </div>
       </section>
 

@@ -1,0 +1,12 @@
+{
+  "viewShop": "Посмотреть магазин",
+  "details": "Детали товара",
+  "description": "Описание",
+  "reviews": "Отзывы",
+  "pageSections": "Разделы страницы товара",
+  "purchaseOptions": "Параметры покупки",
+  "chooseCombination": "Выбрать опции",
+  "quantity": "Количество",
+  "decreaseQuantity": "Уменьшить количество",
+  "increaseQuantity": "Увеличить количество"
+}

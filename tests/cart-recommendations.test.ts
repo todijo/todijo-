@@ -73,6 +73,6 @@ test("recommendation translations have exact parity with RTL and Chinese directi
     assert.deepEqual(Object.keys(JSON.parse(source)).sort(), expected, locale);
     assert.doesNotMatch(source, /\uFFFD|Ãƒ|Ã‚|Ã¢â‚¬/);
   }
-  assert.deepEqual([...rtlLocales].sort(), ["ar","ku"]);
+  assert.deepEqual([...rtlLocales].sort(), ["ar","fa","ku"]);
   assert.equal(rtlLocales.has("zh"), false);
 });

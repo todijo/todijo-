@@ -1,0 +1,22 @@
+{
+  "menu": "Abrir menu",
+  "mobileNavigation": "Navegação móvel",
+  "accountNavigation": "Navegação da conta",
+  "categoryNavigation": "Navegação do marketplace",
+  "locationLabel": "Localização do marketplace",
+  "deliverTo": "Entregar em",
+  "marketplace": "O seu marketplace",
+  "hello": "Olá, inicie sessão",
+  "returns": "Devoluções e",
+  "orders": "Encomendas",
+  "searchCategory": "Pesquisar categoria",
+  "allCategories": "Todas as categorias",
+  "deals": "Promoções",
+  "newArrivals": "Novidades",
+  "bestSellers": "Mais vendidos",
+  "exploreProducts": "Explorar produtos",
+  "sellerCta": "Começar a vender",
+  "viewAll": "Ver tudo",
+  "marketplaceVisual": "Descubra produtos de lojas independentes do Todijo",
+  "discoverCategories": "Explorar categorias do marketplace"
+}

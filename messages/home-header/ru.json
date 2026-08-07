@@ -1,0 +1,22 @@
+{
+  "menu": "Открыть меню",
+  "mobileNavigation": "Мобильная навигация",
+  "accountNavigation": "Навигация аккаунта",
+  "categoryNavigation": "Навигация маркетплейса",
+  "locationLabel": "Местоположение маркетплейса",
+  "deliverTo": "Доставить в",
+  "marketplace": "Ваш маркетплейс",
+  "hello": "Здравствуйте, войдите",
+  "returns": "Возвраты и",
+  "orders": "Заказы",
+  "searchCategory": "Поиск категории",
+  "allCategories": "Все категории",
+  "deals": "Акции",
+  "newArrivals": "Новинки",
+  "bestSellers": "Хиты продаж",
+  "exploreProducts": "Исследовать товары",
+  "sellerCta": "Начать продавать",
+  "viewAll": "Посмотреть всё",
+  "marketplaceVisual": "Откройте товары независимых магазинов Todijo",
+  "discoverCategories": "Исследовать категории маркетплейса"
+}

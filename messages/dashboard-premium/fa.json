@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "dashboard": "داشبورد",
+    "orders": "سفارش‌ها",
+    "messages": "پیام‌ها",
+    "favorites": "علاقه‌مندی‌ها",
+    "addresses": "آدرس‌ها",
+    "payments": "پرداخت‌ها",
+    "reviews": "نظرات",
+    "settings": "تنظیمات",
+    "products": "محصولات",
+    "statistics": "آمار",
+    "revenue": "درآمد",
+    "store": "فروشگاه",
+    "addProduct": "افزودن محصول"
+  },
+  "notifications": "اعلان‌ها",
+  "welcome": "خوش آمدید، {name}",
+  "browseMarketplace": "مرور بازار",
+  "browseProducts": "مرور محصولات",
+  "myOrders": "سفارش‌های من",
+  "myMessages": "پیام‌های من",
+  "myCart": "سبد خرید من",
+  "quickActions": "اقدامات سریع",
+  "recentOrders": "سفارش‌های اخیر",
+  "viewAll": "مشاهده همه",
+  "viewOrders": "مشاهده سفارش‌ها",
+  "viewRevenue": "مشاهده درآمد",
+  "exploreNow": "اکنون کاوش کنید",
+  "discoverBadge": "منتخب‌های بازار",
+  "discoverTitle": "چیزی ویژه در انتظار شماست",
+  "discoverText": "فروشگاه‌های مستقل و محصولات با دقت انتخاب‌شده را در Todijo کشف کنید.",
+  "stats": {
+    "totalOrders": "کل سفارش‌ها",
+    "pendingOrders": "در حال انجام",
+    "deliveredOrders": "تحویل شده",
+    "totalSpent": "کل هزینه‌کرد",
+    "orders": "سفارش‌ها",
+    "customers": "مشتریان"
+  },
+  "buyer": {
+    "eyebrow": "فضای خریدار",
+    "badge": "فضای Todijo شما",
+    "intro": "همه‌چیز برای پیگیری خریدها و پیدا کردن محصول محبوب بعدی شما.",
+    "recentDescription": "آخرین خریدهای شما، به‌روزشده با داده‌های واقعی سفارش‌ها.",
+    "emptyOrders": "اولین سفارش شما از اینجا شروع می‌شود",
+    "emptyOrdersText": "بازار را کاوش کنید و از فروشگاه‌های مستقل Todijo حمایت کنید."
+  },
+  "seller": {
+    "eyebrow": "فضای فروشنده",
+    "badge": "مرکز کنترل فروشگاه",
+    "recentDescription": "آخرین سفارش‌های ثبت‌شده در فروشگاه شما.",
+    "emptyOrders": "هنوز سفارشی برای فروشگاه وجود ندارد",
+    "emptyOrdersText": "به‌محض تکمیل پرداخت توسط مشتریان، سفارش‌ها اینجا نمایش داده می‌شوند."
+  },
+  "revenueOverview": "نمای کلی درآمد",
+  "revenueDescription": "درآمد واقعی فروشنده در شش ماه گذشته.",
+  "noRevenue": "هنوز داده‌ای از درآمد وجود ندارد",
+  "noRevenueText": "پس از دریافت سفارش‌های پرداخت‌شده، نمودار نمایش داده می‌شود."
+}

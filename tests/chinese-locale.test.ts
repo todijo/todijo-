@@ -50,8 +50,8 @@ test("Chinese namespaces, selector label, and document direction use the existin
   const switcher = fs.readFileSync(path.join(root, "components/LanguageSwitcher.tsx"), "utf8");
   const footer = fs.readFileSync(path.join(root, "components/MarketplaceFooter.tsx"), "utf8");
   const layout = fs.readFileSync(path.join(root, "app/layout.tsx"), "utf8");
-  assert.match(request, /\["fr", "zh"\]\.includes\(locale\)/);
-  assert.match(request, /"en", "fr", "ar", "ku", "zh"/);
+  assert.match(request, /\["fa", "fr", "hi", "pt", "ru", "zh"\]\.includes\(locale\)/);
+  assert.match(request, /"ar", "en", "fa", "fr", "hi", "ku", "pt", "ru", "zh"/);
   assert.match(switcher, /zh: "简体中文"/);
   assert.match(footer, /`\/\$\{locale\}\/register\?role=seller`/);
   assert.match(footer, /`\/\$\{locale\}\/dashboard`/);
