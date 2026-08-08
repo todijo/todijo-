@@ -21,6 +21,29 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Quality checks
+
+Pull requests and pushes to `main` run the GitHub Actions quality gate in
+`.github/workflows/ci.yml`. It installs the exact `package-lock.json`
+dependency tree, generates and validates the Prisma client/schema, checks
+TypeScript and ESLint, runs the safe automated test suite, and creates a
+production build.
+
+Run the equivalent checks locally with:
+
+```bash
+npm ci
+DATABASE_URL="postgresql://ci:ci@127.0.0.1:5432/todijo_ci?schema=public" npx prisma validate
+npm run typecheck
+npm run lint
+npm test
+DATABASE_URL="postgresql://ci:ci@127.0.0.1:5432/todijo_ci?schema=public" APP_URL="http://localhost:3000" SESSION_SECRET="local-validation-secret-at-least-32-characters" npm run build
+```
+
+The placeholder database URL is parsed during validation/build only. These
+checks do not start a database, run migrations, seed data, contact Stripe, or
+require production secrets.
+
 ## Deployment
 
 Push all files to GitHub, connect the repository to Coolify, select Dockerfile build, then deploy.

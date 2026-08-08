@@ -9,7 +9,7 @@ const config = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   { rules: { "@next/next/no-html-link-for-pages": "off" } },
   { files: ["tests/**/*.ts"], rules: { "@typescript-eslint/no-explicit-any": "off" } },
-  { ignores: [".next/**", ".test-dist/**", "node_modules/**", "next-env.d.ts"] },
+  { ignores: [".next/**", ".next-dev/**", ".test-dist/**", "node_modules/**", "next-env.d.ts"] },
 ];
 
 export default config;

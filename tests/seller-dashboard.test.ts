@@ -37,7 +37,8 @@ test("seller recent orders prefer snapshots and retain relation fallbacks", () =
 
 test("seller dashboard reuses the strict order ownership filter and retains five recent orders", () => {
   const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
-  assert.match(source, /where: sellerOrderHistoryWhere\(session\.userId, user\.store\.id, ""\)/);
+  assert.match(source, /const sellerOrdersWhere = sellerOrderHistoryWhere\(session\.userId, user\.store\.id, ""\)/);
+  assert.match(source, /prisma\.order\.findMany\(\{ where: sellerOrdersWhere,/);
   assert.match(source, /sellerOrders\.slice\(0, 5\)/);
   const branches: any[] = (sellerOrderHistoryWhere("seller_1", "store_1", "") as any).AND[0].OR;
   assert.deepEqual(branches[0], { storeIdSnapshot: "store_1" });

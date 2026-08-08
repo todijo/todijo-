@@ -15,7 +15,7 @@
     "db:studio": "prisma studio",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.tests.json && node --test .test-dist/tests/*.test.js"
+    "test": "tsc -p tsconfig.tests.json && node --require ./tests/setup.cjs --test .test-dist/tests/*.test.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
