@@ -47,9 +47,10 @@ require production secrets.
 ### Browser smoke tests
 
 The Playwright suite starts the isolated local Next.js server on `localhost:3100` and
-runs focused Chromium smoke tests against public/authentication routes. It does
-not use the production site, production credentials, live Stripe, or database
-writes.
+runs focused Chromium smoke tests against public/authentication routes. It covers
+desktop plus emulated 390px and 320px mobile viewports; these are responsive
+browser checks, not physical-device tests. It does not use the production site,
+production credentials, live Stripe, or database writes.
 
 Install Chromium once, then run the suite:
 
@@ -57,6 +58,9 @@ Install Chromium once, then run the suite:
 npx playwright install chromium
 npm run test:e2e
 ```
+
+Run only the responsive projects with
+`npm run test:e2e -- --project=mobile-standard --project=mobile-narrow`.
 
 For interactive debugging, use `npm run test:e2e:headed` or
 `npm run test:e2e:ui`. GitHub Actions installs Chromium with its required Linux

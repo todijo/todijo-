@@ -1,15 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-function collectRuntimeErrors(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    const text = message.text();
-    const expectedNotFoundResponse = text.includes("Failed to load resource") && text.includes("404");
-    if (message.type() === "error" && !expectedNotFoundResponse) errors.push(text);
-  });
-  return () => expect(errors, "unexpected browser runtime errors").toEqual([]);
-}
+import { expect, test } from "@playwright/test";
+import { collectRuntimeErrors } from "./helpers";
 
 test("English authentication entry renders the application shell", async ({ page }) => {
   const assertNoRuntimeErrors = collectRuntimeErrors(page);
