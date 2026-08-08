@@ -44,6 +44,25 @@ The placeholder database URL is parsed during validation/build only. These
 checks do not start a database, run migrations, seed data, contact Stripe, or
 require production secrets.
 
+### Browser smoke tests
+
+The Playwright suite starts the isolated local Next.js server on `localhost:3100` and
+runs focused Chromium smoke tests against public/authentication routes. It does
+not use the production site, production credentials, live Stripe, or database
+writes.
+
+Install Chromium once, then run the suite:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+For interactive debugging, use `npm run test:e2e:headed` or
+`npm run test:e2e:ui`. GitHub Actions installs Chromium with its required Linux
+dependencies and uploads the HTML report, screenshots, and traces only after a
+failure. The main quality job separately validates the real production build.
+
 ## Deployment
 
 Push all files to GitHub, connect the repository to Coolify, select Dockerfile build, then deploy.
