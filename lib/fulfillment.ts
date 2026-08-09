@@ -40,6 +40,7 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
     if (action === "PROCESSING") Object.assign(data, { trackingCarrier: carrier ?? order.trackingCarrier, trackingNumber: number ?? order.trackingNumber });
     const updated = await tx.order.update({ where: { id: order.id }, data, select: { id: true, status: true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true } });
     await tx.orderFulfillmentEvent.create({ data: { orderId: order.id, status: transition.nextFulfillmentStatus, source: "SELLER", actorId: sellerId, occurredAt: now, metadata: action === "PROCESSING" && (carrier || number) ? { trackingCarrier: carrier, trackingNumber: number } : undefined } });
+    await tx.orderLifecycleEvent.create({ data: { orderId: order.id, type: transition.nextOrderStatus, actorId: sellerId, createdAt: now, metadata: action === "PROCESSING" && (carrier || number) ? { trackingCarrier: carrier, trackingNumber: number } : undefined } });
     return { idempotent: false, order: updated };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

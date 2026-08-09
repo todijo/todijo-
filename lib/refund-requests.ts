@@ -49,7 +49,7 @@ export async function createBuyerRefundRequest(db: BuyerRefundDb, authenticatedU
   if (!authenticatedUserId) throw new RefundRequestError("Authentication required.", 401);
   const order = await db.order.findFirst({ where: { id: orderId, buyerId: authenticatedUserId }, select: { id: true, buyerId: true, status: true, paidAt: true, stripePaymentIntentId: true } });
   if (!order) throw new RefundRequestError("Order not found.", 404);
-  if (order.status === "CANCELLED" || order.status === "REFUNDED" || buyerPaymentState(order) !== "paid") throw new RefundRequestError("Order is not eligible for a refund request.", 400);
+  if (order.status !== "DELIVERED" || buyerPaymentState(order) !== "paid") throw new RefundRequestError("Refund requests are available after delivery. Contact the seller before shipment to request a cancellation.", 400);
   const reason = normalizedReason(input.reason);
   try {
     const request = await db.refundRequest.create({ data: { orderId: order.id, buyerId: authenticatedUserId, reason, status: "PENDING" } });

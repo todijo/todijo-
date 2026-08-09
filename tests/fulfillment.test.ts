@@ -18,7 +18,7 @@ function database(order: any, stores = [{ id: "store_1" }]) {
       },
       update: async ({ data }: any) => { updates.push(data); return { ...order, ...data, id: "order_1" }; },
     },
-    orderFulfillmentEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
+    orderFulfillmentEvent: { create: async ({ data }: any) => { events.push(data); return data; } }, orderLifecycleEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
   };
   return { db: { $transaction: async (callback: any) => callback(tx) } as any, updates, events, storeOwners };
 }

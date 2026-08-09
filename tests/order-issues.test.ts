@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createBuyerOrderIssue, OrderIssueError } from "../lib/order-issues";
+
+function db(order: any) {
+  const issues: any[] = []; const events: any[] = [];
+  const tx: any = { orderIssue: { create: async ({ data }: any) => { if (issues.some((issue) => issue.orderId === data.orderId && issue.type === data.type)) { const error: any = new Error(); error.code = "P2002"; throw error; } const issue = { id: `issue-${issues.length}`, ...data }; issues.push(issue); return issue; }, findUnique: async ({ where }: any) => issues.find((issue) => issue.orderId === where.orderId_type.orderId && issue.type === where.orderId_type.type) ?? null }, orderLifecycleEvent: { create: async ({ data }: any) => { events.push(data); return data; } } };
+  return { issues, events, order: { findFirst: async ({ where }: any) => order?.id === where.id && order?.buyerId === where.buyerId ? order : null }, $transaction: async (callback: any) => callback(tx), orderIssue: tx.orderIssue };
+}
+const order = (status: string) => ({ id: "order", buyerId: "buyer", status, paidAt: new Date(), stripePaymentIntentId: "pi" });
+
+test("cancellation is buyer-owned, pre-shipment, idempotent, and writes one event", async () => { const value: any = db(order("PAID")); const first = await createBuyerOrderIssue(value, "buyer", "order", { type: "CANCELLATION", reason: "Changed my mind", description: "Please cancel." }); assert.equal(first.created, true); assert.equal(value.events[0].type, "CANCELLATION_REQUESTED"); assert.equal((await createBuyerOrderIssue(value, "buyer", "order", { type: "CANCELLATION", reason: "Changed", description: "Again." })).created, false); assert.equal(value.issues.length, 1); });
+test("returns and disputes require delivery while cancellation stops after shipment", async () => { for (const [status, type] of [["PAID", "RETURN"], ["SHIPPED", "CANCELLATION"], ["SHIPPED", "DISPUTE"]] as const) await assert.rejects(() => createBuyerOrderIssue(db(order(status)), "buyer", "order", { type, reason: "reason", description: "description" }), (error: any) => error instanceof OrderIssueError && error.status === 409); for (const type of ["RETURN", "DISPUTE"] as const) assert.equal((await createBuyerOrderIssue(db(order("DELIVERED")), "buyer", "order", { type, reason: "reason", description: "description" })).created, true); });
+test("order issues reject foreign buyers and malformed requests", async () => { await assert.rejects(() => createBuyerOrderIssue(db(order("DELIVERED")), "other", "order", { type: "RETURN", reason: "reason", description: "description" }), (error: any) => error.status === 404); await assert.rejects(() => createBuyerOrderIssue(db(order("DELIVERED")), "buyer", "order", { type: "RETURN", reason: "", description: "description" }), (error: any) => error.status === 400); });

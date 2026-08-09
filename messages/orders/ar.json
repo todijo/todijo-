@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "رفضته Todijo"
     }
   }
+  ,"lifecycle":{"title":"سجل الطلب","CANCELLATION_REQUESTED":"تم طلب الإلغاء","RETURN_REQUESTED":"تم طلب الإرجاع","DISPUTE_REQUESTED":"تم فتح نزاع"}
 }

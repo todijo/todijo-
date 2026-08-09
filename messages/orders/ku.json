@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "لە لایەن Todijo ـەوە ڕەت کراوەتەوە"
     }
   }
+  ,"lifecycle":{"title":"مێژووی داواکاری","CANCELLATION_REQUESTED":"داوای هەڵوەشاندنەوە کرا","RETURN_REQUESTED":"داوای گەڕاندنەوە کرا","DISPUTE_REQUESTED":"ناکۆکی کرایەوە"}
 }

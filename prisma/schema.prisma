@@ -187,6 +187,20 @@ enum RefundEvidenceUploaderRole {
   BUYER
 }
 
+enum OrderIssueType {
+  CANCELLATION
+  RETURN
+  DISPUTE
+}
+
+enum OrderIssueStatus {
+  PENDING
+  SELLER_APPROVED
+  SELLER_REJECTED
+  ESCALATED
+  RESOLVED
+}
+
 model StoreAccessGrant {
   id          String            @id @default(cuid())
   storeId     String
@@ -359,6 +373,8 @@ model Order {
   items             OrderItem[]
   fulfillmentEvents OrderFulfillmentEvent[]
   refundRequest      RefundRequest?
+  issues             OrderIssue[]
+  lifecycleEvents    OrderLifecycleEvent[]
 
   @@unique([buyerId, checkoutRequestId])
   @@index([buyerId, status, createdAt])
@@ -554,6 +570,40 @@ model OrderFulfillmentEvent {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, occurredAt])
+}
+
+model OrderIssue {
+  id          String           @id @default(cuid())
+  orderId     String
+  buyerId     String
+  type        OrderIssueType
+  status      OrderIssueStatus @default(PENDING)
+  reason      String           @db.VarChar(120)
+  description String           @db.VarChar(1000)
+  reviewedById String?
+  reviewedAt  DateTime?
+  decisionNote String?         @db.VarChar(1000)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, type])
+  @@index([buyerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderLifecycleEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  type      String   @db.VarChar(80)
+  actorId   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
 }
 
 model Review {

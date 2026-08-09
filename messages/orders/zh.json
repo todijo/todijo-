@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Todijo 已拒绝"
     }
   }
+  ,"lifecycle":{"title":"订单历史","CANCELLATION_REQUESTED":"已请求取消","RETURN_REQUESTED":"已请求退货","DISPUTE_REQUESTED":"已发起争议"}
 }

@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Rifiutata da Todijo"
     }
   }
+  ,"lifecycle":{"title":"Cronologia dell'ordine","CANCELLATION_REQUESTED":"Annullamento richiesto","RETURN_REQUESTED":"Reso richiesto","DISPUTE_REQUESTED":"Contestazione aperta"}
 }

@@ -43,6 +43,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
     { key: "SHIPPED", label: t("fulfillment.shipped") },
     { key: "DELIVERED", label: t("fulfillment.delivered") },
   ];
+  const lifecycleLabel = (type: string) => ["PAID", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"].includes(type) ? t(`status.${type}`) : t(`lifecycle.${type}`);
 
   return (
     <main className="buyerOrdersPage scopedPublicPage">
@@ -76,6 +77,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
             )}
             {(order.trackingCarrier || order.trackingNumber) && <p><strong>{t("fulfillment.tracking")}</strong>{order.trackingCarrier && ` ${order.trackingCarrier}`}{order.trackingCarrier && order.trackingNumber && " · "}{order.trackingNumber}</p>}
 
+            {order.lifecycleEvents.length > 0 && <section className="buyerLifecycleTimeline" aria-label={t("lifecycle.title")}><h2>{t("lifecycle.title")}</h2><ol>{order.lifecycleEvents.map((event) => <li key={event.id}><i aria-hidden="true"/><div><strong>{lifecycleLabel(event.type)}</strong><time dateTime={event.createdAt.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(event.createdAt)}</time></div></li>)}</ol></section>}
             <h2>{t("products")}</h2>
             <div className="buyerOrderDetailItems">
               {order.items.map((item) => {
@@ -103,7 +105,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
           </aside>
         </div>
 
-        <BuyerRefundRequest orderId={order.id} eligible={paymentState === "paid" && order.status !== "CANCELLED" && order.status !== "REFUNDED"}/>
+        <BuyerRefundRequest orderId={order.id} eligible={paymentState === "paid" && order.status === "DELIVERED"}/>
 
         <Link className="quickActionLink secondary buyerOrdersBack" href={`/${locale}/account/orders`}>← {t("backOrders")}</Link>
       </div>

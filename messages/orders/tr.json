@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Todijo tarafından reddedildi"
     }
   }
+  ,"lifecycle":{"title":"Sipariş geçmişi","CANCELLATION_REQUESTED":"İptal istendi","RETURN_REQUESTED":"İade istendi","DISPUTE_REQUESTED":"Uyuşmazlık açıldı"}
 }

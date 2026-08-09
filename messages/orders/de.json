@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Von Todijo abgelehnt"
     }
   }
+  ,"lifecycle":{"title":"Bestellverlauf","CANCELLATION_REQUESTED":"Stornierung angefordert","RETURN_REQUESTED":"Rückgabe angefordert","DISPUTE_REQUESTED":"Streitfall eröffnet"}
 }

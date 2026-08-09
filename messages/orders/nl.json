@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Afgewezen door Todijo"
     }
   }
+  ,"lifecycle":{"title":"Bestelgeschiedenis","CANCELLATION_REQUESTED":"Annulering aangevraagd","RETURN_REQUESTED":"Retour aangevraagd","DISPUTE_REQUESTED":"Geschil geopend"}
 }

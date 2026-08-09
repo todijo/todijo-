@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Отклонено Todijo"
     }
   }
+  ,"lifecycle":{"title":"История заказа","CANCELLATION_REQUESTED":"Запрошена отмена","RETURN_REQUESTED":"Запрошен возврат","DISPUTE_REQUESTED":"Открыт спор"}
 }

@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "ردشده توسط Todijo"
     }
   }
+  ,"lifecycle":{"title":"تاریخچه سفارش","CANCELLATION_REQUESTED":"لغو درخواست شد","RETURN_REQUESTED":"مرجوعی درخواست شد","DISPUTE_REQUESTED":"اختلاف باز شد"}
 }

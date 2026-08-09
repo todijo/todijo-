@@ -113,4 +113,5 @@
       "ADMIN_REJECTED": "Todijo द्वारा अस्वीकार"
     }
   }
+  ,"lifecycle":{"title":"ऑर्डर इतिहास","CANCELLATION_REQUESTED":"रद्द करने का अनुरोध","RETURN_REQUESTED":"वापसी का अनुरोध","DISPUTE_REQUESTED":"विवाद खोला गया"}
 }
