@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
+import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
@@ -60,6 +62,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       await replaceProductVariantImages(tx, id, images, body.variantImages);
     });
 
+    revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
@@ -78,6 +81,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     const product = await prisma.product.findFirst({ where: { id, store: { ownerId: session.userId } }, select: { id: true } });
     if (!product) return NextResponse.json({ error: "Produit introuvable ou accès refusé." }, { status: 404 });
     await prisma.product.delete({ where: { id } });
+    revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Delete product error:", error);

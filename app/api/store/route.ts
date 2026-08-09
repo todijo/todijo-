@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency";
+import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 
 function makeSlug(value: string) {
   return value
@@ -115,6 +117,7 @@ export async function POST(request: Request) {
       return created;
     });
 
+    revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
     if (
@@ -216,6 +219,7 @@ export async function PATCH(request: Request) {
       data: { storeName: name },
     });
 
+    revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

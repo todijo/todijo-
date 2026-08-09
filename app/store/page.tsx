@@ -6,21 +6,22 @@ import { prisma } from "@/lib/prisma";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { publicStoreAccessWhere } from "@/lib/admin-access";
+import { unstable_cache } from "next/cache";
+import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 
-export const dynamic = "force-dynamic";
+const listPublicStores = unstable_cache(async () => prisma.store.findMany({
+  where: { ...publicStoreAccessWhere(), products: { some: { status: "PUBLISHED" } } },
+  orderBy: { updatedAt: "desc" },
+  select: {
+    id: true, name: true, slug: true, description: true, logo: true,
+    _count: { select: { products: { where: { status: "PUBLISHED" } } } },
+  },
+}), ["public-store-directory"], { revalidate: 60, tags: [PUBLIC_STORES_CACHE_TAG] });
 
 export default async function StoreIndexPage() {
   const locale = await getLocale();
   const [t, marketplace] = await Promise.all([getTranslations("HomeDiscovery"), getTranslations("Marketplace")]);
-  const publicAccess = publicStoreAccessWhere();
-  const stores = await prisma.store.findMany({
-    where: { ...publicAccess, products: { some: { status: "PUBLISHED" } } },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true, name: true, slug: true, description: true, logo: true,
-      _count: { select: { products: { where: { status: "PUBLISHED" } } } },
-    },
-  });
+  const stores = await listPublicStores();
 
   return <main className="storeIndexPage">
     <SiteHeader/>

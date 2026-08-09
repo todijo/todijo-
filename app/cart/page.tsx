@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { useCart } from "@/components/CartProvider";
@@ -38,11 +39,8 @@ export default function CartPage() {
             <section className="cartItems" aria-label={t("items")}>
               {items.map((item) => (
                 <article className="cartItem" key={item.lineKey}>
-                  <Link href={`/product/${item.id}`} className="cartItemImage">
-                    {item.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image} alt={item.name} />
-                    ) : <span>📦</span>}
+                  <Link href={`/product/${item.id}`} className="cartItemImage" style={{ position: "relative" }}>
+                    {item.image ? <Image src={item.image} alt={item.name} fill sizes="(max-width: 620px) 95px, 150px" unoptimized/> : <span>📦</span>}
                   </Link>
                   <div className="cartItemBody">
                     <div className="cartItemTop">
