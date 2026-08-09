@@ -23,6 +23,7 @@ export default getRequestConfig(async () => {
   messages.Privacy = { ...(await import("../messages/privacy/en.json")).default, ...(await import(`../messages/privacy/${locale}.json`)).default };
   messages.Legal = (await import(`../messages/legal/${locale}.json`)).default;
   messages.LegalCleanup = (await import(`../messages/legal-cleanup/${locale}.json`)).default;
+  messages.InfoPages = (await import(`../messages/info-pages/${locale}.json`)).default;
   messages.SellerTransparency = (await import(`../messages/seller-transparency/${locale}.json`)).default;
   messages.Compliance = (await import(`../messages/compliance/${locale}.json`)).default;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
