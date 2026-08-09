@@ -90,9 +90,15 @@ test("search filters are visibly triggered, preserve state, and update the URL",
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Filters" });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Filters" })).toHaveCount(1);
+  await expect(dialog.locator("legend").filter({ hasText: "Filters" })).toHaveCount(0);
+  await expect(dialog.locator(".filterChoice").first()).toHaveCSS("min-height", "40px");
+  await expect(dialog.locator(".filterActions")).toBeVisible();
+  const drawerColors = await dialog.evaluate((element) => { const style = getComputedStyle(element); return [style.backgroundColor, style.color]; });
+  expect(drawerColors[0]).not.toBe(drawerColors[1]);
   await page.getByLabel("Minimum price").fill("10");
   await page.getByLabel("Country").fill("France");
-  await page.getByRole("radio", { name: "4★+" }).check();
+  await dialog.locator(".filterRatingSection .filterChoice").nth(1).click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
