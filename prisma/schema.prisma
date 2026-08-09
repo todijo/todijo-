@@ -31,6 +31,26 @@ enum SellerType {
   PRIVATE
 }
 
+enum SellerVatStatus {
+  UNKNOWN
+  REGISTERED
+  NOT_REGISTERED_OR_NOT_APPLICABLE
+}
+
+enum ProductReportReason {
+  ILLEGAL
+  UNSAFE
+  MISLEADING
+  PROHIBITED
+  OTHER
+}
+
+enum ProductReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 enum SubscriptionStatus {
   INCOMPLETE
   TRIALING
@@ -103,6 +123,7 @@ model User {
   refundRequests      RefundRequest[] @relation("RefundRequestBuyer")
   reviewedRefundRequests RefundRequest[] @relation("RefundRequestReviewer")
   uploadedRefundEvidence RefundEvidence[] @relation("RefundEvidenceUploader")
+  productReports      ProductReport[]
   accessGrantsCreated StoreAccessGrant[] @relation("AccessGrantAdmin")
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
@@ -155,6 +176,7 @@ model Store {
   businessAddress  String?
   businessPostalCode String?
   vatNumber        String?
+  vatStatus        SellerVatStatus @default(UNKNOWN)
 
   ownerId String @unique
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -246,6 +268,13 @@ model Product {
   status             ProductStatus             @default(PUBLISHED)
   deactivationReason ProductDeactivationReason @default(NONE)
   allowPrepurchaseQuestions Boolean               @default(true)
+  productIdentifier String?
+  manufacturerName String?
+  manufacturerContact String?
+  responsiblePerson String?
+  safetyInformation String? @db.Text
+  complianceInformation String? @db.Text
+  complianceDeclaredAt DateTime?
 
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -259,6 +288,7 @@ model Product {
   options       ProductOption[]
   variants      ProductVariant[]
   imageRecords  ProductImage[]
+  reports       ProductReport[]
 
   @@unique([storeId, slug])
   @@index([storeId, status])
@@ -353,7 +383,11 @@ model Order {
   storeIdSnapshot          String?
   storeNameSnapshot        String?
   sellerTypeSnapshot       SellerType?
+  sellerVatStatusSnapshot  SellerVatStatus?
   storeSnapshot            Json?
+  sellerInvoiceReference   String?
+  sellerInvoiceUrl         String?
+  sellerInvoiceIssuedAt    DateTime?
   buyerNameSnapshot        String?
   buyerEmailSnapshot       String?
   buyerPhoneSnapshot       String?
@@ -393,6 +427,23 @@ model Order {
   @@index([buyerId, status, createdAt])
   @@index([storeIdSnapshot])
   @@index([fulfillmentStatus])
+}
+
+model ProductReport {
+  id          String              @id @default(cuid())
+  productId   String
+  reporterId  String
+  reason      ProductReportReason
+  details     String              @db.VarChar(1500)
+  status      ProductReportStatus @default(OPEN)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, reporterId])
+  @@index([status, createdAt])
 }
 
 model StripeWebhookEvent {

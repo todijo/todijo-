@@ -25,7 +25,7 @@ export default async function SellerProductsPage() {
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
     select: {
-      name: true, slug: true, currency: true, status: true, sellerType: true,
+      name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },

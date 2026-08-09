@@ -32,6 +32,7 @@ type StoreValues = {
   businessAddress: string;
   businessPostalCode: string;
   vatNumber: string;
+  vatStatus: "UNKNOWN" | "REGISTERED" | "NOT_REGISTERED_OR_NOT_APPLICABLE";
 };
 
 type MediaKind = "logo" | "banner";
@@ -199,7 +200,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
     setSaving(true);
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber") }) });
+      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus") }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); setMessageError(true); showToast({ message: text, tone: "error" }); return; }
       setMessage(t("settingsSaved")); setMessageError(false); showToast({ message: t("settingsSaved"), tone: "success" }); router.refresh();

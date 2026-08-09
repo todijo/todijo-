@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const cart = useTranslations("Cart");
   const connect = useTranslations("Connect");
   const sellerTransparency = useTranslations("SellerTransparency");
+  const compliance = useTranslations("Compliance");
   const locale = useLocale();
 
   useEffect(() => {
@@ -55,8 +56,9 @@ export default function CheckoutPage() {
     {items.length === 0 ? <div className="emptyCartCard"><div>🛒</div><h2>{t("empty")}</h2><Link className="primary" href="/">{t("discover")}</Link></div> : <div className="checkoutGrid">
       <section className="checkoutForm">
         <section><div className="checkoutStep"><span>1</span><div><h2>{t("card")}</h2><p>{t("stripeDetails")}</p></div></div><div className="paymentNotice">🔒 {t("notice")}</div></section>
+        <aside className="checkoutLegal"><strong>{compliance("precontractTitle")}</strong><p>{compliance("precontractText")}</p><p><Link href={`/${locale}/info/terms`}>{compliance("legalLinks")}</Link></p></aside>
         {error && <p className="formError" role="alert">{error}</p>}
-        <button className="authSubmit" type="button" onClick={beginCheckout} disabled={loading} aria-busy={loading}>{loading ? t("opening") : t("pay", {amount: formatCurrency(subtotal, currency, locale)})}</button>
+        <button className="authSubmit" type="button" onClick={beginCheckout} disabled={loading} aria-busy={loading}>{loading ? t("opening") : compliance("paymentObligation")}</button>
       </section>
       <aside className="checkoutSummary"><h2>{t("order")}</h2>{items.map((item) => <article key={item.id}><div className="checkoutThumb">{item.image ? <Image src={item.image} alt={item.name} width={58} height={58} unoptimized /> : <span aria-hidden="true">📦</span>}<b>{item.quantity}</b></div><div><strong>{item.name}</strong>{item.storeName && <small>{item.storeName}</small>}<SellerTypeDisclosure sellerType={sellerTypes[item.id] ?? "UNKNOWN"} compact/>{item.selectedOptions && <small>{item.selectedOptions}</small>}<span>{formatCurrency(item.price * item.quantity, item.currency, locale)}</span></div></article>)}<div className="summaryLine"><span>{cart("subtotal")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div><div className="summaryLine"><span>{cart("shipping")}</span><span>{t("shippingStripe")}</span></div><div className="summaryTotal"><span>{cart("total")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div><Link href="/cart">← {t("modify")}</Link></aside>
     </div>}

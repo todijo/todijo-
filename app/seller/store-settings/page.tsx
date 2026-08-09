@@ -24,7 +24,7 @@ export default async function StoreSettingsPage() {
     where: { ownerId: session.userId },
     select: {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
-      legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true,
+      legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true,
       contactEmail: true, phone: true, currency: true, language: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { plan: true, status: true, currentPeriodEnd: true } },
@@ -60,7 +60,7 @@ export default async function StoreSettingsPage() {
       logo: store.logo ?? "", banner: store.banner ?? "", country: store.country, city: store.city,
       currency: store.currency, language: store.language,
       sellerType: store.sellerType, legalBusinessName: store.legalBusinessName ?? "", businessRegistrationId: store.businessRegistrationId ?? "",
-      businessAddress: store.businessAddress ?? "", businessPostalCode: store.businessPostalCode ?? "", vatNumber: store.vatNumber ?? "",
+      businessAddress: store.businessAddress ?? "", businessPostalCode: store.businessPostalCode ?? "", vatNumber: store.vatNumber ?? "", vatStatus: store.vatStatus,
     }} />
 
     <div className="sellerSettingsSupportGrid">

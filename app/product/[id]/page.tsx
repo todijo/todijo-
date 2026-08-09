@@ -16,6 +16,7 @@ import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { categoryLabel } from "@/lib/categories";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
+import ProductReportButton from "@/components/ProductReportButton";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -25,6 +26,7 @@ export default async function ProductPage({ params }: Props) {
   const market = await getTranslations("Marketplace");
   const productText = await getTranslations("Product");
   const detailText = await getTranslations("ProductDetail");
+  const compliance = await getTranslations("Compliance");
   const categoryText = await getTranslations("Categories");
   const { id } = await params;
   const session = await readSession();
@@ -33,7 +35,7 @@ export default async function ProductPage({ params }: Props) {
     where: { id, status: "PUBLISHED", ...publicAccess },
     select: {
       id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true,
-      condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true,
+      condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,
       options: { where: { active: true }, orderBy: { position: "asc" }, select: {
         id: true, name: true, position: true,
         values: { where: { active: true }, orderBy: { position: "asc" }, select: {
@@ -72,7 +74,9 @@ export default async function ProductPage({ params }: Props) {
       <p className="productDetailDescription">{product.description}</p>
       <dl className="productFacts productFactsMobile" id="product-facts-mobile"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
     </section>
+    {(product.productIdentifier||product.manufacturerName||product.manufacturerContact||product.responsiblePerson||product.safetyInformation||product.complianceInformation)&&<details className="productCompliancePublic"><summary>{compliance("publicProductInfo")}</summary><dl>{product.productIdentifier&&<div><dt>{compliance("productIdentifier")}</dt><dd>{product.productIdentifier}</dd></div>}{product.manufacturerName&&<div><dt>{compliance("manufacturerName")}</dt><dd>{product.manufacturerName}</dd></div>}{product.manufacturerContact&&<div><dt>{compliance("manufacturerContact")}</dt><dd>{product.manufacturerContact}</dd></div>}{product.responsiblePerson&&<div><dt>{compliance("responsiblePerson")}</dt><dd>{product.responsiblePerson}</dd></div>}</dl>{product.safetyInformation&&<><h3>{compliance("publicSafetyInfo")}</h3><p>{product.safetyInformation}</p></>}{product.complianceInformation&&<p>{product.complianceInformation}</p>}</details>}
     {product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}
+    <ProductReportButton productId={product.id} loggedIn={Boolean(session)}/>
   </section>
   {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div>{item.images[0]?<img src={item.images[0]} alt={item.name}/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{Number(item.price).toFixed(2)} {item.currency}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;

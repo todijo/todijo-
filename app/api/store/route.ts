@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     if (!sellerType) return NextResponse.json({ error: "Choose your seller status.", code: "SELLER_TYPE_REQUIRED" }, { status: 400 });
     let sellerIdentity;
     try { sellerIdentity = sellerIdentityInput(body, sellerType); }
-    catch { return NextResponse.json({ error: "A legal or business name is required for professional sellers.", code: "LEGAL_BUSINESS_NAME_REQUIRED" }, { status: 400 }); }
+    catch (error) { const code = error instanceof Error ? error.message : "SELLER_IDENTITY_REQUIRED"; return NextResponse.json({ error: code, code }, { status: 400 }); }
 
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json(
@@ -158,7 +158,7 @@ export async function PATCH(request: Request) {
     if (!sellerType) return NextResponse.json({ error: "Choose your seller status.", code: "SELLER_TYPE_REQUIRED" }, { status: 400 });
     let sellerIdentity;
     try { sellerIdentity = sellerIdentityInput(body, sellerType); }
-    catch { return NextResponse.json({ error: "A legal or business name is required for professional sellers.", code: "LEGAL_BUSINESS_NAME_REQUIRED" }, { status: 400 }); }
+    catch (error) { const code = error instanceof Error ? error.message : "SELLER_IDENTITY_REQUIRED"; return NextResponse.json({ error: code, code }, { status: 400 }); }
 
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json({ error: "Le nom de la boutique doit contenir entre 2 et 80 caractères." }, { status: 400 });

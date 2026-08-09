@@ -7,6 +7,7 @@ import { createProductWithVariants, ProductVariantError, type ProductVariantsInp
 import { ProductVariantImageError } from "@/lib/product-variant-images";
 import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
+import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
     const category = String(body.category ?? "").trim();
     const condition = String(body.condition ?? "NEUF").trim().toUpperCase();
     const status = body.status === "DRAFT" ? "DRAFT" : "PUBLISHED";
+    const compliance = readProductCompliance(body);
+    if (status === "PUBLISHED" && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
     const price = Number(body.price);
     const stock = Number(body.stock);
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
@@ -100,6 +103,8 @@ export async function POST(request: Request) {
         currency: store.currency,
         storeId: store.id,
         allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
+        ...compliance,
+        complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
       }, variantInput, body.variantImages);
 
     return NextResponse.json({ ok: true, product });
@@ -107,6 +112,7 @@ export async function POST(request: Request) {
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     if (error instanceof ProductVariantError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }

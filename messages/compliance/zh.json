@@ -1,0 +1,6 @@
+{
+  "vatStatus":"增值税状态","vatRegistered":"已登记增值税","vatNotRegistered":"未登记增值税／无需增值税号","vatNoExternalValidation":"由卖家声明；Todijo 未独立核验。",
+  "productComplianceTitle":"产品与安全信息","productComplianceHelp":"填写此产品依法需要的信息；不适用的字段可留空。","productIdentifier":"产品标识","manufacturerName":"制造商／生产者","manufacturerContact":"制造商联系方式","responsiblePerson":"依法需要时的负责人／联系方式","safetyInformation":"安全警告与说明","complianceInformation":"其他合规信息","listingDeclaration":"我确认商品信息准确，且产品符合适用规定。",
+  "publicProductInfo":"产品信息","publicSafetyInfo":"安全信息","reportProduct":"举报此产品","reportReason":"原因","reportIllegal":"违法产品","reportUnsafe":"不安全产品","reportMisleading":"误导性商品信息","reportProhibited":"禁止内容","reportOther":"其他","reportDetails":"详情","reportSubmit":"提交举报","reportSuccess":"已收到举报。","reportLogin":"请登录后提交举报。","reportError":"无法提交举报。",
+  "precontractTitle":"继续前请确认","precontractText":"卖家身份和产品主要信息已显示在上方。运费及任何适用税费会由 Stripe 在付款前计算并显示。","legalLinks":"查看条款、退货政策和隐私政策","paymentObligation":"继续安全付款（产生付款义务）"
+}

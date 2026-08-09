@@ -12,11 +12,13 @@ import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
 import { productStockForForm } from "@/lib/product-variant-form";
 import { useToast } from "@/components/ToastProvider";
 import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
+import ProductComplianceFields from "@/components/ProductComplianceFields";
 export default function NewProductForm({ currency, productCount, productLimit }: { currency: string; productCount: number; productLimit: number | null }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const categoryText = useTranslations("Categories");
   const ux = useTranslations("Ux");
+  const compliance = useTranslations("Compliance");
   const { showToast } = useToast();
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -48,6 +50,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
         images, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on",
+        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on",
       }),
     });
     const data = await response.json() as { error?: string; product?: { id?: string } };
@@ -100,6 +103,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
           </div>
           <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
         </SellerSection>
+        <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
       </div>
 
       {!variantsEnabled && <aside className="sellerControlFormAside">

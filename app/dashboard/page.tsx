@@ -67,7 +67,7 @@ export default async function DashboardPage() {
     select: {
       firstName: true, lastName: true, email: true, role: true,
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
-      store: { select: { id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, currency: true, status: true, sellerType: true, subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, _count: { select: { products: true } } } },
+      store: { select: { id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, currency: true, status: true, sellerType: true, vatStatus: true, subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, _count: { select: { products: true } } } },
       _count: { select: { orders: true, buyerConversations: true, reviews: true } },
     },
   }));

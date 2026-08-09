@@ -45,6 +45,8 @@ export async function createCheckout(
   const stores = new Set(products.map((product) => product.storeId));
   if (stores.size !== 1) throw new CheckoutError("MULTIPLE_SELLERS", 409);
   if (products[0].store.sellerType === "UNKNOWN") throw new CheckoutError("SELLER_STATUS_REQUIRED", 409);
+  const sellerVat = await db.store.findUniqueOrThrow({where:{id:products[0].storeId},select:{vatStatus:true}});
+  if (products[0].store.sellerType === "PROFESSIONAL" && sellerVat.vatStatus === "UNKNOWN") throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
   const seller = products[0].store.owner;
   if (!seller.stripeAccountId || !seller.stripeOnboardingComplete || !seller.stripeChargesEnabled) throw new CheckoutError("SELLER_STRIPE_NOT_READY", 409);
   const currencies = new Set(products.map((product) => product.currency.toUpperCase()));
@@ -87,6 +89,7 @@ export async function createCheckout(
       if (order.stripeCheckoutSessionId && order.stripeCheckoutUrl) return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
     }
   }
+  await db.order.update({where:{id:order.id},data:{sellerVatStatusSnapshot:sellerVat.vatStatus}});
   const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: Number(line.unitPrice.mul(100).toFixed(0)), quantity: line.quantity, currency: line.product.currency })) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
