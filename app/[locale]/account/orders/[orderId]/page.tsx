@@ -8,6 +8,7 @@ import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { fulfillmentStepFor, fulfillmentStepIndex } from "@/lib/order-status";
 import { BuyerRefundRequest } from "@/components/BuyerRefundRequest";
+import OrderCommercialDocuments from "@/components/OrderCommercialDocuments";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,8 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
         </div>
 
         <BuyerRefundRequest orderId={order.id} eligible={paymentState === "paid" && order.status === "DELIVERED"}/>
+
+        <OrderCommercialDocuments locale={locale} orderId={order.id} createdAt={order.createdAt} total={Number(order.total)} currency={order.currency} paymentStatus={t(`payment.${paymentState}`)} sellerType={order.sellerTypeSnapshot} invoiceReference={order.sellerInvoiceReference} invoiceUrl={order.sellerInvoiceUrl} invoiceIssuedAt={order.sellerInvoiceIssuedAt}/>
 
         <Link className="quickActionLink secondary buyerOrdersBack" href={`/${locale}/account/orders`}>← {t("backOrders")}</Link>
       </div>
