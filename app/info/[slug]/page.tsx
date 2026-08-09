@@ -20,26 +20,27 @@ const legalTitleKeys: Record<(typeof legalPages)[number], string> = {
   terms: "terms", "seller-terms": "terms", returns: "returns", privacy: "privacy", cookies: "cookies", "legal-notice": "legalNotice", "marketplace-rules": "rules",
 };
 const policyKinds = { terms: "terms", "seller-terms": "seller", returns: "returns" } as const;
+const cleanupKinds = { "legal-notice": "legalNotice", "marketplace-rules": "rules" } as const;
 
 export default async function MarketplaceInfoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const titleKey = pageTitleKeys[slug];
   if (!titleKey) notFound();
-  const [locale, t, legal, sellerTransparency] = await Promise.all([getLocale(), getTranslations("HomeFooter"), getTranslations("Legal"), getTranslations("SellerTransparency")]);
+  const [locale, t, legal, legalCleanup, sellerTransparency] = await Promise.all([getLocale(), getTranslations("HomeFooter"), getTranslations("Legal"), getTranslations("LegalCleanup"), getTranslations("SellerTransparency")]);
   const isLegal = legalPages.includes(slug as (typeof legalPages)[number]) || slug === "privacy-data";
   const Icon = isLegal ? ShieldCheck : Info;
   const privacyProfile = privacyPublicProfile();
 
   return <main className={`marketInfoPage scopedPublicPage${isLegal ? " legalInfoPage" : ""}`}>
     <SiteHeader />
-    {!["privacy", "cookies", "privacy-data", "terms", "seller-terms", "returns"].includes(slug) && <section className="marketInfoHero">
+    {!["privacy", "cookies", "privacy-data", "terms", "seller-terms", "returns", "legal-notice", "marketplace-rules"].includes(slug) && <section className="marketInfoHero">
       <div className="marketInfoIcon"><Icon size={30} aria-hidden="true"/></div>
       <span><Clock3 size={18} aria-hidden="true"/>{t("comingSoon")}</span>
       <h1>{t(titleKey)}</h1>
       <p>{t("comingSoonText")}</p>
     </section>}
     <div className="marketInfoLayout">
-      {["privacy", "cookies", "privacy-data"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data"} supportEmail={privacyProfile.supportEmail} /> : slug in policyKinds ? <MarketplaceLegalPolicy title={legal(`${policyKinds[slug as keyof typeof policyKinds]}.title`)} intro={legal(`${policyKinds[slug as keyof typeof policyKinds]}.intro`)} statusNote={legal("common.preIncorporation")} traderNote={slug === "seller-terms" || slug === "returns" ? sellerTransparency("legalStatusNote") : undefined} sections={legal.raw(`${policyKinds[slug as keyof typeof policyKinds]}.sections`) as Array<{ title: string; body: string }>} supportEmail={privacyProfile.supportEmail}/> : <article className="marketInfoContent">
+      {["privacy", "cookies", "privacy-data"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data"} supportEmail={privacyProfile.supportEmail} /> : slug in policyKinds ? <MarketplaceLegalPolicy title={legal(`${policyKinds[slug as keyof typeof policyKinds]}.title`)} intro={legal(`${policyKinds[slug as keyof typeof policyKinds]}.intro`)} statusNote={legal("common.preIncorporation")} traderNote={slug === "seller-terms" || slug === "returns" ? sellerTransparency("legalStatusNote") : undefined} sections={legal.raw(`${policyKinds[slug as keyof typeof policyKinds]}.sections`) as Array<{ title: string; body: string }>} supportEmail={privacyProfile.supportEmail}/> : slug in cleanupKinds ? <MarketplaceLegalPolicy title={legalCleanup(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.title`)} intro={legalCleanup(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.intro`)} statusNote={legal("common.preIncorporation")} sections={legalCleanup.raw(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.sections`) as Array<{title:string;body:string}>} supportEmail={privacyProfile.supportEmail} relatedLinks={slug==="marketplace-rules"?[{label:legalCleanup("links.terms"),href:`/${locale}/info/terms`},{label:legalCleanup("links.sellerTerms"),href:`/${locale}/info/seller-terms`},{label:legalCleanup("links.returns"),href:`/${locale}/info/returns`}]:[]}/> : <article className="marketInfoContent">
         <FileText size={28} aria-hidden="true"/>
         <h2>{t(titleKey)}</h2>
         <p>{t("comingSoonText")}</p>
