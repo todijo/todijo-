@@ -32,8 +32,10 @@ export default async function ConversationPage({ params }: Props) {
     },
   });
   if (!conversation) notFound();
-  await prisma.message.updateMany({ where: { conversationId: id, senderId: { not: session.userId }, readAt: null }, data: { readAt: new Date() } });
-  await prisma.notification.updateMany({ where: { userId: session.userId, href: { endsWith: `/messages/${id}` }, readAt: null }, data: { readAt: new Date() } });
+  await Promise.all([
+    prisma.message.updateMany({ where: { conversationId: id, senderId: { not: session.userId }, readAt: null }, data: { readAt: new Date() } }),
+    prisma.notification.updateMany({ where: { userId: session.userId, href: { endsWith: `/messages/${id}` }, readAt: null }, data: { readAt: new Date() } }),
+  ]);
   const other = conversation.buyerId === session.userId ? conversation.seller : conversation.buyer;
 
   return <main className="conversationPage scopedPublicPage">

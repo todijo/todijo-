@@ -22,14 +22,12 @@ export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ProductPage({ params }: Props) {
-  const common = await getTranslations("Common");
-  const market = await getTranslations("Marketplace");
-  const productText = await getTranslations("Product");
-  const detailText = await getTranslations("ProductDetail");
-  const compliance = await getTranslations("Compliance");
-  const categoryText = await getTranslations("Categories");
-  const { id } = await params;
-  const session = await readSession();
+  const [common, market, productText, detailText, compliance, categoryText, resolvedParams, session] = await Promise.all([
+    getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
+    getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"),
+    params, readSession(),
+  ]);
+  const { id } = resolvedParams;
   const publicAccess = publicProductAccessWhere();
   const product = await prisma.product.findFirst({
     where: { id, status: "PUBLISHED", ...publicAccess },

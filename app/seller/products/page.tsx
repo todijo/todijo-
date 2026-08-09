@@ -12,14 +12,11 @@ import { canPublish } from "@/lib/seller-subscription";
 export const dynamic = "force-dynamic";
 
 export default async function SellerProductsPage() {
-  const t = await getTranslations("Seller");
-  const control = await getTranslations("SellerControl");
-  const p = await getTranslations("DashboardPremium");
-  const common = await getTranslations("Common");
-  const dashboardText = await getTranslations("SellerDashboard");
-  const transparency = await getTranslations("SellerTransparency");
-  const locale = await getLocale();
-  const session = await readSession();
+  const [t, control, p, common, dashboardText, transparency, compliance, locale, session] = await Promise.all([
+    getTranslations("Seller"), getTranslations("SellerControl"), getTranslations("DashboardPremium"),
+    getTranslations("Common"), getTranslations("SellerDashboard"), getTranslations("SellerTransparency"),
+    getTranslations("Compliance"), getLocale(), readSession(),
+  ]);
   if (!session) redirect("/login");
 
   const store = await prisma.store.findUnique({
@@ -37,7 +34,6 @@ export default async function SellerProductsPage() {
   const subscriptionActive = canPublish(store);
   const sellerTypeRequired = store.sellerType === "UNKNOWN";
   const vatStatusRequired = store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN";
-  const compliance = await getTranslations("Compliance");
   const readinessHref = sellerTypeRequired || vatStatusRequired ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
   const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : control("subscriptionInactive");
   const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") });

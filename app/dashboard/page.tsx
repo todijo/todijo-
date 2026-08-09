@@ -50,17 +50,12 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
 }
 
 export default async function DashboardPage() {
-  const t = await getTranslations("Dashboard");
-  const p = await getTranslations("DashboardPremium");
-  const s = await getTranslations("SellerDashboard");
-  const common = await getTranslations("Common");
-  const ordersText = await getTranslations("Orders");
-  const control = await getTranslations("SellerControl");
-  const privacy = await getTranslations("Privacy");
-  const transparency = await getTranslations("SellerTransparency");
-  const compliance = await getTranslations("Compliance");
-  const locale = await getLocale();
-  const session = await readSession();
+  const [t, p, s, common, ordersText, control, privacy, transparency, compliance, locale, session] = await Promise.all([
+    getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
+    getTranslations("Common"), getTranslations("Orders"), getTranslations("SellerControl"),
+    getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"),
+    getLocale(), readSession(),
+  ]);
   if (!session) redirect("/login");
 
   const user = await dashboardData(prisma.user.findUnique({
@@ -141,34 +136,33 @@ export default async function DashboardPage() {
   if (!user.store) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={paths.dashboard} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><DashboardEmptyState headingLevel="h1" title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/create-store`}>{t("createShop")}</Link>}/><StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/></div></div></main>;
 
   const sellerOrdersWhere = sellerOrderHistoryWhere(session.userId, user.store.id, "");
-  const [sellerOrders, pendingRefundCount] = await dashboardData(Promise.all([
-    prisma.order.findMany({ where: sellerOrdersWhere, include: { buyer: { select: { firstName: true, lastName: true } }, items: { include: { product: { select: { id: true, name: true, images: true, store: { select: { name: true, slug: true } } } } } } }, orderBy: { createdAt: "desc" } }),
-    prisma.refundRequest.count({ where: { status: "PENDING", order: sellerOrdersWhere } }),
-  ]));
-  const paidSellerOrders = sellerOrders.filter((order) => order.paidAt || order.stripePaymentIntentId);
-  const revenue = paidSellerOrders.reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
-  const customers = new Set(paidSellerOrders.map((order) => order.buyerId)).size;
   const now = new Date();
-  const startToday = new Date(now); startToday.setHours(0, 0, 0, 0);
-  const todayRevenue = paidSellerOrders.filter((order) => (order.paidAt ?? order.createdAt) >= startToday).reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
-  const pendingOrders = sellerOrders.filter((order) => ["PENDING", "PAID", "PROCESSING"].includes(order.status)).length;
-  const firstOrderByBuyer = new Map<string, Date>();
-  for (const order of sellerOrders) { const first = firstOrderByBuyer.get(order.buyerId); if (!first || order.createdAt < first) firstOrderByBuyer.set(order.buyerId, order.createdAt); }
-  const newCustomers = [...firstOrderByBuyer.values()].filter((date) => date >= startToday).length;
-  const profileFields = [user.store.name, user.store.description, user.store.logo, user.store.banner, user.store.city, user.store.country];
-  const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
-  const periods = sellerPeriodMetrics(sellerOrders, now);
-  const comparison = (current: number, previous: number) => { const percent = comparisonPercent(current, previous); return percent == null ? s("noComparison") : s("comparison", { value: percent > 0 ? `+${percent}` : String(percent) }); };
   const productCurrentStart = new Date(now); productCurrentStart.setDate(productCurrentStart.getDate() - 30);
   const productPreviousStart = new Date(now); productPreviousStart.setDate(productPreviousStart.getDate() - 60);
-  const [currentProducts, previousProducts, reviewStats] = await dashboardData(Promise.all([
+  const [analyticsOrders, sellerOrders, pendingRefundCount, currentProducts, previousProducts, reviewStats] = await dashboardData(Promise.all([
+    prisma.order.findMany({ where: sellerOrdersWhere, select: { status: true, buyerId: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, sellerAmount: true, items: { select: { quantity: true, productNameSnapshot: true, product: { select: { id: true, name: true } } } } }, orderBy: { createdAt: "desc" } }),
+    prisma.order.findMany({ where: sellerOrdersWhere, take: 5, select: { id: true, status: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, recipientName: true, buyerNameSnapshot: true, buyer: { select: { firstName: true, lastName: true } }, items: { take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } }, orderBy: { createdAt: "desc" } }),
+    prisma.refundRequest.count({ where: { status: "PENDING", order: sellerOrdersWhere } }),
     prisma.product.count({ where: { storeId: user.store.id, createdAt: { gte: productCurrentStart } } }),
     prisma.product.count({ where: { storeId: user.store.id, createdAt: { gte: productPreviousStart, lt: productCurrentStart } } }),
     prisma.review.aggregate({ where: { product: { storeId: user.store.id }, status: "PUBLISHED" }, _avg: { rating: true }, _count: { rating: true } }),
   ]));
-  const analytics = sellerAnalytics(sellerOrders, locale, now);
+  const paidSellerOrders = analyticsOrders.filter((order) => order.paidAt || order.stripePaymentIntentId);
+  const revenue = paidSellerOrders.reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
+  const customers = new Set(paidSellerOrders.map((order) => order.buyerId)).size;
+  const startToday = new Date(now); startToday.setHours(0, 0, 0, 0);
+  const todayRevenue = paidSellerOrders.filter((order) => (order.paidAt ?? order.createdAt) >= startToday).reduce((sum, order) => sum + (order.sellerAmount ?? 0) / 100, 0);
+  const pendingOrders = analyticsOrders.filter((order) => ["PENDING", "PAID", "PROCESSING"].includes(order.status)).length;
+  const firstOrderByBuyer = new Map<string, Date>();
+  for (const order of analyticsOrders) { const first = firstOrderByBuyer.get(order.buyerId); if (!first || order.createdAt < first) firstOrderByBuyer.set(order.buyerId, order.createdAt); }
+  const newCustomers = [...firstOrderByBuyer.values()].filter((date) => date >= startToday).length;
+  const profileFields = [user.store.name, user.store.description, user.store.logo, user.store.banner, user.store.city, user.store.country];
+  const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
+  const periods = sellerPeriodMetrics(analyticsOrders, now);
+  const comparison = (current: number, previous: number) => { const percent = comparisonPercent(current, previous); return percent == null ? s("noComparison") : s("comparison", { value: percent > 0 ? `+${percent}` : String(percent) }); };
+  const analytics = sellerAnalytics(analyticsOrders, locale, now);
   const analyticsStatuses = analytics.statuses.map((item) => ({ label: ordersText(`status.${item.status}`), value: item.value }));
-  const cancellationRate = sellerOrders.length ? sellerOrders.filter((order) => order.status === "CANCELLED").length / sellerOrders.length * 100 : null;
+  const cancellationRate = analyticsOrders.length ? analyticsOrders.filter((order) => order.status === "CANCELLED").length / analyticsOrders.length * 100 : null;
   const subscriptionActive = sellerCanAddProduct;
   const sellerTypeRequired = user.store.sellerType === "UNKNOWN";
   const vatStatusRequired = user.store.sellerType === "PROFESSIONAL" && user.store.vatStatus === "UNKNOWN";
@@ -182,9 +176,9 @@ export default async function DashboardPage() {
       {!subscriptionActive && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
       {pendingRefundCount > 0 && <section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount === 1 ? "pendingRefundRequestSingular" : "pendingRefundRequestPlural", { count: pendingRefundCount })}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: user.store.name, city: user.store.city, country: user.store.country })}</p>{profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div><div className="sellerHeroMetrics"><div><small>{s("todayRevenue")}</small><strong>{money(locale, todayRevenue, user.store.currency)}</strong></div><div><small>{s("pendingOrders")}</small><strong>{pendingOrders}</strong></div><div><small>{s("newCustomers")}</small><strong>{newCustomers}</strong></div><div><small>{s("unreadMessages")}</small><strong>{unreadMessages}</strong></div></div><Link href={`/${locale}/store/${user.store.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>
-      <section className="premiumStatsGrid"><DashboardStatCard label={p("nav.products")} value={user.store._count.products} hint={comparison(currentProducts, previousProducts)} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardStatCard label={p("stats.orders")} value={sellerOrders.length} hint={comparison(periods.current.orders, periods.previous.orders)} href={`/${locale}/seller/orders`} icon={ReceiptText} tone="blue"/><DashboardStatCard label={p("nav.revenue")} value={money(locale, revenue, user.store.currency)} hint={comparison(periods.current.revenue, periods.previous.revenue)} href={`/${locale}/dashboard#analytics`} icon={TrendingUp} tone="mint"/><DashboardStatCard label={p("stats.customers")} value={customers} hint={comparison(periods.current.customers, periods.previous.customers)} icon={Users} tone="amber"/></section>
+      <section className="premiumStatsGrid"><DashboardStatCard label={p("nav.products")} value={user.store._count.products} hint={comparison(currentProducts, previousProducts)} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardStatCard label={p("stats.orders")} value={analyticsOrders.length} hint={comparison(periods.current.orders, periods.previous.orders)} href={`/${locale}/seller/orders`} icon={ReceiptText} tone="blue"/><DashboardStatCard label={p("nav.revenue")} value={money(locale, revenue, user.store.currency)} hint={comparison(periods.current.revenue, periods.previous.revenue)} href={`/${locale}/dashboard#analytics`} icon={TrendingUp} tone="mint"/><DashboardStatCard label={p("stats.customers")} value={customers} hint={comparison(periods.current.customers, periods.previous.customers)} icon={Users} tone="amber"/></section>
       <div className="premiumDashboardColumns sellerColumns"><DashboardSection id="recent-orders" title={p("recentOrders")} description={p("seller.recentDescription")}>
-        {sellerOrders.length
+        {analyticsOrders.length
           ? <div className="premiumRecentOrders">{sellerOrders.slice(0, 5).map((order) => { const item = order.items[0]; const image = item?.productImageUrlSnapshot ?? item?.product.images[0]; const name = item?.productNameSnapshot ?? item?.product.name; const buyerName = order.recipientName ?? order.buyerNameSnapshot ?? `${order.buyer.firstName} ${order.buyer.lastName}`; const action = sellerFulfillmentActionFor(order.status); const step = fulfillmentStepFor(order.status); return <article className="premiumRecentOrder sellerRecentOrder" key={order.id}><div className="premiumRecentImage">{image ? <Image src={image} alt="" width={68} height={68} unoptimized/> : <Package size={26} aria-hidden="true"/>}</div><div className="premiumRecentProduct"><strong>{name ?? ordersText("details")}</strong><span>{buyerName} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(order.createdAt)}</span></div><div className="sellerOrderStatuses"><DashboardStatusBadge label={buyerPaymentState(order) === "paid" ? ordersText("payment.paid") : ordersText(`payment.${buyerPaymentState(order)}`)} status={buyerPaymentState(order)}/><DashboardStatusBadge label={step ? ordersText(`fulfillment.${step.toLowerCase()}`) : ordersText(`status.${order.status}`)} status={order.status}/>{action && <SellerFulfillmentControl orderId={order.id} action={action}/>}</div><strong className="premiumRecentTotal">{money(locale, Number(order.total), order.currency)}</strong></article>; })}</div>
           : <DashboardEmptyState title={p("seller.emptyOrders")} description={p("seller.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/products`}>{t("manageProducts")}</Link>}/>
         }
