@@ -8,9 +8,10 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
 import { usePathname, useRouter } from "next/navigation";
 import TodijoLogo from "@/components/TodijoLogo";
+import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
 
-export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeName?: string; storeSlug?: string; buyerMobile?: boolean }) {
+function LegacySiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeName?: string; storeSlug?: string; buyerMobile?: boolean }) {
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
   const pathname = usePathname();
@@ -63,4 +64,11 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
       </div>
     </header>
   </>;
+}
+
+export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeName?: string; storeSlug?: string; buyerMobile?: boolean }) {
+  const pathname = usePathname();
+  const path = pathWithoutLocale(pathname);
+  if (path.startsWith("/seller") || path.startsWith("/adm-barewbar-182203")) return <LegacySiteHeader storeName={storeName} storeSlug={storeSlug} buyerMobile={buyerMobile}/>;
+  return <MarketplaceHeader/>;
 }

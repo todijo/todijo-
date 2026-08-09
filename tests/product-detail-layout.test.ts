@@ -95,7 +95,7 @@ test("mobile purchase bar keeps one visible primary action and safe content clea
 test("Product Detail uses the shared mobile shell and a responsive square mobile gallery", async () => {
   const [page, siteHeader, css, gallery] = await Promise.all([readFile("app/product/[id]/page.tsx", "utf8"), readFile("components/SiteHeader.tsx", "utf8"), readFile("app/globals.css", "utf8"), readFile("app/product/[id]/ProductGallery.tsx", "utf8")]);
   assert.match(page, /<SiteHeader storeName=\{product\.store\.name\}/);
-  assert.match(siteHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
+  assert.match(siteHeader, /return <MarketplaceHeader\/>/);
   assert.match(css, /\.buyerMobileShellHeader~\.marketHeader,\.buyerMobileShellHeader~\.siteHeader/);
   assert.match(css, /\.productMobileImageTrack\{[^}]*width:100%;aspect-ratio:4\/5;[^}]*overflow-x:auto;[^}]*scroll-behavior:smooth/);
   assert.match(css, /@media\(max-width:760px\)[\s\S]*?\.productMobileImageTrack\{width:min\(100%,398px\);height:auto;min-height:0;max-height:none;margin-inline:auto;aspect-ratio:1/);

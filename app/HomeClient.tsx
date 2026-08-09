@@ -3,15 +3,12 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, ChevronDown, Heart, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, SearchX, ShoppingBag, Store, UserRound, X } from "lucide-react";
-import CartLink from "@/components/CartLink";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { ArrowRight, Languages, LockKeyhole, MapPin, Menu, MessageCircle, Package, SearchX, ShoppingBag, Store, X } from "lucide-react";
 import { rtlLocales, type Locale } from "@/i18n/config";
-import TodijoLogo from "@/components/TodijoLogo";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
 import MarketplaceProductCard, { type MarketplaceCardProduct } from "@/components/MarketplaceProductCard";
-import BuyerMobileHeader from "@/components/BuyerMobileHeader";
+import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { EmptyState } from "@/components/FeedbackState";
 import { clearMarketplaceFilters, marketplaceUrl, type MarketplaceFilters, type MarketplaceSort } from "@/lib/marketplace-search";
 import { categoryKey, categoryLabel } from "@/lib/categories";
@@ -47,10 +44,8 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   initialFilters: MarketplaceFilters;
   resultsOnly?: boolean;
 }) {
-  const [accountName, setAccountName] = useState<string | null>(null);
   const [filters, setFilters] = useState(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const filterPanelRef = useRef<HTMLElement>(null);
   const activeLocale = useLocale();
@@ -58,21 +53,11 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const c = useTranslations("Common");
   const h = useTranslations("HomeHeader");
   const d = useTranslations("HomeDiscovery");
-  const ux = useTranslations("Ux");
   const categoryText = useTranslations("Categories");
   const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
-
-  useEffect(() => {
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.authenticated && typeof data.name === "string") setAccountName(data.name);
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -99,7 +84,6 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (filters.minPrice && filters.maxPrice && Number(filters.minPrice) > Number(filters.maxPrice)) return;
-    setIsSearching(true);
     window.location.href = buildUrl(filters);
   }
 
@@ -109,37 +93,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
 
   return (
     <main className={`buyerHomePage${resultsOnly ? " searchResultsPage" : ""}`} dir={t.dir}>
-      <BuyerMobileHeader accountName={accountName}/>
-      <header className="marketHeader">
-        <div className="marketPrimaryHeader">
-        <div className="marketHeaderInner">
-          <TodijoLogo href={`/${activeLocale}`} inverse/>
-          <div className="marketLocation" aria-label={h("locationLabel")}><MapPin size={20} aria-hidden="true"/><span><small>{h("deliverTo")}</small><strong>{h("marketplace")}</strong></span></div>
-          <form className="marketTopSearch" onSubmit={submit}>
-            <span aria-hidden>⌕</span>
-            <label className="srOnly" htmlFor="market-category">{h("searchCategory")}</label>
-            <select id="market-category" value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option value="">{t.all}</option>{categories.map((category) => <option key={category} value={category}>{displayCategory(category)}</option>)}</select>
-            <label className="srOnly" htmlFor="desktop-market-search">{t.search}</label>
-            <input id="desktop-market-search" type="search" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} placeholder={t.search} />
-            {filters.q ? <button className="marketSearchClear" type="button" onClick={() => { setFilters({ ...filters, q: "" }); document.getElementById("desktop-market-search")?.focus(); }} aria-label={`${c("remove")}: ${filters.q}`}><X size={18} aria-hidden="true"/></button> : null}
-            <button className="marketSearchSubmit" type="submit" disabled={isSearching} aria-label={isSearching ? c("loading") : t.searchButton}>{isSearching ? <LoaderCircle className="marketSearchSpinner" size={20} aria-hidden="true"/> : <Search size={21} aria-hidden="true"/>}<span>{isSearching ? c("loading") : t.searchButton}</span></button>
-          </form>
-          <nav className="marketDesktopActions" aria-label={h("accountNavigation")}>
-            <LanguageSwitcher className="marketHeaderLanguage"/>
-            {accountName ? <a className="marketFavoritesAction" href={`/${activeLocale}/favorites`}><Heart size={20} aria-hidden="true"/><strong>{ux("favoritesNav")}</strong></a> : null}
-            <a className="marketAccountAction" href={`/${activeLocale}${accountName ? "/dashboard" : "/login"}`}><UserRound size={20} aria-hidden="true"/><span><small>{h("hello")}</small><strong>{accountName ?? t.account}</strong></span><ChevronDown size={14} aria-hidden="true"/></a>
-            <a className="marketOrdersAction" href={`/${activeLocale}/account/orders`}><small>{h("returns")}</small><strong>{h("orders")}</strong></a>
-            <CartLink label={t.cart} className="homeCartLink"/>
-          </nav>
-          <div className="marketMobileActions"><a href={`/${activeLocale}${accountName ? "/dashboard" : "/login"}`} aria-label={accountName ?? t.account}><UserRound size={22} aria-hidden="true"/></a><CartLink label={t.cart} className="homeCartLink"/></div>
-        </div>
-        </div>
-        <nav className="marketSecondaryNav" aria-label={h("categoryNavigation")}><div className="marketSecondaryInner">
-          <a className="marketAllCategories" href="#categories"><Menu size={18} aria-hidden="true"/>{t.categories}</a>
-          {categories.slice(0, 5).map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}>{displayCategory(category)}</button>)}
-          <a href="#products">{h("deals")}</a><a href={buildUrl({ ...filters, sort: "newest" })}>{h("newArrivals")}</a><a href="#products">{h("bestSellers")}</a><a className="marketSellLink" href={`/${activeLocale}/register?role=seller`}>{t.sell}</a>
-        </div></nav>
-      </header>
+      <MarketplaceHeader/>
 
       <section className="discoveryHero">
         <div className="container discoveryHeroGrid">

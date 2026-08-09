@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const cartLinkSource = readFileSync(join(root, "components", "CartLink.tsx"), "utf8");
-const homeSource = readFileSync(join(root, "app", "HomeClient.tsx"), "utf8");
+const marketplaceHeaderSource = readFileSync(join(root, "components", "MarketplaceHeader.tsx"), "utf8");
 const mobileNavigation = readFileSync(join(root, "components", "BuyerMobileNavigation.tsx"), "utf8");
 const mobileHeader = readFileSync(join(root, "components", "BuyerMobileHeader.tsx"), "utf8");
 const cardAction = readFileSync(join(root, "components", "ProductCardAction.tsx"), "utf8");
@@ -14,7 +14,7 @@ const styles = readFileSync(join(root, "app", "globals.css"), "utf8");
 test("mobile header has a direct cart link, menu trigger, and second-row search", () => {
   assert.match(cartLinkSource, /<Link className=\{className\} href=\{localizedPath\(locale, "\/cart"\)\}/);
   assert.match(cartLinkSource, /<ShoppingCart className="cartLinkIcon"/);
-  assert.match(homeSource, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
+  assert.match(marketplaceHeaderSource, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.match(mobileHeader, /className="buyerMobileShellSearch"/);
   assert.match(mobileHeader, /className="buyerMobileShellCart"/);
   assert.match(styles, /\.buyerMobileShellTop\{[^}]*grid-template-columns:auto minmax\(0,1fr\) 44px/);

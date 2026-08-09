@@ -80,7 +80,7 @@ test("unknown public routes render the localized not-found page", async ({ page 
   assertNoRuntimeErrors();
 });
 
-test("desktop filters are on-demand and preserve URL filter behavior", async ({ page }) => {
+test("search filters are visibly triggered, preserve state, and update the URL", async ({ page }) => {
   await page.goto("/en/e2e-ux");
   const trigger = page.locator(".mobileFilterButton");
   await expect(trigger).toBeVisible();
@@ -90,10 +90,36 @@ test("desktop filters are on-demand and preserve URL filter behavior", async ({ 
   const dialog = page.getByRole("dialog", { name: "Filters" });
   await expect(dialog).toBeVisible();
   await page.getByLabel("Minimum price").fill("10");
+  await page.getByLabel("City").fill("Paris");
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(page.getByLabel("Minimum price")).toHaveValue("10");
+  await expect(page.getByLabel("City")).toHaveValue("Paris");
+  await Promise.all([
+    page.waitForURL(/\/en\/search\?.*(?:city=Paris|minPrice=10)/),
+    page.getByRole("button", { name: "Apply" }).click(),
+  ]);
+});
+
+test("marketplace routes render one shared header with core navigation", async ({ page }) => {
+  await authenticate(page, "header-buyer");
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: true, userId: "header-buyer", name: "Header Buyer" } }));
+  await page.goto("/en/e2e-ux");
+  const homeHeader = page.locator("header[data-marketplace-header]");
+  await expect(homeHeader).toBeVisible();
+  await expect(homeHeader.getByRole("link", { name: "Todijo" })).toBeVisible();
+  await expect(homeHeader.getByRole("link", { name: "Messages" })).toBeVisible();
+  await expect(homeHeader.getByRole("link", { name: "My favorites" })).toBeVisible();
+  await expect(homeHeader.getByRole("link", { name: "Cart" })).toBeVisible();
+  await expect(homeHeader.getByRole("combobox")).toBeVisible();
+
+  await page.goto("/en/cart");
+  await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
+  await page.goto("/en/favorites");
+  await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
 });
 
 test("favorites remain isolated across logout and two authenticated buyers", async ({ page }) => {
