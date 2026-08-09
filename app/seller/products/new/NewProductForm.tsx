@@ -16,7 +16,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const categoryText = useTranslations("Categories");
-  const productText = useTranslations("Product");
+  const ux = useTranslations("Ux");
   const { showToast } = useToast();
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -98,7 +98,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
             <SellerFormField label={t("category")} htmlFor="category" required><select id="category" name="category" required defaultValue=""><option value="" disabled>{t("chooseCategory")}</option>{PRODUCT_CATEGORIES.map(({ value }) => <option key={value} value={value}>{categoryLabel(value, (key) => categoryText(key))}</option>)}</select></SellerFormField>
             <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
           </div>
-          <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{productText("ask")}</strong><small>{productText("private")}</small></span></label>
+          <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
         </SellerSection>
       </div>
 

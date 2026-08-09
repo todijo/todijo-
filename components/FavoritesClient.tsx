@@ -9,8 +9,8 @@ import { EmptyState } from "./FeedbackState";
 const KEY = "todijo-wishlist-v1";
 
 export default function FavoritesClient() {
-  const productText = useTranslations("Product");
   const common = useTranslations("Common");
+  const ux = useTranslations("Ux");
   const [products, setProducts] = useState<MarketplaceCardProduct[] | null>(null);
   const load = useCallback(async () => {
     let ids: string[] = [];
@@ -22,6 +22,6 @@ export default function FavoritesClient() {
   }, []);
   useEffect(() => { void load(); const update = () => void load(); window.addEventListener("todijo:wishlist-change", update); return () => window.removeEventListener("todijo:wishlist-change", update); }, [load]);
   if (products === null) return <div className="favoritesLoading" aria-live="polite">{common("loading")}</div>;
-  if (!products.length) return <EmptyState icon={Heart} title={productText("favorite")} description={productText("favoriteAdd")} action={<a className="primary" href="./search">{common("search")}</a>}/>;
+  if (!products.length) return <EmptyState icon={Heart} title={ux("favoritesTitle")} description={ux("favoritesEmpty")} action={<a className="primary" href="./search">{ux("favoritesDiscover")}</a>}/>;
   return <div className="favoritesGrid">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={common("soldOut")}/>)}</div>;
 }

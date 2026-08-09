@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, ChevronDown, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, SearchX, ShoppingBag, Store, UserRound, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Heart, Languages, LoaderCircle, LockKeyhole, MapPin, Menu, MessageCircle, Package, Search, SearchX, ShoppingBag, Store, UserRound, X } from "lucide-react";
 import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { rtlLocales, type Locale } from "@/i18n/config";
@@ -58,6 +58,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const c = useTranslations("Common");
   const h = useTranslations("HomeHeader");
   const d = useTranslations("HomeDiscovery");
+  const ux = useTranslations("Ux");
   const categoryText = useTranslations("Categories");
   const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
@@ -125,6 +126,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
           </form>
           <nav className="marketDesktopActions" aria-label={h("accountNavigation")}>
             <LanguageSwitcher className="marketHeaderLanguage"/>
+            {accountName ? <a className="marketFavoritesAction" href={`/${activeLocale}/favorites`}><Heart size={20} aria-hidden="true"/><strong>{ux("favoritesNav")}</strong></a> : null}
             <a className="marketAccountAction" href={`/${activeLocale}${accountName ? "/dashboard" : "/login"}`}><UserRound size={20} aria-hidden="true"/><span><small>{h("hello")}</small><strong>{accountName ?? t.account}</strong></span><ChevronDown size={14} aria-hidden="true"/></a>
             <a className="marketOrdersAction" href={`/${activeLocale}/account/orders`}><small>{h("returns")}</small><strong>{h("orders")}</strong></a>
             <CartLink label={t.cart} className="homeCartLink"/>

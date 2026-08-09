@@ -16,7 +16,7 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations("Common");
-  const product = useTranslations("Product");
+  const ux = useTranslations("Ux");
   const locale = useLocale();
   const homeHref = localizedPath(locale);
 
@@ -55,7 +55,7 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
           <Link href={`${homeHref}#categories`}>{t("categories")}</Link>
           {storeName && storeSlug ? <Link href={localizedPath(locale, `/store/${storeSlug}`)} aria-current={isNavigationActive(pathname, `/store/${storeSlug}`, true) ? "page" : undefined}>{storeName}</Link> : <Link href={`${localizedPath(locale, "/register")}?role=seller`}>{t("sell")}</Link>}
           <Link href={localizedPath(locale, "/messages")} aria-current={isNavigationActive(pathname, "/messages", true) ? "page" : undefined}>{t("messages")}</Link>
-          {accountName ? <Link href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined}>{product("favorite")}</Link> : null}
+          {accountName ? <Link href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined}>{ux("favoritesNav")}</Link> : null}
           <Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-current={isNavigationActive(pathname, accountName ? "/dashboard" : "/login", true) ? "page" : undefined}>{accountName ?? t("account")}</Link>
           <CartLink label={t("cart")} />
           <LanguageSwitcher />

@@ -16,6 +16,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const common = useTranslations("Common");
   const header = useTranslations("HomeHeader");
   const product = useTranslations("Product");
+  const ux = useTranslations("Ux");
   const { totalItems } = useCart();
   const [open, setOpen] = useState(false);
   const [hash, setHash] = useState("");
@@ -76,7 +77,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
         <a href={`${homeHref}#best-sellers`} onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
         <a href={ordersHref} onClick={closeDrawer} className={isNavigationActive(pathname, ordersHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, ordersHref, true) ? "page" : undefined}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
         <a href={messagesHref} onClick={closeDrawer} className={isNavigationActive(pathname, messagesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, messagesHref, true) ? "page" : undefined}><MessageCircle size={20} aria-hidden="true"/>{common("messages")}</a>
-        {accountName ? <a href={favoritesHref} onClick={closeDrawer} className={isNavigationActive(pathname, favoritesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, favoritesHref, true) ? "page" : undefined}><Heart size={20} aria-hidden="true"/>{product("favorite")}</a> : null}
+        {accountName ? <a href={favoritesHref} onClick={closeDrawer} className={isNavigationActive(pathname, favoritesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, favoritesHref, true) ? "page" : undefined}><Heart size={20} aria-hidden="true"/>{ux("favoritesNav")}</a> : null}
         <a href={accountHref} onClick={closeDrawer} className={isNavigationActive(pathname, accountHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, accountHref, true) ? "page" : undefined}><UserRound size={20} aria-hidden="true"/>{common("account")}</a>
         <a href={sellerHref} onClick={closeDrawer}><Store size={20} aria-hidden="true"/>{common("sell")}</a>
       </nav>

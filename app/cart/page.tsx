@@ -72,7 +72,7 @@ export default function CartPage() {
               <div><span>{t("subtotal")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div>
               <div><span>{t("shipping")}</span><span>{t("shippingNext")}</span></div>
               <div className="cartTotal"><span>{t("total")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div>
-              <Link className="authSubmit checkoutLink" href="/checkout">{t("checkout")}</Link>
+              <Link className="authSubmit checkoutLink cartCheckoutCta" href="/checkout">{t("checkout")}</Link>
               <p>{t("secure")}</p>
               <Link href="/">← {t("continue")}</Link>
             </aside>

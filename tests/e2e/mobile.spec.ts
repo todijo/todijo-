@@ -90,3 +90,18 @@ test("mobile RTL information page preserves direction and layout", async ({ page
   await expectNoDocumentOverflow(page);
   assertNoRuntimeErrors();
 });
+
+test("mobile search filters open as a full-height sheet without squeezing results", async ({ page }) => {
+  await page.goto("/en/e2e-ux");
+  const results = page.locator(".resultsArea");
+  const widthBefore = await results.evaluate((element) => element.getBoundingClientRect().width);
+  await page.getByRole("button", { name: "Filters" }).click();
+  const dialog = page.getByRole("dialog", { name: "Filters" });
+  await expect(dialog).toBeVisible();
+  const sheet = await dialog.boundingBox();
+  expect(sheet?.height).toBeGreaterThanOrEqual(800);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  const widthAfter = await results.evaluate((element) => element.getBoundingClientRect().width);
+  expect(widthAfter).toBe(widthBefore);
+});
