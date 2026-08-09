@@ -5,7 +5,7 @@ import { CartProduct, useCart } from "./CartProvider";
 import { useTranslations } from "next-intl";
 import { useToast } from "./ToastProvider";
 
-export default function AddToCartButton({ product, quantity = 1 }: { product: CartProduct; quantity?: number }) {
+export default function AddToCartButton({ product, quantity = 1, disabledLabel }: { product: CartProduct; quantity?: number; disabledLabel?: string }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
   const t = useTranslations("Product");
@@ -25,7 +25,7 @@ export default function AddToCartButton({ product, quantity = 1 }: { product: Ca
       disabled={product.stock === 0}
       onClick={handleAdd}
     >
-      {product.stock === 0 ? t("unavailable") : added ? t("added") : t("add")}
+      {product.stock === 0 ? disabledLabel ?? t("unavailable") : added ? t("added") : t("add")}
     </button>
   );
 }

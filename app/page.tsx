@@ -31,6 +31,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
+  const resultsOnly = params.__resultsOnly === "1";
   const { filters, page, invalidPriceRange } = normalizeMarketplaceSearch(params);
   const { q, category, condition, city, country, sort, availability } = filters;
   const minPrice = Number(filters.minPrice);
@@ -137,6 +138,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       page={normalizedPage}
       pageSize={PAGE_SIZE}
       initialFilters={filters}
+      resultsOnly={resultsOnly}
     />
   );
 }

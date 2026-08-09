@@ -35,7 +35,7 @@ function ProductRail({ id, title, products, soldOut, viewAll }: { id?: string; t
   return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2>{title}</h2><a href="#products">{viewAll}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
 }
 
-export default function HomeClient({ products, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters }: {
+export default function HomeClient({ products, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters, resultsOnly = false }: {
   products: MarketplaceProduct[];
   newArrivals: MarketplaceProduct[];
   bestSellers: MarketplaceProduct[];
@@ -45,6 +45,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   page: number;
   pageSize: number;
   initialFilters: MarketplaceFilters;
+  resultsOnly?: boolean;
 }) {
   const [accountName, setAccountName] = useState<string | null>(null);
   const [filters, setFilters] = useState(initialFilters);
@@ -106,7 +107,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   }
 
   return (
-    <main className="buyerHomePage" dir={t.dir}>
+    <main className={`buyerHomePage${resultsOnly ? " searchResultsPage" : ""}`} dir={t.dir}>
       <BuyerMobileHeader accountName={accountName}/>
       <header className="marketHeader">
         <div className="marketPrimaryHeader">

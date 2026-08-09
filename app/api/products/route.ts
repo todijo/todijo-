@@ -5,6 +5,17 @@ import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-s
 import { validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
 import { ProductVariantImageError } from "@/lib/product-variant-images";
+import { publicProductAccessWhere } from "@/lib/admin-access";
+import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
+
+export async function GET(request: Request) {
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
+  const ids = [...new Set(new URL(request.url).searchParams.get("ids")?.split(",").map((id) => id.trim()).filter(Boolean) ?? [])].slice(0, 100);
+  if (!ids.length) return NextResponse.json({ products: [] });
+  const products = await prisma.product.findMany({ where: { id: { in: ids }, status: "PUBLISHED", ...publicProductAccessWhere(new Date()) }, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true, stock: true, images: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } }, store: { select: { name: true, slug: true } } } });
+  return NextResponse.json({ products: products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }); return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug }; }) });
+}
 
 function makeSlug(value: string) {
   return value
@@ -88,6 +99,7 @@ export async function POST(request: Request) {
         images,
         currency: store.currency,
         storeId: store.id,
+        allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
       }, variantInput, body.variantImages);
 
     return NextResponse.json({ ok: true, product });

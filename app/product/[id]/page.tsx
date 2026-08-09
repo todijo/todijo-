@@ -32,7 +32,7 @@ export default async function ProductPage({ params }: Props) {
     where: { id, status: "PUBLISHED", ...publicAccess },
     select: {
       id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true,
-      condition: true, stock: true, images: true, colors: true, sizes: true,
+      condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true,
       options: { where: { active: true }, orderBy: { position: "asc" }, select: {
         id: true, name: true, position: true,
         values: { where: { active: true }, orderBy: { position: "asc" }, select: {
@@ -70,7 +70,7 @@ export default async function ProductPage({ params }: Props) {
       <p className="productDetailDescription">{product.description}</p>
       <dl className="productFacts productFactsMobile" id="product-facts-mobile"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
     </section>
-    <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div>
+    {product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}
   </section>
   {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div>{item.images[0]?<img src={item.images[0]} alt={item.name}/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{Number(item.price).toFixed(2)} {item.currency}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;

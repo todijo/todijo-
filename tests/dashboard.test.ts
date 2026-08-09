@@ -76,7 +76,7 @@ test("dashboard actions remain localized and avoid unavailable buyer placeholder
 
   assert.match(ui, /notificationHref: string/);
   assert.match(ui, /href=\{notificationHref\}/);
-  assert.match(dashboardPage, /notificationHref=\{`\/\$\{locale\}\/seller\/store-settings#notifications`\}/);
+  assert.match(dashboardPage, /notificationHref=\{paths\.messages\}/);
   assert.doesNotMatch(dashboardPage, /dashboard#favorites|dashboard#addresses|dashboard#payments/);
   assert.match(dashboardPage, /label: common\("cart"\), href: paths\.cart/);
   assert.match(productsPage, /`\/\$\{locale\}\/seller\/products\/\$\{product\.id\}\/edit`/);

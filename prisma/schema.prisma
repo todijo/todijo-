@@ -219,6 +219,7 @@ model Product {
   images             String[]
   status             ProductStatus             @default(PUBLISHED)
   deactivationReason ProductDeactivationReason @default(NONE)
+  allowPrepurchaseQuestions Boolean               @default(true)
 
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)

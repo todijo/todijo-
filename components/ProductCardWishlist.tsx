@@ -24,6 +24,7 @@ export default function ProductCardWishlist({ productId }: { productId: string }
     ids = saved ? ids.filter((id) => id !== productId) : [...new Set([...ids, productId])];
     localStorage.setItem(KEY, JSON.stringify(ids));
     setSaved(!saved);
+    window.dispatchEvent(new CustomEvent("todijo:wishlist-change", { detail: { productId, saved: !saved } }));
   }
 
   return (

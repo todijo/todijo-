@@ -12,6 +12,7 @@ import { listSellerOrderHistory } from "@/lib/order-history";
 import { fulfillmentStepFor, sellerFulfillmentActionFor } from "@/lib/order-status";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import DashboardReturnLink from "@/components/DashboardReturnLink";
 
 export const dynamic = "force-dynamic";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -27,7 +28,7 @@ export default async function SellerOrdersPage({ searchParams }: { searchParams:
   const href = (page: number) => `/${locale}/seller/orders?${new URLSearchParams({ ...(result.search ? { q: result.search } : {}), page: String(page) })}`;
   const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
   return <><SiteHeader/><main className="buyerOrdersPage scopedPublicPage"><div className="buyerOrdersShell">
-    <section className="buyerOrdersHeading"><p className="dashboardBadge">{t("history.sellerBadge")}</p><h1>{t("history.sellerTitle")}</h1></section>
+    <section className="buyerOrdersHeading"><DashboardReturnLink href={`/${locale}/dashboard`} label={t("backDashboard")}/><p className="dashboardBadge">{t("history.sellerBadge")}</p><h1>{t("history.sellerTitle")}</h1></section>
     <form className="buyerOrdersEmpty" action={`/${locale}/seller/orders`}><label htmlFor="order-reference">{t("history.searchLabel")}</label><input id="order-reference" name="q" defaultValue={result.search} maxLength={100} placeholder={t("history.searchPlaceholder")}/><button className="quickActionLink primary" type="submit">{t("history.searchAction")}</button></form>
     {result.orders.length ? <section className="buyerOrderList">{result.orders.map((order) => {
       const step = fulfillmentStepFor(order.status); const action = sellerFulfillmentActionFor(order.status); const buyer = order.recipientName ?? order.buyerNameSnapshot ?? `${order.buyer.firstName} ${order.buyer.lastName}`;

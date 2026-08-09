@@ -33,15 +33,16 @@ export default async function ConversationPage({ params }: Props) {
   });
   if (!conversation) notFound();
   await prisma.message.updateMany({ where: { conversationId: id, senderId: { not: session.userId }, readAt: null }, data: { readAt: new Date() } });
+  await prisma.notification.updateMany({ where: { userId: session.userId, href: { endsWith: `/messages/${id}` }, readAt: null }, data: { readAt: new Date() } });
   const other = conversation.buyerId === session.userId ? conversation.seller : conversation.buyer;
 
   return <main className="conversationPage scopedPublicPage">
     <SiteHeader storeName={conversation.store.name} storeSlug={conversation.store.slug}/>
     <section className="threadShell">
-      <Link className="threadBack" href="/messages">← {dashboard("myConversations")}</Link>
+      <nav className="threadNavigation" aria-label={common("messages")}><Link className="threadBack" href={`/${locale}/messages`}>← {dashboard("myConversations")}</Link><Link className="threadBack" href={`/${locale}/dashboard`}>{conversation.buyerId === session.userId ? dashboard("buyerArea") : dashboard("sellerDashboard")} →</Link></nav>
       <header className="threadHeader">
         <div className="conversationImage">{conversation.product.images[0] ? <img src={conversation.product.images[0]} alt=""/> : <span>📦</span>}</div>
-        <div><p>{common("messages")} · {other.firstName} {other.lastName}</p><h1>{conversation.product.name}</h1><Link href={`/product/${conversation.product.id}`}>{Number(conversation.product.price).toFixed(2)} {conversation.product.currency} · {common("view")}</Link></div>
+        <div><p>{common("messages")} · {other.firstName} {other.lastName}</p><h1 dir="auto">{conversation.product.name}</h1><Link href={`/${locale}/product/${conversation.product.id}`}>{Number(conversation.product.price).toFixed(2)} {conversation.product.currency} · {common("view")}</Link></div>
       </header>
       <div className="threadPrivacy">🔒 {productText("private")}</div>
       <div className="messageThread">{conversation.messages.map((message) => <div className={`messageBubble ${message.senderId === session.userId ? "mine" : "theirs"}`} key={message.id}><p>{message.body}</p><time>{message.createdAt.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}</time></div>)}</div>

@@ -92,7 +92,7 @@ export default async function DashboardPage() {
     { label: p("nav.messages"), href: paths.messages, icon: MessageCircle, badge: unreadMessages },
     { label: p("nav.statistics"), href: `/${locale}/dashboard#analytics`, icon: BarChart3 },
     { label: p("nav.revenue"), href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign },
-    { label: p("nav.reviews"), href: user.store ? `/${locale}/store/${user.store.slug}#reviews` : `/${locale}/dashboard`, icon: Star },
+    { label: p("nav.reviews"), href: user.store ? `/${locale}/seller/reviews` : `/${locale}/dashboard`, icon: Star },
     { label: p("nav.store"), href: user.store ? `/${locale}/store/${user.store.slug}` : `/${locale}/seller/create-store`, icon: Store },
     { label: p("nav.settings"), href: `/${locale}/seller/store-settings`, icon: Settings },
   ];
@@ -110,7 +110,7 @@ export default async function DashboardPage() {
     return <main className="premiumDashboard premiumBuyerDashboard">
       <DashboardSidebar items={buyerNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")}/>
       <div className="premiumDashboardMain">
-        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("buyer.eyebrow")} homeHref={homeHref} notificationHref={`${paths.dashboard}#notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/>
+        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("buyer.eyebrow")} homeHref={homeHref} notificationHref={paths.messages} notificationLabel={p("notifications")} notificationCount={notificationCount}/>
         <div className="premiumDashboardContent">
           <section className="premiumWelcomeHero"><div><span>{p("buyer.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{p("buyer.intro")}</p></div><Link href={homeHref}>{p("browseMarketplace")} <ShoppingBag size={18}/></Link></section>
           {orders.length > 0 && <section className="premiumStatsGrid" aria-label={p("recentOrders")}>
@@ -168,7 +168,7 @@ export default async function DashboardPage() {
   const subscriptionActive = sellerCanAddProduct;
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
-    <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/seller/store-settings#notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">
+    <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={paths.messages} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">
       {!subscriptionActive && <section className="subscriptionWarning" role="status"><strong>{control("subscriptionInactive")}</strong><span>{control("subscriptionInactiveHelp", { status: control("subscriptionInactive") })}</span><Link href={`/${locale}/seller/subscription`}>{control("viewPlans")}</Link></section>}
       {pendingRefundCount > 0 && <section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount === 1 ? "pendingRefundRequestSingular" : "pendingRefundRequestPlural", { count: pendingRefundCount })}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: user.store.name, city: user.store.city, country: user.store.country })}</p>{profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div><div className="sellerHeroMetrics"><div><small>{s("todayRevenue")}</small><strong>{money(locale, todayRevenue, user.store.currency)}</strong></div><div><small>{s("pendingOrders")}</small><strong>{pendingOrders}</strong></div><div><small>{s("newCustomers")}</small><strong>{newCustomers}</strong></div><div><small>{s("unreadMessages")}</small><strong>{unreadMessages}</strong></div></div><Link href={`/${locale}/store/${user.store.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>

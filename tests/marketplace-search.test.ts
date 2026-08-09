@@ -9,8 +9,8 @@ const filters: MarketplaceFilters = {
 };
 
 test("marketplace URLs preserve locale and encode deterministic shareable state", () => {
-  assert.equal(marketplaceUrl("ku", filters, 3), "/ku?q=camera+%26+lens&category=Electronics&condition=NEW&city=Paris&country=France&minPrice=10&maxPrice=500&availability=in-stock&sort=price-asc&page=3#products");
-  assert.equal(marketplaceUrl("fr", { ...filters, q: "", sort: "newest" }), "/fr?category=Electronics&condition=NEW&city=Paris&country=France&minPrice=10&maxPrice=500&availability=in-stock#products");
+  assert.equal(marketplaceUrl("ku", filters, 3), "/ku/search?q=camera+%26+lens&category=Electronics&condition=NEW&city=Paris&country=France&minPrice=10&maxPrice=500&availability=in-stock&sort=price-asc&page=3");
+  assert.equal(marketplaceUrl("fr", { ...filters, q: "", sort: "newest" }), "/fr/search?category=Electronics&condition=NEW&city=Paris&country=France&minPrice=10&maxPrice=500&availability=in-stock");
 });
 
 test("unsupported and malformed search parameters normalize safely", () => {

@@ -18,6 +18,7 @@ export default function WishlistButton({ productId }: { productId: string }) {
     ids = saved ? ids.filter((id) => id !== productId) : [...new Set([...ids, productId])];
     localStorage.setItem(KEY, JSON.stringify(ids));
     setSaved(!saved);
+    window.dispatchEvent(new CustomEvent("todijo:wishlist-change", { detail: { productId, saved: !saved } }));
     showToast({ message: saved ? t("favoriteRemove") : t("favoriteAdd"), tone: "success" });
   }
   return <button type="button" className={`productIconButton ${saved ? "isSaved" : ""}`} onClick={toggle} aria-label={saved ? t("favoriteRemove") : t("favoriteAdd")} aria-pressed={saved} title={saved ? t("favoriteRemove") : t("favoriteAdd")}>{saved ? "♥" : "♡"}<span>{saved ? t("favorite") : t("favoriteAdd")}</span></button>;

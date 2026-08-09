@@ -9,15 +9,16 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const productId = typeof body?.productId === "string" ? body.productId : "";
   const message = typeof body?.message === "string" ? body.message.trim() : "";
-  if (!productId || message.length < 2 || message.length > 2000) {
+  if (!productId || message.length < 12 || message.length > 2000) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
 
   const product = await prisma.product.findFirst({
     where: { id: productId, status: "PUBLISHED" },
-    select: { id: true, name: true, storeId: true, store: { select: { ownerId: true } } },
+    select: { id: true, name: true, storeId: true, allowPrepurchaseQuestions: true, store: { select: { ownerId: true } } },
   });
   if (!product) return NextResponse.json({ error: "PRODUCT_NOT_FOUND" }, { status: 404 });
+  if (!product.allowPrepurchaseQuestions) return NextResponse.json({ error: "PREPURCHASE_QUESTIONS_DISABLED" }, { status: 403 });
   if (product.store.ownerId === session.userId) {
     return NextResponse.json({ error: "CANNOT_MESSAGE_YOURSELF" }, { status: 400 });
   }

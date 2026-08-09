@@ -8,7 +8,7 @@ type Labels = {
   eyebrow: string; logout: string; menu: string; collapse: string; addProduct: string;
 };
 
-export default function SellerDashboardLayout({ children, locale, storeSlug, firstName, lastName, labels, active, canAddProduct = false, unreadMessages = 0 }: { children: ReactNode; locale: string; storeSlug: string; firstName: string; lastName: string; labels: Labels; active: "products" | "new-product" | "settings"; canAddProduct?: boolean; unreadMessages?: number }) {
+export default function SellerDashboardLayout({ children, locale, storeSlug, firstName, lastName, labels, active, canAddProduct = false, unreadMessages = 0 }: { children: ReactNode; locale: string; storeSlug: string; firstName: string; lastName: string; labels: Labels; active: "products" | "new-product" | "settings" | "reviews"; canAddProduct?: boolean; unreadMessages?: number }) {
   const items: DashboardNavItem[] = [
     { label: labels.dashboard, href: `/${locale}/dashboard`, icon: Home },
     { label: labels.products, href: `/${locale}/seller/products`, icon: Boxes, active: active === "products" },
@@ -16,7 +16,7 @@ export default function SellerDashboardLayout({ children, locale, storeSlug, fir
     { label: labels.messages, href: `/${locale}/messages`, icon: MessageCircle, badge: unreadMessages },
     { label: labels.statistics, href: `/${locale}/dashboard#analytics`, icon: BarChart3 },
     { label: labels.revenue, href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign },
-    { label: labels.reviews, href: `/${locale}/store/${storeSlug}#reviews`, icon: Star },
+    { label: labels.reviews, href: `/${locale}/seller/reviews`, icon: Star, active: active === "reviews" },
     { label: labels.store, href: `/${locale}/store/${storeSlug}`, icon: Store },
     { label: labels.settings, href: `/${locale}/seller/store-settings`, icon: Settings, active: active === "settings" },
   ];
@@ -26,7 +26,7 @@ export default function SellerDashboardLayout({ children, locale, storeSlug, fir
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={items} mobileMenuItems={mobileMenuItems} homeHref={`/${locale}`} logoutLabel={labels.logout} menuLabel={labels.menu} collapseLabel={labels.collapse} seller/>
     <div className="premiumDashboardMain">
-      <DashboardHeader firstName={firstName} lastName={lastName} eyebrow={labels.eyebrow} homeHref={`/${locale}`} notificationHref={`/${locale}/seller/store-settings#notifications`} notificationLabel={labels.notifications}/>
+      <DashboardHeader firstName={firstName} lastName={lastName} eyebrow={labels.eyebrow} homeHref={`/${locale}`} notificationHref={`/${locale}/messages`} notificationLabel={labels.notifications} notificationCount={unreadMessages}/>
       <div className="premiumDashboardContent sellerControlContent">{children}</div>
     </div>
   </main>;

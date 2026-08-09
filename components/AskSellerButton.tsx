@@ -8,7 +8,7 @@ export default function AskSellerButton({ productId, loggedIn }: { productId: st
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const t = useTranslations("Product");
-  const [message, setMessage] = useState(() => t("defaultMessage"));
+  const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,10 +37,11 @@ export default function AskSellerButton({ productId, loggedIn }: { productId: st
         <button className="messageModalClose" onClick={() => setOpen(false)} aria-label={t("close")}>×</button>
         <h2 id="ask-seller-title">{t("contact")}</h2>
         <p>{t("private")}</p>
-        <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} rows={6}/>
+        <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder={t("contact")} minLength={12} maxLength={2000} rows={6}/>
         <small>{message.length}/2000</small>
         {error && <p className="messageError">{error}</p>}
-        <button className="messageSendButton" type="button" onClick={send} disabled={busy || message.trim().length < 2}>{busy ? t("sending") : t("send")}</button>
+        {message.length > 0 && message.trim().length < 12 ? <p className="messageError">{t("messageError")}</p> : null}
+        <button className="messageSendButton" type="button" onClick={send} disabled={busy || message.trim().length < 12}>{busy ? t("sending") : t("send")}</button>
       </section>
     </div>}
   </>;

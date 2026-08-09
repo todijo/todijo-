@@ -50,7 +50,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         deactivationReason: status === "PUBLISHED" ? "NONE" : "SELLER",
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
-        colors, sizes, stock, images,
+        colors, sizes, stock, images, allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
       } });
       await replaceProductVariantImages(tx, id, images, body.variantImages);
     });

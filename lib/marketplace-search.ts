@@ -51,7 +51,7 @@ export function marketplaceUrl(locale: string, filters: MarketplaceFilters, page
   if (filters.sort !== "newest") params.set("sort", filters.sort);
   if (page > 1) params.set("page", String(page));
   const query = params.toString();
-  return `/${locale}${query ? `?${query}` : ""}#products`;
+  return `/${locale}/search${query ? `?${query}` : ""}`;
 }
 
 export function clearMarketplaceFilters(filters: MarketplaceFilters): MarketplaceFilters {

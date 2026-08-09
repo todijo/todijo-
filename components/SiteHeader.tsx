@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import TodijoLogo from "@/components/TodijoLogo";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
 
@@ -14,7 +14,9 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations("Common");
+  const product = useTranslations("Product");
   const locale = useLocale();
   const homeHref = localizedPath(locale);
 
@@ -36,7 +38,7 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
   function submit(event: React.FormEvent) {
     event.preventDefault();
     const value = query.trim();
-    window.location.href = value ? `${homeHref}?q=${encodeURIComponent(value)}#products` : `${homeHref}#products`;
+    router.push(value ? `${homeHref}/search?q=${encodeURIComponent(value)}` : `${homeHref}/search`);
   }
 
   return <>
@@ -53,6 +55,7 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
           <Link href={`${homeHref}#categories`}>{t("categories")}</Link>
           {storeName && storeSlug ? <Link href={localizedPath(locale, `/store/${storeSlug}`)} aria-current={isNavigationActive(pathname, `/store/${storeSlug}`, true) ? "page" : undefined}>{storeName}</Link> : <Link href={`${localizedPath(locale, "/register")}?role=seller`}>{t("sell")}</Link>}
           <Link href={localizedPath(locale, "/messages")} aria-current={isNavigationActive(pathname, "/messages", true) ? "page" : undefined}>{t("messages")}</Link>
+          {accountName ? <Link href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined}>{product("favorite")}</Link> : null}
           <Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-current={isNavigationActive(pathname, accountName ? "/dashboard" : "/login", true) ? "page" : undefined}>{accountName ?? t("account")}</Link>
           <CartLink label={t("cart")} />
           <LanguageSwitcher />

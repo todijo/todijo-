@@ -44,6 +44,8 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const selectedOptions = isVariantProduct ? selectedLabels.join(" · ") : `${color} · ${size}`;
   const available = isVariantProduct ? isSelectedVariantAvailable(selectedVariant) : stock > 0;
   const displayAvailable = isVariantProduct && !selectedVariant ? activeVariants.some((variant) => variant.stock > 0) : available;
+  const selectionComplete = !isVariantProduct || genericOptions.every((option) => Boolean(selection[option.id]));
+  const disabledLabel = isVariantProduct && (!selectionComplete || (!selectedVariant && displayAvailable)) ? t("chooseOptions") : t("unavailable");
 
   return <aside className="productPurchaseCard" aria-label={detail("purchaseOptions")}>
     <div className={`purchaseAvailability${displayAvailable ? " isAvailable" : " isUnavailable"}`}><span aria-hidden="true" />{displayAvailable ? availabilityLabel : t("unavailable")}</div>
@@ -61,8 +63,8 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
         <span>{detail("quantity")}</span>
         <div><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity <= 1} aria-label={detail("decreaseQuantity")}>−</button><output aria-live="polite">{quantity}</output><button type="button" onClick={() => setQuantity((value) => Math.min(stock, value + 1))} disabled={!available || quantity >= stock} aria-label={detail("increaseQuantity")}>+</button></div>
       </div>
-      <AddToCartButton quantity={quantity} product={{ ...product, price: selectedPrice, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
+      <AddToCartButton disabledLabel={disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
     </div>
-    <div className="mobilePurchaseBar"><span aria-live="polite">{selectedOptions || detail("chooseCombination")}</span><AddToCartButton quantity={quantity} product={{ ...product, price: selectedPrice, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
+    <div className="mobilePurchaseBar"><span aria-live="polite">{selectedOptions || detail("chooseCombination")}</span><AddToCartButton disabledLabel={disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
   </aside>;
 }
