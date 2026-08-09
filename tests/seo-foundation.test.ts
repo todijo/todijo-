@@ -47,7 +47,8 @@ test("metadata, robots and sitemap cover public discovery without private routes
   for (const source of [product, store, info]) assert.match(source, /generateMetadata/);
   assert.match(robots, /"\/\*\/dashboard"/);
   assert.match(robots, /"\/\*\/search"/);
-  assert.match(sitemap, /SITEMAP_ENTITY_LIMIT = 1_000/);
+  assert.match(sitemap, /generateSitemaps/);
+  assert.match(sitemap, /SITEMAP_ENTITY_CHUNK_SIZE/);
   assert.match(sitemap, /status: "PUBLISHED"/);
   assert.doesNotMatch(sitemap, /dashboard|checkout|messages|favorites/);
 });
