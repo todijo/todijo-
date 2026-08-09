@@ -28,7 +28,7 @@
     "cookiePolicyIntro": "当前存储用于必要的会话、语言、同意、购物车和结账功能。未安装分析或广告跟踪器。",
     "privacyDataIntro": "您可请求知情、访问、更正、删除、限制、可携带或反对，并撤回同意。",
     "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
-    "identityHeading":"谁负责处理数据？","identityText":"Todijo 运营本多商户市场。代码库中没有经核实的法律实体、注册号、邮寄地址和专用隐私联系方式，所有者须在最终法律文本中提供。",
+    "identityHeading":"谁负责处理数据？","identityText":"Todijo 目前作为成立公司前的项目与服务运营，尚未注册为公司。未来计划采用法国 SAS 法律形式，但 Todijo SAS 目前并不存在。尚无 SIREN、SIRET、注册号、增值税号或注册地址，也未任命 DPO。","privacyContactText":"隐私和 GDPR 请求可通过 Todijo 现有支持渠道发送至 {email}。",
     "dataHeading":"Todijo 处理的信息","dataText":"Todijo 处理账户与资料、买家与卖家、店铺、商品与图片、消息、评价、订单、收件人、配送、问题与退款证据、支持通信以及服务安全运行所需的技术和安全日志。",
     "marketplaceHeading":"订单与付款","marketplaceText":"Todijo 使用订单和卖家信息处理交易。Stripe 处理结账、付款确认、卖家入驻、订阅和付款。Todijo 保存核对交易所需的 Stripe 标识与状态，但不接收完整银行卡资料。",
     "purposesHeading":"使用目的","purposesText":"信息用于创建并保护账户、运营店铺、购物车与收藏、提供消息和评价、处理订单与退款、防止滥用、发送服务邮件、维持可靠性以及响应支持或隐私请求。所有者须确认各项处理的法律依据。",

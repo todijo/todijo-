@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import PrivacyInformation from "@/components/PrivacyInformation";
+import { privacyPublicProfile } from "@/lib/privacy-legal";
 
 const pageTitleKeys: Record<string, string> = {
   about: "about", "how-it-works": "howItWorks", mission: "mission", help: "helpCenter",
@@ -25,6 +26,7 @@ export default async function MarketplaceInfoPage({ params }: { params: Promise<
   const [locale, t] = await Promise.all([getLocale(), getTranslations("HomeFooter")]);
   const isLegal = legalPages.includes(slug as (typeof legalPages)[number]) || slug === "privacy-data";
   const Icon = isLegal ? ShieldCheck : Info;
+  const privacyProfile = privacyPublicProfile();
 
   return <main className={`marketInfoPage scopedPublicPage${isLegal ? " legalInfoPage" : ""}`}>
     <SiteHeader />
@@ -35,7 +37,7 @@ export default async function MarketplaceInfoPage({ params }: { params: Promise<
       <p>{t("comingSoonText")}</p>
     </section>}
     <div className="marketInfoLayout">
-      {["privacy", "cookies", "privacy-data"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data"} /> : <article className="marketInfoContent">
+      {["privacy", "cookies", "privacy-data"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data"} supportEmail={privacyProfile.supportEmail} /> : <article className="marketInfoContent">
         <FileText size={28} aria-hidden="true"/>
         <h2>{t(titleKey)}</h2>
         <p>{t("comingSoonText")}</p>
