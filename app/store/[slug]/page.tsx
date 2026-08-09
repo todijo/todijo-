@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import StoreExperience from "./StoreExperience";
 import { getLocale } from "next-intl/server";
@@ -6,11 +7,33 @@ import { publicStoreAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
+import { concise, localizedAlternates, localizedPath } from "@/lib/seo";
+import { type Locale } from "@/i18n/config";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 const STORE_PAGE_SIZE = 24;
+
+export async function generateMetadata({ params }: Pick<Props, "params">): Promise<Metadata> {
+  const [{ slug }, locale] = await Promise.all([params, getLocale() as Promise<Locale>]);
+  const store = await prisma.store.findFirst({
+    where: { slug, ...publicStoreAccessWhere() },
+    select: { name: true, description: true, logo: true, banner: true, city: true, country: true },
+  });
+  if (!store) return { title: "Todijo", robots: { index: false, follow: false } };
+  const description = concise(store.description || `${store.name} · ${store.city}, ${store.country}`);
+  const pathname = `store/${slug}`;
+  const canonical = localizedPath(locale, pathname);
+  const image = store.banner || store.logo;
+  return {
+    title: store.name,
+    description,
+    alternates: localizedAlternates(locale, pathname),
+    openGraph: { type: "website", title: `${store.name} · Todijo`, description, url: canonical, images: image ? [{ url: image, alt: store.name }] : undefined },
+    twitter: { card: image ? "summary_large_image" : "summary", title: `${store.name} · Todijo`, description, images: image ? [image] : undefined },
+  };
+}
 
 function initials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();

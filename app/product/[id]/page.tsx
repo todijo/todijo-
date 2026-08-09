@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ProductGallery from "./ProductGallery";
@@ -12,21 +13,43 @@ import ReviewSection from "@/components/ReviewSection";
 import AskSellerButton from "@/components/AskSellerButton";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { readSession } from "@/lib/session";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { categoryLabel } from "@/lib/categories";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 import ProductReportButton from "@/components/ProductReportButton";
+import { concise, localizedAlternates, localizedPath } from "@/lib/seo";
+import { type Locale } from "@/i18n/config";
+import { productStructuredData } from "@/lib/product-seo";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
 
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
+  const product = await prisma.product.findFirst({
+    where: { id, status: "PUBLISHED", ...publicProductAccessWhere() },
+    select: { name: true, description: true, images: true, store: { select: { name: true } } },
+  });
+  if (!product) return { title: metadataText("title"), robots: { index: false, follow: false } };
+  const description = concise(`${product.description} ${product.store.name}`);
+  const pathname = `product/${id}`;
+  const canonical = localizedPath(locale, pathname);
+  return {
+    title: product.name,
+    description,
+    alternates: localizedAlternates(locale, pathname),
+    openGraph: { type: "website", title: `${product.name} · Todijo`, description, url: canonical, images: product.images[0] ? [{ url: product.images[0], alt: product.name }] : undefined },
+    twitter: { card: product.images[0] ? "summary_large_image" : "summary", title: `${product.name} · Todijo`, description, images: product.images[0] ? [product.images[0]] : undefined },
+  };
+}
+
 export default async function ProductPage({ params }: Props) {
-  const [common, market, productText, detailText, compliance, categoryText, resolvedParams, session] = await Promise.all([
+  const [common, market, productText, detailText, compliance, categoryText, resolvedParams, session, locale] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
     getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"),
-    params, readSession(),
+    params, readSession(), getLocale(),
   ]);
   const { id } = resolvedParams;
   const publicAccess = publicProductAccessWhere();
@@ -50,7 +73,8 @@ export default async function ProductPage({ params }: Props) {
   const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true} });
   const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
-  return <main className="productDetailPage"><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
+  const productJsonLd = productStructuredData({ ...product, available: availability.isGenerallyAvailable }, locale);
+  return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
       <article className="productDetailInfo">

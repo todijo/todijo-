@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
@@ -7,6 +8,8 @@ import PrivacyInformation from "@/components/PrivacyInformation";
 import MarketplaceLegalPolicy from "@/components/MarketplaceLegalPolicy";
 import MarketplaceInfoContent from "@/components/MarketplaceInfoContent";
 import { privacyPublicProfile } from "@/lib/privacy-legal";
+import { concise, localizedAlternates, localizedPath } from "@/lib/seo";
+import { type Locale } from "@/i18n/config";
 
 const pageTitleKeys: Record<string, string> = {
   about: "about", "how-it-works": "howItWorks", mission: "mission", help: "helpCenter", "how-to-buy": "howToBuy", "how-to-sell": "howToSell", delivery: "delivery", returns: "returns", safety: "safety", "seller-guide": "sellerGuide", contact: "contact", support: "support", "report-problem": "reportProblem", terms: "terms", privacy: "privacy", cookies: "cookies", "privacy-data": "privacyData", "legal-notice": "legalNotice", "marketplace-rules": "rules", "seller-terms": "terms",
@@ -19,6 +22,28 @@ const publicInfoSlugs = ["about", "how-it-works", "mission", "help", "how-to-buy
 const related: Record<(typeof publicInfoSlugs)[number], string[]> = {
   about: ["how-it-works", "mission"], "how-it-works": ["how-to-buy", "how-to-sell"], mission: ["about", "safety"], help: ["how-to-buy", "how-to-sell", "support", "report-problem"], "how-to-buy": ["safety", "delivery", "returns", "help"], "how-to-sell": ["seller-guide", "seller-terms", "marketplace-rules"], delivery: ["returns", "support"], safety: ["report-problem", "marketplace-rules"], "seller-guide": ["dashboard", "seller-terms", "marketplace-rules", "support"], contact: ["support", "report-problem", "privacy"], support: ["help", "report-problem"], "report-problem": ["safety", "support"],
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const [{ slug }, locale, footer, infoPages, metadataText, legal, legalCleanup] = await Promise.all([
+    params, getLocale() as Promise<Locale>, getTranslations("HomeFooter"), getTranslations("InfoPages"), getTranslations("Metadata"), getTranslations("Legal"), getTranslations("LegalCleanup"),
+  ]);
+  const titleKey = pageTitleKeys[slug];
+  if (!titleKey) return { robots: { index: false, follow: false } };
+  const policyKind = policyKinds[slug as keyof typeof policyKinds];
+  const cleanupKind = cleanupKinds[slug as keyof typeof cleanupKinds];
+  const title = policyKind ? legal(`${policyKind}.title`) : cleanupKind ? legalCleanup(`${cleanupKind}.title`) : footer(titleKey);
+  const isPublicInfo = publicInfoSlugs.includes(slug as (typeof publicInfoSlugs)[number]);
+  const description = concise(isPublicInfo ? infoPages(`pages.${slug}.intro`) : policyKind ? legal(`${policyKind}.intro`) : cleanupKind ? legalCleanup(`${cleanupKind}.intro`) : `${title}. ${metadataText("description")}`);
+  const pathname = `info/${slug}`;
+  const canonical = localizedPath(locale, pathname);
+  return {
+    title,
+    description,
+    alternates: localizedAlternates(locale, pathname),
+    openGraph: { type: "article", title: `${title} · Todijo`, description, url: canonical },
+    twitter: { card: "summary", title: `${title} · Todijo`, description },
+  };
+}
 
 export default async function MarketplaceInfoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
