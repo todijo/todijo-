@@ -5,6 +5,7 @@ import { useState } from "react";
 import { LockKeyhole, Mail, MapPin } from "lucide-react";
 import LanguageSwitcher from "./LanguageSwitcher";
 import TodijoLogo from "./TodijoLogo";
+import { OPEN_COOKIE_PREFERENCES_EVENT } from "@/lib/privacy-consent";
 
 type FooterLink = { label: string; href: string };
 
@@ -13,6 +14,7 @@ export default function MarketplaceFooter() {
   const locale = useLocale();
   const t = useTranslations("HomeFooter");
   const h = useTranslations("HomeHeader");
+  const privacy = useTranslations("Privacy");
   const info = (slug: string) => `/${locale}/info/${slug}`;
   const groups: Array<{ title: string; links: FooterLink[] }> = [
     { title: t("aboutTitle"), links: [
@@ -43,6 +45,7 @@ export default function MarketplaceFooter() {
       { label: t("terms"), href: info("terms") },
       { label: t("privacy"), href: info("privacy") },
       { label: t("cookies"), href: info("cookies") },
+      { label: privacy("privacyData"), href: info("privacy-data") },
       { label: t("legalNotice"), href: info("legal-notice") },
       { label: t("rules"), href: info("marketplace-rules") },
     ] },
@@ -72,7 +75,7 @@ export default function MarketplaceFooter() {
     </div>
     <div className="marketplaceFooterBottom">
       <p>© {new Date().getFullYear()} Todijo. {t("rights")}</p>
-      <div><span><MapPin size={15} aria-hidden="true"/>{h("marketplace")}</span><LanguageSwitcher className="marketFooterLanguage"/></div>
+      <div><button type="button" className="footerCookieButton" onClick={() => window.dispatchEvent(new Event(OPEN_COOKIE_PREFERENCES_EVENT))}>{privacy("manageCookies")}</button><span><MapPin size={15} aria-hidden="true"/>{h("marketplace")}</span><LanguageSwitcher className="marketFooterLanguage"/></div>
     </div>
   </footer>;
 }
