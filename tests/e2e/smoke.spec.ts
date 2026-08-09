@@ -122,6 +122,28 @@ test("marketplace routes render one shared header with core navigation", async (
   await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
 });
 
+test("desktop Categories opens a stable mega-menu and preserves localized routing", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: false } }));
+  await page.goto("/en/e2e-ux?view=home");
+  const trigger = page.locator("header[data-marketplace-header] .marketAllCategories");
+  await trigger.hover();
+  const menu = page.locator("#market-category-mega-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Fashion", exact: true })).toBeVisible();
+  await menu.getByRole("link", { name: "Home", exact: true }).hover();
+  await expect(menu.getByRole("link", { name: "View all Home" })).toBeVisible();
+  await expect(menu).toBeVisible();
+  await Promise.all([page.waitForURL(/\/en\/search\?category=Maison/), menu.getByRole("link", { name: "Home", exact: true }).click()]);
+  await page.goto("/en/e2e-ux?view=home");
+  await expect(page.locator(".categoryStripSection")).toBeHidden();
+  await expect(page.locator(".categoryShowcase")).toBeHidden();
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+});
+
 test("favorites remain isolated across logout and two authenticated buyers", async ({ page }) => {
   const products = [
     { id: "e2e-product-x", name: "Buyer A favorite", price: "29.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test" },

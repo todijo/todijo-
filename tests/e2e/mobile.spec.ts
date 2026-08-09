@@ -105,3 +105,13 @@ test("mobile search filters open as a full-height sheet without squeezing result
   const widthAfter = await results.evaluate((element) => element.getBoundingClientRect().width);
   expect(widthAfter).toBe(widthBefore);
 });
+
+test("mobile Categories opens the compact category drawer and preserves locale", async ({ page }) => {
+  await page.goto("/en/e2e-ux?view=home");
+  await page.getByRole("button", { name: "Categories" }).last().click();
+  const drawer = page.getByRole("dialog", { name: "Mobile navigation" });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole("button", { name: "Categories" }).click();
+  await expect(drawer.getByRole("link", { name: "Electronics" })).toBeVisible();
+  await Promise.all([page.waitForURL(/\/en\/search\?category=/), drawer.getByRole("link", { name: "Electronics" }).click()]);
+});

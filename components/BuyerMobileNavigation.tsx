@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useCart } from "@/components/CartProvider";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
+import { PRODUCT_CATEGORIES } from "@/lib/categories";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
   const locale = useLocale();
@@ -17,9 +18,11 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const header = useTranslations("HomeHeader");
   const product = useTranslations("Product");
   const ux = useTranslations("Ux");
+  const categoryText = useTranslations("Categories");
   const { totalItems } = useCart();
   const [open, setOpen] = useState(false);
   const [hash, setHash] = useState("");
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
@@ -72,7 +75,8 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
       <div className="buyerMobileDrawerHeader"><div><UserRound size={22} aria-hidden="true"/><span><small>{header("hello")}</small><strong>{accountName ?? common("account")}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
       <nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>
-        <a href={`${homeHref}#categories`} onClick={closeDrawer} className={isHome && hash === "#categories" ? "active" : ""} aria-current={isHome && hash === "#categories" ? "page" : undefined}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</a>
+        <button className="buyerMobileCategoriesButton" type="button" onClick={() => setCategoriesOpen((open) => !open)} aria-expanded={categoriesOpen}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</button>
+        {categoriesOpen ? <div className="buyerMobileCategoryList">{PRODUCT_CATEGORIES.map((category) => <a key={category.key} href={`${homeHref}/search?category=${encodeURIComponent(category.value)}`} onClick={closeDrawer}>{categoryText(category.key)}</a>)}</div> : null}
         <a href={`${homeHref}?sort=newest#products`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("newArrivals")}</a>
         <a href={`${homeHref}#best-sellers`} onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
         <a href={ordersHref} onClick={closeDrawer} className={isNavigationActive(pathname, ordersHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, ordersHref, true) ? "page" : undefined}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
@@ -91,7 +95,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
     {drawer}
     {showBottomNavigation ? <nav className="buyerMobileBottomNav" aria-label={header("mobileNavigation")}>
       <a className={isHome ? "active" : ""} href={homeHref} aria-current={isHome ? "page" : undefined}><Home size={21} aria-hidden="true"/><span>{common("home")}</span></a>
-      <a className={isHome && hash === "#categories" ? "active" : ""} href={`${homeHref}#categories`}><Grid2X2 size={21} aria-hidden="true"/><span>{common("categories")}</span></a>
+      <button className={isHome && hash === "#categories" ? "active" : ""} type="button" onClick={() => setOpen(true)}><Grid2X2 size={21} aria-hidden="true"/><span>{common("categories")}</span></button>
       <a className={isHome && hash === "#market-search" ? "active" : ""} href="#market-search" onClick={focusSearch}><Search size={21} aria-hidden="true"/><span>{common("search")}</span></a>
       <Link className={isNavigationActive(pathname, cartHref) ? "active" : ""} href={cartHref} aria-current={isNavigationActive(pathname, cartHref) ? "page" : undefined}><ShoppingCart size={21} aria-hidden="true"/><span>{common("cart")}</span>{totalItems > 0 ? <strong>{totalItems > 99 ? "99+" : totalItems}</strong> : null}</Link>
       <a className={isNavigationActive(pathname, accountHref, true) ? "active" : ""} href={accountHref} aria-current={isNavigationActive(pathname, accountHref, true) ? "page" : undefined}><UserRound size={21} aria-hidden="true"/><span>{common("account")}</span></a>
