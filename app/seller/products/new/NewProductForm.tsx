@@ -80,6 +80,10 @@ export default function NewProductForm({ currency, productCount, productLimit }:
           </div>
         </SellerSection>
 
+        <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
+          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/>
+        </SellerSection>
+
         <SellerSection icon={Boxes} title={t("productOptions")} description={t("productOptionsHelp")}>
           {!variantsEnabled ? <button className="sellerVariantStartButton" type="button" onClick={() => setVariantsEnabled(true)}>{t("addProductOptions")}</button> : <>
             <div className="sellerVariantOptionToolbar"><p>{t("productOptionsEnabled")}</p><button className="sellerVariantRemoveButton" type="button" onClick={() => setVariantsEnabled(false)}>{t("removeProductOptions")}</button></div>
@@ -87,9 +91,6 @@ export default function NewProductForm({ currency, productCount, productLimit }:
           </>}
         </SellerSection>
 
-        <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
-          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/>
-        </SellerSection>
         {variantsEnabled && <SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages}/></SellerSection>}
 
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
