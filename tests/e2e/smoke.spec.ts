@@ -84,24 +84,34 @@ test("search filters are visibly triggered, preserve state, and update the URL",
   await page.goto("/en/e2e-ux");
   const trigger = page.locator(".mobileFilterButton");
   await expect(trigger).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Sort" })).toHaveCount(0);
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByRole("dialog", { name: "Filters" })).toHaveCount(0);
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Filters" });
   await expect(dialog).toBeVisible();
   await page.getByLabel("Minimum price").fill("10");
-  await page.getByLabel("City").fill("Paris");
+  await page.getByLabel("Country").fill("France");
+  await page.getByRole("radio", { name: "4★+" }).check();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await trigger.click();
   await expect(page.getByLabel("Minimum price")).toHaveValue("10");
-  await expect(page.getByLabel("City")).toHaveValue("Paris");
+  await expect(page.getByLabel("Country")).toHaveValue("France");
+  await expect(page.getByRole("radio", { name: "4★+" })).toBeChecked();
   await Promise.all([
-    page.waitForURL(/\/en\/search\?.*(?:city=Paris|minPrice=10)/),
+    page.waitForURL(/\/en\/search\?.*(?:country=France|rating=4|minPrice=10)/),
     page.getByRole("button", { name: "Apply" }).click(),
   ]);
+});
+
+test("homepage presents the localized stores CTA to the public directory", async ({ page }) => {
+  await page.goto("/en/e2e-ux?view=home");
+  const storesCta = page.getByRole("link", { name: "Stores to discover" }).last();
+  await expect(storesCta).toBeVisible();
+  await expect(storesCta).toHaveAttribute("href", "/en/store");
 });
 
 test("marketplace routes render one shared header with core navigation", async ({ page }) => {

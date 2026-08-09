@@ -10,7 +10,7 @@ import MobileAppPromotion from "@/components/MobileAppPromotion";
 import MarketplaceProductCard, { type MarketplaceCardProduct } from "@/components/MarketplaceProductCard";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import { EmptyState } from "@/components/FeedbackState";
-import { clearMarketplaceFilters, marketplaceUrl, type MarketplaceFilters, type MarketplaceSort } from "@/lib/marketplace-search";
+import { clearMarketplaceFilters, marketplaceUrl, type MarketplaceFilters } from "@/lib/marketplace-search";
 import { categoryKey, categoryLabel } from "@/lib/categories";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
@@ -55,7 +55,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const d = useTranslations("HomeDiscovery");
   const categoryText = useTranslations("Categories");
   const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
-  const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), city:m("city"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), oldest:m("oldest"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
+  const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), best:h("bestSellers"), low:m("low"), high:m("high"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
 
@@ -77,7 +77,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", keydown); };
   }, [showFilters]);
 
-  const activeCount = useMemo(() => [filters.category, filters.condition, filters.city, filters.country, filters.minPrice, filters.maxPrice, filters.availability].filter(Boolean).length, [filters]);
+  const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability].filter(Boolean).length, [filters]);
   const featuredProducts = products.filter((product) => product.image).slice(0, 3);
   const featuredCategories = categories.slice(0, 4);
 
@@ -132,7 +132,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
 
       <div className="marketplaceDiscoverySections">
         <ProductRail title={h("newArrivals")} products={newArrivals} soldOut={t.soldOut} viewAll={h("viewAll")}/>
-        <aside className="container discoveryPromoBanner"><div><span>{d("discoverLabel")}</span><h2>{d("discoverTitle")}</h2><p>{d("discoverText")}</p></div><a href="#categories">{d("discoverCta")}<ArrowRight size={17} aria-hidden="true"/></a><ShoppingBag size={82} aria-hidden="true"/></aside>
+        <aside className="container discoveryPromoBanner"><div><span>{d("discoverLabel")}</span><h2>{d("discoverTitle")}</h2><p>{d("discoverText")}</p></div><a href={`/${activeLocale}/store`}>{d("storesTitle")}<ArrowRight size={17} aria-hidden="true"/></a><ShoppingBag size={82} aria-hidden="true"/></aside>
         {stores.length > 0 && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading"><div><span>{d("storesLabel")}</span><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></div></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={52} height={52} unoptimized/> : <span><Store size={24} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="90px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
         <ProductRail id="best-sellers" title={h("bestSellers")} products={bestSellers} soldOut={t.soldOut} viewAll={h("viewAll")}/>
       </div>
@@ -145,10 +145,11 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             <label>{t.min}<input type="number" min="0" value={filters.minPrice} onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })} placeholder="0" /></label>
             <label>{t.max}<input type="number" min="0" value={filters.maxPrice} onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })} placeholder="5000" /></label>
             {Boolean(filters.minPrice && filters.maxPrice && Number(filters.minPrice) > Number(filters.maxPrice)) && <p className="filterValidation" role="alert">{t.min} ≤ {t.max}</p>}
+            <fieldset><legend>{t.sort}</legend><label><input type="radio" name="sort" checked={filters.sort === "newest"} onChange={() => setFilters({ ...filters, sort: "newest" })}/>{t.newest}</label><label><input type="radio" name="sort" checked={filters.sort === "best-selling"} onChange={() => setFilters({ ...filters, sort: "best-selling" })}/>{t.best}</label><label><input type="radio" name="sort" checked={filters.sort === "price-asc"} onChange={() => setFilters({ ...filters, sort: "price-asc" })}/>{t.low}</label><label><input type="radio" name="sort" checked={filters.sort === "price-desc"} onChange={() => setFilters({ ...filters, sort: "price-desc" })}/>{t.high}</label></fieldset>
             <label>{t.condition}<input value={filters.condition} onChange={(e) => setFilters({ ...filters, condition: e.target.value })} /></label>
-            <label>{t.city}<input value={filters.city} onChange={(e) => setFilters({ ...filters, city: e.target.value })} /></label>
             <label>{t.country}<input value={filters.country} onChange={(e) => setFilters({ ...filters, country: e.target.value })} /></label>
             <label className="availabilityFilter"><input type="checkbox" checked={filters.availability === "in-stock"} onChange={(e) => setFilters({ ...filters, availability: e.target.checked ? "in-stock" : "" })} />{t.stock}</label>
+            <fieldset><legend>★ {t.filters}</legend><label><input type="radio" name="rating" checked={filters.rating === ""} onChange={() => setFilters({ ...filters, rating: "" })}/>{t.all}</label><label><input type="radio" name="rating" checked={filters.rating === "4"} onChange={() => setFilters({ ...filters, rating: "4" })}/>4★+</label><label><input type="radio" name="rating" checked={filters.rating === "3"} onChange={() => setFilters({ ...filters, rating: "3" })}/>3★+</label></fieldset>
             <button className="filterApply">{t.apply}</button>
             <a className="filterReset" href={buildUrl(clearMarketplaceFilters(filters))}>{t.reset}</a>
           </form>
@@ -158,9 +159,6 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
           {activeCount > 0 && <div className="activeFilterChips" aria-label={t.filters}>{Object.entries(filters).filter(([key,value]) => value && !["q","sort"].includes(key)).map(([key,value]) => { const label = key === "availability" ? t.stock : key === "category" ? displayCategory(String(value)) : String(value); return <a key={key} href={buildUrl({...filters,[key]:""})} aria-label={`${c("remove")}: ${label}`}>{label}<span aria-hidden="true">×</span></a>; })}<a className="clearAllChip" href={buildUrl(clearMarketplaceFilters(filters))}>{t.reset}</a></div>}
           <div className="resultsToolbar">
             <div><button ref={filterTriggerRef} className="mobileFilterButton" type="button" aria-expanded={showFilters} aria-controls="filter-panel" onClick={() => setShowFilters(true)}><Menu size={18} aria-hidden="true"/> {t.filters}{activeCount ? ` (${activeCount})` : ""}</button><h2 tabIndex={-1}>{filters.q ? `${t.products}: “${filters.q}”` : filters.category ? `${t.products}: ${displayCategory(filters.category)}` : t.products}</h2><span aria-live="polite">{total} {t.results}</span></div>
-            <select value={filters.sort} onChange={(e) => window.location.href = buildUrl({ ...filters, sort: e.target.value as MarketplaceSort })} aria-label={t.sort}>
-              <option value="newest">{t.newest}</option><option value="oldest">{t.oldest}</option><option value="price-asc">{t.low}</option><option value="price-desc">{t.high}</option>
-            </select>
           </div>
 
           {products.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">

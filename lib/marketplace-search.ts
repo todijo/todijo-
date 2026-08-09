@@ -1,12 +1,12 @@
-export const MARKETPLACE_SORTS = ["newest", "oldest", "price-asc", "price-desc"] as const;
+export const MARKETPLACE_SORTS = ["newest", "best-selling", "price-asc", "price-desc"] as const;
 export type MarketplaceSort = typeof MARKETPLACE_SORTS[number];
 
 export type MarketplaceFilters = {
   q: string;
   category: string;
   condition: string;
-  city: string;
   country: string;
+  rating: "" | "3" | "4";
   sort: MarketplaceSort;
   minPrice: string;
   maxPrice: string;
@@ -26,13 +26,15 @@ function price(value: string | string[] | undefined) {
 export function normalizeMarketplaceSearch(params: Record<string, string | string[] | undefined>) {
   const requestedSort = text(params.sort, 20);
   const sort = MARKETPLACE_SORTS.includes(requestedSort as MarketplaceSort) ? requestedSort as MarketplaceSort : "newest";
+  const requestedRating = text(params.rating, 2);
+  const rating: MarketplaceFilters["rating"] = requestedRating === "3" || requestedRating === "4" ? requestedRating : "";
   const minPrice = price(params.minPrice);
   const maxPrice = price(params.maxPrice);
   const requestedPage = Number.parseInt(text(params.page, 8), 10);
   return {
     filters: {
       q: text(params.q), category: text(params.category, 80), condition: text(params.condition, 80),
-      city: text(params.city, 80), country: text(params.country, 80), sort, minPrice, maxPrice,
+      country: text(params.country, 80), rating, sort, minPrice, maxPrice,
       availability: text(params.availability, 20) === "in-stock" ? "in-stock" as const : "" as const,
     },
     page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
@@ -44,7 +46,7 @@ export function marketplaceUrl(locale: string, filters: MarketplaceFilters, page
   const params = new URLSearchParams();
   const entries: Array<[keyof MarketplaceFilters, string]> = [
     ["q", filters.q.trim()], ["category", filters.category], ["condition", filters.condition],
-    ["city", filters.city], ["country", filters.country], ["minPrice", filters.minPrice],
+    ["country", filters.country], ["rating", filters.rating], ["minPrice", filters.minPrice],
     ["maxPrice", filters.maxPrice], ["availability", filters.availability],
   ];
   for (const [key, value] of entries) if (value) params.set(key, value);
@@ -55,5 +57,5 @@ export function marketplaceUrl(locale: string, filters: MarketplaceFilters, page
 }
 
 export function clearMarketplaceFilters(filters: MarketplaceFilters): MarketplaceFilters {
-  return { ...filters, category: "", condition: "", city: "", country: "", minPrice: "", maxPrice: "", availability: "" };
+  return { ...filters, category: "", condition: "", country: "", rating: "", sort: "newest", minPrice: "", maxPrice: "", availability: "" };
 }

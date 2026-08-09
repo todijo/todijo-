@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import HomeClient from "./HomeClient";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
@@ -33,14 +33,14 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const params = await searchParams;
   const resultsOnly = params.__resultsOnly === "1";
   const { filters, page, invalidPriceRange } = normalizeMarketplaceSearch(params);
-  const { q, category, condition, city, country, sort, availability } = filters;
+  const { q, category, condition, country, sort, availability } = filters;
   const minPrice = Number(filters.minPrice);
   const maxPrice = Number(filters.maxPrice);
   const now = new Date();
   const publicProductAccess = publicProductAccessWhere(now);
   const publicStoreAccess = publicStoreAccessWhere(now);
 
-  const where: Prisma.ProductWhereInput = {
+  const baseWhere: Prisma.ProductWhereInput = {
     status: "PUBLISHED",
     ...publicProductAccess,
     ...(category ? { category } : {}),
@@ -50,11 +50,10 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     ...(!invalidPriceRange && filters.maxPrice
       ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } }
       : {}),
-    ...(city || country
+    ...(country
       ? {
           store: {
             ...publicStoreAccess,
-            ...(city ? { city: { contains: city, mode: "insensitive" } } : {}),
             ...(country ? { country: { contains: country, mode: "insensitive" } } : {}),
           },
         }
@@ -76,25 +75,54 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       : {}),
   };
 
+  const ratingThreshold = Number(filters.rating);
+  const ratedProducts = filters.rating
+    ? await prisma.review.groupBy({
+        by: ["productId"],
+        where: { status: "PUBLISHED", product: baseWhere },
+        _avg: { rating: true },
+        having: { rating: { _avg: { gte: ratingThreshold } } },
+      })
+    : [];
+  const where: Prisma.ProductWhereInput = filters.rating
+    ? { ...baseWhere, id: { in: ratedProducts.map((review) => review.productId) } }
+    : baseWhere;
+
+  const qualifyingOrderStatuses: OrderStatus[] = ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"];
+  const isBestSelling = sort === "best-selling";
+
   const primaryOrder: Prisma.ProductOrderByWithRelationInput =
     sort === "price-asc"
       ? { price: "asc" }
       : sort === "price-desc"
         ? { price: "desc" }
-        : sort === "oldest"
-          ? { createdAt: "asc" }
-          : { createdAt: "desc" };
+        : { createdAt: "desc" };
   const orderBy: Prisma.ProductOrderByWithRelationInput[] = [primaryOrder, { id: "asc" }];
 
-  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * PAGE_SIZE,
+  async function productsForPage(requestedPage: number) {
+    if (!isBestSelling) {
+      return prisma.product.findMany({
+        where, orderBy, skip: (requestedPage - 1) * PAGE_SIZE, take: PAGE_SIZE, select: productSelect,
+      });
+    }
+    const sales = await prisma.orderItem.groupBy({
+      by: ["productId"],
+      where: { order: { status: { in: qualifyingOrderStatuses } }, product: where },
+      _sum: { quantity: true },
+      orderBy: [{ _sum: { quantity: "desc" } }, { productId: "asc" }],
+      skip: (requestedPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      select: productSelect,
-    }),
-    prisma.product.count({ where }),
+    });
+    const ids = sales.map((sale) => sale.productId);
+    if (!ids.length) return [];
+    const unordered = await prisma.product.findMany({ where: { ...where, id: { in: ids } }, select: productSelect });
+    const byId = new Map(unordered.map((product) => [product.id, product]));
+    return ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product));
+  }
+
+  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows] = await Promise.all([
+    productsForPage(page),
+    prisma.product.count({ where: isBestSelling ? { ...where, orderItems: { some: { order: { status: { in: qualifyingOrderStatuses } } } } } : where }),
     prisma.product.findMany({
       where: { status: "PUBLISHED", ...publicProductAccess },
       distinct: ["category"],
@@ -104,7 +132,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     prisma.product.findMany({ where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 8, select: productSelect }),
     prisma.orderItem.groupBy({
       by: ["productId"],
-      where: { order: { status: { in: ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"] } }, product: { status: "PUBLISHED", ...publicProductAccess } },
+      where: { order: { status: { in: qualifyingOrderStatuses } }, product: { status: "PUBLISHED", ...publicProductAccess } },
       _sum: { quantity: true }, orderBy: { _sum: { quantity: "desc" } }, take: 8,
     }),
     prisma.store.findMany({
@@ -117,9 +145,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   ]);
   const availablePages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const normalizedPage = Math.min(page, availablePages);
-  const rows = normalizedPage === page ? initialRows : await prisma.product.findMany({
-    where, orderBy, skip: (normalizedPage - 1) * PAGE_SIZE, take: PAGE_SIZE, select: productSelect,
-  });
+  const rows = normalizedPage === page ? initialRows : await productsForPage(normalizedPage);
 
   const bestSellerIds = bestSellerCounts.map((item) => item.productId);
   const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED", ...publicProductAccess }, select: productSelect }) : [];

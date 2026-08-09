@@ -4,26 +4,26 @@ import { readFileSync } from "node:fs";
 import { clearMarketplaceFilters, marketplaceUrl, normalizeMarketplaceSearch, type MarketplaceFilters } from "../lib/marketplace-search";
 
 const filters: MarketplaceFilters = {
-  q: "camera & lens", category: "Electronics", condition: "NEW", city: "Paris", country: "France",
-  sort: "price-asc", minPrice: "10", maxPrice: "500", availability: "in-stock",
+  q: "camera & lens", category: "Electronics", condition: "NEW", country: "France", rating: "4",
+  sort: "best-selling", minPrice: "10", maxPrice: "500", availability: "in-stock",
 };
 
 test("marketplace URLs preserve locale and encode deterministic shareable state", () => {
-  assert.equal(marketplaceUrl("ku", filters, 3), "/ku/search?q=camera+%26+lens&category=Electronics&condition=NEW&city=Paris&country=France&minPrice=10&maxPrice=500&availability=in-stock&sort=price-asc&page=3");
-  assert.equal(marketplaceUrl("fr", { ...filters, q: "", sort: "newest" }), "/fr/search?category=Electronics&condition=NEW&city=Paris&country=France&minPrice=10&maxPrice=500&availability=in-stock");
+  assert.equal(marketplaceUrl("ku", filters, 3), "/ku/search?q=camera+%26+lens&category=Electronics&condition=NEW&country=France&rating=4&minPrice=10&maxPrice=500&availability=in-stock&sort=best-selling&page=3");
+  assert.equal(marketplaceUrl("fr", { ...filters, q: "", sort: "newest" }), "/fr/search?category=Electronics&condition=NEW&country=France&rating=4&minPrice=10&maxPrice=500&availability=in-stock");
 });
 
 test("unsupported and malformed search parameters normalize safely", () => {
   const result = normalizeMarketplaceSearch({ q: "  camera  ", sort: "popular", minPrice: "-1", maxPrice: "oops", availability: "all", page: "-4" });
-  assert.deepEqual(result, { filters: { q: "camera", category: "", condition: "", city: "", country: "", sort: "newest", minPrice: "", maxPrice: "", availability: "" }, page: 1, invalidPriceRange: false });
+  assert.deepEqual(result, { filters: { q: "camera", category: "", condition: "", country: "", rating: "", sort: "newest", minPrice: "", maxPrice: "", availability: "" }, page: 1, invalidPriceRange: false });
 });
 
 test("invalid price ranges are explicit and clearing filters preserves query and sort", () => {
-  const result = normalizeMarketplaceSearch({ q: "camera", minPrice: "500", maxPrice: "10", sort: "oldest" });
+  const result = normalizeMarketplaceSearch({ q: "camera", minPrice: "500", maxPrice: "10", sort: "best-selling", rating: "4" });
   assert.equal(result.invalidPriceRange, true);
-  assert.deepEqual(clearMarketplaceFilters(result.filters), { ...result.filters, category: "", condition: "", city: "", country: "", minPrice: "", maxPrice: "", availability: "" });
+  assert.deepEqual(clearMarketplaceFilters(result.filters), { ...result.filters, category: "", condition: "", country: "", rating: "", sort: "newest", minPrice: "", maxPrice: "", availability: "" });
   assert.equal(clearMarketplaceFilters(result.filters).q, "camera");
-  assert.equal(clearMarketplaceFilters(result.filters).sort, "oldest");
+  assert.equal(clearMarketplaceFilters(result.filters).sort, "newest");
 });
 
 test("search UI uses one locale-safe URL builder, accessible mobile dialog, and localized product links", () => {
@@ -38,7 +38,8 @@ test("search UI uses one locale-safe URL builder, accessible mobile dialog, and 
   assert.match(home, /filterTriggerRef\.current\?\.focus\(\)/);
   assert.match(productCard, /href=\{`\/\$\{locale\}\/product\/\$\{product\.id\}`\}/);
   assert.match(mobile, /new URLSearchParams\(window\.location\.search\)\.get\("q"\)/);
-  assert.match(server, /const orderBy:[^=]+ = \[primaryOrder, \{ id: "asc" \}\]/);
+  assert.match(server, /const qualifyingOrderStatuses: OrderStatus\[\] = \["PAID", "PROCESSING", "SHIPPED", "DELIVERED"\]/);
+  assert.match(server, /having: \{ rating: \{ _avg: \{ gte: ratingThreshold \} \} \}/);
   assert.match(server, /const normalizedPage = Math\.min\(page, availablePages\)/);
 });
 
