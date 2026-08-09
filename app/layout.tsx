@@ -6,6 +6,7 @@ import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import { locales, rtlLocales, type Locale } from "@/i18n/config";
 import { ToastProvider } from "@/components/ToastProvider";
+import { WishlistProvider } from "@/components/WishlistProvider";
 
 export const viewport: Viewport = {
   themeColor: "#063d2d",
@@ -36,7 +37,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
-      <body><NextIntlClientProvider messages={messages}><ToastProvider><CartProvider>{children}</CartProvider></ToastProvider></NextIntlClientProvider></body>
+      <body><NextIntlClientProvider messages={messages}><ToastProvider><WishlistProvider><CartProvider>{children}</CartProvider></WishlistProvider></ToastProvider></NextIntlClientProvider></body>
     </html>
   );
 }

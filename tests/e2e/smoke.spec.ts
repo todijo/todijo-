@@ -4,10 +4,9 @@ import { SignJWT } from "jose";
 
 const e2eSecret = "e2e-only-placeholder-secret-at-least-32-characters";
 
-async function authenticate(page: import("@playwright/test").Page) {
-  const token = await new SignJWT({ userId: "e2e-user", role: "CUSTOMER" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
+async function authenticate(page: import("@playwright/test").Page, userId: string) {
+  const token = await new SignJWT({ userId, role: "CUSTOMER" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
   await page.context().addCookies([{ name: "todijo_session", value: token, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
-  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: true, userId: "e2e-user", name: "Alex" } }));
 }
 
 test("English authentication entry renders the application shell", async ({ page }) => {
@@ -97,20 +96,63 @@ test("desktop filters are on-demand and preserve URL filter behavior", async ({ 
   await expect(trigger).toBeFocused();
 });
 
-test("authenticated marketplace navigation and favorites persistence are rendered", async ({ page }) => {
-  await authenticate(page);
-  const favoriteProduct = { id: "e2e-product", name: "Browser verified product", price: "29.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test" };
-  await page.route("**/api/products?ids=**", (route) => route.fulfill({ json: { products: [favoriteProduct] } }));
+test("favorites remain isolated across logout and two authenticated buyers", async ({ page }) => {
+  const products = [
+    { id: "e2e-product-x", name: "Buyer A favorite", price: "29.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test" },
+    { id: "e2e-product-y", name: "Buyer B favorite", price: "39.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test" },
+  ];
+  let currentUser: { id: string; name: string } | null = { id: "buyer-a", name: "Buyer A" };
+  await page.route("**/api/auth/session", (route) => route.fulfill({
+    json: currentUser ? { authenticated: true, userId: currentUser.id, name: currentUser.name } : { authenticated: false },
+  }));
+  await page.route("**/api/products?ids=**", (route) => {
+    const ids = new URL(route.request().url()).searchParams.get("ids")?.split(",") ?? [];
+    return route.fulfill({ json: { products: products.filter((product) => ids.includes(product.id)) } });
+  });
+
+  await authenticate(page, currentUser.id);
   await page.goto("/en/e2e-ux");
-  await page.getByRole("button", { name: "Add to favorites" }).click();
+  await page.getByRole("article").filter({ hasText: products[0].name }).getByRole("button", { name: "Add to favorites" }).click();
   await page.getByRole("link", { name: "My favorites" }).click();
-  await expect(page).toHaveURL(/\/en\/favorites/);
-  await expect(page.getByRole("heading", { name: "My favorites" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: favoriteProduct.name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: products[0].name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: products[1].name })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("heading", { name: favoriteProduct.name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: products[0].name })).toBeVisible();
+
+  currentUser = null;
+  await page.context().clearCookies();
+  await page.goto("/en/e2e-ux");
+  await expect(page.getByRole("button", { name: "Add to favorites" })).toHaveCount(2);
+
+  currentUser = { id: "buyer-b", name: "Buyer B" };
+  await authenticate(page, currentUser.id);
+  await page.goto("/en/e2e-ux");
+  await expect(page.getByRole("button", { name: "Add to favorites" })).toHaveCount(2);
+  await page.getByRole("article").filter({ hasText: products[1].name }).getByRole("button", { name: "Add to favorites" }).click();
+  await page.getByRole("link", { name: "My favorites" }).click();
+  await expect(page.getByRole("heading", { name: products[1].name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: products[0].name })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: products[1].name })).toBeVisible();
+
+  currentUser = null;
+  await page.context().clearCookies();
+  await page.goto("/en/e2e-ux");
+  currentUser = { id: "buyer-a", name: "Buyer A" };
+  await authenticate(page, currentUser.id);
+  await page.goto("/en/favorites");
+  await expect(page.getByRole("heading", { name: products[0].name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: products[1].name })).toHaveCount(0);
   await page.getByRole("button", { name: "Remove from favorites" }).click();
   await expect(page.getByText("You don’t have any favorites yet.")).toBeVisible();
+
+  currentUser = null;
+  await page.context().clearCookies();
+  await page.goto("/en/e2e-ux");
+  currentUser = { id: "buyer-b", name: "Buyer B" };
+  await authenticate(page, currentUser.id);
+  await page.goto("/en/favorites");
+  await expect(page.getByRole("heading", { name: products[1].name })).toBeVisible();
 });
 
 test("pre-purchase setting copy and checkbox render with the existing field", async ({ page }) => {
