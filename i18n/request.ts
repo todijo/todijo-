@@ -21,6 +21,7 @@ export default getRequestConfig(async () => {
   messages.HomeHeader = (await import(`../messages/home-header/${locale}.json`)).default;
   messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
   messages.Privacy = { ...(await import("../messages/privacy/en.json")).default, ...(await import(`../messages/privacy/${locale}.json`)).default };
+  messages.Legal = (await import(`../messages/legal/${locale}.json`)).default;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = ["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
