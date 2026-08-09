@@ -1,7 +1,6 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
 import { LockKeyhole, Mail, MapPin } from "lucide-react";
 import LanguageSwitcher from "./LanguageSwitcher";
 import TodijoLogo from "./TodijoLogo";
@@ -10,7 +9,6 @@ import { OPEN_COOKIE_PREFERENCES_EVENT } from "@/lib/privacy-consent";
 type FooterLink = { label: string; href: string };
 
 export default function MarketplaceFooter() {
-  const [newsletterMessage, setNewsletterMessage] = useState("");
   const locale = useLocale();
   const t = useTranslations("HomeFooter");
   const h = useTranslations("HomeHeader");
@@ -54,16 +52,9 @@ export default function MarketplaceFooter() {
     ] },
   ];
 
-  function handleNewsletter(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    setNewsletterMessage(t("newsletterUnavailable"));
-  }
-
   return <footer className="marketplaceFooter">
     <div className="marketplaceFooterTrust">
-      <div className="marketplaceNewsletter"><div><Mail size={25} aria-hidden="true"/><span><strong>{t("newsletterTitle")}</strong><small>{t("newsletterText")}</small></span></div><form onSubmit={handleNewsletter}><label className="srOnly" htmlFor="footer-newsletter">{t("emailLabel")}</label><input id="footer-newsletter" type="email" required placeholder={t("emailPlaceholder")}/><button type="submit">{t("subscribe")}</button></form>{newsletterMessage && <p role="status">{newsletterMessage}</p>}</div>
+      <div className="marketplaceNewsletter"><div><Mail size={25} aria-hidden="true"/><span><strong>{t("newsletterTitle")}</strong><small>{t("newsletterText")}</small></span></div></div>
       <div className="marketplacePaymentTrust"><div><LockKeyhole size={20} aria-hidden="true"/><span><strong>{t("securePayment")}</strong><small>{t("securePaymentText")}</small></span></div><div className="paymentBadges" aria-label={t("paymentMethods")}><span>Visa</span><span>Mastercard</span><span>Apple Pay</span><span>Google Pay</span><span>Stripe</span></div></div>
     </div>
     <div className="marketplaceFooterMain">

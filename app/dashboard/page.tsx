@@ -58,6 +58,7 @@ export default async function DashboardPage() {
   const control = await getTranslations("SellerControl");
   const privacy = await getTranslations("Privacy");
   const transparency = await getTranslations("SellerTransparency");
+  const compliance = await getTranslations("Compliance");
   const locale = await getLocale();
   const session = await readSession();
   if (!session) redirect("/login");
@@ -88,7 +89,7 @@ export default async function DashboardPage() {
     { label: common("cart"), href: paths.cart, icon: ShoppingCart },
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
-  const sellerNav: DashboardNavItem[] = [
+  const sellerNavBase: DashboardNavItem[] = [
     { label: p("nav.dashboard"), href: paths.dashboard, icon: Home, active: true },
     { label: p("nav.products"), href: `/${locale}/seller/products`, icon: Boxes },
     { label: p("nav.orders"), href: `/${locale}/seller/orders`, icon: ReceiptText },
@@ -101,9 +102,8 @@ export default async function DashboardPage() {
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
   const sellerCanAddProduct = Boolean(user.store && canPublish(user.store));
-  const sellerMobileNav = sellerCanAddProduct
-    ? [sellerNav[0], { label: p("nav.addProduct"), href: `/${locale}/seller/products/new`, icon: Plus }, ...sellerNav.slice(1)]
-    : sellerNav;
+  const sellerNav = sellerCanAddProduct ? [sellerNavBase[0], sellerNavBase[1], { label: p("nav.addProduct"), href: `/${locale}/seller/products/new`, icon: Plus }, ...sellerNavBase.slice(2)] : sellerNavBase;
+  const sellerMobileNav = sellerNav;
 
   if (!isSeller) {
     const orders = await dashboardData(listBuyerOrders(prisma, session.userId));
@@ -171,10 +171,15 @@ export default async function DashboardPage() {
   const cancellationRate = sellerOrders.length ? sellerOrders.filter((order) => order.status === "CANCELLED").length / sellerOrders.length * 100 : null;
   const subscriptionActive = sellerCanAddProduct;
   const sellerTypeRequired = user.store.sellerType === "UNKNOWN";
+  const vatStatusRequired = user.store.sellerType === "PROFESSIONAL" && user.store.vatStatus === "UNKNOWN";
+  const readinessHref = sellerTypeRequired || vatStatusRequired ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
+  const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : control("subscriptionInactive");
+  const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") });
+  const readinessAction = sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : control("viewPlans");
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={paths.messages} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">
-      {!subscriptionActive && <section className="subscriptionWarning" role="status"><strong>{sellerTypeRequired ? transparency("statusPending") : control("subscriptionInactive")}</strong><span>{sellerTypeRequired ? transparency("typeHelp") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") })}</span><Link href={sellerTypeRequired ? `/${locale}/seller/store-settings` : `/${locale}/seller/subscription`}>{sellerTypeRequired ? p("nav.settings") : control("viewPlans")}</Link></section>}
+      {!subscriptionActive && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
       {pendingRefundCount > 0 && <section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount === 1 ? "pendingRefundRequestSingular" : "pendingRefundRequestPlural", { count: pendingRefundCount })}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: user.store.name, city: user.store.city, country: user.store.country })}</p>{profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div><div className="sellerHeroMetrics"><div><small>{s("todayRevenue")}</small><strong>{money(locale, todayRevenue, user.store.currency)}</strong></div><div><small>{s("pendingOrders")}</small><strong>{pendingOrders}</strong></div><div><small>{s("newCustomers")}</small><strong>{newCustomers}</strong></div><div><small>{s("unreadMessages")}</small><strong>{unreadMessages}</strong></div></div><Link href={`/${locale}/store/${user.store.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>
       <section className="premiumStatsGrid"><DashboardStatCard label={p("nav.products")} value={user.store._count.products} hint={comparison(currentProducts, previousProducts)} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardStatCard label={p("stats.orders")} value={sellerOrders.length} hint={comparison(periods.current.orders, periods.previous.orders)} href={`/${locale}/seller/orders`} icon={ReceiptText} tone="blue"/><DashboardStatCard label={p("nav.revenue")} value={money(locale, revenue, user.store.currency)} hint={comparison(periods.current.revenue, periods.previous.revenue)} href={`/${locale}/dashboard#analytics`} icon={TrendingUp} tone="mint"/><DashboardStatCard label={p("stats.customers")} value={customers} hint={comparison(periods.current.customers, periods.previous.customers)} icon={Users} tone="amber"/></section>
@@ -183,7 +188,7 @@ export default async function DashboardPage() {
           ? <div className="premiumRecentOrders">{sellerOrders.slice(0, 5).map((order) => { const item = order.items[0]; const image = item?.productImageUrlSnapshot ?? item?.product.images[0]; const name = item?.productNameSnapshot ?? item?.product.name; const buyerName = order.recipientName ?? order.buyerNameSnapshot ?? `${order.buyer.firstName} ${order.buyer.lastName}`; const action = sellerFulfillmentActionFor(order.status); const step = fulfillmentStepFor(order.status); return <article className="premiumRecentOrder sellerRecentOrder" key={order.id}><div className="premiumRecentImage">{image ? <Image src={image} alt="" width={68} height={68} unoptimized/> : <Package size={26} aria-hidden="true"/>}</div><div className="premiumRecentProduct"><strong>{name ?? ordersText("details")}</strong><span>{buyerName} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(order.createdAt)}</span></div><div className="sellerOrderStatuses"><DashboardStatusBadge label={buyerPaymentState(order) === "paid" ? ordersText("payment.paid") : ordersText(`payment.${buyerPaymentState(order)}`)} status={buyerPaymentState(order)}/><DashboardStatusBadge label={step ? ordersText(`fulfillment.${step.toLowerCase()}`) : ordersText(`status.${order.status}`)} status={order.status}/>{action && <SellerFulfillmentControl orderId={order.id} action={action}/>}</div><strong className="premiumRecentTotal">{money(locale, Number(order.total), order.currency)}</strong></article>; })}</div>
           : <DashboardEmptyState title={p("seller.emptyOrders")} description={p("seller.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/products`}>{t("manageProducts")}</Link>}/>
         }
-      </DashboardSection><DashboardSection title={p("quickActions")}><div className="premiumQuickGrid">{subscriptionActive ? <DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new`} icon={Plus} primary/> : sellerTypeRequired ? <DashboardQuickAction label={transparency("statusPending")} href={`/${locale}/seller/store-settings`} icon={Settings} primary/> : <DashboardQuickAction label={control("viewPlans")} href={`/${locale}/seller/subscription`} icon={CreditCard} primary/>}<DashboardQuickAction label={p("viewOrders")} href={`/${locale}/seller/orders`} icon={ReceiptText}/><DashboardQuickAction label={t("manageProducts")} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/><DashboardQuickAction label={p("nav.settings")} href={`/${locale}/seller/store-settings`} icon={Settings}/><DashboardQuickAction label={t("viewShop")} href={`/${locale}/store/${user.store.slug}`} icon={Store}/></div></DashboardSection></div>
+      </DashboardSection><DashboardSection title={p("quickActions")}><div className="premiumQuickGrid">{subscriptionActive ? <DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new`} icon={Plus} primary/> : <DashboardQuickAction label={readinessAction} href={readinessHref} icon={sellerTypeRequired || vatStatusRequired ? Settings : CreditCard} primary/>}<DashboardQuickAction label={p("viewOrders")} href={`/${locale}/seller/orders`} icon={ReceiptText}/><DashboardQuickAction label={t("manageProducts")} href={`/${locale}/seller/products`} icon={Boxes}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/><DashboardQuickAction label={p("nav.settings")} href={`/${locale}/seller/store-settings`} icon={Settings}/><DashboardQuickAction label={t("viewShop")} href={`/${locale}/store/${user.store.slug}`} icon={Store}/></div></DashboardSection></div>
       <DashboardSection id="analytics" title={s("analyticsTitle")} description={s("analyticsDescription")}>
         {sellerOrders.length
           ? <SellerAnalytics trends={analytics.trends} products={analytics.products} statuses={analyticsStatuses} currency={user.store.currency} labels={{ revenue: s("revenue30"), orders: s("orders30"), topProducts: s("topProducts"), statuses: s("statusDistribution") }}/>

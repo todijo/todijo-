@@ -36,6 +36,12 @@ export default async function SellerProductsPage() {
 
   const subscriptionActive = canPublish(store);
   const sellerTypeRequired = store.sellerType === "UNKNOWN";
+  const vatStatusRequired = store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN";
+  const compliance = await getTranslations("Compliance");
+  const readinessHref = sellerTypeRequired || vatStatusRequired ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
+  const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : control("subscriptionInactive");
+  const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") });
+  const readinessAction = sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : control("viewPlans");
   const published = store.products.filter((product) => product.status === "PUBLISHED").length;
   const lowStock = store.products.filter((product) => product.stock < 5).length;
   const labels = {
@@ -50,7 +56,7 @@ export default async function SellerProductsPage() {
       badges={<><SellerStatusBadge tone="accent">{store.name}</SellerStatusBadge><SellerStatusBadge>{control("currencyBadge", { currency: store.currency })}</SellerStatusBadge></>}
       actions={subscriptionActive ? <Link className="sellerControlButton light" href={`/${locale}/seller/products/new`}><Plus size={17}/>{t("addProduct")}</Link> : undefined}/>
 
-    {!subscriptionActive && <section className="subscriptionWarning sellerProductsWarning" role="status"><div><strong>{sellerTypeRequired ? transparency("statusPending") : control("subscriptionInactive")}</strong><span>{sellerTypeRequired ? transparency("typeHelp") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") })}</span></div><Link href={sellerTypeRequired ? `/${locale}/seller/store-settings` : `/${locale}/seller/subscription`}>{sellerTypeRequired ? p("nav.settings") : control("viewPlans")}</Link></section>}
+    {!subscriptionActive && <section className="subscriptionWarning sellerProductsWarning" role="status"><div><strong>{readinessTitle}</strong><span>{readinessHelp}</span></div><Link href={readinessHref}>{readinessAction}</Link></section>}
 
     <section className="sellerProductSummary" aria-label={control("productSummary")}>
       <article><Boxes size={20}/><span>{control("totalProducts")}</span><strong>{store.products.length}</strong></article>
@@ -59,7 +65,7 @@ export default async function SellerProductsPage() {
       <article><Warehouse size={20}/><span>{control("lowStock")}</span><strong>{lowStock}</strong></article>
     </section>
 
-    {store.products.length === 0 ? <section className="emptyProductsPanel sellerProductsEmpty"><Package size={48} aria-hidden="true"/><h2>{t("noProducts")}</h2><p>{t("noProductsText")}</p><Link className="sellerControlButton primary" href={subscriptionActive ? `/${locale}/seller/products/new` : sellerTypeRequired ? `/${locale}/seller/store-settings` : `/${locale}/seller/subscription`}>{subscriptionActive ? <Plus size={17} aria-hidden="true"/> : sellerTypeRequired ? <Boxes size={17} aria-hidden="true"/> : <CreditCard size={17} aria-hidden="true"/>}{subscriptionActive ? t("firstProduct") : sellerTypeRequired ? transparency("statusPending") : control("viewPlans")}</Link></section>
+    {store.products.length === 0 ? <section className="emptyProductsPanel sellerProductsEmpty"><Package size={48} aria-hidden="true"/><h2>{t("noProducts")}</h2><p>{t("noProductsText")}</p><Link className="sellerControlButton primary" href={subscriptionActive ? `/${locale}/seller/products/new` : readinessHref}>{subscriptionActive ? <Plus size={17} aria-hidden="true"/> : sellerTypeRequired || vatStatusRequired ? <Boxes size={17} aria-hidden="true"/> : <CreditCard size={17} aria-hidden="true"/>}{subscriptionActive ? t("firstProduct") : readinessAction}</Link></section>
       : <section className="sellerProductsGrid sellerProductsGridPremium">{store.products.map((product) => <article className="sellerProductCard" key={product.id}>
         <Link className="sellerProductVisual" href={`/${locale}/seller/products/${product.id}/edit`}>
           {product.images[0] ? <Image src={product.images[0]} alt={product.name} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 340px" unoptimized/> : <span className="sellerProductPlaceholder"><Package size={48}/></span>}
