@@ -23,9 +23,19 @@
     "privacyDataTitle":  "गोपनीयता और डेटा",
     "privacyData":  "गोपनीयता और डेटा",
     "contactPrivacy":  "Todijo से संपर्क करें"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Todijo अपने बहु-विक्रेता बाज़ार की जानकारी कैसे प्रोसेस करता है।",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "वर्तमान स्टोरेज आवश्यक सत्र, भाषा, सहमति, कार्ट और checkout कार्यों को चलाता है। कोई विश्लेषण या विज्ञापन ट्रैकर नहीं है।",
+    "privacyDataIntro": "जानकारी, पहुँच, सुधार, मिटाने, सीमा, पोर्टेबिलिटी या आपत्ति का अनुरोध करें और सहमति वापस लें।",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"प्रोसेसिंग के लिए कौन जिम्मेदार है?","identityText":"Todijo इस बहु-विक्रेता बाज़ार को चलाता है। सत्यापित कानूनी इकाई, पंजीकरण, डाक पता और समर्पित गोपनीयता संपर्क रिपॉज़िटरी में नहीं हैं और मालिक को देने होंगे।",
+    "dataHeading":"प्रोसेस की जाने वाली जानकारी","dataText":"Todijo खाता और प्रोफ़ाइल, खरीदार और विक्रेता, स्टोर, उत्पाद और चित्र, संदेश, समीक्षाएँ, ऑर्डर, प्राप्तकर्ता, डिलीवरी, समस्या और रिफंड प्रमाण, सहायता संचार तथा तकनीकी और सुरक्षा लॉग प्रोसेस करता है।",
+    "marketplaceHeading":"ऑर्डर और भुगतान","marketplaceText":"Todijo लेनदेन के लिए ऑर्डर और विक्रेता डेटा उपयोग करता है। Stripe checkout, भुगतान पुष्टि, विक्रेता onboarding, सदस्यता और payout प्रोसेस करता है। Todijo जरूरी Stripe ID और स्थिति रखता है, पर पूरे कार्ड विवरण नहीं पाता।",
+    "purposesHeading":"उपयोग के उद्देश्य","purposesText":"डेटा खाता और सुरक्षा, स्टोर, कार्ट और पसंदीदा, संदेश और समीक्षा, ऑर्डर और रिफंड, दुरुपयोग रोकने, सेवा ईमेल, विश्वसनीयता और सहायता या गोपनीयता अनुरोधों के लिए उपयोग होता है। मालिक को कानूनी आधार सत्यापित करने होंगे।",
+    "providersHeading":"सेवा प्रदाता और प्राप्तकर्ता","providersText":"रिपॉज़िटरी Stripe, Cloudflare Turnstile, Cloudinary, R2-संगत स्टोरेज और SMTP प्रदाता का प्रमाण देती है। डेटा केवल सेवा, सुरक्षा, विवाद या दायित्व के लिए साझा होता है। स्थान, अनुबंध और अंतरराष्ट्रीय हस्तांतरण सुरक्षा सत्यापित करनी होंगी।",
+    "retentionHeading":"डेटा कितने समय रखा जाता है","retentionText":"डेटा केवल सेवा, सुरक्षा, लेनदेन इतिहास, विवाद और लागू लेखा या कानूनी दायित्वों की जरूरत तक रखा जाता है। कोई असत्यापित तय अवधि नहीं बताई जाती। अनुरोध से मिटाना, निष्क्रिय करना या अनाम करना हो सकता है।",
+    "rightsHeading":"आपके GDPR अधिकार","rightsText":"लागू होने पर आप जानकारी, पहुँच, सुधार, मिटाना, सीमा, पोर्टेबिलिटी या आपत्ति माँग सकते हैं। भविष्य के लिए सहमति वापस ले सकते हैं और सक्षम पर्यवेक्षी प्राधिकरण में शिकायत कर सकते हैं।",
+    "securityHeading":"सुरक्षा और ब्राउज़र स्टोरेज","securityText":"Todijo पासवर्ड हैशिंग, हस्ताक्षरित HTTP-only सत्र, पहुँच नियंत्रण, हस्ताक्षरित Stripe webhook और सुरक्षा सत्यापन उपयोग करता है। आवश्यक स्टोरेज सत्र, भाषा, कार्ट, checkout और सहमति चलाता है; वैकल्पिक बिना सहमति बंद रहता है।",
+    "updatesHeading":"नीति अपडेट","updatesText":"ऑपरेटर, प्रोसेसिंग या प्रदाताओं में महत्वपूर्ण बदलाव पर यह सूचना अपडेट होगी। जरूरत होने पर सहमति फिर माँगी जाएगी।",
+    "requestHeading":"अधिकार कैसे इस्तेमाल करें","requestText":"गोपनीयता, पहुँच, सुधार, export, आपत्ति, सीमा, सहमति वापसी या मिटाने के लिए Todijo संपर्क मार्ग उपयोग करें। स्वचालित export और तत्काल पूर्ण मिटाना उपलब्ध नहीं है; जरूरी लेनदेन रिकॉर्ड सुरक्षित रखे जा सकते हैं।"
 }

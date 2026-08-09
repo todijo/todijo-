@@ -23,9 +23,19 @@
     "privacyDataTitle":  "隐私与数据",
     "privacyData":  "隐私与数据",
     "contactPrivacy":  "联系 Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Todijo 如何处理其多商户市场中的信息。",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "当前存储用于必要的会话、语言、同意、购物车和结账功能。未安装分析或广告跟踪器。",
+    "privacyDataIntro": "您可请求知情、访问、更正、删除、限制、可携带或反对，并撤回同意。",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"谁负责处理数据？","identityText":"Todijo 运营本多商户市场。代码库中没有经核实的法律实体、注册号、邮寄地址和专用隐私联系方式，所有者须在最终法律文本中提供。",
+    "dataHeading":"Todijo 处理的信息","dataText":"Todijo 处理账户与资料、买家与卖家、店铺、商品与图片、消息、评价、订单、收件人、配送、问题与退款证据、支持通信以及服务安全运行所需的技术和安全日志。",
+    "marketplaceHeading":"订单与付款","marketplaceText":"Todijo 使用订单和卖家信息处理交易。Stripe 处理结账、付款确认、卖家入驻、订阅和付款。Todijo 保存核对交易所需的 Stripe 标识与状态，但不接收完整银行卡资料。",
+    "purposesHeading":"使用目的","purposesText":"信息用于创建并保护账户、运营店铺、购物车与收藏、提供消息和评价、处理订单与退款、防止滥用、发送服务邮件、维持可靠性以及响应支持或隐私请求。所有者须确认各项处理的法律依据。",
+    "providersHeading":"服务商与接收方","providersText":"代码库证实使用 Stripe、Cloudflare Turnstile、Cloudinary、R2 兼容对象存储和 SMTP 邮件服务商。信息仅在服务、安全、争议或法律义务所需时共享。服务地点、合同及跨境传输保障须由所有者核实。",
+    "retentionHeading":"保留期限","retentionText":"信息仅在提供服务、账户安全、交易记录、争议以及适用会计或法律义务所需期间保留，不声称未经核实的固定期限。删除请求可能导致删除、停用或匿名化，而必须保留的记录会继续受保护。",
+    "rightsHeading":"您的 GDPR 权利","rightsText":"在 GDPR 适用时，您可请求知情、访问、更正、删除、限制、可携带或反对处理；可对未来撤回同意，并向有管辖权的监管机构投诉。",
+    "securityHeading":"安全与浏览器存储","securityText":"Todijo 使用密码哈希、签名 HTTP-only 会话、访问控制、签名 Stripe webhook 和安全验证。必要存储支持会话、语言、购物车、结账与同意选择；可选类别未经同意保持关闭。",
+    "updatesHeading":"政策更新","updatesText":"运营者资料、处理活动或服务商发生重大变化时，本说明会更新。涉及重大同意变化时会重新征求选择。",
+    "requestHeading":"如何行使权利","requestText":"请通过 Todijo 联系渠道提交隐私、访问、更正、导出、反对、限制、撤回或删除请求。目前不提供自动导出或即时彻底删除；订单、争议、会计或法律所需的交易记录可能继续受保护。"
 }

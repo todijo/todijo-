@@ -23,9 +23,19 @@
     "privacyDataTitle":  "Privacy en gegevens",
     "privacyData":  "Privacy en gegevens",
     "contactPrivacy":  "Contact opnemen met Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Hoe Todijo informatie voor zijn marktplaats met meerdere verkopers verwerkt.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "De huidige opslag dekt noodzakelijke sessie-, taal-, toestemmings-, winkelwagen- en checkoutfuncties. Er zijn geen analyse- of advertentietrackers.",
+    "privacyDataIntro": "Vraag informatie, inzage, correctie, verwijdering, beperking, overdraagbaarheid of bezwaar aan en trek toestemming in.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"Wie is verantwoordelijk?","identityText":"Todijo beheert de marktplaats. Geverifieerde juridische identiteit, registratie, postadres en privacycontact staan niet in de repository en moeten door de eigenaar worden aangeleverd.",
+    "dataHeading":"Verwerkte informatie","dataText":"Todijo verwerkt account- en profielgegevens, koper- en verkopergegevens, winkels, producten en afbeeldingen, berichten, reviews, bestellingen, ontvanger-, bezorg-, probleem- en terugbetalingsbewijs, supportcommunicatie en technische en beveiligingslogs.",
+    "marketplaceHeading":"Bestellingen en betalingen","marketplaceText":"Todijo gebruikt bestel- en verkopergegevens voor transacties. Stripe verwerkt checkout, betalingsbevestiging, verkoper-onboarding, abonnementen en uitbetalingen. Todijo bewaart benodigde Stripe-ID’s en statussen, maar ontvangt geen volledige kaartgegevens.",
+    "purposesHeading":"Doeleinden","purposesText":"Gegevens worden gebruikt voor accounts en beveiliging, winkels, winkelwagen en favorieten, berichten en reviews, bestellingen en terugbetalingen, misbruikpreventie, servicemails, betrouwbaarheid en support- of privacyverzoeken. De eigenaar moet de rechtsgronden bevestigen.",
+    "providersHeading":"Dienstverleners en ontvangers","providersText":"Aangetoond zijn Stripe, Cloudflare Turnstile, Cloudinary, R2-compatibele opslag en een SMTP-provider. Gegevens worden alleen gedeeld voor dienst, veiligheid, geschillen of verplichtingen. Locaties, contracten en overdrachtswaarborgen moeten worden geverifieerd.",
+    "retentionHeading":"Bewaartermijn","retentionText":"Gegevens blijven alleen zolang nodig voor dienst, veiligheid, transactiegeschiedenis, geschillen en boekhoudkundige of wettelijke verplichtingen. Er wordt geen onbevestigde vaste termijn genoemd. Een verzoek kan leiden tot verwijdering, deactivering of anonimisering.",
+    "rightsHeading":"Uw AVG-rechten","rightsText":"Waar van toepassing kunt u informatie, inzage, correctie, verwijdering, beperking, overdraagbaarheid of bezwaar vragen. Toestemming kan voor de toekomst worden ingetrokken en u kunt klagen bij de bevoegde toezichthouder.",
+    "securityHeading":"Beveiliging en browseropslag","securityText":"Todijo gebruikt wachtwoordhashing, ondertekende HTTP-only sessies, toegangscontrole, ondertekende Stripe-webhooks en beveiligingsverificatie. Noodzakelijke opslag ondersteunt sessie, taal, winkelwagen, checkout en toestemming; optionele opslag blijft zonder toestemming uit.",
+    "updatesHeading":"Updates","updatesText":"Deze kennisgeving wordt bijgewerkt bij belangrijke wijzigingen in exploitant, verwerking of providers. Waar nodig wordt opnieuw toestemming gevraagd.",
+    "requestHeading":"Uw rechten uitoefenen","requestText":"Gebruik het Todijo-contact voor privacy-, inzage-, correctie-, export-, bezwaar-, beperkings-, intrekkings- of verwijderverzoeken. Automatische export en directe volledige verwijdering zijn er niet; noodzakelijke transactiegegevens kunnen beschermd blijven."
 }

@@ -23,9 +23,19 @@
     "privacyDataTitle":  "تایبەتمەندی و داتا",
     "privacyData":  "تایبەتمەندی و داتا",
     "contactPrivacy":  "پەیوەندی بە Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "چۆنیەتی پرۆسێسکردنی زانیارییەکانی بازاڕی چەندفرۆشیاری Todijo.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "هەڵگرتنی ئێستا session، زمان، ڕەزامەندی، سەبەتە و checkout ـی پێویست دەگرێتەوە. هیچ tracker ـی شیکاری یان ڕیکلامی نییە.",
+    "privacyDataIntro": "داوای زانیاری، دەستگەیشتن، ڕاستکردنەوە، سڕینەوە، سنووردارکردن، گواستنەوە یان ناڕەزایی بکە و ڕەزامەندی بکشێنەوە.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"کێ بەرپرسی پرۆسێسکردنە؟","identityText":"Todijo ئەم بازاڕە بەڕێوەدەبات. ناسنامەی یاسایی پشتڕاستکراو، ژمارەی تۆمار، ناونیشانی پۆستی و پەیوەندی تایبەتمەندی لە repository ـدا نییە و خاوەن پێویستە دابینیان بکات.",
+    "dataHeading":"زانیارییە پرۆسێسکراوەکان","dataText":"Todijo داتای هەژمار و پڕۆفایل، کڕیار و فرۆشیار، فرۆشگا، بەرهەم و وێنە، پەیام، هەڵسەنگاندن، داواکاری، وەرگر، گەیاندن، کێشە و بەڵگەی گەڕاندنەوەی پارە، پشتگیری و تۆماری تەکنیکی و ئاسایش پرۆسێس دەکات.",
+    "marketplaceHeading":"داواکاری و پارەدان","marketplaceText":"Todijo داتای داواکاری و فرۆشیار بۆ مامەڵەکان بەکاردەهێنێت. Stripe checkout، پشتڕاستکردنەوەی پارەدان، onboarding ـی فرۆشیار، subscription و payout پرۆسێس دەکات. Todijo ناسێنەر و status ـی پێویست هەڵدەگرێت، بەڵام زانیاری تەواوی کارت وەرناگرێت.",
+    "purposesHeading":"ئامانجەکان","purposesText":"داتا بۆ هەژمار و ئاسایش، فرۆشگا، سەبەتە و دڵخواز، پەیام و هەڵسەنگاندن، داواکاری و گەڕاندنەوە، ڕێگری لە بەکارهێنانی خراپ، ئیمەیڵی خزمەتگوزاری، جێگیری و داواکاری پشتگیری یان تایبەتمەندی بەکاردێت. خاوەن پێویستە بنەمای یاسایی پشتڕاست بکاتەوە.",
+    "providersHeading":"دابینکەر و وەرگرەکان","providersText":"repository بەکارهێنانی Stripe، Cloudflare Turnstile، Cloudinary، هەڵگرتنی گونجاو لەگەڵ R2 و دابینکەری SMTP پیشان دەدات. داتا تەنها بۆ خزمەتگوزاری، ئاسایش، ناکۆکی یان پابەندی هاوبەش دەکرێت. شوێن، گرێبەست و پاراستنی گواستنەوە پێویستی بە پشتڕاستکردنەوە هەیە.",
+    "retentionHeading":"ماوەی هەڵگرتن","retentionText":"داتا تەنها تا ئەو کاتە دەمێنێت کە بۆ خزمەتگوزاری، ئاسایش، مێژووی مامەڵە، ناکۆکی و پابەندی ژمێریاری یان یاسایی پێویستە. هیچ ماوەیەکی دیاریکراوی پشتڕاستنەکراو بانگەشە ناکرێت. داواکاری دەتوانێت ببێتە سڕینەوە، ناچالاککردن یان بێناسنامەکردن.",
+    "rightsHeading":"مافەکانی GDPR","rightsText":"کاتێک جێبەجێ دەبێت دەتوانیت داوای زانیاری، دەستگەیشتن، ڕاستکردنەوە، سڕینەوە، سنووردارکردن، گواستنەوە یان ناڕەزایی بکەیت. ڕەزامەندی بۆ داهاتوو بکشێنەوە و سکاڵا لای دەسەڵاتی چاودێری پەیوەندیدار تۆمار بکەیت.",
+    "securityHeading":"ئاسایش و هەڵگرتنی وێبگەڕ","securityText":"Todijo hash ـی وشەی نهێنی، session ـی واژۆکراوی HTTP-only، کۆنترۆڵی دەستگەیشتن، webhook ـی واژۆکراوی Stripe و پشکنینی ئاسایش بەکاردەهێنێت. هەڵگرتنی پێویست session، زمان، سەبەتە، checkout و ڕەزامەندی پشتگیری دەکات؛ ئارەزوومەندانە بەبێ ڕەزامەندی ناچالاکە.",
+    "updatesHeading":"نوێکردنەوەکان","updatesText":"لە گۆڕانکاری گرنگی بەڕێوەبەر، پرۆسێسکردن یان دابینکەرەکاندا ئەم ئاگادارییە نوێ دەکرێتەوە. کاتێک پێویست بێت دووبارە ڕەزامەندی داوا دەکرێت.",
+    "requestHeading":"چۆنیەتی بەکارهێنانی مافەکان","requestText":"بۆ داواکاری تایبەتمەندی، دەستگەیشتن، ڕاستکردنەوە، export، ناڕەزایی، سنووردارکردن، کشاندنەوە یان سڕینەوە ڕێگای پەیوەندی Todijo بەکاربهێنە. export ـی خۆکار و سڕینەوەی تەواوی دەستبەجێ نییە؛ تۆماری پێویستی مامەڵە دەتوانێت پارێزراو بمێنێتەوە."
 }

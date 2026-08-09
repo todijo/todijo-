@@ -23,9 +23,19 @@
     "privacyDataTitle":  "الخصوصية والبيانات",
     "privacyData":  "الخصوصية والبيانات",
     "contactPrivacy":  "اتصل بـ Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "كيفية معالجة Todijo لمعلومات سوقها متعدد البائعين.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "يغطي التخزين الحالي الجلسة واللغة والموافقة والسلة والدفع الضرورية. لا توجد أدوات تتبع تحليلية أو إعلانية.",
+    "privacyDataIntro": "اطلب المعلومات أو الوصول أو التصحيح أو المحو أو التقييد أو النقل أو الاعتراض واسحب الموافقة.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"من المسؤول عن المعالجة؟","identityText":"تدير Todijo السوق. لا تتضمن المستودعات الهوية القانونية الموثقة أو رقم التسجيل أو العنوان البريدي أو جهة اتصال الخصوصية، ويجب على المالك توفيرها.",
+    "dataHeading":"المعلومات التي تتم معالجتها","dataText":"تعالج Todijo بيانات الحساب والملف والمشترين والبائعين والمتاجر والمنتجات والصور والرسائل والتقييمات والطلبات والمستلمين والتسليم والمشكلات وأدلة الاسترداد واتصالات الدعم والسجلات التقنية والأمنية.",
+    "marketplaceHeading":"الطلبات والمدفوعات","marketplaceText":"تستخدم Todijo بيانات الطلب والبائع للمعاملات. تعالج Stripe الدفع وتأكيده وإعداد البائع والاشتراكات والتحويلات. تحفظ Todijo المعرّفات والحالات اللازمة ولا تستلم بيانات البطاقة الكاملة.",
+    "purposesHeading":"أغراض الاستخدام","purposesText":"تُستخدم البيانات للحسابات والأمان والمتاجر والسلة والمفضلة والرسائل والتقييمات والطلبات والاسترداد ومنع الإساءة ورسائل الخدمة والموثوقية وطلبات الدعم أو الخصوصية. يجب على المالك تأكيد الأسس القانونية.",
+    "providersHeading":"مقدمو الخدمات والمستلمون","providersText":"يثبت المستودع استخدام Stripe وCloudflare Turnstile وCloudinary وتخزين متوافق مع R2 ومزود SMTP. لا تُشارك البيانات إلا للخدمة أو الأمان أو النزاعات أو الالتزامات. يجب التحقق من المواقع والعقود وضمانات النقل.",
+    "retentionHeading":"مدة الاحتفاظ","retentionText":"تُحفظ البيانات فقط بقدر الحاجة للخدمة والأمان وسجل المعاملات والنزاعات والالتزامات المحاسبية أو القانونية. لا تُذكر مدة ثابتة غير موثقة. قد يؤدي الطلب إلى الحذف أو التعطيل أو إخفاء الهوية.",
+    "rightsHeading":"حقوقك بموجب GDPR","rightsText":"عند انطباقه يمكنك طلب المعلومات والوصول والتصحيح والمحو والتقييد والنقل أو الاعتراض. يمكنك سحب الموافقة للمستقبل وتقديم شكوى للجهة الرقابية المختصة.",
+    "securityHeading":"الأمان وتخزين المتصفح","securityText":"تستخدم Todijo تشفير كلمات المرور وجلسات HTTP-only موقعة وضوابط وصول وwebhooks موقعة من Stripe والتحقق الأمني. يدعم التخزين الضروري الجلسة واللغة والسلة والدفع والموافقة؛ ويبقى الاختياري معطلاً دون موافقة.",
+    "updatesHeading":"التحديثات","updatesText":"يُحدّث الإشعار عند تغييرات مهمة في المشغل أو المعالجة أو المزودين. تُطلب الموافقة مجددًا عند الحاجة.",
+    "requestHeading":"كيفية ممارسة الحقوق","requestText":"استخدم مسار اتصال Todijo لطلبات الخصوصية أو الوصول أو التصحيح أو التصدير أو الاعتراض أو التقييد أو السحب أو الحذف. لا يتوفر تصدير آلي أو حذف كامل فوري؛ وقد تبقى سجلات المعاملات الضرورية محمية."
 }

@@ -23,9 +23,19 @@
     "privacyDataTitle":  "Privacy e dati",
     "privacyData":  "Privacy e dati",
     "contactPrivacy":  "Contatta Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Come Todijo tratta le informazioni del suo marketplace multi-venditore.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "La memoria attuale copre sessione, lingua, consenso, carrello e checkout necessari. Non sono installati tracker analitici o pubblicitari.",
+    "privacyDataIntro": "Richiedi informazione, accesso, rettifica, cancellazione, limitazione, portabilità o opposizione e revoca il consenso.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"Chi è il titolare?","identityText":"Todijo gestisce il marketplace. Identità giuridica verificata, registrazione, indirizzo postale e contatto privacy non risultano nel repository e devono essere forniti dal proprietario.",
+    "dataHeading":"Informazioni trattate","dataText":"Todijo tratta dati di account e profilo, acquirenti e venditori, negozi, prodotti e immagini, messaggi, recensioni, ordini, destinatari, consegna, problemi e prove di rimborso, oltre a comunicazioni di assistenza e log tecnici e di sicurezza.",
+    "marketplaceHeading":"Ordini e pagamenti","marketplaceText":"Todijo usa dati di ordini e venditori per le transazioni. Stripe gestisce checkout, conferme, onboarding, abbonamenti e accrediti. Todijo conserva identificativi e stati necessari, ma non riceve i dati completi della carta.",
+    "purposesHeading":"Finalità","purposesText":"I dati servono a creare e proteggere account, gestire negozi, carrello e preferiti, messaggi e recensioni, ordini e rimborsi, prevenire abusi, inviare email di servizio, mantenere l’affidabilità e rispondere a richieste. Il proprietario deve confermare le basi giuridiche.",
+    "providersHeading":"Fornitori e destinatari","providersText":"Il repository documenta Stripe, Cloudflare Turnstile, Cloudinary, memoria compatibile R2 e un fornitore SMTP. I dati sono comunicati solo per servizio, sicurezza, controversie o obblighi. Sedi, contratti e garanzie di trasferimento devono essere verificati.",
+    "retentionHeading":"Conservazione","retentionText":"I dati restano solo per il tempo necessario a servizio, sicurezza, storico transazioni, controversie e obblighi contabili o legali. Non viene dichiarato un termine fisso non verificato. Una richiesta può portare a cancellazione, disattivazione o anonimizzazione.",
+    "rightsHeading":"Diritti GDPR","rightsText":"Ove applicabile puoi chiedere informazione, accesso, rettifica, cancellazione, limitazione, portabilità o opporti. Puoi revocare il consenso per il futuro e proporre reclamo all’autorità di controllo competente.",
+    "securityHeading":"Sicurezza e memoria browser","securityText":"Todijo usa hashing delle password, sessioni firmate HTTP-only, controlli di accesso, webhook Stripe firmati e verifiche di sicurezza. La memoria necessaria supporta sessione, lingua, carrello, checkout e consenso; quella opzionale resta disattivata senza consenso.",
+    "updatesHeading":"Aggiornamenti","updatesText":"L’informativa sarà aggiornata per cambiamenti rilevanti del titolare, trattamenti o fornitori. Sarà richiesto un nuovo consenso quando necessario.",
+    "requestHeading":"Esercitare i diritti","requestText":"Usa il contatto Todijo per richieste privacy, accesso, correzione, esportazione, opposizione, limitazione, revoca o cancellazione. Non sono disponibili esportazione automatica e cancellazione totale immediata; i dati transazionali necessari possono restare protetti."
 }

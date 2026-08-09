@@ -23,9 +23,19 @@
     "privacyDataTitle":  "Privacidade e dados",
     "privacyData":  "Privacidade e dados",
     "contactPrivacy":  "Contactar a Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Como a Todijo trata informações no seu marketplace multivendedor.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "O armazenamento atual cobre sessão, idioma, consentimento, carrinho e checkout necessários. Não existem rastreadores analíticos ou publicitários.",
+    "privacyDataIntro": "Peça informação, acesso, correção, eliminação, limitação, portabilidade ou oposição e retire o consentimento.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"Quem é responsável?","identityText":"A Todijo opera o marketplace. A identidade jurídica verificada, registo, morada postal e contacto de privacidade não constam do repositório e devem ser fornecidos pelo proprietário.",
+    "dataHeading":"Informações tratadas","dataText":"A Todijo trata dados de conta e perfil, compradores e vendedores, lojas, produtos e imagens, mensagens, avaliações, encomendas, destinatários, entrega, incidentes e provas de reembolso, comunicações de apoio e registos técnicos e de segurança.",
+    "marketplaceHeading":"Encomendas e pagamentos","marketplaceText":"A Todijo usa dados de encomendas e vendedores nas transações. A Stripe trata checkout, confirmação, integração de vendedores, subscrições e pagamentos. A Todijo guarda identificadores e estados necessários, mas não recebe dados completos do cartão.",
+    "purposesHeading":"Finalidades","purposesText":"Os dados servem para contas e segurança, lojas, carrinho e favoritos, mensagens e avaliações, encomendas e reembolsos, prevenção de abuso, emails de serviço, fiabilidade e pedidos de apoio ou privacidade. O proprietário deve confirmar as bases legais.",
+    "providersHeading":"Prestadores e destinatários","providersText":"O repositório comprova Stripe, Cloudflare Turnstile, Cloudinary, armazenamento compatível com R2 e um prestador SMTP. Os dados são partilhados apenas para serviço, segurança, litígios ou obrigações. Localizações, contratos e garantias de transferência devem ser verificados.",
+    "retentionHeading":"Conservação","retentionText":"Os dados ficam apenas pelo tempo necessário ao serviço, segurança, histórico transacional, litígios e obrigações contabilísticas ou legais. Não se afirma um prazo fixo não verificado. Um pedido pode resultar em eliminação, desativação ou anonimização.",
+    "rightsHeading":"Direitos RGPD","rightsText":"Quando aplicável, pode pedir informação, acesso, correção, eliminação, limitação, portabilidade ou oposição. Pode retirar consentimento para o futuro e reclamar junto da autoridade de controlo competente.",
+    "securityHeading":"Segurança e armazenamento","securityText":"A Todijo usa hashing de palavras-passe, sessões assinadas HTTP-only, controlo de acesso, webhooks Stripe assinados e verificações de segurança. O armazenamento necessário suporta sessão, idioma, carrinho, checkout e consentimento; o opcional fica desligado sem consentimento.",
+    "updatesHeading":"Atualizações","updatesText":"O aviso será atualizado perante alterações importantes ao operador, tratamentos ou prestadores. Será pedido novo consentimento quando necessário.",
+    "requestHeading":"Exercer os seus direitos","requestText":"Use o contacto Todijo para pedidos de privacidade, acesso, correção, exportação, oposição, limitação, retirada ou eliminação. Não há exportação automática nem eliminação total imediata; dados transacionais necessários podem permanecer protegidos."
 }

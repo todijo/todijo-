@@ -23,9 +23,19 @@
     "privacyDataTitle":  "Gizlilik ve veriler",
     "privacyData":  "Gizlilik ve veriler",
     "contactPrivacy":  "Todijo ile iletişime geç"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Todijo'nun çok satıcılı pazaryeri bilgilerini nasıl işlediği.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "Mevcut depolama gerekli oturum, dil, onay, sepet ve checkout işlevlerini kapsar. Analiz veya reklam izleyicisi yoktur.",
+    "privacyDataIntro": "Bilgi, erişim, düzeltme, silme, kısıtlama, taşınabilirlik veya itiraz talep edin ve onayı geri çekin.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"Veri sorumlusu kimdir?","identityText":"Todijo pazaryerini işletir. Doğrulanmış tüzel kimlik, kayıt bilgisi, posta adresi ve gizlilik irtibatı depoda bulunmaz; işletme sahibi bunları sağlamalıdır.",
+    "dataHeading":"İşlenen bilgiler","dataText":"Todijo hesap ve profil, alıcı ve satıcı, mağaza, ürün ve görsel, mesaj, değerlendirme, sipariş, alıcı, teslimat, sorun ve iade kanıtı, destek iletişimi ile teknik ve güvenlik kayıtlarını işler.",
+    "marketplaceHeading":"Siparişler ve ödemeler","marketplaceText":"Todijo işlemler için sipariş ve satıcı verilerini kullanır. Stripe ödeme, onay, satıcı katılımı, abonelik ve ödemeleri işler. Todijo gerekli Stripe kimlikleri ve durumlarını saklar, tam kart bilgilerini almaz.",
+    "purposesHeading":"Amaçlar","purposesText":"Veriler hesap ve güvenlik, mağaza, sepet ve favoriler, mesaj ve yorumlar, sipariş ve iadeler, kötüye kullanımı önleme, hizmet e-postaları, güvenilirlik ve destek ya da gizlilik talepleri için kullanılır. Hukuki dayanakları işletme sahibi doğrulamalıdır.",
+    "providersHeading":"Hizmet sağlayıcılar","providersText":"Depoda Stripe, Cloudflare Turnstile, Cloudinary, R2 uyumlu depolama ve SMTP sağlayıcısı kanıtlanmıştır. Veriler yalnızca hizmet, güvenlik, uyuşmazlık veya yükümlülük için paylaşılır. Konumlar, sözleşmeler ve aktarım güvenceleri doğrulanmalıdır.",
+    "retentionHeading":"Saklama","retentionText":"Veriler yalnızca hizmet, güvenlik, işlem geçmişi, uyuşmazlık ve muhasebe ya da hukuki yükümlülükler için gerektiği sürece tutulur. Doğrulanmamış sabit süre belirtilmez. Talep silme, devre dışı bırakma veya anonimleştirme ile sonuçlanabilir.",
+    "rightsHeading":"KVKK/GDPR haklarınız","rightsText":"Uygulandığında bilgi, erişim, düzeltme, silme, kısıtlama, taşınabilirlik veya itiraz isteyebilirsiniz. Onayı gelecek için geri çekebilir ve yetkili denetim makamına şikâyet edebilirsiniz.",
+    "securityHeading":"Güvenlik ve tarayıcı depolaması","securityText":"Todijo parola karma, imzalı HTTP-only oturum, erişim kontrolü, imzalı Stripe webhook ve güvenlik doğrulaması kullanır. Gerekli depolama oturum, dil, sepet, ödeme ve onayı destekler; isteğe bağlılar onaysız kapalıdır.",
+    "updatesHeading":"Güncellemeler","updatesText":"İşletmeci, işleme veya sağlayıcılardaki önemli değişikliklerde bildirim güncellenir. Gerektiğinde yeniden onay istenir.",
+    "requestHeading":"Haklarınızı kullanma","requestText":"Gizlilik, erişim, düzeltme, dışa aktarma, itiraz, kısıtlama, geri çekme veya silme talepleri için Todijo iletişim yolunu kullanın. Otomatik dışa aktarma ve anında tam silme yoktur; gerekli işlem kayıtları korunabilir."
 }

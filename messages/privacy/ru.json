@@ -23,9 +23,19 @@
     "privacyDataTitle":  "Конфиденциальность и данные",
     "privacyData":  "Конфиденциальность и данные",
     "contactPrivacy":  "Связаться с Todijo"
-    ,"privacyPolicyIntro": "How Todijo processes information for its multi-vendor marketplace.",
+    ,"privacyPolicyIntro": "Как Todijo обрабатывает информацию своего маркетплейса.",
     "policyBody": "Todijo processes account, profile, store, product, message, review, order, support, security and technical data to provide the service, support payments and orders, prevent abuse and meet duties. Stripe, Cloudflare Turnstile, Cloudinary, R2-compatible storage and email providers are used. The owner must verify legal bases, retention, transfers and company details.",
-    "cookiePolicyIntro": "Current storage covers necessary session, language, consent, cart and checkout functions, plus favorites as a preference. No analytics or advertising tracker is installed.",
-    "privacyDataIntro": "Request information, access, correction, deletion, restriction, portability or objection, and withdraw consent.",
-    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised."
+    "cookiePolicyIntro": "Текущее хранилище обеспечивает необходимые сессию, язык, согласие, корзину и checkout. Аналитических и рекламных трекеров нет.",
+    "privacyDataIntro": "Запросите информацию, доступ, исправление, удаление, ограничение, переносимость или возражение и отзовите согласие.",
+    "rightsBody": "Contact Todijo for a rights, export or deletion request. Required transaction records may be safely retained, deactivated or anonymised.",
+    "identityHeading":"Кто отвечает за обработку?","identityText":"Todijo управляет маркетплейсом. Проверенные данные юридического лица, регистрации, почтовый адрес и контакт по приватности отсутствуют в репозитории и должны быть предоставлены владельцем.",
+    "dataHeading":"Обрабатываемые данные","dataText":"Todijo обрабатывает данные аккаунта и профиля, покупателей и продавцов, магазинов, товаров и изображений, сообщения, отзывы, заказы, получателей, доставку, обращения и доказательства возврата, поддержку, технические журналы и данные безопасности.",
+    "marketplaceHeading":"Заказы и платежи","marketplaceText":"Todijo использует данные заказов и продавцов для транзакций. Stripe обрабатывает checkout, подтверждение платежа, подключение продавцов, подписки и выплаты. Todijo хранит нужные идентификаторы и статусы, но не получает полные данные карты.",
+    "purposesHeading":"Цели","purposesText":"Данные нужны для аккаунтов и безопасности, магазинов, корзины и избранного, сообщений и отзывов, заказов и возвратов, предотвращения злоупотреблений, сервисных писем, надежности и запросов поддержки или приватности. Правовые основания должен подтвердить владелец.",
+    "providersHeading":"Поставщики и получатели","providersText":"Репозиторий подтверждает Stripe, Cloudflare Turnstile, Cloudinary, R2-совместимое хранилище и SMTP-провайдера. Данные передаются только для сервиса, безопасности, споров или обязанностей. Места, договоры и гарантии передачи требуют проверки.",
+    "retentionHeading":"Хранение","retentionText":"Данные хранятся лишь пока нужны для сервиса, безопасности, истории транзакций, споров и бухгалтерских или правовых обязанностей. Неподтвержденный фиксированный срок не заявляется. Запрос может привести к удалению, деактивации или обезличиванию.",
+    "rightsHeading":"Ваши права GDPR","rightsText":"Когда применимо, вы можете запросить информацию, доступ, исправление, удаление, ограничение, переносимость или возражение. Согласие можно отозвать на будущее и подать жалобу компетентному надзорному органу.",
+    "securityHeading":"Безопасность и хранение в браузере","securityText":"Todijo использует хеширование паролей, подписанные HTTP-only сессии, контроль доступа, подписанные webhook Stripe и проверки безопасности. Необходимое хранилище поддерживает сессию, язык, корзину, checkout и согласие; необязательное без согласия выключено.",
+    "updatesHeading":"Обновления","updatesText":"Уведомление обновляется при существенных изменениях оператора, обработки или провайдеров. При необходимости согласие запрашивается снова.",
+    "requestHeading":"Как воспользоваться правами","requestText":"Используйте контакт Todijo для запросов приватности, доступа, исправления, экспорта, возражения, ограничения, отзыва или удаления. Автоматического экспорта и немедленного полного удаления нет; необходимые записи транзакций могут сохраняться защищенно."
 }
