@@ -25,6 +25,12 @@ enum SellerStatus {
   REJECTED
 }
 
+enum SellerType {
+  UNKNOWN
+  PROFESSIONAL
+  PRIVATE
+}
+
 enum SubscriptionStatus {
   INCOMPLETE
   TRIALING
@@ -143,6 +149,12 @@ model Store {
   language         String       @default("fr")
   status           SellerStatus @default(PENDING)
   stripeCustomerId String?      @unique
+  sellerType       SellerType   @default(UNKNOWN)
+  legalBusinessName String?
+  businessRegistrationId String?
+  businessAddress  String?
+  businessPostalCode String?
+  vatNumber        String?
 
   ownerId String @unique
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -340,6 +352,7 @@ model Order {
   snapshotCapturedAt       DateTime?
   storeIdSnapshot          String?
   storeNameSnapshot        String?
+  sellerTypeSnapshot       SellerType?
   storeSnapshot            Json?
   buyerNameSnapshot        String?
   buyerEmailSnapshot       String?

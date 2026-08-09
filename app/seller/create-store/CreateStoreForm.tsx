@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import SellerTypeFields from "@/components/SellerTypeFields";
 
 function slugify(value: string) {
   return value
@@ -36,7 +37,7 @@ export default function CreateStoreForm({ locale }: { locale: string }) {
 
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug: displayedSlug, description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo: form.get("logo"), country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language") }) });
+      const response = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug: displayedSlug, description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo: form.get("logo"), country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber") }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { setMessage(data.error ?? "Une erreur est survenue. Please try again."); return; }
       router.push(`/${locale}/seller/subscription`); router.refresh();
@@ -46,6 +47,7 @@ export default function CreateStoreForm({ locale }: { locale: string }) {
 
   return (
     <form className="storeForm" onSubmit={submit} aria-busy={submitting}>
+      <SellerTypeFields />
       <div className="formField">
         <label htmlFor="name">{t("shopName")}</label>
         <input

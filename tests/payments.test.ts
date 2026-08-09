@@ -5,10 +5,10 @@ import { Prisma } from "@prisma/client";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete, processStripeEvent } from "../lib/payments";
 import { verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
-function checkoutDb(stock = 5, sellerReady = true) {
+function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
   let order: any = null;
   let creates = 0;
-  const product = { id: "prod_1", name: "Produit", price: new Prisma.Decimal("12.50"), currency: "EUR", stock, storeId: "store_1", store: { owner: { stripeAccountId: sellerReady ? "acct_seller" : null, stripeOnboardingComplete: sellerReady, stripeChargesEnabled: sellerReady } } };
+  const product = { id: "prod_1", name: "Produit", price: new Prisma.Decimal("12.50"), currency: "EUR", stock, storeId: "store_1", store: { id: "store_1", name: "Store", slug: "store", city: "Paris", country: "France", contactEmail: "seller@example.com", phone: null, sellerType, legalBusinessName: sellerType === "PROFESSIONAL" ? "Example SARL" : null, businessRegistrationId: null, businessAddress: null, businessPostalCode: null, vatNumber: null, owner: { stripeAccountId: sellerReady ? "acct_seller" : null, stripeOnboardingComplete: sellerReady, stripeChargesEnabled: sellerReady } } };
   const db: any = {
     order: {
       findUnique: async () => order,
@@ -105,6 +105,17 @@ test("webhook signature rejection blocks altered payloads", () => {
   assert.throws(() => verifyStripeWebhook(`${body} `, `t=${timestamp},v1=${signature}`, secret), /Invalid Stripe webhook signature/);
 });
 
+test("checkout blocks unknown sellers and snapshots confirmed status", async () => {
+  const unknown = checkoutDb(5, true, "UNKNOWN");
+  await assert.rejects(() => createCheckout(unknown.db, "buyer_1", "request_unknown", [{ productId: "prod_1", quantity: 1 }]), (error: unknown) => error instanceof CheckoutError && error.message === "SELLER_STATUS_REQUIRED");
+  const professional = checkoutDb();
+  await createCheckout(professional.db, "buyer_1", "request_status", [{ productId: "prod_1", quantity: 1 }], async () => ({ id: "cs_status", url: "https://checkout.stripe.test/status" }));
+  const order = await professional.db.order.findUnique();
+  assert.equal(order.sellerTypeSnapshot, "PROFESSIONAL");
+  assert.equal(order.storeSnapshot.sellerType, "PROFESSIONAL");
+  assert.equal(order.storeSnapshot.legalBusinessName, "Example SARL");
+});
+
 test("only a buyer-owned paid checkout is eligible for cart reconciliation", async () => {
   let status = "PAID";
   let where: unknown;
@@ -150,7 +161,7 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
       upsert: async (args: any) => { subscriptionUpsert = args; return {}; },
     },
     store: {
-      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1" }),
+      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1", sellerType: "PROFESSIONAL" }),
       update: async (args: any) => { storeUpdate = args; return {}; },
     },
     product: { updateMany: async () => ({ count: 2 }) },
@@ -180,7 +191,7 @@ test("replayed subscription Checkout repairs an incomplete record instead of sto
       upsert: async (args: any) => { updatedStatus = args.update.status; return { id: "local_sub", storeId: "store_1", ...args.update }; },
     },
     store: {
-      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1" }),
+      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1", sellerType: "PROFESSIONAL" }),
       update: async () => ({ id: "store_1", status: "ACTIVE", stripeCustomerId: "cus_1" }),
     },
     product: { updateMany: async () => ({ count: 0 }) },

@@ -25,7 +25,7 @@ export default async function MarketplaceInfoPage({ params }: { params: Promise<
   const { slug } = await params;
   const titleKey = pageTitleKeys[slug];
   if (!titleKey) notFound();
-  const [locale, t, legal] = await Promise.all([getLocale(), getTranslations("HomeFooter"), getTranslations("Legal")]);
+  const [locale, t, legal, sellerTransparency] = await Promise.all([getLocale(), getTranslations("HomeFooter"), getTranslations("Legal"), getTranslations("SellerTransparency")]);
   const isLegal = legalPages.includes(slug as (typeof legalPages)[number]) || slug === "privacy-data";
   const Icon = isLegal ? ShieldCheck : Info;
   const privacyProfile = privacyPublicProfile();
@@ -39,7 +39,7 @@ export default async function MarketplaceInfoPage({ params }: { params: Promise<
       <p>{t("comingSoonText")}</p>
     </section>}
     <div className="marketInfoLayout">
-      {["privacy", "cookies", "privacy-data"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data"} supportEmail={privacyProfile.supportEmail} /> : slug in policyKinds ? <MarketplaceLegalPolicy title={legal(`${policyKinds[slug as keyof typeof policyKinds]}.title`)} intro={legal(`${policyKinds[slug as keyof typeof policyKinds]}.intro`)} statusNote={legal("common.preIncorporation")} traderNote={slug === "seller-terms" || slug === "returns" ? legal("common.traderStatus") : undefined} sections={legal.raw(`${policyKinds[slug as keyof typeof policyKinds]}.sections`) as Array<{ title: string; body: string }>} supportEmail={privacyProfile.supportEmail}/> : <article className="marketInfoContent">
+      {["privacy", "cookies", "privacy-data"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data"} supportEmail={privacyProfile.supportEmail} /> : slug in policyKinds ? <MarketplaceLegalPolicy title={legal(`${policyKinds[slug as keyof typeof policyKinds]}.title`)} intro={legal(`${policyKinds[slug as keyof typeof policyKinds]}.intro`)} statusNote={legal("common.preIncorporation")} traderNote={slug === "seller-terms" || slug === "returns" ? sellerTransparency("legalStatusNote") : undefined} sections={legal.raw(`${policyKinds[slug as keyof typeof policyKinds]}.sections`) as Array<{ title: string; body: string }>} supportEmail={privacyProfile.supportEmail}/> : <article className="marketInfoContent">
         <FileText size={28} aria-hidden="true"/>
         <h2>{t(titleKey)}</h2>
         <p>{t("comingSoonText")}</p>

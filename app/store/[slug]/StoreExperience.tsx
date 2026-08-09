@@ -5,6 +5,7 @@ import ProductCardWishlist from "@/components/ProductCardWishlist";
 import ProductCardAction from "@/components/ProductCardAction";
 import { useTranslations } from "next-intl";
 import { categoryLabel } from "@/lib/categories";
+import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 
 type Product = {
   id: string;
@@ -33,7 +34,9 @@ type Props = {
     sellerName: string;
     sellerInitials: string;
     sellerSince: string;
-    verified: boolean;
+    emailConfirmed: boolean;
+    sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE";
+    professionalInfo: { legalBusinessName: string | null; businessRegistrationId: string | null; businessAddress: string | null; businessPostalCode: string | null; vatNumber: string | null } | null;
     products: Product[];
   };
 };
@@ -74,6 +77,7 @@ const tabs = [
 export default function StoreExperience({ store }: Props) {
   const common = useTranslations("Common"); const market = useTranslations("Marketplace"); const seller = useTranslations("Seller"); const productText = useTranslations("Product");
   const categoryText = useTranslations("Categories");
+  const transparency = useTranslations("SellerTransparency");
   const [activeTab, setActiveTab] = useState("products");
   const [followed, setFollowed] = useState(false);
   const [query, setQuery] = useState("");
@@ -112,8 +116,9 @@ export default function StoreExperience({ store }: Props) {
               {store.logo ? <img src={store.logo} alt={`Logo ${store.name}`} /> : <span>{store.sellerInitials}</span>}
             </div>
             <div className="premiumStoreTitleBlock">
-              <div className="premiumStoreOfficial"><span>Todijo</span>{store.verified && <span className="verifiedPill"><Icon name="check" size={14} /> {seller("sellerArea")}</span>}</div>
+              <div className="premiumStoreOfficial"><span>Todijo</span>{store.emailConfirmed && <span className="verifiedPill"><Icon name="check" size={14} /> {transparency("emailConfirmed")}</span>}</div>
               <h1>{store.name}</h1>
+              <SellerTypeDisclosure sellerType={store.sellerType} compact/>
               <p><Icon name="pin" size={17} /> {store.city}, {store.country}</p>
             </div>
           </div>
@@ -174,13 +179,15 @@ export default function StoreExperience({ store }: Props) {
 
         <aside className="premiumStoreSidebar" id="seller">
           <section className="sellerCardPremium">
-            <div className="sellerCardTop"><div className="sellerAvatarPremium">{store.sellerInitials}</div>{store.verified && <span className="sellerVerifiedMark"><Icon name="check" size={15} /></span>}</div>
+            <div className="sellerCardTop"><div className="sellerAvatarPremium">{store.sellerInitials}</div></div>
             <span className="sectionKicker">Votre vendeur</span><h2>{store.sellerName}</h2><p>Membre depuis {store.sellerSince}</p>
+            <SellerTypeDisclosure sellerType={store.sellerType} notice/>
+            {store.professionalInfo && <dl className="sellerBusinessPublic">{store.professionalInfo.legalBusinessName && <div><dt>{transparency("legalBusinessName")}</dt><dd>{store.professionalInfo.legalBusinessName}</dd></div>}{store.professionalInfo.businessRegistrationId && <div><dt>{transparency("registrationId")}</dt><dd>{store.professionalInfo.businessRegistrationId}</dd></div>}{store.professionalInfo.businessAddress && <div><dt>{transparency("businessAddress")}</dt><dd>{store.professionalInfo.businessAddress}{store.professionalInfo.businessPostalCode ? `, ${store.professionalInfo.businessPostalCode}` : ""}</dd></div>}{store.professionalInfo.vatNumber && <div><dt>{transparency("vatNumber")}</dt><dd>{store.professionalInfo.vatNumber}</dd></div>}</dl>}
             <div className="sellerMiniStats"><div><strong>100%</strong><span>Engagement</span></div><div><strong>&lt;24h</strong><span>Réponse</span></div></div>
             <a className="sellerContactPrimary" href={`mailto:?subject=Question pour ${encodeURIComponent(store.name)}`}><Icon name="message" size={18} /> Contacter le vendeur</a>
           </section>
-          <section className="trustCardPremium"><div className="trustCardHeader"><span><Icon name="shield" size={24} /></span><div><h3>Achetez en confiance</h3><p>Protection et transparence</p></div></div><ul><li><Icon name="check" size={16} /><span><strong>Profil contrôlé</strong><small>Informations du vendeur enregistrées</small></span></li><li><Icon name="check" size={16} /><span><strong>Paiement encadré</strong><small>Parcours de commande sécurisé</small></span></li><li><Icon name="check" size={16} /><span><strong>Stock visible</strong><small>Disponibilité indiquée sur les produits</small></span></li></ul></section>
-          <section className="storeInfoCard"><h3>Informations boutique</h3><dl><div><dt>Localisation</dt><dd>{store.city}, {store.country}</dd></div><div><dt>Ouverte depuis</dt><dd>{store.openedLabel}</dd></div><div><dt>Statut</dt><dd>{store.verified ? "Vendeur vérifié" : "Nouvelle boutique"}</dd></div></dl></section>
+          <section className="trustCardPremium"><div className="trustCardHeader"><span><Icon name="shield" size={24} /></span><div><h3>Achetez en confiance</h3><p>Protection et transparence</p></div></div><ul><li><Icon name="info" size={16} /><span><strong>{store.emailConfirmed ? transparency("emailConfirmed") : transparency("statusPending")}</strong><small>{transparency(store.sellerType === "PROFESSIONAL" ? "professionalSeller" : store.sellerType === "PRIVATE" ? "privateSeller" : "statusPending")}</small></span></li><li><Icon name="check" size={16} /><span><strong>Paiement encadré</strong><small>Parcours de commande sécurisé</small></span></li><li><Icon name="check" size={16} /><span><strong>Stock visible</strong><small>Disponibilité indiquée sur les produits</small></span></li></ul></section>
+          <section className="storeInfoCard"><h3>Informations boutique</h3><dl><div><dt>Localisation</dt><dd>{store.city}, {store.country}</dd></div><div><dt>Ouverte depuis</dt><dd>{store.openedLabel}</dd></div><div><dt>Statut</dt><dd>{transparency(store.sellerType === "PROFESSIONAL" ? "professionalSeller" : store.sellerType === "PRIVATE" ? "privateSeller" : "statusPending")}</dd></div></dl></section>
         </aside>
       </div>
     </>

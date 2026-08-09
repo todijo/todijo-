@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency";
 
 function makeSlug(value: string) {
   return value
@@ -45,6 +46,11 @@ export async function POST(request: Request) {
     const city = String(body.city ?? "").trim();
     const currency = String(body.currency ?? "EUR").trim().toUpperCase();
     const language = String(body.language ?? "fr").trim().toLowerCase();
+    const sellerType = parseSellerType(body.sellerType);
+    if (!sellerType) return NextResponse.json({ error: "Choose your seller status.", code: "SELLER_TYPE_REQUIRED" }, { status: 400 });
+    let sellerIdentity;
+    try { sellerIdentity = sellerIdentityInput(body, sellerType); }
+    catch { return NextResponse.json({ error: "A legal or business name is required for professional sellers.", code: "LEGAL_BUSINESS_NAME_REQUIRED" }, { status: 400 }); }
 
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json(
@@ -94,6 +100,8 @@ export async function POST(request: Request) {
           city,
           currency,
           language,
+          sellerType,
+          ...sellerIdentity,
           ownerId: session.userId,
         },
         select: { id: true, slug: true },
@@ -146,6 +154,11 @@ export async function PATCH(request: Request) {
     const city = String(body.city ?? "").trim();
     const currency = String(body.currency ?? "EUR").trim().toUpperCase();
     const language = String(body.language ?? "fr").trim().toLowerCase();
+    const sellerType = parseSellerType(body.sellerType);
+    if (!sellerType) return NextResponse.json({ error: "Choose your seller status.", code: "SELLER_TYPE_REQUIRED" }, { status: 400 });
+    let sellerIdentity;
+    try { sellerIdentity = sellerIdentityInput(body, sellerType); }
+    catch { return NextResponse.json({ error: "A legal or business name is required for professional sellers.", code: "LEGAL_BUSINESS_NAME_REQUIRED" }, { status: 400 }); }
 
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json({ error: "Le nom de la boutique doit contenir entre 2 et 80 caractères." }, { status: 400 });
@@ -192,6 +205,8 @@ export async function PATCH(request: Request) {
         city,
         currency,
         language,
+        sellerType,
+        ...sellerIdentity,
       },
       select: { slug: true },
     });

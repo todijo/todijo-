@@ -15,6 +15,7 @@ import { getTranslations } from "next-intl/server";
 import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { categoryLabel } from "@/lib/categories";
+import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -41,7 +42,7 @@ export default async function ProductPage({ params }: Props) {
         } },
       } },
       variants: { where: buyerVisibleVariantWhere(), select: { id: true, stock: true, active: true, priceOverride: true, values: { select: { optionValue: { select: { id: true, value: true, option: { select: { id: true, name: true, position: true } } } } } } } },
-      store: { select: { name: true, slug: true, city: true, country: true } },
+      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true } },
     },
   });
   if (!product) notFound();
@@ -53,6 +54,7 @@ export default async function ProductPage({ params }: Props) {
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
       <article className="productDetailInfo">
         <Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link>
+        <SellerTypeDisclosure sellerType={product.store.sellerType} notice/>
         <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
         <h1>{product.name}</h1><ProductDetailPrice price={price} compareAtPrice={compare} currency={product.currency}/>
         <div className="productMobileSecondaryActions"><ShareButton title={product.name}/></div>

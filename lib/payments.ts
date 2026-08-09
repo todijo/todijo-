@@ -40,10 +40,11 @@ export async function createCheckout(
   if (existing && existing.status !== "PENDING") throw new CheckoutError("This checkout request can no longer be reused.", 409);
 
   const lines = [...quantities.values()];
-  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
+  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, sellerType: true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
   if (products.length !== new Set(lines.map((line) => line.productId)).size) throw new CheckoutError("One or more products are unavailable.", 409);
   const stores = new Set(products.map((product) => product.storeId));
   if (stores.size !== 1) throw new CheckoutError("MULTIPLE_SELLERS", 409);
+  if (products[0].store.sellerType === "UNKNOWN") throw new CheckoutError("SELLER_STATUS_REQUIRED", 409);
   const seller = products[0].store.owner;
   if (!seller.stripeAccountId || !seller.stripeOnboardingComplete || !seller.stripeChargesEnabled) throw new CheckoutError("SELLER_STRIPE_NOT_READY", 409);
   const currencies = new Set(products.map((product) => product.currency.toUpperCase()));
@@ -79,7 +80,7 @@ export async function createCheckout(
   if (!order) {
     try {
       const store = products[0].store;
-      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, subtotal: total, shippingCost: new Prisma.Decimal(0), taxTotal: new Prisma.Decimal(0), shippingCurrency: products[0].currency.toUpperCase(), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: line.product.currency.toUpperCase(), lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null })) } }, include: { items: true } });
+      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, subtotal: total, shippingCost: new Prisma.Decimal(0), taxTotal: new Prisma.Decimal(0), shippingCurrency: products[0].currency.toUpperCase(), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: line.product.currency.toUpperCase(), lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null })) } }, include: { items: true } });
     } catch (error) {
       if (!isPrismaCode(error, "P2002")) throw error;
       order = await db.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
@@ -146,10 +147,10 @@ export async function processStripeEvent(
         const invoiceSubscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
         if (invoice.object !== "invoice" || !invoiceSubscriptionId) throw new Error(`[Stripe webhook ${event.id}] Invoice event has no subscription ID.`);
         const status = event.type === "invoice.paid" ? "ACTIVE" : "PAST_DUE";
-        const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true } });
+        const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true, store: { select: { sellerType: true } } } });
         if (!existing) throw new Error(`[Stripe webhook ${event.id}] No local seller subscription matches invoice subscription ${invoiceSubscriptionId}.`);
         await tx.sellerSubscription.update({ where: { stripeSubscriptionId: invoiceSubscriptionId }, data: { status } });
-        if (status === "ACTIVE") {
+        if (status === "ACTIVE" && existing.store.sellerType !== "UNKNOWN") {
           await tx.store.update({ where: { id: existing.storeId }, data: { status: "ACTIVE" } });
           await tx.product.updateMany({ where: { storeId: existing.storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } });
         } else {
@@ -222,7 +223,7 @@ async function syncSellerSubscription(
     : { found: false, subscriptionId: subscription.id, customerId, hintedStoreId: hint.storeId ?? null });
   const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
   if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);
-  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true } });
+  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true } });
   if (!store) throw new Error(`[Stripe webhook ${eventId}] Store ${storeId} does not exist.`);
   if (hint.userId && store.ownerId !== hint.userId) throw new Error(`[Stripe webhook ${eventId}] Checkout user does not own store ${storeId}.`);
   if (store.stripeCustomerId && store.stripeCustomerId !== customerId) throw new Error(`[Stripe webhook ${eventId}] Stripe customer does not match store ${storeId}.`);
@@ -251,7 +252,7 @@ async function syncSellerSubscription(
     stripePriceId: subscriptionUpdate.stripePriceId,
     currentPeriodEnd: subscriptionUpdate.currentPeriodEnd,
   });
-  const products = active
+  const products = active && store.sellerType !== "UNKNOWN"
     ? await tx.product.updateMany({ where: { storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } })
     : await tx.product.updateMany({ where: { storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
   console.info(`[Stripe webhook ${eventId}] Saved ${status} subscription for store ${storeId}; updated ${products.count} product(s).`);

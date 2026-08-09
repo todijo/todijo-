@@ -22,7 +22,7 @@ export default async function NewProductPage() {
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
     select: {
-      name: true, slug: true, currency: true, status: true,
+      name: true, slug: true, currency: true, status: true, sellerType: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true, plan: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
@@ -30,6 +30,7 @@ export default async function NewProductPage() {
     },
   });
   if (!store) redirect("/seller/create-store");
+  if (store.sellerType === "UNKNOWN") redirect("/seller/store-settings");
   if (!canPublish(store)) redirect("/seller/subscription");
 
   const plan = sellerPlans().find((item) => item.id === store.subscription?.plan);

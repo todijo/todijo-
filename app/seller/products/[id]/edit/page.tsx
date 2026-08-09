@@ -22,7 +22,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     options:{where:{active:true},orderBy:{position:"asc"},select:{id:true,name:true,values:{where:{active:true},orderBy:{position:"asc"},select:{id:true,value:true}}}},
     imageRecords:{orderBy:{position:"asc"},select:{url:true,optionValueImages:{orderBy:{position:"asc"},select:{isPrimary:true,optionValue:{select:{id:true}}}}}},
     variants:{orderBy:{createdAt:"asc"},select:{combinationKey:true,sku:true,barcode:true,priceOverride:true,compareAtPrice:true,stock:true,active:true,values:{select:{optionValue:{select:{value:true}}}}}},
-    store:{select:{name:true,slug:true,status:true,subscription:{select:{status:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},owner:{select:{firstName:true,lastName:true}}}},
+    store:{select:{name:true,slug:true,status:true,sellerType:true,subscription:{select:{status:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},owner:{select:{firstName:true,lastName:true}}}},
   }});
   if (!product) notFound();
   const labels = { dashboard:p("nav.dashboard"),products:p("nav.products"),orders:p("nav.orders"),messages:p("nav.messages"),statistics:p("nav.statistics"),revenue:p("nav.revenue"),reviews:p("nav.reviews"),store:p("nav.store"),settings:p("nav.settings"),notifications:p("notifications"),eyebrow:p("seller.eyebrow"),logout:common("logout"),menu:dashboardText("menu"),collapse:dashboardText("collapse"),addProduct:p("nav.addProduct") };

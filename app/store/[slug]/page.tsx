@@ -21,7 +21,8 @@ export default async function StorePage({ params }: Props) {
   const store = await prisma.store.findFirst({
     where: { slug, ...publicStoreAccessWhere() },
     select: {
-      name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, createdAt: true,
+      name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, createdAt: true, sellerType: true,
+      legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true,
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
       products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } } } },
     },
@@ -42,7 +43,9 @@ export default async function StorePage({ params }: Props) {
     sellerName: `${store.owner.firstName} ${store.owner.lastName}`,
     sellerInitials: initials(store.owner.firstName, store.owner.lastName),
     sellerSince: dateFormat.format(store.owner.createdAt),
-    verified: store.owner.emailVerified,
+    sellerType: store.sellerType,
+    emailConfirmed: store.owner.emailVerified,
+    professionalInfo: store.sellerType === "PROFESSIONAL" ? { legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber } : null,
     products: store.products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }); return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, images: product.images, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: product.condition, category: product.category }; }),
   };
 
