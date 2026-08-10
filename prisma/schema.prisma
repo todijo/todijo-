@@ -40,6 +40,8 @@ enum SellerVatStatus {
 enum ProductReportReason {
   ILLEGAL
   UNSAFE
+  COUNTERFEIT
+  INTELLECTUAL_PROPERTY
   MISLEADING
   PROHIBITED
   OTHER
@@ -47,6 +49,7 @@ enum ProductReportReason {
 
 enum ProductReportStatus {
   OPEN
+  UNDER_REVIEW
   RESOLVED
   DISMISSED
 }
@@ -124,6 +127,8 @@ model User {
   reviewedRefundRequests RefundRequest[] @relation("RefundRequestReviewer")
   uploadedRefundEvidence RefundEvidence[] @relation("RefundEvidenceUploader")
   productReports      ProductReport[]
+  productReportsReviewed ProductReport[] @relation("ProductReportReviewer")
+  productModerationEvents ProductModerationEvent[] @relation("ProductModerationActor")
   accessGrantsCreated StoreAccessGrant[] @relation("AccessGrantAdmin")
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
@@ -436,14 +441,37 @@ model ProductReport {
   reason      ProductReportReason
   details     String              @db.VarChar(1500)
   status      ProductReportStatus @default(OPEN)
+  reviewedById String?
+  reviewedAt DateTime?
+  resolutionNote String? @db.VarChar(1000)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
   product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("ProductReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  events ProductModerationEvent[]
 
   @@unique([productId, reporterId])
   @@index([status, createdAt])
+  @@index([reviewedById, reviewedAt])
+}
+
+model ProductModerationEvent {
+  id         String              @id @default(cuid())
+  reportId   String
+  actorId    String
+  fromStatus ProductReportStatus
+  toStatus   ProductReportStatus
+  action     String              @db.VarChar(50)
+  note       String?             @db.VarChar(1000)
+  createdAt  DateTime            @default(now())
+
+  report ProductReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  actor  User          @relation("ProductModerationActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([reportId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 model StripeWebhookEvent {
