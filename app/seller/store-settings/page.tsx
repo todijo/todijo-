@@ -18,6 +18,7 @@ export default async function StoreSettingsPage() {
   const p = await getTranslations("DashboardPremium");
   const common = await getTranslations("Common");
   const dashboardText = await getTranslations("SellerDashboard");
+  const shippingText = await getTranslations("Shipping");
   const locale = await getLocale();
 
   const store = await prisma.store.findUnique({
@@ -26,6 +27,7 @@ export default async function StoreSettingsPage() {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true,
       contactEmail: true, phone: true, currency: true, language: true,
+      shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingCarrier: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { plan: true, status: true, currentPeriodEnd: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
@@ -52,7 +54,7 @@ export default async function StoreSettingsPage() {
     />
 
     <nav className="sellerSettingsTabs" aria-label={t("settingsTitle")}>
-      <a href="#profile">{t("storeProfile")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a>
+      <a href="#profile">{t("storeProfile")}</a><a href="#shipping">{shippingText("settingsTitle")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a>
     </nav>
 
     <StoreSettingsForm initialValues={{
@@ -61,6 +63,7 @@ export default async function StoreSettingsPage() {
       currency: store.currency, language: store.language,
       sellerType: store.sellerType, legalBusinessName: store.legalBusinessName ?? "", businessRegistrationId: store.businessRegistrationId ?? "",
       businessAddress: store.businessAddress ?? "", businessPostalCode: store.businessPostalCode ?? "", vatNumber: store.vatNumber ?? "", vatStatus: store.vatStatus,
+      shippingEnabled: store.shippingEnabled, shippingMethodName: store.shippingMethodName ?? "", shippingPrice: store.shippingPrice?.toString() ?? "", shippingFree: store.shippingFree, shippingMinDays: store.shippingMinDays, shippingMaxDays: store.shippingMaxDays, shippingCountries: store.shippingCountries, shippingCarrier: store.shippingCarrier ?? "",
     }} />
 
     <div className="sellerSettingsSupportGrid">

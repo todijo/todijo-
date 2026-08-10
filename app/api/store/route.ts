@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
+import { parseShippingSettings, ShippingError } from "@/lib/shipping";
 
 function makeSlug(value: string) {
   return value
@@ -162,6 +163,9 @@ export async function PATCH(request: Request) {
     let sellerIdentity;
     try { sellerIdentity = sellerIdentityInput(body, sellerType); }
     catch (error) { const code = error instanceof Error ? error.message : "SELLER_IDENTITY_REQUIRED"; return NextResponse.json({ error: code, code }, { status: 400 }); }
+    let shippingSettings;
+    try { shippingSettings = parseShippingSettings(body); }
+    catch (error) { const code = error instanceof ShippingError ? error.message : "SHIPPING_NOT_CONFIGURED"; return NextResponse.json({ error: code, code }, { status: 400 }); }
 
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json({ error: "Le nom de la boutique doit contenir entre 2 et 80 caractères." }, { status: 400 });
@@ -210,6 +214,7 @@ export async function PATCH(request: Request) {
         language,
         sellerType,
         ...sellerIdentity,
+        ...shippingSettings,
       },
       select: { slug: true },
     });

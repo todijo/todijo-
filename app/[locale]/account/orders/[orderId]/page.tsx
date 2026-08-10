@@ -31,6 +31,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   if (!order) notFound();
 
   const t = await getTranslations("Orders");
+  const shippingText = await getTranslations("Shipping");
   const money = (amount: number) => new Intl.NumberFormat(locale, { style: "currency", currency: order.currency }).format(amount);
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(order.createdAt);
   const paymentState = buyerPaymentState(order);
@@ -76,7 +77,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
                 })}
               </ol>
             )}
-            {(order.trackingCarrier || order.trackingNumber) && <p><strong>{t("fulfillment.tracking")}</strong>{order.trackingCarrier && ` ${order.trackingCarrier}`}{order.trackingCarrier && order.trackingNumber && " · "}{order.trackingNumber}</p>}
+            {(order.trackingCarrier || order.trackingNumber || order.trackingUrl) && <div className="buyerTrackingCard"><strong>{t("fulfillment.tracking")}</strong>{order.trackingCarrier&&<span>{order.trackingCarrier}</span>}{order.trackingNumber&&<code>{order.trackingNumber}</code>}{order.trackingUrl&&<a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">{shippingText("trackPackage")}</a>}</div>}
 
             {order.lifecycleEvents.length > 0 && <section className="buyerLifecycleTimeline" aria-label={t("lifecycle.title")}><h2>{t("lifecycle.title")}</h2><ol>{order.lifecycleEvents.map((event) => <li key={event.id}><i aria-hidden="true"/><div><strong>{lifecycleLabel(event.type)}</strong><time dateTime={event.createdAt.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(event.createdAt)}</time></div></li>)}</ol></section>}
             <h2>{t("products")}</h2>
@@ -100,6 +101,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
           <aside className="buyerOrderTotalsCard">
             <h2>{t("summary")}</h2>
             <div><span>{t("subtotal")}</span><strong>{money(subtotal)}</strong></div>
+            {order.shippingMethod&&<div className="buyerOrderShippingSnapshot"><span>{shippingText("shipping")}</span><strong>{order.shippingCost?.isZero()?shippingText("freeLabel"):money(Number(order.shippingCost??0))}</strong><small>{order.shippingMethod}{order.shippingCarrier?` · ${order.shippingCarrier}`:""}</small>{order.shippingEstimatedMinDays&&order.shippingEstimatedMaxDays&&<small>{shippingText("estimate",{min:order.shippingEstimatedMinDays,max:order.shippingEstimatedMaxDays})}</small>}</div>}
             <div className="buyerOrderFinalTotal"><span>{t("finalTotal")}</span><strong>{money(Number(order.total))}</strong></div>
             <small>{order.currency}</small>
             {order.stripePaymentIntentId && <div className="buyerOrderPaymentReference"><span>{t("paymentReference")}</span><code>{order.stripePaymentIntentId}</code></div>}

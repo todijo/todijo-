@@ -147,6 +147,8 @@ export async function createStripeCheckoutSession(input: {
   items: Array<{ name: string; unitAmount: number; quantity: number; currency: string }>;
   connectedAccountId: string;
   platformFeeAmount: number;
+  allowedCountries?: string[];
+  shipping?: { name: string; amount: number; currency: string; minDays: number; maxDays: number };
 }) {
   const origin = appUrl();
   const body = new URLSearchParams({
@@ -164,7 +166,17 @@ export async function createStripeCheckoutSession(input: {
     "payment_intent_data[application_fee_amount]": String(input.platformFeeAmount),
     "payment_intent_data[transfer_data][destination]": input.connectedAccountId,
   });
-  for (const [index, country] of ["FR", "BE", "DE", "NL"].entries()) body.set(`shipping_address_collection[allowed_countries][${index}]`, country);
+  for (const [index, country] of (input.allowedCountries?.length ? input.allowedCountries : ["FR"]).entries()) body.set(`shipping_address_collection[allowed_countries][${index}]`, country);
+  if (input.shipping) {
+    body.set("shipping_options[0][shipping_rate_data][type]", "fixed_amount");
+    body.set("shipping_options[0][shipping_rate_data][display_name]", input.shipping.name);
+    body.set("shipping_options[0][shipping_rate_data][fixed_amount][amount]", String(input.shipping.amount));
+    body.set("shipping_options[0][shipping_rate_data][fixed_amount][currency]", input.shipping.currency.toLowerCase());
+    body.set("shipping_options[0][shipping_rate_data][delivery_estimate][minimum][unit]", "business_day");
+    body.set("shipping_options[0][shipping_rate_data][delivery_estimate][minimum][value]", String(input.shipping.minDays));
+    body.set("shipping_options[0][shipping_rate_data][delivery_estimate][maximum][unit]", "business_day");
+    body.set("shipping_options[0][shipping_rate_data][delivery_estimate][maximum][value]", String(input.shipping.maxDays));
+  }
   input.items.forEach((item, index) => {
     body.set(`line_items[${index}][quantity]`, String(item.quantity));
     body.set(`line_items[${index}][price_data][currency]`, item.currency.toLowerCase());

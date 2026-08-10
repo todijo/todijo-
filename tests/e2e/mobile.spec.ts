@@ -153,3 +153,16 @@ test("mobile RTL product information and report dialog do not overflow", async (
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("mobile RTL shipping settings stay readable and contained", async ({ page }) => {
+  await page.goto("/ar/e2e-ux?view=shipping");
+  await dismissCookieConsent(page);
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  const section = page.locator("#shipping");
+  await expect(section).toBeVisible();
+  const box = await section.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await expect(page.locator("#shippingMethodName")).toHaveCSS("color", "rgb(23, 59, 48)");
+  await expect(page.locator("#shippingMethodName")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+});

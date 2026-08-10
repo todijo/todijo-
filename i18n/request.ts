@@ -32,6 +32,7 @@ export default getRequestConfig(async () => {
   messages.NotificationEvents = (await import(`../messages/notification-events/${locale}.json`)).default;
   messages.ContactMessage = (await import(`../messages/contact-message/${locale}.json`)).default;
   messages.ReportDialog = (await import(`../messages/report-dialog/${locale}.json`)).default;
+  messages.Shipping = (await import(`../messages/shipping/${locale}.json`)).default;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = ["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)

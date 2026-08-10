@@ -8,7 +8,7 @@ export async function POST(request: Request, context: { params: Promise<{ orderI
   if (!session || !["SELLER", "ADMIN"].includes(session.role)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const { orderId } = await context.params;
-    const body = await request.json() as { action?: SellerFulfillmentAction; trackingCarrier?: unknown; trackingNumber?: unknown };
+    const body = await request.json() as { action?: SellerFulfillmentAction; trackingCarrier?: unknown; trackingNumber?: unknown; trackingUrl?: unknown };
     const result = await advanceSellerFulfillment(prisma, session.userId, orderId, body.action as SellerFulfillmentAction, body);
     return NextResponse.json(result);
   } catch (error) {

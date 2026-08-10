@@ -46,9 +46,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const [common, market, productText, detailText, compliance, categoryText, resolvedParams, session, locale] = await Promise.all([
+  const [common, market, productText, detailText, compliance, categoryText, shippingText, resolvedParams, session, locale] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
-    getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"),
+    getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"),
     params, readSession(), getLocale(),
   ]);
   const { id } = resolvedParams;
@@ -66,7 +66,7 @@ export default async function ProductPage({ params }: Props) {
         } },
       } },
       variants: { where: buyerVisibleVariantWhere(), select: { id: true, stock: true, active: true, priceOverride: true, values: { select: { optionValue: { select: { id: true, value: true, option: { select: { id: true, name: true, position: true } } } } } } } },
-      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true } },
+      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true, currency: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingCarrier: true } },
     },
   });
   if (!product) notFound();
@@ -96,6 +96,7 @@ export default async function ProductPage({ params }: Props) {
       <div className="productPurchaseColumn">
         <ProductPurchasePanel availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))}))} variants={product.variants.map((variant) => ({ ...variant, priceOverride: variant.priceOverride == null ? null : Number(variant.priceOverride) }))} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
         <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
+        {product.store.shippingEnabled&&product.store.shippingMethodName&&product.store.shippingMinDays&&product.store.shippingMaxDays&&<aside className="productShippingSummary"><strong>{shippingText("productTitle")}</strong><span>{product.store.shippingMethodName}{product.store.shippingCarrier?` · ${product.store.shippingCarrier}`:""}</span><span>{shippingText("estimate",{min:product.store.shippingMinDays,max:product.store.shippingMaxDays})}</span><b>{product.store.shippingFree?shippingText("freeLabel"):shippingText("fromPrice",{price:new Intl.NumberFormat(locale,{style:"currency",currency:product.store.currency}).format(Number(product.store.shippingPrice??0))})}</b></aside>}
       </div>
     </div>
     <nav className="productDetailSections" aria-label={detailText("pageSections")}><a href="#description">{detailText("description")}</a><a className="productFactsDesktopLink" href="#product-facts">{detailText("details")}</a><a className="productFactsMobileLink" href="#product-facts-mobile">{detailText("details")}</a><a href="#reviews">{detailText("reviews")}</a></nav>

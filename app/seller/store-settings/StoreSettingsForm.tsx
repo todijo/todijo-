@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Contact, Store } from "lucide-react";
+import { Contact, Store, Truck } from "lucide-react";
 import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
 import { useToast } from "@/components/ToastProvider";
 import SellerTypeFields from "@/components/SellerTypeFields";
@@ -33,6 +33,14 @@ type StoreValues = {
   businessPostalCode: string;
   vatNumber: string;
   vatStatus: "UNKNOWN" | "REGISTERED" | "NOT_REGISTERED_OR_NOT_APPLICABLE";
+  shippingEnabled: boolean;
+  shippingMethodName: string;
+  shippingPrice: string;
+  shippingFree: boolean;
+  shippingMinDays: number | null;
+  shippingMaxDays: number | null;
+  shippingCountries: string[];
+  shippingCarrier: string;
 };
 
 type MediaKind = "logo" | "banner";
@@ -103,6 +111,7 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
 export default function StoreSettingsForm({ initialValues }: { initialValues: StoreValues }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
+  const shipping = useTranslations("Shipping");
   const { showToast } = useToast();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +122,8 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
   const [logo, setLogo] = useState(initialValues.logo);
   const [banner, setBanner] = useState(initialValues.banner);
   const [dragging, setDragging] = useState<MediaKind | null>(null);
+  const [shippingEnabled, setShippingEnabled] = useState(initialValues.shippingEnabled);
+  const [shippingFree, setShippingFree] = useState(initialValues.shippingFree);
 
   async function uploadFile(file: File, kind: MediaKind): Promise<string> {
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -200,7 +211,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
     setSaving(true);
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus") }) });
+      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus"), shippingEnabled, shippingMethodName: form.get("shippingMethodName"), shippingPrice: form.get("shippingPrice"), shippingFree, shippingMinDays: form.get("shippingMinDays"), shippingMaxDays: form.get("shippingMaxDays"), shippingCountries: String(form.get("shippingCountries") ?? "").split(/[\s,;]+/).filter(Boolean), shippingCarrier: form.get("shippingCarrier") }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); setMessageError(true); showToast({ message: text, tone: "error" }); return; }
       setMessage(t("settingsSaved")); setMessageError(false); showToast({ message: t("settingsSaved"), tone: "success" }); router.refresh();
@@ -280,6 +291,19 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
           <SellerFormField label={t("contactEmail")} htmlFor="contactEmail" required><input id="contactEmail" name="contactEmail" type="email" required defaultValue={initialValues.contactEmail} /></SellerFormField>
           <SellerFormField label={t("phone")} htmlFor="phone" hint={t("phoneHint")}><input id="phone" name="phone" type="tel" maxLength={30} defaultValue={initialValues.phone} aria-describedby="phone-hint" /></SellerFormField>
         </div>
+      </SellerSection>
+
+      <SellerSection id="shipping" icon={Truck} title={shipping("settingsTitle")} description={shipping("settingsHelp")}>
+        <label className="shippingToggle"><input type="checkbox" checked={shippingEnabled} onChange={(event)=>setShippingEnabled(event.target.checked)}/><span><strong>{shipping("enabled")}</strong><small>{shippingEnabled ? shipping("enabledHelp") : shipping("disabledHelp")}</small></span></label>
+        {shippingEnabled && <div className="shippingSettingsGrid">
+          <SellerFormField label={shipping("method")} htmlFor="shippingMethodName" required><input id="shippingMethodName" name="shippingMethodName" required maxLength={80} defaultValue={initialValues.shippingMethodName}/></SellerFormField>
+          <SellerFormField label={shipping("carrier")} htmlFor="shippingCarrier" hint={shipping("carrierHelp")}><input id="shippingCarrier" name="shippingCarrier" maxLength={80} defaultValue={initialValues.shippingCarrier}/></SellerFormField>
+          <label className="shippingToggle shippingFreeToggle"><input type="checkbox" checked={shippingFree} onChange={(event)=>setShippingFree(event.target.checked)}/><span><strong>{shipping("free")}</strong><small>{shipping("freeHelp")}</small></span></label>
+          {!shippingFree && <SellerFormField label={shipping("price")} htmlFor="shippingPrice" required><input id="shippingPrice" name="shippingPrice" type="number" min="0" step="0.01" required defaultValue={initialValues.shippingPrice}/></SellerFormField>}
+          <SellerFormField label={shipping("minDays")} htmlFor="shippingMinDays" required><input id="shippingMinDays" name="shippingMinDays" type="number" min="1" max="365" required defaultValue={initialValues.shippingMinDays ?? ""}/></SellerFormField>
+          <SellerFormField label={shipping("maxDays")} htmlFor="shippingMaxDays" required><input id="shippingMaxDays" name="shippingMaxDays" type="number" min="1" max="365" required defaultValue={initialValues.shippingMaxDays ?? ""}/></SellerFormField>
+          <SellerFormField label={shipping("countries")} htmlFor="shippingCountries" hint={shipping("countriesHelp")}><input id="shippingCountries" name="shippingCountries" required defaultValue={initialValues.shippingCountries.join(", ")} placeholder="FR, BE, DE"/></SellerFormField>
+        </div>}
       </SellerSection>
 
       <section className="storeSettingsSection" id="media">
