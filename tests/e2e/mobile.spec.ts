@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { collectRuntimeErrors, expectNoDocumentOverflow, expectWithinViewport } from "./helpers";
+import { collectRuntimeErrors, dismissCookieConsent, expectNoDocumentOverflow, expectWithinViewport } from "./helpers";
 
 test("mobile authentication entry keeps critical controls usable", async ({ page }) => {
   const assertNoRuntimeErrors = collectRuntimeErrors(page);
   const response = await page.goto("/en/login");
 
   expect(response?.ok()).toBeTruthy();
+  await dismissCookieConsent(page);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expectWithinViewport(page.getByLabel("Email address"), page);
   await expectWithinViewport(page.getByLabel("Password"), page);
@@ -107,11 +108,13 @@ test("mobile search filters open as a full-height sheet without squeezing result
 });
 
 test("mobile Categories opens the compact category drawer and preserves locale", async ({ page }) => {
+  await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
+  await dismissCookieConsent(page);
   await page.getByRole("button", { name: "Categories" }).last().click();
   const drawer = page.getByRole("dialog", { name: "Mobile navigation" });
   await expect(drawer).toBeVisible();
   await drawer.getByRole("button", { name: "Categories" }).click();
   await expect(drawer.getByRole("link", { name: "Electronics" })).toBeVisible();
-  await Promise.all([page.waitForURL(/\/en\/search\?category=/), drawer.getByRole("link", { name: "Electronics" }).click()]);
+  await Promise.all([page.waitForURL(/\/en\/search\?category=/, { waitUntil: "commit" }), drawer.getByRole("link", { name: "Electronics" }).click()]);
 });

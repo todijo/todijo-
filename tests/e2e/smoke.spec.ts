@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectRuntimeErrors } from "./helpers";
+import { collectRuntimeErrors, dismissCookieConsent } from "./helpers";
 import { SignJWT } from "jose";
 
 const e2eSecret = "e2e-only-placeholder-secret-at-least-32-characters";
@@ -81,7 +81,9 @@ test("unknown public routes render the localized not-found page", async ({ page 
 });
 
 test("search filters are visibly triggered, preserve state, and update the URL", async ({ page }) => {
+  await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux");
+  await dismissCookieConsent(page);
   const trigger = page.locator(".mobileFilterButton");
   await expect(trigger).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Sort" })).toHaveCount(0);
@@ -107,10 +109,14 @@ test("search filters are visibly triggered, preserve state, and update the URL",
   await expect(page.getByLabel("Minimum price")).toHaveValue("10");
   await expect(page.getByLabel("Country")).toHaveValue("France");
   await expect(page.getByRole("radio", { name: "4★+" })).toBeChecked();
-  await Promise.all([
-    page.waitForURL(/\/en\/search\?.*(?:country=France|rating=4|minPrice=10)/),
-    page.getByRole("button", { name: "Apply" }).click(),
+  const [searchRequest] = await Promise.all([
+    page.waitForRequest((request) => new URL(request.url()).pathname === "/en/search"),
+    dialog.getByRole("button", { name: "Apply" }).click({ noWaitAfter: true }),
   ]);
+  const searchUrl = new URL(searchRequest.url());
+  expect(searchUrl.searchParams.get("minPrice")).toBe("10");
+  expect(searchUrl.searchParams.get("country")).toBe("France");
+  expect(searchUrl.searchParams.get("rating")).toBe("4");
 });
 
 test("homepage presents the localized stores CTA to the public directory", async ({ page }) => {
@@ -140,6 +146,7 @@ test("marketplace routes render one shared header with core navigation", async (
 
 test("desktop Categories opens a stable mega-menu and preserves localized routing", async ({ page }) => {
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: false } }));
+  await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
   const trigger = page.locator("header[data-marketplace-header] .marketAllCategories");
   await trigger.hover();
@@ -153,6 +160,10 @@ test("desktop Categories opens a stable mega-menu and preserves localized routin
   await page.goto("/en/e2e-ux?view=home");
   await expect(page.locator(".categoryStripSection")).toBeHidden();
   await expect(page.locator(".categoryShowcase")).toBeHidden();
+  if (await menu.isVisible()) {
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+  }
   await trigger.focus();
   await page.keyboard.press("Enter");
   await expect(menu).toBeVisible();

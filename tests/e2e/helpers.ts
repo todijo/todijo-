@@ -11,6 +11,16 @@ export function collectRuntimeErrors(page: Page) {
   return () => expect(errors, "unexpected browser runtime errors").toEqual([]);
 }
 
+export async function dismissCookieConsent(page: Page) {
+  const rejectAll = page.getByRole("button", { name: "Reject all" });
+  try {
+    await rejectAll.waitFor({ state: "visible", timeout: 5_000 });
+    await rejectAll.click();
+  } catch {
+    // A persisted decision means the banner is intentionally absent.
+  }
+}
+
 export async function expectNoDocumentOverflow(page: Page, tolerance = 1) {
   const overflow = await page.evaluate(() => {
     const root = document.documentElement;
