@@ -8,11 +8,11 @@ type Labels = {
   eyebrow: string; logout: string; menu: string; collapse: string; addProduct: string;
 };
 
-export default function SellerDashboardLayout({ children, locale, storeSlug, firstName, lastName, labels, active, canAddProduct = false, unreadMessages = 0 }: { children: ReactNode; locale: string; storeSlug: string; firstName: string; lastName: string; labels: Labels; active: "products" | "new-product" | "settings" | "reviews"; canAddProduct?: boolean; unreadMessages?: number }) {
+export default function SellerDashboardLayout({ children, locale, storeSlug, firstName, lastName, labels, active, canAddProduct = false, unreadMessages = 0 }: { children: ReactNode; locale: string; storeSlug: string; firstName: string; lastName: string; labels: Labels; active: "products" | "new-product" | "orders" | "settings" | "reviews"; canAddProduct?: boolean; unreadMessages?: number }) {
   const baseItems: DashboardNavItem[] = [
     { label: labels.dashboard, href: `/${locale}/dashboard`, icon: Home },
     { label: labels.products, href: `/${locale}/seller/products`, icon: Boxes, active: active === "products" },
-    { label: labels.orders, href: `/${locale}/dashboard#recent-orders`, icon: ReceiptText },
+    { label: labels.orders, href: `/${locale}/seller/orders`, icon: ReceiptText, active: active === "orders" },
     { label: labels.messages, href: `/${locale}/messages`, icon: MessageCircle, badge: unreadMessages },
     { label: labels.statistics, href: `/${locale}/dashboard#analytics`, icon: BarChart3 },
     { label: labels.revenue, href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign },

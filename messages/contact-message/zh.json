@@ -1,0 +1,1 @@
+{"messageMinimum":"消息至少需要 {min} 个字符。","messageProgress":"{count} / {min} 最少 · {max} 最多","selfError":"您不能给自己发送消息。","questionsDisabledError":"卖家已不再接受关于此商品的提问。","productUnavailableError":"此商品已不可用。","authRequiredError":"请重新登录后再发送消息。","messageLengthError":"消息长度必须在 {min} 到 {max} 个字符之间。","messageError":"消息发送失败。"}

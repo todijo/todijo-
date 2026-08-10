@@ -118,3 +118,26 @@ test("mobile Categories opens the compact category drawer and preserves locale",
   await expect(drawer.getByRole("link", { name: "Electronics" })).toBeVisible();
   await Promise.all([page.waitForURL(/\/en\/search\?category=/, { waitUntil: "commit" }), drawer.getByRole("link", { name: "Electronics" }).click()]);
 });
+
+test("mobile compliance fields and contact seller remain readable", async ({ page }) => {
+  await page.goto("/ar/e2e-ux?view=seller");
+  await dismissCookieConsent(page);
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  const complianceInput = page.locator("#responsiblePartyName");
+  await expect(complianceInput).toBeVisible();
+  await expect(complianceInput).toHaveCSS("color", "rgb(23, 59, 48)");
+
+  await page.goto("/fr/e2e-ux?view=contact");
+  await dismissCookieConsent(page);
+  await expectNoDocumentOverflow(page);
+  const askButton = page.getByRole("button", { name: "Demander au vendeur" });
+  const buttonBox = await askButton.boundingBox();
+  expect(buttonBox?.width).toBeLessThan(page.viewportSize()!.width);
+  await askButton.click();
+  const textarea = page.getByRole("textbox");
+  await textarea.fill("Trop court");
+  await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeDisabled();
+  await expect(page.locator(".messageError")).toHaveCount(0);
+  await textarea.fill("Ce message est assez long.");
+  await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeEnabled();
+});

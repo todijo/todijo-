@@ -259,3 +259,28 @@ test("cart checkout and Stripe refresh controls keep readable state palettes", a
   resolveStatus();
   await expect(page.getByRole("button", { name: "Refresh status" })).toBeEnabled();
 });
+
+test("seller compliance inputs and contact-message validation remain readable", async ({ page }) => {
+  await page.goto("/ar/e2e-ux?view=seller");
+  await dismissCookieConsent(page);
+  const complianceInput = page.locator('input[name="productIdentifier"]');
+  await complianceInput.fill("SKU-RTL-123");
+  const inputColors = await complianceInput.evaluate((element) => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
+  expect(inputColors[0]).not.toBe(inputColors[1]);
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+
+  await page.goto("/fr/e2e-ux?view=contact");
+  await dismissCookieConsent(page);
+  const description = page.locator(".productDetailDescription");
+  const descriptionBox = await description.boundingBox();
+  const sectionBox = await page.locator(".productDetailDescriptionSection").boundingBox();
+  expect(descriptionBox!.width).toBeLessThanOrEqual(sectionBox!.width);
+  await page.getByRole("button", { name: "Demander au vendeur" }).click();
+  const message = page.getByRole("textbox");
+  await message.fill("Court");
+  await expect(page.getByText("Votre message doit contenir au moins 12 caractères.")).toBeVisible();
+  await expect(page.getByText("Le message n’a pas pu être envoyé.")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeDisabled();
+  await message.fill("Bonjour, disponible ?");
+  await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeEnabled();
+});
