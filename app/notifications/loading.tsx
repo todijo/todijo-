@@ -1,0 +1,1 @@
+export default function NotificationsLoading(){return <main className="notificationsPage"><section className="notificationsShell" aria-busy="true"><div className="notificationList">{[1,2,3].map(item=><article key={item}><div className="notificationIcon"/><div><p>••••••••••</p><p>••••••••••••••••••••</p></div></article>)}</div></section></main>}

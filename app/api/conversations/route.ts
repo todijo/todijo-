@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       select: { id: true },
     });
     await tx.message.create({ data: { conversationId: convo.id, senderId: session.userId, body: message } });
+    await tx.notification.deleteMany({ where: { userId: product.store.ownerId, type: "NEW_MESSAGE", href: `/messages/${convo.id}`, readAt: null } });
     await tx.notification.create({
       data: {
         userId: product.store.ownerId,
