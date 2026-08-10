@@ -73,7 +73,13 @@ export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput
 }
 
 export function publicProductAccessWhere(now = new Date()): Prisma.ProductWhereInput {
-  return { store: publicStoreAccessWhere(now) };
+  return {
+    store: publicStoreAccessWhere(now),
+    OR: [
+      { supplierLink: { is: null } },
+      { supplierLink: { is: { supplierAvailable: true, syncStatus: "HEALTHY" } } },
+    ],
+  };
 }
 
 export type ManagedStoreInput = {

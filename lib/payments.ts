@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 import { cartLineKey, normalizeCartOption } from "./cart-line";
 import { cartShippingQuote, ShippingError } from "./shipping";
+import { assertSupplierPurchasable } from "./suppliers/safety";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -45,6 +46,12 @@ export async function createCheckout(
   const lines = [...quantities.values()];
   const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, currency: true, sellerType: true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
   if (products.length !== new Set(lines.map((line) => line.productId)).size) throw new CheckoutError("One or more products are unavailable.", 409);
+  const supplierLinks = db.supplierProductLink ? await db.supplierProductLink.findMany({where:{productId:{in:products.map((product)=>product.id)}},select:{productId:true,supplierAvailable:true,syncStatus:true}}) : [];
+  const supplierByProduct = new Map(supplierLinks.map((link)=>[link.productId,link]));
+  for (const product of products) {
+    try { assertSupplierPurchasable({supplierLink:supplierByProduct.get(product.id)??null}); }
+    catch { throw new CheckoutError("SUPPLIER_PRODUCT_REQUIRES_REVIEW",409); }
+  }
   const stores = new Set(products.map((product) => product.storeId));
   if (stores.size !== 1) throw new CheckoutError("MULTIPLE_SELLERS", 409);
   if (products[0].store.sellerType === "UNKNOWN") throw new CheckoutError("SELLER_STATUS_REQUIRED", 409);

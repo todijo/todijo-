@@ -76,6 +76,26 @@ enum ProductDeactivationReason {
   SUBSCRIPTION_INACTIVE
 }
 
+enum SupplierProvider {
+  CJ
+}
+
+enum SupplierSyncStatus {
+  HEALTHY
+  PRICE_CHANGED
+  UNAVAILABLE
+  ERROR
+}
+
+enum ProductMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ProductMediaProvider {
+  CLOUDINARY
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -321,10 +341,60 @@ model Product {
   variants      ProductVariant[]
   imageRecords  ProductImage[]
   reports       ProductReport[]
+  supplierLink  SupplierProductLink?
+  media         ProductMedia[]
 
   @@unique([storeId, slug])
   @@index([storeId, status])
   @@index([category])
+}
+
+model SupplierProductLink {
+  id                    String             @id @default(cuid())
+  productId             String             @unique
+  provider              SupplierProvider
+  supplierProductId     String
+  supplierSku           String?
+  sourceUrl             String?
+  supplierCost          Decimal?           @db.Decimal(12, 2)
+  previousSupplierCost  Decimal?           @db.Decimal(12, 2)
+  supplierCurrency      String?            @db.VarChar(3)
+  supplierStock         Int?
+  supplierAvailable     Boolean            @default(true)
+  syncStatus            SupplierSyncStatus @default(HEALTHY)
+  lastSyncedAt          DateTime?
+  lastSyncError         String?            @db.VarChar(500)
+  sourceMetadata        Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, supplierProductId])
+  @@index([provider, syncStatus, lastSyncedAt])
+}
+
+model ProductMedia {
+  id          String               @id @default(cuid())
+  productId   String
+  type        ProductMediaType
+  provider    ProductMediaProvider
+  publicId    String
+  url         String
+  posterUrl   String?
+  position    Int
+  width       Int?
+  height      Int?
+  durationMs  Int?
+  sourceUrl   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, position])
+  @@unique([provider, publicId])
+  @@index([productId, type, position])
 }
 
 model SellerSubscription {
@@ -618,6 +688,13 @@ model ProductVariant {
   compareAtPrice  Decimal? @db.Decimal(12, 2)
   stock           Int      @default(0)
   active          Boolean  @default(true)
+  supplierProvider  SupplierProvider?
+  supplierVariantId String? @db.VarChar(200)
+  supplierSku       String? @db.VarChar(200)
+  supplierCost      Decimal? @db.Decimal(12, 2)
+  supplierStock     Int?
+  supplierAvailable Boolean?
+  supplierLastSyncedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -626,6 +703,7 @@ model ProductVariant {
   orderItems OrderItem[]
 
   @@unique([productId, combinationKey])
+  @@unique([supplierProvider, supplierVariantId])
   @@index([productId, active])
 }
 

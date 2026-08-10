@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { defaultLocale, isLocale } from "./config";
 import { advancedShippingMessages } from "./shipping-advanced";
 import { shippingHotfixMessages } from "./shipping-hotfix";
+import { supplierMessages } from "./supplier";
+import { productVideoMessages } from "./product-video";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -35,6 +37,8 @@ export default getRequestConfig(async () => {
   messages.ContactMessage = (await import(`../messages/contact-message/${locale}.json`)).default;
   messages.ReportDialog = (await import(`../messages/report-dialog/${locale}.json`)).default;
   messages.Shipping = { ...(await import(`../messages/shipping/${locale}.json`)).default, ...(advancedShippingMessages[locale] ?? advancedShippingMessages.en), ...(shippingHotfixMessages[locale]??shippingHotfixMessages.en) };
+  messages.Supplier = supplierMessages[locale] ?? supplierMessages.en;
+  messages.ProductVideo = productVideoMessages[locale] ?? productVideoMessages.en;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = ["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)

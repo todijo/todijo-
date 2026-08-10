@@ -1,4 +1,4 @@
-export const MAX_PRODUCT_IMAGES = 10;
+export const MAX_PRODUCT_IMAGES = 15;
 
 export type ProductImageValidation =
   | { ok: true; images: string[] }

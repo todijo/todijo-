@@ -166,3 +166,13 @@ test("mobile RTL shipping settings stay readable and contained", async ({ page }
   await expect(page.locator("#shippingMethodName")).toHaveCSS("color", "rgb(23, 59, 48)");
   await expect(page.locator("#shippingMethodName")).toHaveCSS("background-color", "rgb(255, 255, 255)");
 });
+
+test("mobile RTL supplier management stays readable and contained", async ({ page }) => {
+  await page.goto("/ar/e2e-ux?view=supplier");
+  await dismissCookieConsent(page);
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  await expect(page.locator(".supplierManager")).toBeVisible();
+  await expect(page.locator(".supplierImportForm")).toHaveCSS("grid-template-columns", /\d+(\.\d+)?px/);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});

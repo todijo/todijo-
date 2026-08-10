@@ -8,6 +8,7 @@ import { readSession } from "@/lib/session";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
 import { canPublish } from "@/lib/seller-subscription";
+import SupplierProductManager from "@/components/SupplierProductManager";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function SellerProductsPage() {
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
-      products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true } },
+      products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true, supplierLink:{select:{provider:true,supplierCost:true,supplierCurrency:true,supplierStock:true,syncStatus:true,lastSyncedAt:true}} } },
     },
   });
   if (!store) redirect("/seller/create-store");
@@ -53,6 +54,8 @@ export default async function SellerProductsPage() {
       actions={subscriptionActive ? <Link className="sellerControlButton light" href={`/${locale}/seller/products/new`}><Plus size={17}/>{t("addProduct")}</Link> : undefined}/>
 
     {!subscriptionActive && <section className="subscriptionWarning sellerProductsWarning" role="status"><div><strong>{readinessTitle}</strong><span>{readinessHelp}</span></div><Link href={readinessHref}>{readinessAction}</Link></section>}
+
+    <SupplierProductManager products={store.products.filter((product)=>product.supplierLink).map((product)=>({productId:product.id,name:product.name,provider:product.supplierLink!.provider,supplierCost:product.supplierLink!.supplierCost?.toString()??null,supplierCurrency:product.supplierLink!.supplierCurrency,supplierStock:product.supplierLink!.supplierStock,syncStatus:product.supplierLink!.syncStatus,lastSyncedAt:product.supplierLink!.lastSyncedAt?.toISOString()??null,sellingPrice:product.price.toString(),currency:product.currency}))}/>
 
     <section className="sellerProductSummary" aria-label={control("productSummary")}>
       <article><Boxes size={20}/><span>{control("totalProducts")}</span><strong>{store.products.length}</strong></article>

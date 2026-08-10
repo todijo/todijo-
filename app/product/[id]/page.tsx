@@ -58,6 +58,7 @@ export default async function ProductPage({ params }: Props) {
     select: {
       id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true,
       condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
+      media: { orderBy: { position: "asc" }, select: { type: true, url: true, posterUrl: true } },
       options: { where: { active: true }, orderBy: { position: "asc" }, select: {
         id: true, name: true, position: true,
         values: { where: { active: true }, orderBy: { position: "asc" }, select: {
@@ -84,7 +85,7 @@ export default async function ProductPage({ params }: Props) {
   const shippingRule=product.shippingOverrideEnabled?product:product.store;
   return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
-      <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
+      <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name} media={product.media}/></div>
       <article className="productDetailInfo">
         <Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link>
         <SellerTypeDisclosure sellerType={product.store.sellerType} notice/>

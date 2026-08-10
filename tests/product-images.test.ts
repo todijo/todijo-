@@ -10,10 +10,10 @@ import {
 
 const urls = ["https://img.test/one.jpg", "https://img.test/two.jpg", "https://img.test/three.jpg"];
 
-test("product images enforce the ten-image server limit and reject duplicates", () => {
-  const ten = Array.from({ length: MAX_PRODUCT_IMAGES }, (_, index) => `https://img.test/${index}.jpg`);
-  assert.deepEqual(validateProductImages(ten), { ok: true, images: ten });
-  assert.equal(validateProductImages([...ten, "https://img.test/extra.jpg"]).ok, false);
+test("product images enforce the configured server limit and reject duplicates", () => {
+  const maximum = Array.from({ length: MAX_PRODUCT_IMAGES }, (_, index) => `https://img.test/${index}.jpg`);
+  assert.deepEqual(validateProductImages(maximum), { ok: true, images: maximum });
+  assert.equal(validateProductImages([...maximum, "https://img.test/extra.jpg"]).ok, false);
   assert.equal(validateProductImages([urls[0], urls[0]]).ok, false);
 });
 

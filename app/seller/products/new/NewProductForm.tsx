@@ -9,6 +9,8 @@ import ProductImageManager from "@/components/ProductImageManager";
 import ProductVariantEditor, { type ProductVariantsDraft } from "@/components/ProductVariantEditor";
 import VariantImageManager, { type VariantImageAssignment } from "@/components/VariantImageManager";
 import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
+import ProductVideoManager from "@/components/ProductVideoManager";
+import type { ProductVideoInput } from "@/lib/product-media";
 import { productStockForForm } from "@/lib/product-variant-form";
 import { useToast } from "@/components/ToastProvider";
 import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
@@ -26,6 +28,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
+  const [video,setVideo]=useState<ProductVideoInput|null>(null);
   const [variantsEnabled, setVariantsEnabled] = useState(false);
   const [variantDraft, setVariantDraft] = useState<ProductVariantsDraft>({ options: [], generate: true, variants: [], generated: false });
   const [variantImages, setVariantImages] = useState<VariantImageAssignment[]>([]);
@@ -53,7 +56,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         colors: String(form.get("colors") || "").split(",").map((value) => value.trim()).filter(Boolean),
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
-        images, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on",
+        images, video, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on",
         productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}),
       }),
     });
@@ -88,7 +91,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         </SellerSection>
 
         <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
-          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/>
+          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/><ProductVideoManager key={`video-${resetGeneration}`} onChange={setVideo} onUploadingChange={setUploading}/>
         </SellerSection>
 
         <SellerSection icon={Boxes} title={t("productOptions")} description={t("productOptionsHelp")}>

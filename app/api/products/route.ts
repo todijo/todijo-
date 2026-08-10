@@ -11,6 +11,7 @@ import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
+import { replaceProductVideo } from "@/lib/product-media";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -111,6 +112,7 @@ export async function POST(request: Request) {
         ...productShipping,
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
       }, variantInput, body.variantImages);
+    await prisma.$transaction((tx)=>replaceProductVideo(tx,product.id,body.video));
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, product });

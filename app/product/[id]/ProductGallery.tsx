@@ -7,6 +7,7 @@ import { useLocale } from "next-intl";
 type ProductGalleryProps = {
   images: string[];
   productName: string;
+  media?: Array<{ type: "IMAGE" | "VIDEO"; url: string; posterUrl: string | null }>;
 };
 
 type MobileImageMetrics = {
@@ -14,9 +15,10 @@ type MobileImageMetrics = {
   orientation: "landscape" | "square" | "portrait";
 };
 
-export default function ProductGallery({ images, productName }: ProductGalleryProps) {
+export default function ProductGallery({ images, productName, media = [] }: ProductGalleryProps) {
   const locale = useLocale();
   const baseImages = useMemo(() => images.filter(Boolean), [images]);
+  const video = media.find((item) => item.type === "VIDEO");
   const [variantImages, setVariantImages] = useState<string[]>([]);
   const cleanImages = variantImages.length ? variantImages : baseImages;
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -255,6 +257,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
             ))}
           </div>
         )}
+        {video && <div className="productGalleryVideo"><video src={video.url} poster={video.posterUrl??undefined} controls preload="metadata" playsInline aria-label={`${productName} video`}/></div>}
       </div>
 
       {isOpen && createPortal((

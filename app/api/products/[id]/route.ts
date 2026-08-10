@@ -8,6 +8,7 @@ import { validateProductImages } from "@/lib/product-images";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
+import { replaceProductVideo } from "@/lib/product-media";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -63,6 +64,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         complianceDeclaredAt: product.complianceDeclaredAt ?? (status === "PUBLISHED" ? new Date() : null),
       } });
       await replaceProductVariantImages(tx, id, images, body.variantImages);
+      await replaceProductVideo(tx,id,body.video);
     });
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
