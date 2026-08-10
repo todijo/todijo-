@@ -5,6 +5,7 @@ import test from "node:test";
 import { Prisma } from "@prisma/client";
 import { cartShippingQuote, parseShippingSettings, ShippingError, shippingQuote } from "../lib/shipping";
 import { advancedShippingMessages } from "../i18n/shipping-advanced";
+import { SHIPPING_COUNTRY_CODES } from "../lib/shipping-countries";
 
 const store = { shippingEnabled: true, shippingMethodName: "Standard", shippingPrice: new Prisma.Decimal("6.25"), shippingFree: false, shippingMinDays: 2, shippingMaxDays: 5, shippingCountries: ["fr", "BE"], shippingCarrier: "La Poste", shippingProvider: "MANUAL", shippingExternalServiceId: null, currency: "EUR" };
 
@@ -69,3 +70,11 @@ test("shipping translations have key and placeholder parity in all locales", () 
 });
 
 test("advanced shipping UI is available for all locales",()=>{assert.equal(Object.keys(advancedShippingMessages).length,14);for(const messages of Object.values(advancedShippingMessages))assert.deepEqual(Object.keys(messages).sort(),Object.keys(advancedShippingMessages.en).sort());});
+
+test("country picker source contains the complete ISO destination set",()=>{assert.equal(SHIPPING_COUNTRY_CODES.length,249);assert.equal(new Set(SHIPPING_COUNTRY_CODES).size,249);for(const code of ["US","CA","SE","NO","DK","FI","NL","DE","BE","FR","CH","AT","PL","IT","ES","PT","IE","GR","RO","CZ","CN","JP","KR","AU","NZ","ZW"])assert.ok(SHIPPING_COUNTRY_CODES.includes(code),code);});
+
+test("French country display names and full-list search are localized",()=>{const names=new Intl.DisplayNames(["fr"],{type:"region"});assert.equal(names.of("US"),"États-Unis");assert.equal(names.of("SE"),"Suède");assert.equal(names.of("NO"),"Norvège");assert.equal(names.of("NL"),"Pays-Bas");const sorted=SHIPPING_COUNTRY_CODES.map(code=>names.of(code)??code).sort((a,b)=>a.localeCompare(b,"fr"));for(const query of ["Suède","Norvège","États-Unis","Pays-Bas"])assert.ok(sorted.some(name=>name.toLocaleLowerCase("fr").includes(query.toLocaleLowerCase("fr"))),query);assert.ok(sorted.indexOf("Zimbabwe")>sorted.indexOf("Hongrie"));});
+
+test("French advanced shipping copy has no English fallback",()=>{for(const key of Object.keys(advancedShippingMessages.en) as Array<keyof typeof advancedShippingMessages.en>)assert.notEqual(advancedShippingMessages.fr[key],advancedShippingMessages.en[key],key);assert.match(advancedShippingMessages.fr.freeThreshold,/Livraison gratuite à partir de/);});
+
+test("advanced shipping copy has no English fallback in any localized locale",()=>{for(const [locale,messages] of Object.entries(advancedShippingMessages)){if(locale==="en")continue;for(const key of Object.keys(advancedShippingMessages.en) as Array<keyof typeof advancedShippingMessages.en>){assert.notEqual(messages[key],advancedShippingMessages.en[key],`${locale}:${key}`);const placeholders=(value:string)=>[...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]).sort();assert.deepEqual(placeholders(messages[key]),placeholders(advancedShippingMessages.en[key]),`${locale}:${key}`);}}});
