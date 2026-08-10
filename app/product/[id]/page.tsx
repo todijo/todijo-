@@ -74,6 +74,13 @@ export default async function ProductPage({ params }: Props) {
   const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   const productJsonLd = productStructuredData({ ...product, available: availability.isGenerallyAvailable }, locale);
+  const publicProductInfo = [
+    ["productIdentifier", product.productIdentifier], ["manufacturerName", product.manufacturerName],
+    ["manufacturerContact", product.manufacturerContact], ["responsiblePerson", product.responsiblePerson],
+  ].filter((entry): entry is [string, string] => Boolean(entry[1]?.trim()));
+  const safetyInformation = product.safetyInformation?.trim() ?? "";
+  const complianceInformation = product.complianceInformation?.trim() ?? "";
+  const hasPublicProductInfo = publicProductInfo.length > 0 || Boolean(safetyInformation || complianceInformation);
   return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
@@ -97,9 +104,11 @@ export default async function ProductPage({ params }: Props) {
       <p className="productDetailDescription">{product.description}</p>
       <dl className="productFacts productFactsMobile" id="product-facts-mobile"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
     </section>
-    {(product.productIdentifier||product.manufacturerName||product.manufacturerContact||product.responsiblePerson||product.safetyInformation||product.complianceInformation)&&<details className="productCompliancePublic"><summary>{compliance("publicProductInfo")}</summary><dl>{product.productIdentifier&&<div><dt>{compliance("productIdentifier")}</dt><dd>{product.productIdentifier}</dd></div>}{product.manufacturerName&&<div><dt>{compliance("manufacturerName")}</dt><dd>{product.manufacturerName}</dd></div>}{product.manufacturerContact&&<div><dt>{compliance("manufacturerContact")}</dt><dd>{product.manufacturerContact}</dd></div>}{product.responsiblePerson&&<div><dt>{compliance("responsiblePerson")}</dt><dd>{product.responsiblePerson}</dd></div>}</dl>{product.safetyInformation&&<><h3>{compliance("publicSafetyInfo")}</h3><p>{product.safetyInformation}</p></>}{product.complianceInformation&&<p>{product.complianceInformation}</p>}</details>}
-    {product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}
-    <ProductReportButton productId={product.id} loggedIn={Boolean(session)}/>
+    {hasPublicProductInfo && <section className="productCompliancePublic" aria-labelledby="product-information-title"><h2 id="product-information-title">{compliance("publicProductInfo")}</h2>{publicProductInfo.length > 0 && <dl>{publicProductInfo.map(([key,value])=><div key={key}><dt>{compliance(key)}</dt><dd>{value}</dd></div>)}</dl>}<div className="productComplianceLongText">{safetyInformation && <section><h3>{compliance("publicSafetyInfo")}</h3><p>{safetyInformation}</p></section>}{complianceInformation && <section><h3>{compliance("complianceInformation")}</h3><p>{complianceInformation}</p></section>}</div></section>}
+    <div className="productLowerActions">
+      {product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}
+      <ProductReportButton productId={product.id} loggedIn={Boolean(session)}/>
+    </div>
   </section>
   {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{Number(item.price).toFixed(2)} {item.currency}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;

@@ -141,3 +141,15 @@ test("mobile compliance fields and contact seller remain readable", async ({ pag
   await textarea.fill("Ce message est assez long.");
   await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeEnabled();
 });
+
+test("mobile RTL product information and report dialog do not overflow", async ({ page }) => {
+  await page.goto("/ar/e2e-ux?view=product-lower");
+  await dismissCookieConsent(page);
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  await expectNoDocumentOverflow(page);
+  await page.getByRole("button", { name: "الإبلاغ عن هذا المنتج" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expectNoDocumentOverflow(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});

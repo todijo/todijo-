@@ -284,3 +284,20 @@ test("seller compliance inputs and contact-message validation remain readable", 
   await message.fill("Bonjour, disponible ?");
   await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeEnabled();
 });
+
+test("product lower section is compact and report dialog is accessible", async ({ page }) => {
+  await page.goto("/fr/e2e-ux?view=product-lower");
+  await dismissCookieConsent(page);
+  await expect(page.getByRole("heading", { name: "Informations sur le produit" })).toBeVisible();
+  await expect(page.locator(".productCompliancePublic details")).toHaveCount(0);
+  await expect(page.locator(".productDetailPage")).not.toHaveCSS("overflow-x", "scroll");
+  const reportTrigger = page.getByRole("button", { name: "Signaler ce produit" });
+  await reportTrigger.click();
+  const dialog = page.getByRole("dialog", { name: "Signaler ce produit" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("select")).toHaveCSS("color", "rgb(23, 59, 48)");
+  await expect(dialog.locator("textarea")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(reportTrigger).toBeFocused();
+});
