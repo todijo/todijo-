@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { localeFromReferer, localizedHome, postLoginDestination, safeLoginDestination } from "../lib/auth-redirects";
+import { adminEntryPath, localeFromReferer, localizedHome, postLoginDestination, safeLoginDestination } from "../lib/auth-redirects";
 import { registrationPersistenceData, validateRegistrationInput } from "../lib/auth-registration";
 import { verifyTurnstileTokenWith } from "../lib/turnstile-verification";
 
@@ -42,7 +42,8 @@ test("buyer and seller login destinations are localized and reject open redirect
   for (const destination of ["https://example.test", "//example.test", "\\\\example.test", "/api/auth/logout"]) assert.equal(safeLoginDestination(destination, "fr"), "/fr");
   assert.equal(postLoginDestination("CUSTOMER", null, "fr"), "/fr");
   assert.equal(postLoginDestination("SELLER", null, "ku"), "/ku");
-  assert.equal(postLoginDestination("ADMIN", "/messages", "fr"), "/dashboard");
+  assert.equal(adminEntryPath("fr"), "/fr/admin");
+  assert.equal(postLoginDestination("ADMIN", "/messages", "fr"), "/fr/admin");
   assert.equal(localizedHome(localeFromReferer("https://todijo.test/fr/dashboard")), "/fr");
   assert.equal(localizedHome(localeFromReferer("https://todijo.test/ku/seller/orders")), "/ku");
   assert.equal(localizedHome(localeFromReferer("not a URL")), "/en");

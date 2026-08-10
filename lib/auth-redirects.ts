@@ -4,6 +4,10 @@ export function localizedHome(locale: string | null | undefined) {
   return `/${isLocale(locale) ? locale : defaultLocale}`;
 }
 
+export function adminEntryPath(locale: Locale) {
+  return `/${locale}/admin`;
+}
+
 export function safeLoginDestination(next: string | null, locale: Locale) {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return localizedHome(locale);
   try {
@@ -18,7 +22,7 @@ export function safeLoginDestination(next: string | null, locale: Locale) {
 }
 
 export function postLoginDestination(role: "CUSTOMER" | "SELLER" | "ADMIN" | undefined, next: string | null, locale: Locale) {
-  return role === "ADMIN" ? "/dashboard" : safeLoginDestination(next, locale);
+  return role === "ADMIN" ? adminEntryPath(locale) : safeLoginDestination(next, locale);
 }
 
 export function localeFromReferer(referer: string | null) {
