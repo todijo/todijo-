@@ -7,6 +7,7 @@ import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-s
 import { validateProductImages } from "@/lib/product-images";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
+import { parseProductShipping, ShippingError } from "@/lib/shipping";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -32,6 +33,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const condition = String(body.condition ?? "NEUF").trim().toUpperCase();
     const status = body.status === "DRAFT" ? "DRAFT" : "PUBLISHED";
     const compliance = readProductCompliance(body);
+    const productShipping = parseProductShipping(body);
     if (status === "PUBLISHED" && !product.complianceDeclaredAt && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
     if (status === "PUBLISHED") await requirePublishingAccess(prisma, session.userId);
     const price = Number(body.price);
@@ -57,6 +59,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
         colors, sizes, stock, images, allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
         ...compliance,
+        ...productShipping,
         complianceDeclaredAt: product.complianceDeclaredAt ?? (status === "PUBLISHED" ? new Date() : null),
       } });
       await replaceProductVariantImages(tx, id, images, body.variantImages);
@@ -68,6 +71,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });
   }

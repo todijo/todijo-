@@ -57,7 +57,7 @@ export default async function ProductPage({ params }: Props) {
     where: { id, status: "PUBLISHED", ...publicAccess },
     select: {
       id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true,
-      condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,
+      condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
       options: { where: { active: true }, orderBy: { position: "asc" }, select: {
         id: true, name: true, position: true,
         values: { where: { active: true }, orderBy: { position: "asc" }, select: {
@@ -66,7 +66,7 @@ export default async function ProductPage({ params }: Props) {
         } },
       } },
       variants: { where: buyerVisibleVariantWhere(), select: { id: true, stock: true, active: true, priceOverride: true, values: { select: { optionValue: { select: { id: true, value: true, option: { select: { id: true, name: true, position: true } } } } } } } },
-      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true, currency: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingCarrier: true } },
+      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true, currency: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true } },
     },
   });
   if (!product) notFound();
@@ -81,6 +81,7 @@ export default async function ProductPage({ params }: Props) {
   const safetyInformation = product.safetyInformation?.trim() ?? "";
   const complianceInformation = product.complianceInformation?.trim() ?? "";
   const hasPublicProductInfo = publicProductInfo.length > 0 || Boolean(safetyInformation || complianceInformation);
+  const shippingRule=product.shippingOverrideEnabled?product:product.store;
   return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name}/></div>
@@ -96,7 +97,7 @@ export default async function ProductPage({ params }: Props) {
       <div className="productPurchaseColumn">
         <ProductPurchasePanel availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))}))} variants={product.variants.map((variant) => ({ ...variant, priceOverride: variant.priceOverride == null ? null : Number(variant.priceOverride) }))} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
         <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
-        {product.store.shippingEnabled&&product.store.shippingMethodName&&product.store.shippingMinDays&&product.store.shippingMaxDays&&<aside className="productShippingSummary"><strong>{shippingText("productTitle")}</strong><span>{product.store.shippingMethodName}{product.store.shippingCarrier?` · ${product.store.shippingCarrier}`:""}</span><span>{shippingText("estimate",{min:product.store.shippingMinDays,max:product.store.shippingMaxDays})}</span><b>{product.store.shippingFree?shippingText("freeLabel"):shippingText("fromPrice",{price:new Intl.NumberFormat(locale,{style:"currency",currency:product.store.currency}).format(Number(product.store.shippingPrice??0))})}</b></aside>}
+        {shippingRule.shippingEnabled&&shippingRule.shippingMethodName&&shippingRule.shippingMinDays&&shippingRule.shippingMaxDays&&<aside className="productShippingSummary"><strong>{shippingText("productTitle")}</strong><span>{shippingRule.shippingMethodName}{shippingRule.shippingCarrier?` · ${shippingRule.shippingCarrier}`:""}</span><span>{shippingText("estimate",{min:shippingRule.shippingMinDays,max:shippingRule.shippingMaxDays})}</span><span>{shippingRule.shippingWorldwide?shippingText("worldwide"):shippingRule.shippingPostalCodes.length?shippingText("postalZones"):shippingText("selectedDestinations")}</span><b>{shippingRule.shippingFree?shippingText("freeLabel"):shippingRule.shippingFreeThreshold?shippingText("freeThreshold",{currency:new Intl.NumberFormat(locale,{style:"currency",currency:product.store.currency}).format(Number(shippingRule.shippingFreeThreshold))}):shippingText("fromPrice",{price:new Intl.NumberFormat(locale,{style:"currency",currency:product.store.currency}).format(Number(shippingRule.shippingPrice??0))})}</b></aside>}
       </div>
     </div>
     <nav className="productDetailSections" aria-label={detailText("pageSections")}><a href="#description">{detailText("description")}</a><a className="productFactsDesktopLink" href="#product-facts">{detailText("details")}</a><a className="productFactsMobileLink" href="#product-facts-mobile">{detailText("details")}</a><a href="#reviews">{detailText("reviews")}</a></nav>

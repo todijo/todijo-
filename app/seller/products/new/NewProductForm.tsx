@@ -3,7 +3,7 @@
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Boxes, FileText, ImagePlus, Shapes, Tag } from "lucide-react";
+import { Boxes, FileText, ImagePlus, Shapes, Tag, Truck } from "lucide-react";
 import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
 import ProductImageManager from "@/components/ProductImageManager";
 import ProductVariantEditor, { type ProductVariantsDraft } from "@/components/ProductVariantEditor";
@@ -13,12 +13,14 @@ import { productStockForForm } from "@/lib/product-variant-form";
 import { useToast } from "@/components/ToastProvider";
 import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
 import ProductComplianceFields from "@/components/ProductComplianceFields";
-export default function NewProductForm({ currency, productCount, productLimit }: { currency: string; productCount: number; productLimit: number | null }) {
+import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type ShippingDraft} from "@/components/ShippingRuleFields";
+export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const categoryText = useTranslations("Categories");
   const ux = useTranslations("Ux");
   const compliance = useTranslations("Compliance");
+  const shipping = useTranslations("Shipping");
   const { showToast } = useToast();
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +33,8 @@ export default function NewProductForm({ currency, productCount, productLimit }:
   const [productStock, setProductStock] = useState("1");
   const [resetGeneration, setResetGeneration] = useState(0);
   const [published, setPublished] = useState(false);
+  const [shippingOverrideEnabled,setShippingOverrideEnabled]=useState(false);
+  const [shippingRule,setShippingRule]=useState<ShippingDraft>(emptyShippingDraft);
   const submitLock = useRef(false);
   const successRef = useRef<HTMLParagraphElement>(null);
 
@@ -50,7 +54,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
         images, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on",
-        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on",
+        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}),
       }),
     });
     const data = await response.json() as { error?: string; product?: { id?: string } };
@@ -104,6 +108,7 @@ export default function NewProductForm({ currency, productCount, productLimit }:
           <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
         </SellerSection>
         <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
+        <SellerSection icon={Truck} title={shipping("productSettingsTitle")} description={shipping("productSettingsHelp")}><label className="shippingToggle"><input type="checkbox" checked={shippingOverrideEnabled} onChange={e=>setShippingOverrideEnabled(e.target.checked)}/><span><strong>{shippingOverrideEnabled?shipping("customProductShipping"):shipping("inheritStoreShipping")}</strong><small>{storeShippingSummary||shipping("storeShippingUnconfigured")}</small></span></label>{shippingOverrideEnabled&&<ShippingRuleFields value={shippingRule} onChange={setShippingRule} currency={currency}/>}</SellerSection>
       </div>
 
       {!variantsEnabled && <aside className="sellerControlFormAside">

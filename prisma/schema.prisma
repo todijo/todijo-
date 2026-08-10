@@ -189,6 +189,9 @@ model Store {
   shippingMinDays  Int?
   shippingMaxDays  Int?
   shippingCountries String[]    @default([])
+  shippingWorldwide Boolean     @default(false)
+  shippingPostalCodes String[]  @default([])
+  shippingFreeThreshold Decimal? @db.Decimal(12, 2)
   shippingCarrier String?
   shippingProvider String       @default("MANUAL")
   shippingExternalServiceId String?
@@ -290,6 +293,20 @@ model Product {
   safetyInformation String? @db.Text
   complianceInformation String? @db.Text
   complianceDeclaredAt DateTime?
+  shippingOverrideEnabled Boolean @default(false)
+  shippingEnabled Boolean?
+  shippingMethodName String?
+  shippingPrice Decimal? @db.Decimal(12, 2)
+  shippingFree Boolean?
+  shippingFreeThreshold Decimal? @db.Decimal(12, 2)
+  shippingMinDays Int?
+  shippingMaxDays Int?
+  shippingCountries String[] @default([])
+  shippingWorldwide Boolean?
+  shippingPostalCodes String[] @default([])
+  shippingCarrier String?
+  shippingProvider String?
+  shippingExternalServiceId String?
 
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -423,6 +440,7 @@ model Order {
   shippingCarrier          String?
   shippingProvider         String?
   shippingExternalServiceId String?
+  shippingPolicySnapshot    Json?
   subtotal                 Decimal? @db.Decimal(12, 2)
   taxTotal                 Decimal? @db.Decimal(12, 2)
   fulfillmentStatus        FulfillmentStatus?

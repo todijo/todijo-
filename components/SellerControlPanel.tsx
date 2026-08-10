@@ -16,7 +16,7 @@ export function SellerSection({ icon: Icon, title, description, aside, children,
   </section>;
 }
 
-export function SellerFormField({ label, htmlFor, hint, required, children }: { label: string; htmlFor: string; hint?: string; required?: boolean; children: ReactNode }) {
+export function SellerFormField({ label, htmlFor, hint, required, children }: { label: string; htmlFor?: string; hint?: string; required?: boolean; children: ReactNode }) {
   return <div className="sellerControlField"><label htmlFor={htmlFor}>{label}{required && <span aria-hidden="true"> *</span>}</label>{children}{hint && <small id={`${htmlFor}-hint`}>{hint}</small>}</div>;
 }
 

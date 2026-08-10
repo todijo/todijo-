@@ -27,7 +27,7 @@ export default async function StoreSettingsPage() {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true,
       contactEmail: true, phone: true, currency: true, language: true,
-      shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingCarrier: true,
+      shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true, shippingPostalCodes:true, shippingCarrier: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { plan: true, status: true, currentPeriodEnd: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
@@ -63,7 +63,7 @@ export default async function StoreSettingsPage() {
       currency: store.currency, language: store.language,
       sellerType: store.sellerType, legalBusinessName: store.legalBusinessName ?? "", businessRegistrationId: store.businessRegistrationId ?? "",
       businessAddress: store.businessAddress ?? "", businessPostalCode: store.businessPostalCode ?? "", vatNumber: store.vatNumber ?? "", vatStatus: store.vatStatus,
-      shippingEnabled: store.shippingEnabled, shippingMethodName: store.shippingMethodName ?? "", shippingPrice: store.shippingPrice?.toString() ?? "", shippingFree: store.shippingFree, shippingMinDays: store.shippingMinDays, shippingMaxDays: store.shippingMaxDays, shippingCountries: store.shippingCountries, shippingCarrier: store.shippingCarrier ?? "",
+      shippingEnabled: store.shippingEnabled, shippingMethodName: store.shippingMethodName ?? "", shippingPrice: store.shippingPrice?.toString() ?? "", shippingFree: store.shippingFree, shippingFreeThreshold:store.shippingFreeThreshold?.toString()??"", shippingMinDays: store.shippingMinDays, shippingMaxDays: store.shippingMaxDays, shippingCountries: store.shippingCountries, shippingWorldwide:store.shippingWorldwide, shippingPostalCodes:store.shippingPostalCodes, shippingCarrier: store.shippingCarrier ?? "",
     }} />
 
     <div className="sellerSettingsSupportGrid">

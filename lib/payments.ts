@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 import { cartLineKey, normalizeCartOption } from "./cart-line";
-import { ShippingError, shippingQuote } from "./shipping";
+import { cartShippingQuote, ShippingError } from "./shipping";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -23,6 +23,7 @@ export async function createCheckout(
   requestedItems: CheckoutItem[],
   stripeCreate = createStripeCheckoutSession,
   destinationCountry?: unknown,
+  destinationPostalCode?: unknown,
 ) {
   if (!/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) throw new CheckoutError("Invalid checkout request ID.");
   if (!Array.isArray(requestedItems) || requestedItems.length === 0 || requestedItems.length > 100) throw new CheckoutError("Your cart is empty or too large.");
@@ -42,7 +43,7 @@ export async function createCheckout(
   if (existing && existing.status !== "PENDING") throw new CheckoutError("This checkout request can no longer be reused.", 409);
 
   const lines = [...quantities.values()];
-  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, currency: true, sellerType: true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
+  const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, currency: true, sellerType: true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
   if (products.length !== new Set(lines.map((line) => line.productId)).size) throw new CheckoutError("One or more products are unavailable.", 409);
   const stores = new Set(products.map((product) => product.storeId));
   if (stores.size !== 1) throw new CheckoutError("MULTIPLE_SELLERS", 409);
@@ -50,9 +51,6 @@ export async function createCheckout(
   const sellerVat = await db.store.findUniqueOrThrow({where:{id:products[0].storeId},select:{vatStatus:true}});
   if (products[0].store.sellerType === "PROFESSIONAL" && sellerVat.vatStatus === "UNKNOWN") throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
   const seller = products[0].store.owner;
-  let shipping;
-  try { shipping = shippingQuote(products[0].store, destinationCountry); }
-  catch (error) { if (error instanceof ShippingError) throw new CheckoutError(error.message, 409); throw error; }
   if (!seller.stripeAccountId || !seller.stripeOnboardingComplete || !seller.stripeChargesEnabled) throw new CheckoutError("SELLER_STRIPE_NOT_READY", 409);
   const currencies = new Set(products.map((product) => product.currency.toUpperCase()));
   if (currencies.size !== 1) throw new CheckoutError("All products must use the same currency.");
@@ -74,6 +72,9 @@ export async function createCheckout(
     if (available < requested) throw new CheckoutError(`Insufficient stock for ${line.product.name}.`, 409);
   }
   const subtotal = resolvedLines.reduce((sum, line) => sum.add(line.unitPrice.mul(line.quantity)), new Prisma.Decimal(0));
+  let shipping;
+  try { shipping = cartShippingQuote(products[0].store, resolvedLines.map(line=>({product:line.product,subtotal:line.unitPrice.mul(line.quantity)})), destinationCountry, destinationPostalCode); }
+  catch (error) { if (error instanceof ShippingError) throw new CheckoutError(error.message, 409); throw error; }
   const total = subtotal.add(shipping.amount);
   const totalAmount = Number(total.mul(100).toFixed(0));
   const platformFeeAmount = Math.round(Number(subtotal.mul(100).toFixed(0)) * platformFeePercent() / 100);
@@ -95,7 +96,7 @@ export async function createCheckout(
       if (order.stripeCheckoutSessionId && order.stripeCheckoutUrl) return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
     }
   }
-  await db.order.update({where:{id:order.id},data:{sellerVatStatusSnapshot:sellerVat.vatStatus}});
+  await db.order.update({where:{id:order.id},data:{sellerVatStatusSnapshot:sellerVat.vatStatus,shippingPolicySnapshot:shipping.policies}});
   const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: Number(shipping.amount.mul(100).toFixed(0)), currency: shipping.currency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: Number(line.unitPrice.mul(100).toFixed(0)), quantity: line.quantity, currency: line.product.currency })) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };

@@ -16,13 +16,14 @@ export default async function NewProductPage() {
   const common = await getTranslations("Common");
   const dashboardText = await getTranslations("SellerDashboard");
   const locale = await getLocale();
+  const countryNames=new Intl.DisplayNames([locale],{type:"region"});
   const session = await readSession();
   if (!session) redirect("/login");
 
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
     select: {
-      name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true,
+      name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true, shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true, plan: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
@@ -58,6 +59,6 @@ export default async function NewProductPage() {
         </SellerStatusBadge>
       </>}
     />
-    <NewProductForm currency={store.currency} productCount={store._count.products} productLimit={productLimit} />
+    <NewProductForm currency={store.currency} productCount={store._count.products} productLimit={productLimit} storeShippingSummary={store.shippingEnabled?`${store.shippingMethodName??""} · ${store.shippingWorldwide?"Worldwide":store.shippingCountries.map(code=>countryNames.of(code)??code).join(", ")} · ${store.shippingFree?"Free":store.shippingPrice?.toString()??""} · ${store.shippingMinDays??"?"}–${store.shippingMaxDays??"?"} days`:undefined}/>
   </SellerDashboardLayout>;
 }
