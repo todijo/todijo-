@@ -37,13 +37,15 @@ test("visible category surfaces use the shared resolver while values and queries
   const home = fs.readFileSync(path.join(root, "app/HomeClient.tsx"), "utf8");
   const detail = fs.readFileSync(path.join(root, "app/product/[id]/page.tsx"), "utf8");
   const store = fs.readFileSync(path.join(root, "app/store/[slug]/StoreExperience.tsx"), "utf8");
+  const productCard = fs.readFileSync(path.join(root, "components/MarketplaceProductCard.tsx"), "utf8");
   const create = fs.readFileSync(path.join(root, "app/seller/products/new/NewProductForm.tsx"), "utf8");
   const edit = fs.readFileSync(path.join(root, "app/seller/products/[id]/edit/EditProductForm.tsx"), "utf8");
   assert.match(home, /const displayCategory = .*categoryLabel/);
   assert.match(home, /categories\.map\(\(name\) => <button className=\{filters\.category === name/);
   assert.match(home, /chooseCategory\(category\)/);
   assert.match(detail, /categoryLabel\(product\.category/);
-  assert.match(store, /categoryLabel\(product\.category/);
+  assert.match(store, /<MarketplaceProductCard[^>]+showCategory/);
+  assert.match(productCard, /categoryLabel\(product\.category/);
   for (const source of [create, edit]) {
     assert.match(source, /PRODUCT_CATEGORIES\.map/);
     assert.match(source, /value=\{value\}/);

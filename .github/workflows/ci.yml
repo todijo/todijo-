@@ -19,11 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Prisma requires a syntactically valid URL for generation and validation.
-      # No command in this workflow connects to this placeholder database.
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/todijo_ci?schema=public
       APP_URL: http://localhost:3000
       SESSION_SECRET: ci-only-placeholder-secret-at-least-32-characters
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: todijo_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d todijo_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Check out repository
@@ -40,6 +52,9 @@ jobs:
 
       - name: Validate Prisma schema
         run: npx prisma validate
+
+      - name: Prepare ephemeral CI database
+        run: npx prisma migrate deploy
 
       - name: Type-check
         run: npm run typecheck
@@ -59,6 +74,21 @@ jobs:
     timeout-minutes: 25
     env:
       CI: true
+      DATABASE_URL: postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e
+          POSTGRES_DB: todijo_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d todijo_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Check out repository
@@ -75,6 +105,9 @@ jobs:
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Prepare ephemeral browser-test database
+        run: npx prisma migrate deploy
 
       - name: Run browser smoke tests
         run: npm run test:e2e

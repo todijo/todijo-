@@ -21,7 +21,7 @@ test("buyer routes share one mobile header with menu, logo, cart, and search", (
   assert.match(marketplaceHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);
   assert.doesNotMatch(marketplaceHeader, /<BuyerMobileNavigation accountName=/);
   assert.match(siteHeader, /return <MarketplaceHeader\/>/);
-  assert.match(store, /<BuyerMobileHeader \/>/);
+  assert.match(store, /<SiteHeader storeName=\{store\.name\}/);
   assert.match(product, /<SiteHeader storeName=/);
 });
 

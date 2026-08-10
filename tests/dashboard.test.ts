@@ -46,7 +46,7 @@ test("seller mobile drawer adds the authorized localized product-create destinat
   const sellerLayout = readFileSync("components/SellerDashboardLayout.tsx", "utf8");
   const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
 
-  assert.match(sellerLayout, /const mobileMenuItems = canAddProduct/);
+  assert.match(sellerLayout, /const items = canAddProduct/);
   assert.match(sellerLayout, /href: `\/\$\{locale\}\/seller\/products\/new`/);
   assert.match(sellerLayout, /icon: Plus, active: active === "new-product"/);
   assert.match(ui, /premiumMobileDrawer[\s\S]*mobileMenuItems\.map/);
@@ -76,7 +76,7 @@ test("dashboard actions remain localized and avoid unavailable buyer placeholder
 
   assert.match(ui, /notificationHref: string/);
   assert.match(ui, /href=\{notificationHref\}/);
-  assert.match(dashboardPage, /notificationHref=\{paths\.messages\}/);
+  assert.match(dashboardPage, /notificationHref=\{`\/\$\{locale\}\/notifications`\}/);
   assert.doesNotMatch(dashboardPage, /dashboard#favorites|dashboard#addresses|dashboard#payments/);
   assert.match(dashboardPage, /label: common\("cart"\), href: paths\.cart/);
   assert.match(productsPage, /`\/\$\{locale\}\/seller\/products\/\$\{product\.id\}\/edit`/);
@@ -88,8 +88,8 @@ test("seller product actions keep the existing subscription gate", () => {
   const productsPage = readFileSync("app/seller/products/page.tsx", "utf8");
 
   assert.match(dashboardPage, /subscriptionActive \? <DashboardQuickAction[^>]+seller\/products\/new/);
-  assert.match(dashboardPage, /<DashboardQuickAction label=\{control\("viewPlans"\)\} href=\{`\/\$\{locale\}\/seller\/subscription`\}/);
-  assert.match(productsPage, /href=\{subscriptionActive \? `\/\$\{locale\}\/seller\/products\/new` : `\/\$\{locale\}\/seller\/subscription`\}/);
+  assert.match(dashboardPage, /subscriptionActive \? <DashboardQuickAction[^>]+seller\/products\/new[^:]+: <DashboardQuickAction label=\{readinessAction\} href=\{readinessHref\}/);
+  assert.match(productsPage, /href=\{subscriptionActive \? `\/\$\{locale\}\/seller\/products\/new` : readinessHref\}/);
   assert.doesNotMatch(dashboardPage, /Status: \{user\.store\.subscription/);
   assert.doesNotMatch(productsPage, /store\.subscription\?\.status \?\? "NOT_STARTED"/);
 });

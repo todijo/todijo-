@@ -4,7 +4,7 @@ import { join } from "node:path";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100";
 const serverEnvironment = {
   ...process.env,
-  DATABASE_URL: "postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public",
+  DATABASE_URL: process.env.DATABASE_URL ?? "postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public",
   APP_URL: baseURL,
   SESSION_SECRET: "e2e-only-placeholder-secret-at-least-32-characters",
   STRIPE_SECRET_KEY: "",

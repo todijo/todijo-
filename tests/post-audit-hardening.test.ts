@@ -32,7 +32,7 @@ test("pre-purchase questions are meaningful and controlled by the seller", () =>
 
 test("seller reviews, favorites, messages, and notifications have purposeful destinations", () => {
   assert.match(source("components/SellerDashboardLayout.tsx"), /seller\/reviews/);
-  assert.match(source("app/dashboard/page.tsx"), /notificationHref=\{paths\.messages\}/);
+  assert.match(source("app/dashboard/page.tsx"), /notificationHref=\{`\/\$\{locale\}\/notifications`\}/);
   assert.match(source("app/favorites/page.tsx"), /FavoritesClient/);
   assert.match(source("app/messages/page.tsx"), /DashboardReturnLink/);
   assert.match(source("app/messages/\[id\]/page.tsx"), /threadNavigation/);

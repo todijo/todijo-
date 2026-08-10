@@ -17,7 +17,8 @@ function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROF
       update: async ({ data }: any) => { Object.assign(order, data); return order; },
     },
     product: { findMany: async () => [product] },
-    user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com" }) },
+    store: { findUniqueOrThrow: async () => ({ vatStatus: "REGISTERED" }) },
+    user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com", firstName: "Buyer", lastName: "Example" }) },
   };
   return { db, product, getCreates: () => creates };
 }
@@ -27,11 +28,13 @@ test("successful payment marks order paid and decrements stock once", async () =
   const tx: any = {
     stripeWebhookEvent: { create: async () => ({}) },
     order: {
-      findUnique: async () => ({ id: "order_1", status: state.status, total: new Prisma.Decimal("25.00"), currency: "EUR", stripeCheckoutSessionId: "cs_1", items: [{ productId: "prod_1", quantity: 2 }] }),
+      findUnique: async () => ({ id: "order_1", buyerId: "buyer_1", storeIdSnapshot: "store_1", status: state.status, total: new Prisma.Decimal("25.00"), currency: "EUR", stripeCheckoutSessionId: "cs_1", items: [{ productId: "prod_1", variantId: null, quantity: 2 }] }),
       update: async ({ data }: any) => { state.status = data.status; return {}; },
       updateMany: async () => ({ count: 0 }),
     },
     product: { updateMany: async ({ where, data }: any) => { if (state.stock < where.stock.gte) return { count: 0 }; state.stock -= data.stock.decrement; return { count: 1 }; } },
+    store: { findUnique: async () => ({ ownerId: "seller_1" }) },
+    notification: { create: async () => ({}) },
   };
   const db: any = { $transaction: (callback: any) => callback(tx) };
   const event: StripeEvent = { id: "evt_1", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", payment_status: "paid", client_reference_id: "order_1", metadata: { orderId: "order_1" } } } };
@@ -132,7 +135,7 @@ test("only a buyer-owned paid checkout is eligible for cart reconciliation", asy
 
 test("verified Checkout data persists recipient details and rejects amount mismatches", async () => {
   const updates: any[] = [];
-  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: { findUnique: async () => ({ id: "order_1", status: "PENDING", total: new Prisma.Decimal("12.50"), currency: "EUR", stripeCheckoutSessionId: "cs_1", stripeConnectedAccountId: "acct_1", subtotal: new Prisma.Decimal("12.50"), items: [{ productId: "prod_1", quantity: 1 }] }), update: async (args: any) => { updates.push(args); return {}; } }, product: { updateMany: async () => ({ count: 1 }) } };
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: { findUnique: async () => ({ id: "order_1", buyerId: "buyer_1", storeIdSnapshot: "store_1", status: "PENDING", total: new Prisma.Decimal("12.50"), currency: "EUR", stripeCheckoutSessionId: "cs_1", stripeConnectedAccountId: "acct_1", subtotal: new Prisma.Decimal("12.50"), items: [{ productId: "prod_1", variantId: null, quantity: 1 }] }), update: async (args: any) => { updates.push(args); return {}; } }, product: { updateMany: async () => ({ count: 1 }) }, store: { findUnique: async () => ({ ownerId: "seller_1" }) }, notification: { create: async () => ({}) } };
   const db: any = { $transaction: async (callback: any) => callback(tx) };
   const event: StripeEvent = { id: "evt_shipping", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", payment_status: "paid", client_reference_id: "order_1", metadata: { orderId: "order_1", connectedAccountId: "acct_1" } } } };
   const session: any = { ...event.data.object, amount_total: 1250, amount_subtotal: 1250, currency: "eur", customer_details: { email: "buyer@example.com", phone: "+33000000000" }, shipping_details: { name: "Recipient", address: { line1: "1 Rue", city: "Paris", postal_code: "75001", country: "FR" } }, total_details: { amount_shipping: 0, amount_tax: 0 } };

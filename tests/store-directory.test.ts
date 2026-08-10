@@ -18,7 +18,7 @@ test("public store directory renders store cards without product cards", () => {
 
 test("public store directory reuses centralized access eligibility", () => {
   assert.match(directorySource, /publicStoreAccessWhere\(\)/);
-  assert.match(directorySource, /where:\s*\{\s*\.\.\.publicAccess,\s*products:\s*\{\s*some:\s*\{\s*status:\s*"PUBLISHED"/);
+  assert.match(directorySource, /where:\s*\{\s*\.\.\.publicStoreAccessWhere\(\),\s*products:\s*\{\s*some:\s*\{\s*status:\s*"PUBLISHED"/);
 });
 
 test("every store-directory destination preserves the active locale", () => {

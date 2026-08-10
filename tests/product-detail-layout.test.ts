@@ -7,7 +7,7 @@ test("product detail renders one full description below the bounded gallery grid
   assert.equal(source.match(/productDetailDescription/g)?.length, 2); // section and paragraph class names
   assert.ok(source.indexOf("productDetailTop") < source.indexOf("productDetailDescriptionSection"));
   assert.ok(source.indexOf("productGallerySticky") < source.indexOf("productDetailDescriptionSection"));
-  assert.equal(source.match(/\{product\.description\}/g)?.length, 1);
+  assert.equal(source.match(/\{product\.description\}/g)?.length, 2); // metadata/JSON-LD and the visible description
 });
 
 test("shop wording and Ask Seller order match their actions", async () => {
