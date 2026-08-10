@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { normalizePostalValue, parsePostalRule, postalRulesAllow } from "./postal-rules";
 
 export type ShippingRule = {
   shippingEnabled: boolean | null; shippingMethodName: string | null; shippingPrice: Prisma.Decimal | null;
@@ -18,11 +19,7 @@ export function normalizeCountryCode(value: unknown) {
   if (!/^[A-Z]{2}$/.test(code)) throw new ShippingError("INVALID_DESTINATION");
   return code;
 }
-export function normalizePostalCode(value: unknown) { return typeof value === "string" ? value.trim().toUpperCase().replace(/\s+/g, "") : ""; }
-function postalMatches(postal: string, rules: string[]) {
-  if (!rules.length) return true;
-  return rules.some((raw) => { const rule = normalizePostalCode(raw); return rule.endsWith("*") ? postal.startsWith(rule.slice(0, -1)) : postal === rule; });
-}
+export const normalizePostalCode=normalizePostalValue;
 export function effectiveShippingRule(store: ShippingRule, product?: ShippingProduct): ShippingRule {
   return product?.shippingOverrideEnabled ? product : store;
 }
@@ -31,7 +28,7 @@ export function quoteShippingRule(rule: ShippingRule, destinationInput: unknown,
   if (!rule.shippingEnabled || !rule.shippingMethodName?.trim()) throw new ShippingError("SHIPPING_NOT_CONFIGURED");
   const countries = [...new Set(rule.shippingCountries.map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))];
   if (!rule.shippingWorldwide && (!countries.length || !countries.includes(destinationCountry))) throw new ShippingError("SHIPPING_DESTINATION_UNAVAILABLE");
-  if (rule.shippingPostalCodes?.length && (!postalCode || !postalMatches(postalCode, rule.shippingPostalCodes))) throw new ShippingError("SHIPPING_POSTAL_UNAVAILABLE");
+  if (rule.shippingPostalCodes?.length && (!postalCode || !postalRulesAllow(rule.shippingPostalCodes,destinationCountry,postalCode))) throw new ShippingError("SHIPPING_POSTAL_UNAVAILABLE");
   const thresholdFree = rule.shippingFreeThreshold != null && !rule.shippingFreeThreshold.isNegative() && subtotal.greaterThanOrEqualTo(rule.shippingFreeThreshold);
   const amount = rule.shippingFree || thresholdFree ? new Prisma.Decimal(0) : rule.shippingPrice;
   if (!amount || amount.isNegative()) throw new ShippingError("SHIPPING_NOT_CONFIGURED");
@@ -55,7 +52,7 @@ export function parseShippingSettings(body: Record<string, unknown>) {
   const postalCodes = Array.isArray(get("PostalCodes")) ? [...new Set((get("PostalCodes") as unknown[]).map((v) => normalizePostalCode(v)).filter(Boolean))] : [];
   const minDays = Number(get("MinDays")), maxDays = Number(get("MaxDays"));
   if (!enabled) return { shippingEnabled: false, shippingMethodName: null, shippingPrice: null, shippingFree: false, shippingFreeThreshold: null, shippingMinDays: null, shippingMaxDays: null, shippingCountries: [], shippingWorldwide: false, shippingPostalCodes: [], shippingCarrier: null };
-  if (!method || method.length > 80 || carrier.length > 80 || (!worldwide && !countries.length) || countries.some((c) => !/^[A-Z]{2}$/.test(c)) || postalCodes.some((p) => !/^[A-Z0-9-]{1,12}\*?$/.test(p)) || !Number.isInteger(minDays) || !Number.isInteger(maxDays) || minDays < 1 || maxDays < minDays || maxDays > 365) throw new ShippingError("SHIPPING_NOT_CONFIGURED");
+  if (!method || method.length > 80 || carrier.length > 80 || (!worldwide && !countries.length) || countries.some((c) => !/^[A-Z]{2}$/.test(c)) || postalCodes.length>100 || postalCodes.some((p) => !parsePostalRule(p)) || !Number.isInteger(minDays) || !Number.isInteger(maxDays) || minDays < 1 || maxDays < minDays || maxDays > 365) throw new ShippingError("SHIPPING_NOT_CONFIGURED");
   return { shippingEnabled: true, shippingMethodName: method, shippingPrice: free ? new Prisma.Decimal(0) : decimal(get("Price")), shippingFree: free, shippingFreeThreshold: decimal(get("FreeThreshold"), true), shippingMinDays: minDays, shippingMaxDays: maxDays, shippingCountries: worldwide ? [] : countries, shippingWorldwide: worldwide, shippingPostalCodes: postalCodes, shippingCarrier: carrier || null };
 }
 export function parseProductShipping(body: Record<string, unknown>) { if (body.shippingOverrideEnabled !== true) return { shippingOverrideEnabled: false }; return { shippingOverrideEnabled: true, ...parseShippingSettings(body) }; }

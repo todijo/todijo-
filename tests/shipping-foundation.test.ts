@@ -6,6 +6,8 @@ import { Prisma } from "@prisma/client";
 import { cartShippingQuote, parseShippingSettings, ShippingError, shippingQuote } from "../lib/shipping";
 import { advancedShippingMessages } from "../i18n/shipping-advanced";
 import { SHIPPING_COUNTRY_CODES } from "../lib/shipping-countries";
+import {parsePostalRule,postalRulesAllow,serializePostalRule} from "../lib/postal-rules";
+import {shippingHotfixMessages} from "../i18n/shipping-hotfix";
 
 const store = { shippingEnabled: true, shippingMethodName: "Standard", shippingPrice: new Prisma.Decimal("6.25"), shippingFree: false, shippingMinDays: 2, shippingMaxDays: 5, shippingCountries: ["fr", "BE"], shippingCarrier: "La Poste", shippingProvider: "MANUAL", shippingExternalServiceId: null, currency: "EUR" };
 
@@ -78,3 +80,11 @@ test("French country display names and full-list search are localized",()=>{cons
 test("French advanced shipping copy has no English fallback",()=>{for(const key of Object.keys(advancedShippingMessages.en) as Array<keyof typeof advancedShippingMessages.en>)assert.notEqual(advancedShippingMessages.fr[key],advancedShippingMessages.en[key],key);assert.match(advancedShippingMessages.fr.freeThreshold,/Livraison gratuite à partir de/);});
 
 test("advanced shipping copy has no English fallback in any localized locale",()=>{for(const [locale,messages] of Object.entries(advancedShippingMessages)){if(locale==="en")continue;for(const key of Object.keys(advancedShippingMessages.en) as Array<keyof typeof advancedShippingMessages.en>){assert.notEqual(messages[key],advancedShippingMessages.en[key],`${locale}:${key}`);const placeholders=(value:string)=>[...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]).sort();assert.deepEqual(placeholders(messages[key]),placeholders(advancedShippingMessages.en[key]),`${locale}:${key}`);}}});
+
+test("postal prefix, exact, country scope, and legacy wildcard are deterministic",()=>{const prefix=serializePostalRule({country:"FR",type:"PREFIX",value:"59"})!;assert.equal(prefix,"FR|PREFIX|59");assert.equal(postalRulesAllow([prefix],"FR","59000"),true);assert.equal(postalRulesAllow([prefix],"FR","59100"),true);assert.equal(postalRulesAllow([prefix],"FR","75001"),false);assert.equal(postalRulesAllow([prefix],"BE","59000"),true);const exact=serializePostalRule({country:"FR",type:"EXACT",value:"59000"})!;assert.equal(postalRulesAllow([exact],"FR","59000"),true);assert.equal(postalRulesAllow([exact],"FR","59100"),false);assert.deepEqual(parsePostalRule("59*"),{country:"*",type:"PREFIX",value:"59"});assert.equal(postalRulesAllow(["59*"],"FR","59000"),true);});
+
+test("effective product postal override takes precedence",()=>{const product={...store,id:"override",shippingOverrideEnabled:true,shippingCountries:["FR"],shippingPostalCodes:["FR|EXACT|75001"]};assert.throws(()=>cartShippingQuote(store,[{product,subtotal:new Prisma.Decimal(10)}],"FR","59000"),/SHIPPING_POSTAL_UNAVAILABLE/);assert.equal(cartShippingQuote(store,[{product,subtotal:new Prisma.Decimal(10)}],"FR","75001").destinationCountry,"FR");});
+
+test("checkout clears stale quotes and revalidates country and postal changes",()=>{const source=readFileSync(join(process.cwd(),"app/checkout/page.tsx"),"utf8");assert.match(source,/\[destinationCountry,destinationPostalCode, items/);assert.match(source,/setQuote\(null\);setError\(""\)/);assert.match(source,/setTimeout\([\s\S]*destinationPostalCode/);assert.match(source,/disabled=\{loading\|\|!quote\}/);assert.match(source,/LocalizedCountrySelect/);});
+
+test("shipping hotfix messages have 14-locale key and placeholder parity",()=>{assert.equal(Object.keys(shippingHotfixMessages).length,14);const reference=shippingHotfixMessages.en,placeholders=(value:string)=>[...value.matchAll(/\{(\w+)\}/g)].map(match=>match[1]).sort();for(const [locale,messages] of Object.entries(shippingHotfixMessages)){assert.deepEqual(Object.keys(messages).sort(),Object.keys(reference).sort(),locale);for(const key of Object.keys(reference) as Array<keyof typeof reference>)assert.deepEqual(placeholders(messages[key]),placeholders(reference[key]),`${locale}:${key}`);}});
