@@ -7,6 +7,7 @@ import { advanceSellerFulfillment, FulfillmentError } from "../lib/fulfillment";
 function database(order: any, stores = [{ id: "store_1" }]) {
   const updates: any[] = [];
   const events: any[] = [];
+  const notifications: any[] = [];
   const storeOwners: string[] = [];
   const tx = {
     store: { findMany: async ({ where }: any) => { storeOwners.push(where.ownerId); return stores; } },
@@ -19,12 +20,13 @@ function database(order: any, stores = [{ id: "store_1" }]) {
       update: async ({ data }: any) => { updates.push(data); return { ...order, ...data, id: "order_1" }; },
     },
     orderFulfillmentEvent: { create: async ({ data }: any) => { events.push(data); return data; } }, orderLifecycleEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
+    notification: { create: async ({ data }: any) => { notifications.push(data); return data; } },
   };
-  return { db: { $transaction: async (callback: any) => callback(tx) } as any, updates, events, storeOwners };
+  return { db: { $transaction: async (callback: any) => callback(tx) } as any, updates, events, notifications, storeOwners };
 }
 
 test("seller with an owned order can advance only the next forward fulfillment transition with tracking", async () => {
-  const { db, updates, events, storeOwners } = database({ id: "order_1", status: "PROCESSING" });
+  const { db, updates, events, notifications, storeOwners } = database({ id: "order_1", buyerId: "buyer_1", status: "PROCESSING" });
   const result = await advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingCarrier: "  La Poste  ", trackingNumber: " AB  123 " });
   assert.equal(result.idempotent, false);
   assert.equal(updates.length, 1);
@@ -34,6 +36,7 @@ test("seller with an owned order can advance only the next forward fulfillment t
   assert.equal(updates[0].trackingNumber, "AB 123");
   assert.equal(events[0].source, "SELLER");
   assert.equal(events[0].status, "SHIPPED");
+  assert.deepEqual(notifications, [{ userId: "buyer_1", type: "ORDER_SHIPPED", title: "Order shipped", body: "Your order has been shipped.", href: "/account/orders/order_1" }]);
   assert.deepEqual(storeOwners, ["seller_1"]);
 });
 
@@ -59,11 +62,18 @@ test("skipped and backward fulfillment transitions are rejected without writes",
 });
 
 test("repeating an already completed transition is idempotent", async () => {
-  const { db, updates, events } = database({ id: "order_1", status: "SHIPPED" });
+  const { db, updates, events, notifications } = database({ id: "order_1", buyerId: "buyer_1", status: "SHIPPED" });
   const result = await advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING");
   assert.equal(result.idempotent, true);
   assert.equal(updates.length, 0);
   assert.equal(events.length, 0);
+  assert.equal(notifications.length, 0);
+});
+
+test("delivered transition notifies only the owning buyer with the order-detail link", async () => {
+  const { db, notifications } = database({ id: "order_1", buyerId: "buyer_1", status: "SHIPPED" });
+  await advanceSellerFulfillment(db, "seller_1", "order_1", "SHIPPED");
+  assert.deepEqual(notifications, [{ userId: "buyer_1", type: "ORDER_DELIVERED", title: "Order delivered", body: "Your order has been delivered.", href: "/account/orders/order_1" }]);
 });
 
 test("admin without ownership and a foreign seller are rejected", async () => {
