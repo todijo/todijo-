@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   const locale = await getLocale();
-  const [t, ordersText] = await Promise.all([getTranslations("Admin"), getTranslations("Orders")]);
+  const [t, ordersText, trustText] = await Promise.all([getTranslations("Admin"), getTranslations("Orders"), getTranslations("TrustSafety")]);
   const session = await readSession();
   if (!session) redirect(`/${locale}/login`);
   try {
@@ -61,7 +61,7 @@ export default async function AdminPage() {
     <section className="adminShell">
       <header className="adminHero">
         <div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{t("intro")}</p></div>
-        <div><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/moderation">Moderation</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link></div>
+        <div><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link></div>
       </header>
       {pendingFinalRefundCount > 0 && <section className="subscriptionWarning adminRefundAlert" role="alert"><strong>{t(pendingFinalRefundCount === 1 ? "pendingFinalRefundSingular" : "pendingFinalRefundPlural", { count: pendingFinalRefundCount })}</strong><Link href="/adm-barewbar-182203/orders">{t("reviewRefundRequests")}</Link></section>}
       <AdminDashboard
