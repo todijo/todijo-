@@ -98,6 +98,39 @@ test("CJ product retrieval follows the documented v2 contract sequentially", asy
   assert.match(urls[2],/\/product\/stock\/getInventoryByPid\?pid=240626050813160030$/);
 });
 
+test("CJ SKU input resolves to canonical pid before variant and inventory requests", async () => {
+  const urls: string[] = [];
+  const canonicalPid = "91A35D0B-7FD2-4AC9-A4B3-2E55349E9D62";
+  const fetcher: typeof fetch = async (input) => {
+    const url = String(input); urls.push(url);
+    if (urls.length === 1) return new Response(JSON.stringify({code:200,result:true,success:true,data:{pid:canonicalPid,productSku:"CJCS206905203CX",productNameEn:"Pullover",productImageSet:[]}}));
+    if (urls.length === 2) return new Response(JSON.stringify({code:200,result:true,success:true,data:[]}));
+    return new Response(JSON.stringify({code:200,result:true,success:true,data:{variantInventories:[]}}));
+  };
+  const auth = {isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  const result = await new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0}).getProduct("CJCS206905203CX");
+  assert.equal(result.supplierProductId,canonicalPid);
+  assert.match(urls[0],/\/product\/query\?productSku=CJCS206905203CX&features=enable_video$/);
+  assert.match(urls[1],new RegExp(`/product/variant/query\\?pid=${canonicalPid}$`));
+  assert.match(urls[2],new RegExp(`/product/stock/getInventoryByPid\\?pid=${canonicalPid}$`));
+});
+
+test("CJ product-not-found stays sanitized and logs the SKU lookup context", async () => {
+  const original = console.error;
+  const output: string[] = [];
+  console.error = (...values: unknown[]) => output.push(values.map(String).join(" "));
+  const auth = {isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  try {
+    const fetcher: typeof fetch = async () => new Response(JSON.stringify({code:1602001,result:false,success:false,message:"Product not found; token access-secret",requestId:"cj-request-404"}),{status:200});
+    await assert.rejects(()=>new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0}).getProduct("CJCS206905203CX"),/CJ_PRODUCT_NOT_FOUND/);
+  } finally { console.error = original; }
+  assert.match(output[0],/resolve-product-sku/);
+  assert.match(output[0],/CJCS206905203CX/);
+  assert.match(output[0],/1602001/);
+  assert.match(output[0],/cj-request-404/);
+  assert.doesNotMatch(output[0],/access-secret/);
+});
+
 test("CJ diagnostics identify the failed operation and redact every credential", () => {
   const original = console.error;
   const output: string[] = [];

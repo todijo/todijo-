@@ -74,6 +74,7 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
       if (authFailed || !response.ok || payload.result === false || payload.success === false) {
         logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);
         if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
+        if (payload.code === 1602001 || payload.code === "1602001") throw new Error("CJ_PRODUCT_NOT_FOUND");
         throw new Error(response.status >= 500 ? "CJ_UNAVAILABLE" : "CJ_API_REQUEST_FAILED");
       }
       return payload.data;
@@ -82,12 +83,17 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
   }
   async testConnection() { await this.get("test-connection","/setting/get"); }
   async getProduct(supplierProductId: string) {
-    const pid = supplierProductId.trim();
-    if (!/^[A-Za-z0-9-]{4,200}$/.test(pid)) throw new Error("CJ_PRODUCT_ID_INVALID");
-    const context = { supplierProductId:pid };
-    const product = await this.get("get-product-detail",`/product/query?pid=${encodeURIComponent(pid)}&features=enable_video`,context);
-    const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(pid)}`,context);
-    const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(pid)}`,context);
+    const identifier = supplierProductId.trim();
+    if (!/^[A-Za-z0-9-]{4,200}$/.test(identifier)) throw new Error("CJ_PRODUCT_ID_INVALID");
+    const isSku = /^CJ[A-Za-z0-9-]+$/i.test(identifier);
+    const context = { supplierProductIdentifier:identifier, identifierType:isSku?"productSku":"pid" };
+    const query = isSku ? `productSku=${encodeURIComponent(identifier)}` : `pid=${encodeURIComponent(identifier)}`;
+    const product = await this.get(isSku?"resolve-product-sku":"get-product-detail",`/product/query?${query}&features=enable_video`,context);
+    const canonicalPid = text(object(product).pid ?? object(product).productId);
+    if (!canonicalPid) throw new Error("CJ_PRODUCT_NOT_FOUND");
+    const canonicalContext = {...context,canonicalPid};
+    const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
+    const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     return normalizeCjProduct(product, variants, inventory);
   }
 }
