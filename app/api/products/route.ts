@@ -4,7 +4,7 @@ import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
-import { validateProductImages } from "@/lib/product-images";
+import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
 import { ProductVariantImageError } from "@/lib/product-variant-images";
 import { publicProductAccessWhere } from "@/lib/admin-access";
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const colors = variantsEnabled ? [] : Array.isArray(body.colors) ? body.colors.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,20) : [];
     const sizes = variantsEnabled ? [] : Array.isArray(body.sizes) ? body.sizes.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,30) : [];
     const imageValidation = validateProductImages(body.images);
-    if (!imageValidation.ok) return NextResponse.json({ error: "La sélection d’images est invalide ou dépasse la limite de 10 images." }, { status: 400 });
+    if (!imageValidation.ok) return NextResponse.json({ error: `La sélection d’images est invalide ou dépasse la limite de ${MAX_PRODUCT_IMAGES} images.` }, { status: 400 });
     const images = imageValidation.images;
     const slugBase = makeSlug(name);
 

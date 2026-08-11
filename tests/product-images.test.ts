@@ -11,10 +11,20 @@ import {
 const urls = ["https://img.test/one.jpg", "https://img.test/two.jpg", "https://img.test/three.jpg"];
 
 test("product images enforce the configured server limit and reject duplicates", () => {
+  assert.equal(MAX_PRODUCT_IMAGES, 30);
   const maximum = Array.from({ length: MAX_PRODUCT_IMAGES }, (_, index) => `https://img.test/${index}.jpg`);
   assert.deepEqual(validateProductImages(maximum), { ok: true, images: maximum });
   assert.equal(validateProductImages([...maximum, "https://img.test/extra.jpg"]).ok, false);
   assert.equal(validateProductImages([urls[0], urls[0]]).ok, false);
+});
+
+test("product image validation accepts every supported count through 30", () => {
+  for (const count of [1, 14, 15, 16, 23, 30]) {
+    const images = Array.from({ length: count }, (_, index) => `https://img.test/${count}/${index}.jpg`);
+    assert.deepEqual(validateProductImages(images), { ok: true, images });
+  }
+  assert.deepEqual(validateProductImages(Array.from({ length: 31 }, (_, index) => `https://img.test/31/${index}.jpg`)), { ok: false, reason: "too-many" });
+  assert.deepEqual(validateProductImages(["not a URL"]), { ok: false, reason: "invalid-url" });
 });
 
 test("reordering preserves the exact order sent to product persistence", () => {

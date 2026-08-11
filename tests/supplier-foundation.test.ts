@@ -6,19 +6,37 @@ import { readProductVideo } from "../lib/product-media";
 import { supplierMessages } from "../i18n/supplier";
 import { productVideoMessages } from "../i18n/product-video";
 import { dropshippingAccessMessages } from "../i18n/dropshipping-access";
-import { normalizeCjProduct } from "../lib/suppliers/cj-client";
+import { normalizeCjProduct, normalizeCjProductImages } from "../lib/suppliers/cj-client";
 import { assertRealSupplierFulfillmentDisabled, assertSupplierPurchasable, realSupplierFulfillmentAllowed, simulateSupplierHandoff, stripeIsTestMode } from "../lib/suppliers/safety";
 
 test("CJ product normalization preserves supplier and variant identity with bounded media",()=>{
-  const snapshot=normalizeCjProduct({pid:"cj-1",productNameEn:"Test",description:"Description",productSku:"SPU",productImageSet:Array.from({length:20},(_,index)=>`https://example.com/${index}.jpg`),productVideo:"https://example.com/video.mp4",saleStatus:"3"},{list:[{vid:"v1",variantSku:"SKU-1",variantNameEn:"Black",variantSellPrice:"8.00"},{vid:"v2",variantSku:"SKU-2",variantNameEn:"White",variantSellPrice:"9.00"}]},{data:{variantInventories:[{vid:"v1",inventory:[{totalInventory:2}]},{vid:"v2",inventory:[{totalInventory:0}]}]}});
+  const snapshot=normalizeCjProduct({pid:"cj-1",productNameEn:"Test",description:"Description",productSku:"SPU",productImageSet:Array.from({length:45},(_,index)=>`https://example.com/${index}.jpg`),productVideo:"https://example.com/video.mp4",saleStatus:"3"},{list:[{vid:"v1",variantSku:"SKU-1",variantNameEn:"Black",variantSellPrice:"8.00"},{vid:"v2",variantSku:"SKU-2",variantNameEn:"White",variantSellPrice:"9.00"}]},{data:{variantInventories:[{vid:"v1",inventory:[{totalInventory:2}]},{vid:"v2",inventory:[{totalInventory:0}]}]}});
   assert.equal(snapshot.supplierProductId,"cj-1"); assert.equal(snapshot.variants[0].supplierVariantId,"v1"); assert.equal(snapshot.variants[0].stock,2); assert.equal(snapshot.variants[1].available,false);
-  assert.equal(snapshot.media.filter((item)=>item.type==="IMAGE").length,15); assert.equal(snapshot.media.filter((item)=>item.type==="VIDEO").length,1);
+  assert.equal(snapshot.media.filter((item)=>item.type==="IMAGE").length,30); assert.equal(snapshot.media.filter((item)=>item.type==="VIDEO").length,1);
 });
 
-test("product image validation supports 15 images but rejects 16",()=>{
-  assert.equal(MAX_PRODUCT_IMAGES,15);
-  assert.equal(validateProductImages(Array.from({length:15},(_,index)=>`https://example.com/${index}.jpg`)).ok,true);
-  assert.deepEqual(validateProductImages(Array.from({length:16},(_,index)=>`https://example.com/${index}.jpg`)),{ok:false,reason:"too-many"});
+test("CJ image normalization filters, deduplicates, preserves order, and caps after filtering",()=>{
+  const tail=Array.from({length:35},(_,index)=>`https://example.com/${index}.jpg`);
+  const images=normalizeCjProductImages({bigImage:" https://example.com/cover.jpg ",productImageSet:["", "invalid", "https://example.com/cover.jpg", ...tail]});
+  assert.equal(images.length,30);
+  assert.deepEqual(images.slice(0,4),["https://example.com/cover.jpg",...tail.slice(0,3)]);
+  assert.equal(new Set(images).size,images.length);
+  assert.equal(images.includes("invalid"),false);
+});
+
+test("product image validation supports 30 images but rejects 31",()=>{
+  assert.equal(MAX_PRODUCT_IMAGES,30);
+  assert.equal(validateProductImages(Array.from({length:30},(_,index)=>`https://example.com/${index}.jpg`)).ok,true);
+  assert.deepEqual(validateProductImages(Array.from({length:31},(_,index)=>`https://example.com/${index}.jpg`)),{ok:false,reason:"too-many"});
+});
+
+test("seller create and update routes share the 30-image validator",()=>{
+  const root=resolve(__dirname,"../..");
+  for(const route of ["app/api/products/route.ts","app/api/products/[id]/route.ts"]){
+    const source=readFileSync(resolve(root,route),"utf8");
+    assert.match(source,/validateProductImages\(body\.images\)/);
+    assert.doesNotMatch(source,/slice\(0,\s*15\)|max\(15\)/);
+  }
 });
 
 test("one controlled-storage product video is validated",()=>{

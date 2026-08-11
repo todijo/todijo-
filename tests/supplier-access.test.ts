@@ -141,6 +141,25 @@ test("import rejects a connection whose tenant ownership does not match", async 
   assert.equal(where.id, "seller-b-cj"); assert.equal(where.storeId, "store-a"); assert.equal(where.ownerType, "SELLER");
 });
 
+test("supplier import copies and persists at most 30 ordered images", async () => {
+  const sourceImages=Array.from({length:35},(_,index)=>({type:"IMAGE" as const,url:`https://supplier.test/${index}.jpg`}));
+  const copied:string[]=[];
+  let created:any;
+  const db:any={
+    supplierConnection:{findFirst:async()=>({id:"platform-cj"})},
+    supplierProductLink:{findUnique:async()=>null},
+    product:{findUnique:async()=>null},
+    $transaction:async(callback:any)=>callback({product:{create:async({data}:any)=>{created=data;return{id:"product-1"};}}}),
+  };
+  const provider:any={id:"CJ",isConfigured:()=>true,getProduct:async()=>({provider:"CJ",supplierProductId:"PID",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:1,currency:"USD",stock:1,available:true,weightGrams:null,variants:[],media:sourceImages,rawMetadata:{}})};
+  const media:any={copyRemote:async(source:any)=>{copied.push(source.url);return{...source,provider:"CLOUDINARY",publicId:`media-${copied.length}`,width:null,height:null,durationMs:null};}};
+  await importSupplierProduct(db,provider,media,{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID",sellingPrice:10,category:"Other"});
+  assert.deepEqual(copied,sourceImages.slice(0,30).map((item)=>item.url));
+  assert.deepEqual(created.images,copied);
+  assert.equal(created.images[0],sourceImages[0].url);
+  assert.equal(created.media.create.length,30);
+});
+
 test("corrective migration replaces only global supplier identities with tenant-scoped constraints", () => {
   const root = resolve(__dirname, "../..");
   const sql = readFileSync(resolve(root, "prisma/migrations/20260811170000_scope_supplier_identities_by_tenant/migration.sql"), "utf8");

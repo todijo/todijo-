@@ -1,6 +1,7 @@
 import type { SupplierCatalogProvider, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
+import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
@@ -9,6 +10,19 @@ function number(value: unknown) { const parsed = Number(value); return Number.is
 function list(value: unknown) { return Array.isArray(value) ? value : []; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === "object" ? value as Record<string, unknown> : {}; }
 function normalizedIdentifier(value: unknown) { return text(value).toUpperCase(); }
+
+export function normalizeCjProductImages(productValue: unknown) {
+  const product = object(productValue);
+  const ordered = [product.bigImage, ...list(product.productImageSet)];
+  const unique = new Set<string>();
+  for (const value of ordered) {
+    const url = text(value);
+    if (!isValidProductImageUrl(url) || unique.has(url)) continue;
+    unique.add(url);
+    if (unique.size === MAX_PRODUCT_IMAGES) break;
+  }
+  return [...unique];
+}
 
 export function normalizeCjProduct(productValue: unknown, variantValue: unknown, inventoryValue: unknown): SupplierProductSnapshot {
   const product = object(productValue);
@@ -23,7 +37,7 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     const row = object(entry); const id = text(row.vid ?? row.variantId); const stock = inventoryByVariant.get(id) ?? Math.max(0, number(row.variantInventory ?? row.stock) ?? 0);
     return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantNameEn ?? row.variantName ?? row.variantKey) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0 };
   }).filter((variant) => variant.supplierVariantId);
-  const imageUrls = [...new Set([text(product.bigImage), ...list(product.productImageSet).map(text)].filter(Boolean))].slice(0, 15);
+  const imageUrls = normalizeCjProductImages(product);
   const videoUrl = text(product.productVideo ?? product.videoUrl);
   const stock = variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, number(product.inventory) ?? 0);
   const productId = text(product.pid ?? product.productId);

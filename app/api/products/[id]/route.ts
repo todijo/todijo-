@@ -4,7 +4,7 @@ import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
-import { validateProductImages } from "@/lib/product-images";
+import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
@@ -43,7 +43,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const colors = normalizeList(body.colors, 20);
     const sizes = normalizeList(body.sizes, 30);
     const imageValidation = validateProductImages(body.images);
-    if (!imageValidation.ok) return NextResponse.json({ error: "La sélection d’images est invalide ou dépasse la limite de 10 images." }, { status: 400 });
+    if (!imageValidation.ok) return NextResponse.json({ error: `La sélection d’images est invalide ou dépasse la limite de ${MAX_PRODUCT_IMAGES} images.` }, { status: 400 });
     const images = imageValidation.images;
 
     if (name.length < 2 || name.length > 120) return NextResponse.json({ error: "Le nom doit contenir entre 2 et 120 caractères." }, { status: 400 });

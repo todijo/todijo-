@@ -1,15 +1,25 @@
-export const MAX_PRODUCT_IMAGES = 15;
+export const MAX_PRODUCT_IMAGES = 30;
 
 export type ProductImageValidation =
   | { ok: true; images: string[] }
   | { ok: false; reason: "not-array" | "too-many" | "invalid-url" | "duplicate" };
+
+export function isValidProductImageUrl(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    return (url.protocol === "https:" || url.protocol === "http:") && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 export function validateProductImages(value: unknown): ProductImageValidation {
   if (!Array.isArray(value)) return { ok: false, reason: "not-array" };
   if (value.length > MAX_PRODUCT_IMAGES) return { ok: false, reason: "too-many" };
 
   const images = value.map((item) => String(item ?? "").trim());
-  if (images.some((image) => !/^https?:\/\//i.test(image))) return { ok: false, reason: "invalid-url" };
+  if (images.some((image) => !isValidProductImageUrl(image))) return { ok: false, reason: "invalid-url" };
   if (new Set(images).size !== images.length) return { ok: false, reason: "duplicate" };
   return { ok: true, images };
 }

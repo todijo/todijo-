@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { CloudinaryProductMediaProvider, type ProductMediaProvider, type StoredProductMedia } from "../media-provider";
 import type { SupplierCatalogProvider } from "./types";
+import { MAX_PRODUCT_IMAGES } from "../product-images";
 
 type Database = PrismaClient;
 
@@ -24,9 +25,9 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   const exists = await db.supplierProductLink.findUnique({where:{connectionId_supplierProductId:{connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId}},select:{productId:true}});
   if (exists) throw new Error("SUPPLIER_PRODUCT_ALREADY_IMPORTED");
   const copied: StoredProductMedia[] = [];
-  for (const source of snapshot.media.slice(0,16)) {
+  for (const source of snapshot.media) {
     if (source.type === "VIDEO" && copied.some((item) => item.type === "VIDEO")) continue;
-    if (source.type === "IMAGE" && copied.filter((item) => item.type === "IMAGE").length >= 15) continue;
+    if (source.type === "IMAGE" && copied.filter((item) => item.type === "IMAGE").length >= MAX_PRODUCT_IMAGES) continue;
     copied.push(await mediaProvider.copyRemote(source));
   }
   const images = copied.filter((item) => item.type === "IMAGE").map((item) => item.url);
