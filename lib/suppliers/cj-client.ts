@@ -1,4 +1,5 @@
 import type { SupplierCatalogProvider, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
+import { CjAuthService, cjAuth } from "./cj-auth";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
@@ -40,16 +41,27 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
 
 export class CjCatalogProvider implements SupplierCatalogProvider {
   readonly id = "CJ" as const;
-  constructor(private readonly accessToken = process.env.CJ_ACCESS_TOKEN) {}
-  isConfigured() { return Boolean(this.accessToken); }
+  constructor(private readonly auth: Pick<CjAuthService, "isConfigured" | "getAccessToken" | "invalidateAccessToken"> = cjAuth) {}
+  isConfigured() { return this.auth.isConfigured(); }
   private async get(path: string) {
-    if (!this.accessToken) throw new Error("CJ_NOT_CONFIGURED");
-    const response = await fetch(`${CJ_BASE_URL}${path}`, { headers:{"CJ-Access-Token":this.accessToken,"Accept":"application/json"}, signal:AbortSignal.timeout(15000), cache:"no-store" });
-    if (!response.ok) throw new Error(`CJ_API_${response.status}`);
-    const payload = await response.json() as { result?:boolean; success?:boolean; data?:unknown; message?:string };
-    if (payload.result === false || payload.success === false) throw new Error("CJ_API_REQUEST_FAILED");
-    return payload.data;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const accessToken = await this.auth.getAccessToken();
+      let response: Response;
+      try {
+        response = await fetch(`${CJ_BASE_URL}${path}`, { headers:{"CJ-Access-Token":accessToken,"Accept":"application/json"}, signal:AbortSignal.timeout(15000), cache:"no-store" });
+      } catch { throw new Error("CJ_UNAVAILABLE"); }
+      let payload: { code?:number; result?:boolean; success?:boolean; data?:unknown };
+      try { payload = await response.json() as typeof payload; } catch { throw new Error(response.ok ? "CJ_API_REQUEST_FAILED" : "CJ_UNAVAILABLE"); }
+      const authFailed = response.status === 401 || payload.code === 1600001 || payload.code === 1600002;
+      if (authFailed && attempt === 0) { this.auth.invalidateAccessToken(); continue; }
+      if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
+      if (!response.ok) throw new Error(response.status >= 500 ? "CJ_UNAVAILABLE" : "CJ_API_REQUEST_FAILED");
+      if (payload.result === false || payload.success === false) throw new Error("CJ_API_REQUEST_FAILED");
+      return payload.data;
+    }
+    throw new Error("CJ_AUTHENTICATION_FAILED");
   }
+  async testConnection() { await this.get("/setting/get"); }
   async getProduct(supplierProductId: string) {
     const pid = supplierProductId.trim();
     if (!/^[A-Za-z0-9-]{4,200}$/.test(pid)) throw new Error("CJ_PRODUCT_ID_INVALID");
