@@ -156,3 +156,22 @@ test("corrective migration replaces only global supplier identities with tenant-
   assert.match(products, /supplierConnectionId:current\.connectionId/);
   assert.doesNotMatch(products, /provider_supplierProductId/);
 });
+
+test("rolling guard maps old-app platform product and variant writes to platform-cj", () => {
+  const sql = readFileSync(resolve(__dirname, "../../prisma/migrations/20260811180000_guard_legacy_supplier_connection_scope/migration.sql"), "utf8");
+  assert.match(sql, /NEW\."ownerType" = 'PLATFORM' AND NEW\."connectionId" IS NULL/);
+  assert.match(sql, /NEW\."connectionId" := 'platform-cj'/);
+  assert.match(sql, /WHERE link\."productId" = NEW\."productId"/);
+  assert.match(sql, /INTO NEW\."supplierConnectionId"/);
+  assert.doesNotMatch(sql, /NEW\."supplierConnectionId" := 'platform-cj'/);
+  assert.doesNotMatch(sql, /DELETE FROM|TRUNCATE|DROP TABLE|DROP COLUMN/i);
+});
+
+test("rolling guard preserves seller and manual isolation while backfilling only exact ownership", () => {
+  const sql = readFileSync(resolve(__dirname, "../../prisma/migrations/20260811180000_guard_legacy_supplier_connection_scope/migration.sql"), "utf8");
+  assert.match(sql, /WHERE "ownerType" = 'PLATFORM' AND "connectionId" IS NULL/);
+  assert.match(sql, /link\."productId" = variant\."productId"/);
+  assert.match(sql, /link\."connectionId" IS NOT NULL/);
+  assert.match(sql, /variant\."supplierVariantId" IS NOT NULL/);
+  assert.doesNotMatch(sql, /"ownerType" = 'SELLER'[\s\S]*'platform-cj'/);
+});
