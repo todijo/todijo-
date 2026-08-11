@@ -7,13 +7,14 @@ import { PLATFORM_CJ_CONNECTION_ID, requirePlatformSupplierAdmin } from "@/lib/s
 import { AdminAccessError } from "@/lib/admin-access";
 
 export async function POST(request: Request) {
-  const session = await readSession();
-    const admin = await requirePlatformSupplierAdmin(prisma, session);
   try {
-    const body = await request.json() as {supplierProductId?:unknown;sellingPrice?:unknown;category?:unknown};
-    const store = await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true}});
+    const session = await readSession();
+    const admin = await requirePlatformSupplierAdmin(prisma, session);
+    const body = await request.json() as {supplierProductId?:unknown;sellingPrice?:unknown;pricingMode?:unknown;category?:unknown};
+    const store = await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true,currency:true}});
     if (!store) return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
-    const product = await importSupplierProduct(prisma,new CjCatalogProvider(),defaultSupplierMediaProvider(),{storeId:store.id,connectionId:PLATFORM_CJ_CONNECTION_ID,ownerType:"PLATFORM",supplierProductId:String(body.supplierProductId??""),sellingPrice:Number(body.sellingPrice),category:String(body.category??"Other")});
+    const manual = body.pricingMode === "MANUAL";
+    const product = await importSupplierProduct(prisma,new CjCatalogProvider(),defaultSupplierMediaProvider(),{storeId:store.id,connectionId:PLATFORM_CJ_CONNECTION_ID,ownerType:"PLATFORM",supplierProductId:String(body.supplierProductId??""),sellingPrice:manual?Number(body.sellingPrice):null,sellingCurrency:store.currency,category:String(body.category??"Other")});
     return NextResponse.json({ok:true,productId:product.id,status:"DRAFT"},{status:201});
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});

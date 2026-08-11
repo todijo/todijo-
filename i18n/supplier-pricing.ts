@@ -1,0 +1,5 @@
+const en={automaticPricing:"Automatic base pricing",targetMargin:"Target margin: 20%",calculatePrice:"Calculate estimate",baseEstimate:"Base selling-price estimate",shippingDeferred:"CJ freight is destination-dependent and is not included yet. The 20% margin is not guaranteed until destination freight is known.",manualOverride:"Use a manual selling-price override",currencyConversionRequired:"Automatic pricing needs a verified currency conversion rate. Use a reviewed manual override until one is configured."};
+export const supplierPricingMessages:Record<string,Partial<typeof en>>={
+  en,
+  fr:{automaticPricing:"Tarification de base automatique",targetMargin:"Marge cible : 20 %",calculatePrice:"Calculer l’estimation",baseEstimate:"Estimation du prix de vente de base",shippingDeferred:"Le fret CJ dépend de la destination et n’est pas encore inclus. La marge de 20 % n’est pas garantie tant que le fret de destination n’est pas connu.",manualOverride:"Utiliser un prix de vente manuel",currencyConversionRequired:"La tarification automatique nécessite un taux de change vérifié. Utilisez un prix manuel contrôlé jusqu’à sa configuration."},
+};
