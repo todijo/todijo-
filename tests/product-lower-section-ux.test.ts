@@ -19,6 +19,10 @@ test("public product information is filtered and rendered without an accordion",
 test("compact information and action layouts are responsive and RTL-safe", () => {
   assert.match(css, /\.productCompliancePublic dl\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /\.productComplianceLongText p\{[^}]*white-space:pre-wrap;overflow-wrap:anywhere/);
+  assert.match(css, /\.productComplianceLongText\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css, /\.productComplianceLongText p\{max-width:68ch;[^}]*word-break:break-word/);
+  assert.match(css, /\.productCompliancePublic\{width:min\(1180px,calc\(100% - 24px\)\);margin:20px auto 0\}/);
+  assert.match(css, /@media\(max-width:900px\)\{\.productComplianceLongText\{grid-template-columns:1fr\}/);
   assert.match(css, /@media\(max-width:640px\)[\s\S]*\.productCompliancePublic dl\{grid-template-columns:1fr\}/);
   assert.match(css, /\.productLowerActions\{[^}]*flex-wrap:wrap/);
   assert.match(page, /productLowerActions/);

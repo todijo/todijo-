@@ -15,13 +15,17 @@ type MobileImageMetrics = {
   orientation: "landscape" | "square" | "portrait";
 };
 
+type SelectedMedia =
+  | { type: "IMAGE"; index: number }
+  | { type: "VIDEO" };
+
 export default function ProductGallery({ images, productName, media = [] }: ProductGalleryProps) {
   const locale = useLocale();
   const baseImages = useMemo(() => images.filter(Boolean), [images]);
   const video = media.find((item) => item.type === "VIDEO");
   const [variantImages, setVariantImages] = useState<string[]>([]);
   const cleanImages = variantImages.length ? variantImages : baseImages;
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMedia>(() => baseImages.length ? { type: "IMAGE", index: 0 } : { type: "VIDEO" });
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isMobileGallery, setIsMobileGallery] = useState(false);
@@ -31,6 +35,27 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
   const scrollFrameRef = useRef<number | null>(null);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
+  const mainVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const selectedIndex = selectedMedia.type === "IMAGE" ? selectedMedia.index : 0;
+  const stopVideo = useCallback(() => {
+    const player = mainVideoRef.current;
+    if (!player) return;
+    player.pause();
+    if (player.readyState > 0) player.currentTime = 0;
+  }, []);
+
+  const selectImage = useCallback((index: number) => {
+    stopVideo();
+    setSelectedMedia({ type: "IMAGE", index });
+    setIsZoomed(false);
+  }, [stopVideo]);
+
+  const selectVideo = useCallback(() => {
+    setSelectedMedia({ type: "VIDEO" });
+    setIsZoomed(false);
+    setIsOpen(false);
+  }, []);
 
   const jumpToPhysicalIndex = useCallback((physicalIndex: number) => {
     const track = trackRef.current;
@@ -53,12 +78,13 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
     requestAnimationFrame(() => openerRef.current?.focus());
   }, []);
 
-  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; setVariantImages(Array.isArray(next) ? next.filter(Boolean) : []); setSelectedIndex(0); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [scrollToIndex]);
+  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; const filtered = Array.isArray(next) ? next.filter(Boolean) : []; stopVideo(); setVariantImages(filtered); setSelectedMedia(filtered.length || baseImages.length ? { type: "IMAGE", index: 0 } : { type: "VIDEO" }); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [baseImages.length, scrollToIndex, stopVideo]);
 
   useEffect(() => () => {
+    stopVideo();
     if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
     if (scrollEndTimerRef.current !== null) clearTimeout(scrollEndTimerRef.current);
-  }, []);
+  }, [stopVideo]);
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 860px)");
@@ -69,6 +95,9 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
   }, []);
 
   const hasImages = cleanImages.length > 0;
+  const hasMedia = hasImages || Boolean(video);
+  const mediaCount = cleanImages.length + (video ? 1 : 0);
+  const selectedPosition = selectedMedia.type === "VIDEO" ? cleanImages.length + 1 : selectedIndex + 1;
   const selectedImage = cleanImages[selectedIndex];
   const selectedMobileMetrics = mobileImageMetrics[selectedImage] ?? { aspectRatio: 1, orientation: "square" as const };
 
@@ -79,15 +108,17 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
 
   const showPrevious = useCallback(() => {
     if (cleanImages.length < 2) return;
-    setSelectedIndex((index) => { const next = (index - 1 + cleanImages.length) % cleanImages.length; scrollToIndex(next); return next; });
-    setIsZoomed(false);
-  }, [cleanImages.length, scrollToIndex]);
+    const next = (selectedIndex - 1 + cleanImages.length) % cleanImages.length;
+    selectImage(next);
+    scrollToIndex(next);
+  }, [cleanImages.length, scrollToIndex, selectImage, selectedIndex]);
 
   const showNext = useCallback(() => {
     if (cleanImages.length < 2) return;
-    setSelectedIndex((index) => { const next = (index + 1) % cleanImages.length; scrollToIndex(next); return next; });
-    setIsZoomed(false);
-  }, [cleanImages.length, scrollToIndex]);
+    const next = (selectedIndex + 1) % cleanImages.length;
+    selectImage(next);
+    scrollToIndex(next);
+  }, [cleanImages.length, scrollToIndex, selectImage, selectedIndex]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -108,7 +139,7 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
     };
   }, [closeGallery, isOpen, showNext, showPrevious]);
 
-  if (!hasImages) {
+  if (!hasMedia) {
     return <div className="productMainPlaceholder">📦</div>;
   }
 
@@ -133,8 +164,13 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
 
   return (
     <>
-      <div className="productGalleryInteractive">
-        {isMobileGallery ? (
+      <div className={`productGalleryInteractive${mediaCount > 1 ? " hasMediaThumbs" : ""}`}>
+        <div className="productMainMediaStage">
+          {selectedMedia.type === "VIDEO" && video ? (
+          <div className="productMainVideo" aria-label={`${productName} video`}>
+            <video ref={mainVideoRef} src={video.url} poster={video.posterUrl ?? undefined} controls preload="metadata" playsInline aria-label={`${productName} video`}/>
+          </div>
+        ) : isMobileGallery ? (
           <div
             className="productMobileImageTrack"
             ref={trackRef}
@@ -153,7 +189,7 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
                     : physicalIndex === cleanImages.length + 1
                       ? 0
                       : physicalIndex - 1;
-                setSelectedIndex((current) => current === next ? current : next);
+                setSelectedMedia((current) => current.type === "IMAGE" && current.index === next ? current : { type: "IMAGE", index: next });
                 if (scrollEndTimerRef.current !== null) clearTimeout(scrollEndTimerRef.current);
                 if (cleanImages.length > 1 && (physicalIndex === 0 || physicalIndex === cleanImages.length + 1)) {
                   scrollEndTimerRef.current = setTimeout(() => {
@@ -181,7 +217,7 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
                   className="productMobileImageSlide"
                   onClick={(event) => {
                     openerRef.current = event.currentTarget;
-                    setSelectedIndex(index);
+                    selectImage(index);
                     setIsOpen(true);
                   }}
                   aria-label={`Agrandir l'image ${index + 1} de ${productName}`}
@@ -236,18 +272,19 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
             />
             <span className="productZoomHint">⛶ Agrandir</span>
           </button>
-        )}
-        <span className="productGalleryCounter" aria-live="polite">{selectedIndex + 1} / {cleanImages.length}</span>
+          )}
+          <span className="productGalleryCounter" aria-live="polite">{selectedPosition} / {mediaCount}</span>
+        </div>
 
-        {!isMobileGallery && cleanImages.length > 1 && (
-          <div className="productThumbs" aria-label="Photos du produit">
+        {mediaCount > 1 && (
+          <div className="productThumbs productMediaThumbs" aria-label="Médias du produit">
             {cleanImages.map((image, index) => (
               <button
                 type="button"
-                className={`productThumbButton${index === selectedIndex ? " isActive" : ""}`}
-                onClick={() => { setSelectedIndex(index); scrollToIndex(index); }}
+                className={`productThumbButton${selectedMedia.type === "IMAGE" && index === selectedIndex ? " isActive" : ""}`}
+                onClick={() => { selectImage(index); scrollToIndex(index); }}
                 aria-label={`Afficher l'image ${index + 1}`}
-                aria-current={index === selectedIndex ? "true" : undefined}
+                aria-current={selectedMedia.type === "IMAGE" && index === selectedIndex ? "true" : undefined}
                 key={`${image}-${index}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -255,9 +292,14 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
                 <span>{index + 1}</span>
               </button>
             ))}
+            {video && <button type="button" className={`productThumbButton productVideoThumb${selectedMedia.type === "VIDEO" ? " isActive" : ""}`} onClick={selectVideo} aria-label={locale === "fr" ? `Afficher la vidéo de ${productName}` : `Show ${productName} video`} aria-current={selectedMedia.type === "VIDEO" ? "true" : undefined}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {video.posterUrl ? <img src={video.posterUrl} alt="" loading="lazy"/> : <span className="productVideoThumbBackdrop" aria-hidden="true"/>}
+              <span className="productVideoThumbPlay" aria-hidden="true">▶</span>
+              <small>{locale === "fr" ? "Vidéo" : "Video"}</small>
+            </button>}
           </div>
         )}
-        {video && <div className="productGalleryVideo"><video src={video.url} poster={video.posterUrl??undefined} controls preload="metadata" playsInline aria-label={`${productName} video`}/></div>}
       </div>
 
       {isOpen && createPortal((
@@ -304,7 +346,7 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
                 <button
                   type="button"
                   className={index === selectedIndex ? "isActive" : ""}
-                  onClick={() => { setSelectedIndex(index); setIsZoomed(false); }}
+                  onClick={() => selectImage(index)}
                   aria-label={`Afficher l'image ${index + 1}`}
                   key={`lightbox-${image}-${index}`}
                 >

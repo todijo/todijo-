@@ -73,8 +73,8 @@ test("mobile product gallery has no floating actions and keeps a live counter", 
   assert.doesNotMatch(page, /className="productGalleryActions"/);
   assert.match(page, /<WishlistButton productId=\{product\.id\}/);
   assert.match(page, /<ShareButton title=\{product\.name\}/);
-  assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedIndex \+ 1\} \/ \{cleanImages\.length\}/);
-  assert.match(gallery, /!isMobileGallery && cleanImages\.length > 1/);
+  assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedPosition\} \/ \{mediaCount\}/);
+  assert.match(gallery, /mediaCount > 1/);
   assert.match(gallery, /window\.matchMedia\("\(max-width: 860px\)"\)/);
   assert.match(gallery, /openerRef\.current = event\.currentTarget;[\s\S]*?setIsOpen\(true\)/);
   assert.match(page, /className="productMobileSecondaryActions"><ShareButton title=\{product\.name\}/);
@@ -159,28 +159,44 @@ test("mobile gallery removes the shell gap and uses a horizontal snap track", as
 
 test("gallery index, counter, and thumbnails stay synchronized", async () => {
   const gallery = await readFile("app/product/[id]/ProductGallery.tsx", "utf8");
-  assert.match(gallery, /setSelectedIndex\(\(current\) => current === next \? current : next\)/);
-  assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedIndex \+ 1\} \/ \{cleanImages\.length\}/);
-  assert.match(gallery, /index === selectedIndex \? " isActive" : ""/);
-  assert.match(gallery, /setSelectedIndex\(index\); scrollToIndex\(index\)/);
+  assert.match(gallery, /setSelectedMedia\(\(current\) => current\.type === "IMAGE" && current\.index === next/);
+  assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedPosition\} \/ \{mediaCount\}/);
+  assert.match(gallery, /selectedMedia\.type === "IMAGE" && index === selectedIndex \? " isActive" : ""/);
+  assert.match(gallery, /selectImage\(index\); scrollToIndex\(index\)/);
   assert.match(gallery, /requestAnimationFrame\(\(\) => scrollToIndex\(0, "auto"\)\)/);
-  assert.match(gallery, /setVariantImages\(Array\.isArray\(next\) \? next\.filter\(Boolean\) : \[\]\); setSelectedIndex\(0\)/);
+  assert.match(gallery, /setVariantImages\(filtered\); setSelectedMedia\(filtered\.length \|\| baseImages\.length/);
   assert.doesNotMatch(gallery, /setTrackHeight|ResizeObserver|active-gallery-height/);
+});
+
+test("video shares the main media viewer and stops before returning to an image", async () => {
+  const [gallery, css] = await Promise.all([readFile("app/product/[id]/ProductGallery.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
+  assert.match(gallery, /type SelectedMedia =[\s\S]*type: "IMAGE"[\s\S]*type: "VIDEO"/);
+  assert.match(gallery, /selectedMedia\.type === "VIDEO" && video/);
+  assert.match(gallery, /className="productMainVideo"/);
+  assert.match(gallery, /controls preload="metadata" playsInline/);
+  assert.match(gallery, /className=\{`productThumbButton productVideoThumb/);
+  assert.match(gallery, /player\.pause\(\)/);
+  assert.match(gallery, /player\.readyState > 0\) player\.currentTime = 0/);
+  assert.match(gallery, /const selectImage = useCallback[\s\S]*stopVideo\(\);[\s\S]*setSelectedMedia\(\{ type: "IMAGE", index \}\)/);
+  assert.doesNotMatch(gallery, /productGalleryVideo/);
+  assert.match(css, /\.productMainVideo video\{[^}]*width:100%;height:100%;[^}]*object-fit:contain/);
+  assert.match(css, /\.productVideoThumbPlay/);
 });
 
 test("desktop gallery uses a large image with a vertical thumbnail rail and responsive fallback", async () => {
   const [gallery, css] = await Promise.all([readFile("app/product/[id]/ProductGallery.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
   assert.match(css, /@media\(min-width:1101px\)[\s\S]*?\.productGalleryInteractive\{display:grid;grid-template-columns:88px minmax\(0,1fr\);grid-template-rows:minmax\(560px,640px\)/);
   assert.match(css, /@media\(min-width:1101px\)[\s\S]*?\.productThumbs\{grid-column:1;grid-row:1;[^}]*flex-direction:column;[^}]*overflow-y:auto/);
-  assert.match(css, /\.productMainImageButton\{grid-column:2;grid-row:1;position:relative;width:100%;height:100%;min-height:0;[^}]*border-radius:24px;[^}]*overflow:hidden/);
+  assert.match(css, /\.productMainMediaStage\{grid-column:2;grid-row:1;min-height:0\}/);
+  assert.match(css, /\.productMainImageButton\{position:relative;width:100%;height:100%;min-height:0;[^}]*border-radius:24px;[^}]*overflow:hidden/);
   assert.match(css, /\.productMainImage\.productMainImageIntrinsic\{display:block;width:100%;height:100%;max-height:none;margin:0;object-fit:contain;object-position:center\}/);
   assert.match(css, /\.productMainImage\.productMainImageIntrinsic\[data-orientation="landscape"\]\{object-fit:cover\}/);
   assert.match(gallery, /image\.dataset\.orientation = image\.naturalWidth >= image\.naturalHeight \? "landscape" : "portrait"/);
   assert.match(gallery, /key=\{selectedImage\}/);
   assert.match(css, /@media\(min-width:861px\) and \(max-width:1100px\)[\s\S]*?\.productThumbs\{display:flex;[^}]*overflow-x:auto;overflow-y:hidden/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.productThumbButton\{transition:none\}\}/);
-  assert.match(gallery, /index === selectedIndex \? " isActive" : ""/);
-  assert.match(gallery, /onClick=\{\(\) => \{ setSelectedIndex\(index\); scrollToIndex\(index\); \}\}/);
+  assert.match(gallery, /selectedMedia\.type === "IMAGE" && index === selectedIndex \? " isActive" : ""/);
+  assert.match(gallery, /onClick=\{\(\) => \{ selectImage\(index\); scrollToIndex\(index\); \}\}/);
 });
 
 test("mobile product info starts with compact title and price", async () => {
