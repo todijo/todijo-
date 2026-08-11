@@ -122,13 +122,14 @@ test("import blocks duplicates within one connection but permits platform and tw
     product: { findUnique: async () => null },
     $transaction: async (callback: any) => callback(tx),
   };
-  const provider: any = { id: "CJ", isConfigured: () => true, getProduct: async () => ({ provider: "CJ", supplierProductId: "ABC", sku: null, title: "Product", description: "Description", categoryReference: null, sourceUrl: null, cost: 5, currency: "USD", stock: 2, available: true, weightGrams: null, media: [], rawMetadata: {}, variants: [{ supplierVariantId: "V1", sku: null, title: "Variant", cost: 5, currency: "USD", stock: 2, available: true }] }) };
+  const provider: any = { id: "CJ", isConfigured: () => true, getProduct: async () => ({ provider: "CJ", supplierProductId: "CANONICAL-PID", sku: "CJ-SKU", title: "Product", description: "Description", categoryReference: null, sourceUrl: null, cost: 5, currency: "USD", stock: 2, available: true, weightGrams: null, media: [], rawMetadata: {}, variants: [{ supplierVariantId: "V1", sku: null, title: "Variant", cost: 5, currency: "USD", stock: 2, available: true }] }) };
   const media: any = { copyRemote: async () => { throw new Error("unexpected media copy"); } };
   for (const [connectionId, ownerType, storeId] of [[PLATFORM_CJ_CONNECTION_ID, "PLATFORM", "platform-store"], ["seller-a-cj", "SELLER", "store-a"], ["seller-b-cj", "SELLER", "store-b"]] as const) {
     await importSupplierProduct(db, provider, media, { connectionId, ownerType, storeId, supplierProductId: "ABC", sellingPrice: 20, category: "Other" });
   }
   await assert.rejects(() => importSupplierProduct(db, provider, media, { connectionId: "seller-a-cj", ownerType: "SELLER", storeId: "store-a", supplierProductId: "ABC", sellingPrice: 20, category: "Other" }), /SUPPLIER_PRODUCT_ALREADY_IMPORTED/);
   assert.deepEqual(createdLinks.map((link) => link.connectionId), [PLATFORM_CJ_CONNECTION_ID, "seller-a-cj", "seller-b-cj"]);
+  assert.deepEqual(createdLinks.map((link) => link.supplierProductId), ["CANONICAL-PID", "CANONICAL-PID", "CANONICAL-PID"]);
   assert.deepEqual(createdVariants.map((variant) => variant.supplierConnectionId), [PLATFORM_CJ_CONNECTION_ID, "seller-a-cj", "seller-b-cj"]);
 });
 

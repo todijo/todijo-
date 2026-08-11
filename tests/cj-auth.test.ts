@@ -115,13 +115,60 @@ test("CJ SKU input resolves to canonical pid before variant and inventory reques
   assert.match(urls[2],new RegExp(`/product/stock/getInventoryByPid\\?pid=${canonicalPid}$`));
 });
 
+test("CJ SKU product-not-found falls back to listV2 exact SPU and canonical pid", async () => {
+  const urls: string[] = [];
+  const logs: string[] = [];
+  const originalInfo = console.info;
+  console.info = (...values: unknown[]) => logs.push(values.map(String).join(" "));
+  const canonicalPid="CANONICAL-PID-206905203";
+  const fetcher: typeof fetch = async (input) => {
+    const url=String(input); urls.push(url);
+    if (urls.length===1) return new Response(JSON.stringify({code:1602001,result:false,success:false,message:"Product not found",requestId:"direct-404"}));
+    if (urls.length===2) return new Response(JSON.stringify({code:200,result:true,success:true,message:"Success",requestId:"list-request",data:{content:[{productList:[{id:"FUZZY-PID",sku:"CJCS206905203CX-OTHER",spu:"OTHER"},{id:canonicalPid,sku:"unrelated",spu:" cjcs206905203cx "}]}]}}));
+    if (urls.length===3) return new Response(JSON.stringify({code:200,result:true,success:true,data:{pid:canonicalPid,productSku:"CJCS206905203CX",productNameEn:"Pullover",productImageSet:[]}}));
+    if (urls.length===4) return new Response(JSON.stringify({code:200,result:true,success:true,data:[]}));
+    return new Response(JSON.stringify({code:200,result:true,success:true,data:{variantInventories:[]}}));
+  };
+  const auth={isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  try {
+    const result=await new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0}).getProduct("CJCS206905203CX");
+    assert.equal(result.supplierProductId,canonicalPid);
+  } finally { console.info=originalInfo; }
+  assert.match(urls[0],/productSku=CJCS206905203CX/);
+  assert.match(urls[1],/\/product\/listV2\?page=1&size=20&keyWord=CJCS206905203CX$/);
+  assert.match(urls[2],new RegExp(`/product/query\\?pid=${canonicalPid}&features=enable_video$`));
+  assert.match(urls[3],new RegExp(`/product/variant/query\\?pid=${canonicalPid}$`));
+  assert.match(urls[4],new RegExp(`/product/stock/getInventoryByPid\\?pid=${canonicalPid}$`));
+  assert.match(logs[0],/resolve-product-sku-list-v2/);
+  assert.match(logs[0],/"candidateCount":2/);
+  assert.match(logs[0],/"exactMatchFound":true/);
+  assert.match(logs[0],new RegExp(canonicalPid));
+  assert.doesNotMatch(logs[0],/access-secret/);
+});
+
+test("CJ listV2 fallback rejects fuzzy-only and ambiguous exact SKU results", async () => {
+  const auth={isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  const providerFor=(productList:unknown[])=>{
+    let calls=0;
+    const fetcher:typeof fetch=async()=>++calls===1
+      ? new Response(JSON.stringify({code:1602001,result:false,success:false,message:"Product not found"}))
+      : new Response(JSON.stringify({code:200,result:true,success:true,data:{content:[{productList}]}}));
+    return new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0});
+  };
+  await assert.rejects(()=>providerFor([{id:"FUZZY",sku:"CJCS206905203CX-OTHER",spu:"NOT-EXACT"}]).getProduct("CJCS206905203CX"),/CJ_PRODUCT_NOT_FOUND/);
+  await assert.rejects(()=>providerFor([{id:"PID-A",sku:"CJCS206905203CX"},{id:"PID-B",spu:"cjcs206905203cx"}]).getProduct("CJCS206905203CX"),/CJ_PRODUCT_IDENTIFIER_AMBIGUOUS/);
+});
+
 test("CJ product-not-found stays sanitized and logs the SKU lookup context", async () => {
   const original = console.error;
   const output: string[] = [];
   console.error = (...values: unknown[]) => output.push(values.map(String).join(" "));
   const auth = {isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
   try {
-    const fetcher: typeof fetch = async () => new Response(JSON.stringify({code:1602001,result:false,success:false,message:"Product not found; token access-secret",requestId:"cj-request-404"}),{status:200});
+    let calls=0;
+    const fetcher: typeof fetch = async () => ++calls===1
+      ? new Response(JSON.stringify({code:1602001,result:false,success:false,message:"Product not found; token access-secret",requestId:"cj-request-404"}),{status:200})
+      : new Response(JSON.stringify({code:200,result:true,success:true,data:{content:[]}}),{status:200});
     await assert.rejects(()=>new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0}).getProduct("CJCS206905203CX"),/CJ_PRODUCT_NOT_FOUND/);
   } finally { console.error = original; }
   assert.match(output[0],/resolve-product-sku/);

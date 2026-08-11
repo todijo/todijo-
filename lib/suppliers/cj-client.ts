@@ -1,6 +1,6 @@
 import type { SupplierCatalogProvider, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
 import { CjAuthService, cjAuth } from "./cj-auth";
-import { logCjFailure } from "./cj-diagnostics";
+import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
@@ -8,6 +8,7 @@ function text(value: unknown) { return typeof value === "string" ? value.trim() 
 function number(value: unknown) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
 function list(value: unknown) { return Array.isArray(value) ? value : []; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === "object" ? value as Record<string, unknown> : {}; }
+function normalizedIdentifier(value: unknown) { return text(value).toUpperCase(); }
 
 export function normalizeCjProduct(productValue: unknown, variantValue: unknown, inventoryValue: unknown): SupplierProductSnapshot {
   const product = object(productValue);
@@ -77,7 +78,7 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
         if (payload.code === 1602001 || payload.code === "1602001") throw new Error("CJ_PRODUCT_NOT_FOUND");
         throw new Error(response.status >= 500 ? "CJ_UNAVAILABLE" : "CJ_API_REQUEST_FAILED");
       }
-      return payload.data;
+      return {data:payload.data,meta:{httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId}};
     }
     throw new Error("CJ_AUTHENTICATION_FAILED");
   }
@@ -88,12 +89,33 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const isSku = /^CJ[A-Za-z0-9-]+$/i.test(identifier);
     const context = { supplierProductIdentifier:identifier, identifierType:isSku?"productSku":"pid" };
     const query = isSku ? `productSku=${encodeURIComponent(identifier)}` : `pid=${encodeURIComponent(identifier)}`;
-    const product = await this.get(isSku?"resolve-product-sku":"get-product-detail",`/product/query?${query}&features=enable_video`,context);
+    let productResult: Awaited<ReturnType<CjCatalogProvider["get"]>>;
+    try {
+      productResult = await this.get(isSku?"resolve-product-sku":"get-product-detail",`/product/query?${query}&features=enable_video`,context);
+    } catch (error) {
+      if (!isSku || !(error instanceof Error) || error.message !== "CJ_PRODUCT_NOT_FOUND") throw error;
+      const fallbackPath = `/product/listV2?page=1&size=20&keyWord=${encodeURIComponent(identifier)}`;
+      const fallback = await this.get("resolve-product-sku-list-v2",fallbackPath,context);
+      const candidates = list(object(fallback.data).content).flatMap((entry)=>list(object(entry).productList));
+      const normalizedSku = normalizedIdentifier(identifier);
+      const exactCandidates = candidates.filter((entry)=>{
+        const row=object(entry);
+        return [row.sku,row.spu].some((value)=>normalizedIdentifier(value)===normalizedSku);
+      });
+      const canonicalPids = [...new Set(exactCandidates.map((entry)=>text(object(entry).id ?? object(entry).pid)).filter(Boolean))];
+      const selectedCanonicalPid = canonicalPids.length===1 ? canonicalPids[0] : undefined;
+      const exactMatchFound = canonicalPids.length>0;
+      logCjSkuResolution({operation:"resolve-product-sku-list-v2",stage:"product-retrieval",path:fallbackPath,...fallback.meta,context:{...context,candidateCount:candidates.length,exactMatchFound,selectedCanonicalPid:selectedCanonicalPid??null},candidateCount:candidates.length,exactMatchFound,selectedCanonicalPid,ambiguous:canonicalPids.length>1});
+      if (!canonicalPids.length) throw new Error("CJ_PRODUCT_NOT_FOUND");
+      if (canonicalPids.length>1) throw new Error("CJ_PRODUCT_IDENTIFIER_AMBIGUOUS");
+      productResult = await this.get("get-product-detail",`/product/query?pid=${encodeURIComponent(selectedCanonicalPid!)}&features=enable_video`,{...context,canonicalPid:selectedCanonicalPid!});
+    }
+    const product = productResult.data;
     const canonicalPid = text(object(product).pid ?? object(product).productId);
     if (!canonicalPid) throw new Error("CJ_PRODUCT_NOT_FOUND");
     const canonicalContext = {...context,canonicalPid};
     const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
-    return normalizeCjProduct(product, variants, inventory);
+    return normalizeCjProduct(product, variants.data, inventory.data);
   }
 }

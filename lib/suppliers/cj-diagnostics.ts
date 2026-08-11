@@ -1,4 +1,4 @@
-type CjFailure = {
+type CjDiagnostic = {
   operation: string;
   path: string;
   stage: "authentication" | "product-retrieval";
@@ -17,7 +17,7 @@ function redact(value: string | undefined, secrets: Array<string | undefined>) {
     .replace(/Bearer\s+[^\s,;}]+/gi, "Bearer [REDACTED]");
 }
 
-export function logCjFailure(failure: CjFailure, secrets: Array<string | undefined> = []) {
+export function logCjFailure(failure: CjDiagnostic, secrets: Array<string | undefined> = []) {
   console.error("[cj-api]", JSON.stringify({
     event: "cj_api_failure",
     operation: failure.operation,
@@ -28,5 +28,23 @@ export function logCjFailure(failure: CjFailure, secrets: Array<string | undefin
     responseMessage: redact(failure.responseMessage, secrets) || null,
     requestId: redact(failure.requestId, secrets) || null,
     context: failure.context ?? {},
+  }));
+}
+
+export function logCjSkuResolution(diagnostic: CjDiagnostic & {candidateCount:number;exactMatchFound:boolean;selectedCanonicalPid?:string;ambiguous:boolean}, secrets: Array<string | undefined> = []) {
+  console.info("[cj-api]", JSON.stringify({
+    event:"cj_sku_resolution",
+    operation:diagnostic.operation,
+    stage:diagnostic.stage,
+    path:diagnostic.path,
+    httpStatus:diagnostic.httpStatus ?? null,
+    responseCode:diagnostic.responseCode ?? null,
+    responseMessage:redact(diagnostic.responseMessage,secrets) || null,
+    requestId:redact(diagnostic.requestId,secrets) || null,
+    context:diagnostic.context ?? {},
+    candidateCount:diagnostic.candidateCount,
+    exactMatchFound:diagnostic.exactMatchFound,
+    selectedCanonicalPid:diagnostic.selectedCanonicalPid ?? null,
+    ambiguous:diagnostic.ambiguous,
   }));
 }
