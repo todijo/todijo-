@@ -99,6 +99,19 @@ enum SupplierSyncStatus {
   ERROR
 }
 
+enum SupplierFulfillmentStatus {
+  PENDING
+  SUBMITTING
+  SUBMITTED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  RETRYABLE
+  AMBIGUOUS
+  MANUAL_ACTION_REQUIRED
+  CANCELLED
+}
+
 enum ProductMediaType {
   IMAGE
   VIDEO
@@ -409,6 +422,7 @@ model SupplierConnection {
   store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
   productLinks SupplierProductLink[]
   variantMappings ProductVariant[]
+  fulfillments SupplierFulfillment[]
 
   @@index([ownerType, storeId, provider, status])
   @@index([provider, status])
@@ -570,6 +584,7 @@ model Order {
   refundRequest      RefundRequest?
   issues             OrderIssue[]
   lifecycleEvents    OrderLifecycleEvent[]
+  supplierFulfillments SupplierFulfillment[]
 
   @@unique([buyerId, checkoutRequestId])
   @@index([buyerId, status, createdAt])
@@ -649,6 +664,7 @@ model OrderItem {
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   review  Review?
   supplierPricingSnapshot OrderItemSupplierPricingSnapshot?
+  supplierFulfillmentItem SupplierFulfillmentItem?
 
   @@unique([orderId, lineKey])
   @@index([productId])
@@ -664,6 +680,72 @@ model OrderItemSupplierPricingSnapshot {
   createdAt DateTime @default(now())
 
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+}
+
+/// Private supplier-side fulfillment state. Never include this model in buyer payloads.
+model SupplierFulfillment {
+  id                    String                    @id @default(cuid())
+  orderId               String
+  connectionId          String?
+  provider              SupplierProvider
+  externalReference     String                    @unique @db.VarChar(50)
+  status                SupplierFulfillmentStatus @default(PENDING)
+  originCountry         String?                   @db.VarChar(2)
+  destinationCountry    String?                   @db.VarChar(2)
+  shippingMethod        String?                   @db.VarChar(80)
+  supplierOrderId       String?                   @db.VarChar(120)
+  supplierOrderNumber   String?                   @db.VarChar(120)
+  supplierStatus        String?                   @db.VarChar(80)
+  attemptCount          Int                       @default(0)
+  claimToken            String?                   @db.VarChar(64)
+  claimedAt             DateTime?
+  submittedAt           DateTime?
+  confirmedAt           DateTime?
+  lastSyncedAt          DateTime?
+  lastErrorCategory     String?                   @db.VarChar(40)
+  lastErrorCode         String?                   @db.VarChar(120)
+  lastErrorMessage      String?                   @db.VarChar(500)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  order      Order                    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  connection SupplierConnection?      @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  items      SupplierFulfillmentItem[]
+  tracking   SupplierTracking[]
+
+  @@index([orderId, status])
+  @@index([connectionId, status, updatedAt])
+}
+
+model SupplierFulfillmentItem {
+  id                    String @id @default(cuid())
+  fulfillmentId         String
+  orderItemId           String @unique
+  supplierProductId     String @db.VarChar(200)
+  supplierVariantId     String @db.VarChar(200)
+  quantity              Int
+
+  fulfillment SupplierFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  @@index([fulfillmentId])
+}
+
+model SupplierTracking {
+  id                    String   @id @default(cuid())
+  fulfillmentId         String
+  supplierShipmentId    String?  @db.VarChar(120)
+  carrier               String?  @db.VarChar(120)
+  trackingNumber        String   @db.VarChar(160)
+  trackingUrl           String?  @db.VarChar(500)
+  shippedAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  fulfillment SupplierFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+
+  @@unique([fulfillmentId, trackingNumber])
+  @@index([fulfillmentId, createdAt])
 }
 
 model ProductOption {

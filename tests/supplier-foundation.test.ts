@@ -74,7 +74,7 @@ test("supplier preflight preserves manual products and fails closed for supplier
   for(const syncStatus of ["PRICE_CHANGED","UNAVAILABLE","ERROR"]) assert.throws(()=>assertSupplierPurchasable({supplierLink:{supplierAvailable:true,syncStatus}}),/SUPPLIER_PRODUCT_REQUIRES_REVIEW/);
 });
 
-test("real supplier order/payment/fulfilment remains impossible and dry-run is gated",()=>{
+test("legacy supplier dry-run remains disabled and independently gated",()=>{
   assert.equal(realSupplierFulfillmentAllowed(),false); assert.throws(assertRealSupplierFulfillmentDisabled,/REAL_SUPPLIER_FULFILLMENT_DISABLED/);
   assert.equal(stripeIsTestMode("sk_test_example"),true); assert.equal(stripeIsTestMode("sk_live_example"),false);
   const previousNode=process.env.NODE_ENV, previousDry=process.env.SUPPLIER_DRY_RUN_ENABLED, previousStripe=process.env.STRIPE_SECRET_KEY;

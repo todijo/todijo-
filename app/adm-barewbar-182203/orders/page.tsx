@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { AdminRefundReviewControl } from "@/components/AdminRefundReviewControl";
+import { AdminSupplierFulfillmentControl } from "@/components/AdminSupplierFulfillmentControl";
 import { requireAdmin } from "@/lib/admin-access";
 import { adminOrderWhere, adminPage, normalizeAdminSearch, orderStoreNames } from "@/lib/admin-marketplace";
 import { buyerPaymentState } from "@/lib/buyer-orders";
@@ -77,6 +78,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
           },
         },
       },
+      supplierFulfillments: { select: { id: true, status: true, supplierStatus: true, attemptCount: true, lastErrorCode: true, lastErrorMessage: true }, orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -131,6 +133,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
               </section>
 
               {order.refundRequest && <section className="adminOrderRefund"><h2>{orders("refundRequest.title")}</h2><AdminRefundReviewControl request={order.refundRequest} totalLabel={orders("total")} total={money(Number(order.total), order.currency)} /></section>}
+              {order.supplierFulfillments.map((fulfillment) => <AdminSupplierFulfillmentControl key={fulfillment.id} fulfillment={fulfillment}/>)}
             </article>;
           })}
         </section> : <p className="adminOrdersEmpty">{t("noOrders")}</p>}

@@ -1,7 +1,7 @@
 type CjDiagnostic = {
   operation: string;
   path: string;
-  stage: "authentication" | "product-retrieval";
+  stage: "authentication" | "product-retrieval" | "fulfillment";
   httpStatus?: number;
   responseCode?: number | string;
   responseMessage?: string;
@@ -15,6 +15,23 @@ function redact(value: string | undefined, secrets: Array<string | undefined>) {
   return safe
     .replace(/(CJ-Access-Token|Authorization|apiKey|accessToken|refreshToken)\s*[:=]\s*[^\s,;}]+/gi, "$1=[REDACTED]")
     .replace(/Bearer\s+[^\s,;}]+/gi, "Bearer [REDACTED]");
+}
+
+export function logCjFulfillment(diagnostic: CjDiagnostic & { fulfillmentId: string; externalReference: string; outcome: string }, secrets: Array<string | undefined> = []) {
+  console.info("[cj-fulfillment]", JSON.stringify({
+    event: "cj_fulfillment",
+    operation: diagnostic.operation,
+    stage: "fulfillment",
+    path: diagnostic.path,
+    httpStatus: diagnostic.httpStatus ?? null,
+    responseCode: diagnostic.responseCode ?? null,
+    responseMessage: redact(diagnostic.responseMessage, secrets) || null,
+    requestId: redact(diagnostic.requestId, secrets) || null,
+    fulfillmentId: diagnostic.fulfillmentId,
+    externalReference: diagnostic.externalReference,
+    outcome: diagnostic.outcome,
+    context: diagnostic.context ?? {},
+  }));
 }
 
 export function logCjFailure(failure: CjDiagnostic, secrets: Array<string | undefined> = []) {

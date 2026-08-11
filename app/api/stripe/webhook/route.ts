@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { processStripeEvent } from "@/lib/payments";
 import { verifyStripeWebhook, type StripeCheckoutSession } from "@/lib/stripe";
+import { processOrderSupplierFulfillments } from "@/lib/suppliers/supplier-fulfillment";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,18 @@ export async function POST(request: Request) {
         : { found: false, lookup: { storeId, customerId, subscriptionId, userId } });
     }
     const result = await processStripeEvent(prisma, event);
+    const paidOrderId = !sellerCheckout && "paid" in result && result.paid === true
+      ? session.metadata?.orderId ?? session.client_reference_id
+      : null;
+    if (paidOrderId) {
+      try {
+        const fulfillment = await processOrderSupplierFulfillments(paidOrderId);
+        console.info("[cj-fulfillment]", JSON.stringify({ event: "paid_order_fulfillment_attempted", orderId: paidOrderId, fulfillmentCount: fulfillment.length }));
+      } catch (error) {
+        // Buyer payment is already final. Supplier failure is persisted/recoverable and must not replay stock/payment effects.
+        console.error("[cj-fulfillment]", JSON.stringify({ event: "paid_order_fulfillment_dispatch_failed", orderId: paidOrderId, error: error instanceof Error ? error.message : "FULFILLMENT_DISPATCH_FAILED" }));
+      }
+    }
     if (sellerCheckout) {
       const updatedStoreId = "storeId" in result && typeof result.storeId === "string"
         ? result.storeId

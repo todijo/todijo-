@@ -2,6 +2,13 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
   lifecycleEvents: { select: { id: true, type: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+  supplierFulfillments: {
+    select: {
+      status: true,
+      tracking: { select: { carrier: true, trackingNumber: true, trackingUrl: true, shippedAt: true }, orderBy: { createdAt: "asc" } },
+    },
+    orderBy: { createdAt: "asc" },
+  },
   items: {
     select: { id: true, quantity: true, unitPrice: true, lineTotal: true, selectedColor: true, selectedSize: true, selectedOptions: true, productNameSnapshot: true, productImageUrlSnapshot: true,
       product: {

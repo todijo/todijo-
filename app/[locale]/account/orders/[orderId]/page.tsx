@@ -46,6 +46,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
     { key: "DELIVERED", label: t("fulfillment.delivered") },
   ];
   const lifecycleLabel = (type: string) => ["PAID", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"].includes(type) ? t(`status.${type}`) : t(`lifecycle.${type}`);
+  const supplierStatusLabel = (status: string) => status === "DELIVERED" ? t("fulfillment.delivered") : status === "SHIPPED" ? t("fulfillment.shipped") : ["PROCESSING", "SUBMITTED"].includes(status) ? t("fulfillment.preparing") : t("fulfillment.confirmed");
 
   return (
     <main className="buyerOrdersPage scopedPublicPage">
@@ -78,6 +79,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
               </ol>
             )}
             {(order.trackingCarrier || order.trackingNumber || order.trackingUrl) && <div className="buyerTrackingCard"><strong>{t("fulfillment.tracking")}</strong>{order.trackingCarrier&&<span>{order.trackingCarrier}</span>}{order.trackingNumber&&<code>{order.trackingNumber}</code>}{order.trackingUrl&&<a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">{shippingText("trackPackage")}</a>}</div>}
+            {order.supplierFulfillments.map((fulfillment, fulfillmentIndex) => <div className="buyerTrackingCard" key={`supplier-fulfillment-${fulfillmentIndex}`}><strong>{supplierStatusLabel(fulfillment.status)}</strong>{fulfillment.tracking.map((tracking) => <div key={tracking.trackingNumber}>{tracking.carrier&&<span>{tracking.carrier}</span>}<code>{tracking.trackingNumber}</code>{tracking.trackingUrl&&<a href={tracking.trackingUrl} target="_blank" rel="noopener noreferrer">{shippingText("trackPackage")}</a>}</div>)}</div>)}
 
             {order.lifecycleEvents.length > 0 && <section className="buyerLifecycleTimeline" aria-label={t("lifecycle.title")}><h2>{t("lifecycle.title")}</h2><ol>{order.lifecycleEvents.map((event) => <li key={event.id}><i aria-hidden="true"/><div><strong>{lifecycleLabel(event.type)}</strong><time dateTime={event.createdAt.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(event.createdAt)}</time></div></li>)}</ol></section>}
             <h2>{t("products")}</h2>
