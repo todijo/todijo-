@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { CjCatalogProvider } from "@/lib/suppliers/cj-client";
 import { defaultSupplierMediaProvider, importSupplierProduct } from "@/lib/suppliers/supplier-products";
-import { requirePlatformSupplierAdmin } from "@/lib/suppliers/supplier-access";
+import { PLATFORM_CJ_CONNECTION_ID, requirePlatformSupplierAdmin } from "@/lib/suppliers/supplier-access";
 import { AdminAccessError } from "@/lib/admin-access";
 
 export async function POST(request: Request) {
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const body = await request.json() as {supplierProductId?:unknown;sellingPrice?:unknown;category?:unknown};
     const store = await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true}});
     if (!store) return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
-    const product = await importSupplierProduct(prisma,new CjCatalogProvider(),defaultSupplierMediaProvider(),{storeId:store.id,supplierProductId:String(body.supplierProductId??""),sellingPrice:Number(body.sellingPrice),category:String(body.category??"Other")});
+    const product = await importSupplierProduct(prisma,new CjCatalogProvider(),defaultSupplierMediaProvider(),{storeId:store.id,connectionId:PLATFORM_CJ_CONNECTION_ID,ownerType:"PLATFORM",supplierProductId:String(body.supplierProductId??""),sellingPrice:Number(body.sellingPrice),category:String(body.category??"Other")});
     return NextResponse.json({ok:true,productId:product.id,status:"DRAFT"},{status:201});
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});

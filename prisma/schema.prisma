@@ -387,7 +387,7 @@ model SupplierProductLink {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   connection SupplierConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
 
-  @@unique([provider, supplierProductId])
+  @@unique([connectionId, supplierProductId])
   @@index([provider, syncStatus, lastSyncedAt])
   @@index([connectionId, syncStatus, lastSyncedAt])
 }
@@ -408,6 +408,7 @@ model SupplierConnection {
 
   store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
   productLinks SupplierProductLink[]
+  variantMappings ProductVariant[]
 
   @@index([ownerType, storeId, provider, status])
   @@index([provider, status])
@@ -728,6 +729,7 @@ model ProductVariant {
   stock           Int      @default(0)
   active          Boolean  @default(true)
   supplierProvider  SupplierProvider?
+  supplierConnectionId String?
   supplierVariantId String? @db.VarChar(200)
   supplierSku       String? @db.VarChar(200)
   supplierCost      Decimal? @db.Decimal(12, 2)
@@ -740,9 +742,11 @@ model ProductVariant {
   product Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
   values  ProductVariantValue[]
   orderItems OrderItem[]
+  supplierConnection SupplierConnection? @relation(fields: [supplierConnectionId], references: [id], onDelete: Restrict)
 
   @@unique([productId, combinationKey])
-  @@unique([supplierProvider, supplierVariantId])
+  @@unique([supplierConnectionId, supplierVariantId])
+  @@index([supplierConnectionId, productId])
   @@index([productId, active])
 }
 

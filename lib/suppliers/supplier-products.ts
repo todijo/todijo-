@@ -14,12 +14,14 @@ async function uniqueSlug(db: Database, storeId: string, title: string) {
   return slug;
 }
 
-export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;supplierProductId:string;sellingPrice:number;category:string}) {
+export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice:number;category:string}) {
   if (!provider.isConfigured()) throw new Error("SUPPLIER_NOT_CONFIGURED");
   if (!Number.isFinite(input.sellingPrice) || input.sellingPrice <= 0) throw new Error("SELLING_PRICE_INVALID");
+  const connection = await db.supplierConnection.findFirst({where:{id:input.connectionId,provider:provider.id,ownerType:input.ownerType,status:"CONNECTED",...(input.ownerType==="SELLER"?{storeId:input.storeId,store:{dropshippingEnabled:true}}:{storeId:null})},select:{id:true}});
+  if (!connection) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
   const snapshot = await provider.getProduct(input.supplierProductId);
   if (!snapshot.supplierProductId) throw new Error("SUPPLIER_PRODUCT_INVALID");
-  const exists = await db.supplierProductLink.findUnique({where:{provider_supplierProductId:{provider:provider.id,supplierProductId:snapshot.supplierProductId}},select:{productId:true}});
+  const exists = await db.supplierProductLink.findUnique({where:{connectionId_supplierProductId:{connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId}},select:{productId:true}});
   if (exists) throw new Error("SUPPLIER_PRODUCT_ALREADY_IMPORTED");
   const copied: StoredProductMedia[] = [];
   for (const source of snapshot.media.slice(0,16)) {
@@ -33,14 +35,14 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     const product = await tx.product.create({data:{
       storeId:input.storeId,name:snapshot.title.slice(0,120),slug,description:snapshot.description.slice(0,5000),category:input.category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
       price:input.sellingPrice.toFixed(2),currency:"EUR",stock:snapshot.stock,images,
-      supplierLink:{create:{provider:provider.id,ownerType:"PLATFORM",connectionId:null,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}},
+      supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}},
       media:{create:copied.map((item,index)=>({type:item.type,provider:item.provider,publicId:item.publicId,url:item.url,posterUrl:item.posterUrl,position:index,width:item.width,height:item.height,durationMs:item.durationMs,sourceUrl:snapshot.media[index]?.url??null}))},
     }});
     if (snapshot.variants.length) {
       const option = await tx.productOption.create({data:{productId:product.id,name:"Variant",position:0}});
       for (const [index,variant] of snapshot.variants.entries()) {
         const value = await tx.productOptionValue.create({data:{optionId:option.id,value:variant.title.slice(0,100),position:index}});
-        const created = await tx.productVariant.create({data:{productId:product.id,combinationKey:`variant:${index}`,sku:null,stock:variant.stock,active:variant.available,supplierProvider:provider.id,supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,supplierLastSyncedAt:new Date()}});
+        const created = await tx.productVariant.create({data:{productId:product.id,combinationKey:`variant:${index}`,sku:null,stock:variant.stock,active:variant.available,supplierProvider:provider.id,supplierConnectionId:input.connectionId,supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,supplierLastSyncedAt:new Date()}});
         await tx.productVariantValue.create({data:{variantId:created.id,optionValueId:value.id}});
       }
     }
@@ -59,7 +61,7 @@ export async function syncSupplierProduct(db: Database, provider: SupplierCatalo
     await db.$transaction(async (tx) => {
       await tx.supplierProductLink.update({where:{id:current.id},data:{previousSupplierCost:changed?current.supplierCost:undefined,supplierCost:centsSafe(snapshot.cost),supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:status,lastSyncedAt:new Date(),lastSyncError:null,sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}});
       await tx.product.update({where:{id:productId},data:{stock:unavailable?0:snapshot.stock}});
-      for (const variant of snapshot.variants) await tx.productVariant.updateMany({where:{productId,supplierVariantId:variant.supplierVariantId},data:{supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,stock:variant.stock,active:variant.available,supplierLastSyncedAt:new Date()}});
+      for (const variant of snapshot.variants) await tx.productVariant.updateMany({where:{productId,supplierConnectionId:current.connectionId,supplierVariantId:variant.supplierVariantId},data:{supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,stock:variant.stock,active:variant.available,supplierLastSyncedAt:new Date()}});
     });
     return {status,sellingPricePreserved:current.product.price.toString()};
   } catch (error) {

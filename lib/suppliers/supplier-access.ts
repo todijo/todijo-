@@ -2,6 +2,8 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { requireAdmin } from "../admin-access";
 
 type Database = PrismaClient | Prisma.TransactionClient;
+export const PLATFORM_CJ_CONNECTION_ID = "platform-cj";
+export function supplierIdentityKey(connectionId: string, supplierId: string) { return `${connectionId}\u0000${supplierId}`; }
 
 export class SupplierAccessError extends Error {
   constructor(public code: string, public status = 403) { super(code); }
@@ -28,7 +30,7 @@ export async function requireSellerSupplierAccess(db: Database, session: { userI
 }
 
 export async function requirePlatformSupplierProduct(db: Database, productId: string) {
-  const product = await db.product.findFirst({ where: { id: productId, supplierLink: { is: { ownerType: "PLATFORM", connectionId: null } } }, select: { id: true, supplierLink: { select: { id: true } } } });
+  const product = await db.product.findFirst({ where: { id: productId, supplierLink: { is: { ownerType: "PLATFORM", connectionId: PLATFORM_CJ_CONNECTION_ID } } }, select: { id: true, supplierLink: { select: { id: true } } } });
   if (!product?.supplierLink) throw new SupplierAccessError("SUPPLIER_LINK_NOT_FOUND", 404);
   return product;
 }
