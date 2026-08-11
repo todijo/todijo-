@@ -43,11 +43,13 @@ test("metadata, robots and sitemap cover public discovery without private routes
   const store = read("app", "store", "[slug]", "page.tsx");
   const info = read("app", "info", "[slug]", "page.tsx");
   const robots = read("app", "robots.ts");
-  const sitemap = read("app", "sitemap.ts");
+  const sitemap = read("app", "sitemaps", "[id]", "route.ts");
+  const sitemapIndex = read("app", "sitemap.xml", "route.ts");
   for (const source of [product, store, info]) assert.match(source, /generateMetadata/);
   assert.match(robots, /"\/\*\/dashboard"/);
   assert.match(robots, /"\/\*\/search"/);
-  assert.match(sitemap, /generateSitemaps/);
+  assert.match(sitemapIndex, /sitemapPartitionDescriptors/);
+  assert.match(sitemapIndex, /dynamic = "force-dynamic"/);
   assert.match(sitemap, /SITEMAP_ENTITY_CHUNK_SIZE/);
   assert.match(sitemap, /status: "PUBLISHED"/);
   assert.doesNotMatch(sitemap, /dashboard|checkout|messages|favorites/);

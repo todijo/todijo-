@@ -9,6 +9,6 @@
     "incremental": false,
     "isolatedModules": false
   },
-  "include": ["lib/admin-access.ts", "lib/auth-redirects.ts", "lib/auth-registration.ts", "lib/buyer-orders.ts", "lib/dashboard.ts", "lib/locale-routing.ts", "lib/payments.ts", "lib/product-images.ts", "lib/product-media.ts", "lib/seller-dashboard.ts", "lib/seller-subscription.ts", "lib/stripe.ts", "lib/suppliers/cj-client.ts", "lib/suppliers/safety.ts", "lib/suppliers/types.ts", "lib/turnstile-verification.ts", "tests/**/*.test.ts"],
+  "include": ["lib/admin-access.ts", "lib/auth-redirects.ts", "lib/auth-registration.ts", "lib/buyer-orders.ts", "lib/dashboard.ts", "lib/locale-routing.ts", "lib/payments.ts", "lib/product-images.ts", "lib/product-media.ts", "lib/seller-dashboard.ts", "lib/seller-subscription.ts", "lib/sitemap-partitions.ts", "lib/sitemap-xml.ts", "lib/stripe.ts", "lib/suppliers/cj-client.ts", "lib/suppliers/safety.ts", "lib/suppliers/types.ts", "lib/turnstile-verification.ts", "tests/**/*.test.ts"],
   "exclude": ["node_modules"]
 }
