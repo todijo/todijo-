@@ -8,7 +8,7 @@ const source=(path:string)=>readFileSync(path,"utf8");
 test("eligible product detail enables the authoritative pricing UI while normal products retain the old path",()=>{
  const page=source("app/product/[id]/page.tsx"),panel=source("components/ProductPurchasePanel.tsx");
  assert.match(page,/resolveDropshippingEligibility/);assert.match(page,/dropshippingEligible=\{dropshippingEligibility\.eligible\}/);assert.match(panel,/enabled=\{dropshippingEligible\}/);
- assert.match(panel,/!dropshippingEligible\|\|Boolean\(activePricing\)/);assert.match(panel,/pricingRequired/);
+ assert.match(panel,/!dropshippingEligible\|\|Boolean\(activePricing\)/);assert.match(panel,/pricingRequired=dropshippingEligible/);assert.match(panel,/activePricing\?detail\("pricingUnavailable"\)/);
 });
 
 test("destination is explicit or saved and never inferred from locale, seller, origin, or currency",()=>{

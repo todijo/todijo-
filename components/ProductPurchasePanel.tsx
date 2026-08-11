@@ -51,8 +51,8 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const displayAvailable = isVariantProduct && !selectedVariant ? activeVariants.some((variant) => variant.stock > 0) : available;
   const selectionComplete = !isVariantProduct || genericOptions.every((option) => Boolean(selection[option.id]));
   const disabledLabel = isVariantProduct && (!selectionComplete || (!selectedVariant && displayAvailable)) ? t("chooseOptions") : t("unavailable");
-  const pricingRequired=dropshippingEligible&&(!activePricing||pricingPending);
-  const pricingLabel=pricingPending?detail("pricingLoading"):detail("selectDeliveryCountry");
+  const pricingRequired=dropshippingEligible;
+  const pricingLabel=pricingPending?detail("pricingLoading"):activePricing?detail("pricingUnavailable"):detail("selectDeliveryCountry");
   const updatePricing=useCallback((pricing:BuyerDropshippingPricingResponse|null,pending:boolean)=>{setVerifiedPricing(pricing);setPricingPending(pending);},[]);
 
   return <aside className="productPurchaseCard" aria-label={detail("purchaseOptions")}>
