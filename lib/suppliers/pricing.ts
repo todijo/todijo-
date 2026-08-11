@@ -124,3 +124,9 @@ export function calculateSupplierSnapshotPrices(snapshot: SupplierProductSnapsho
     : new Prisma.Decimal(product!.finalSellingPrice);
   return { product, variants, basePrice:basePrice.toFixed(2), targetMargin:DEFAULT_SUPPLIER_TARGET_MARGIN.toString(), shippingStatus:"DEFERRED" as const, marginGuaranteed:false };
 }
+
+export function calculateSupplierVariantPriceWithFreight(snapshot:SupplierProductSnapshot,supplierVariantId:string,freight:{amount:Prisma.Decimal.Value;currency:string}){
+  const variant=snapshot.variants.find((item)=>item.supplierVariantId===supplierVariantId);
+  if(!variant)throw new SupplierPricingError("PRICING_COST_INVALID");
+  return calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency:variant.currency,shipping:{status:"KNOWN",amount:freight.amount,currency:freight.currency}});
+}

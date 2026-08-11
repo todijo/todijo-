@@ -8,6 +8,7 @@ export type SupplierVariantSnapshot = {
   currency: string;
   stock: number;
   available: boolean;
+  originCountryCodes: string[];
 };
 
 export type SupplierMediaSource = {

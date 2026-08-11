@@ -2,6 +2,7 @@ import type { SupplierCatalogProvider, SupplierProductSnapshot, SupplierVariantS
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
+import { CjFreightError, countryCode, freightCacheKey, normalizeCjFreightMethods, readFreightCache, selectCjFreightMethod, writeFreightCache, type CjFreightQuote } from "./cj-freight";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
@@ -37,9 +38,10 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     const row = object(entry); const total = list(row.inventory).reduce((sum, item) => sum + Math.max(0, number(object(item).totalInventory) ?? 0), 0);
     return [text(row.vid), total] as const;
   }));
+  const originsByVariant = new Map(variantInventories.map((entry)=>{const row=object(entry);return [text(row.vid),[...new Set(list(row.inventory).map((item)=>text(object(item).countryCode).toUpperCase()).filter((code)=>/^[A-Z]{2}$/.test(code)))]] as const;}));
   const variants: SupplierVariantSnapshot[] = variantsRaw.slice(0, 200).map((entry, index) => {
     const row = object(entry); const id = text(row.vid ?? row.variantId); const stock = inventoryByVariant.get(id) ?? Math.max(0, number(row.variantInventory ?? row.stock) ?? 0);
-    return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantNameEn ?? row.variantName ?? row.variantKey) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0 };
+    return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantNameEn ?? row.variantName ?? row.variantKey) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0, originCountryCodes:[...(originsByVariant.get(id)??[])] };
   }).filter((variant) => variant.supplierVariantId);
   const imageUrls = normalizeCjProductImages(product);
   const videoUrl = text(product.productVideo ?? product.videoUrl);
@@ -75,13 +77,13 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
     this.nextRequestAt = Date.now() + (this.options.minimumRequestIntervalMs ?? 1_050);
   }
-  private async get(operation: string, path: string, context: Record<string,string> = {}) {
+  private async request(operation:string,path:string,context:Record<string,string>={},body?:unknown){
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const accessToken = await this.auth.getAccessToken();
       await this.throttle();
       let response: Response;
       try {
-        response = await (this.options.fetcher ?? fetch)(`${CJ_BASE_URL}${path}`, { headers:{"CJ-Access-Token":accessToken,"Accept":"application/json"}, signal:AbortSignal.timeout(15000), cache:"no-store" });
+        response = await (this.options.fetcher ?? fetch)(`${CJ_BASE_URL}${path}`, {method:body===undefined?"GET":"POST",headers:{"CJ-Access-Token":accessToken,"Accept":"application/json",...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000),cache:"no-store"});
       } catch (error) {
         logCjFailure({operation,stage:"product-retrieval",path,responseMessage:error instanceof Error?error.message:"Network request failed",context},[accessToken]);
         throw new Error("CJ_UNAVAILABLE");
@@ -103,6 +105,7 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     }
     throw new Error("CJ_AUTHENTICATION_FAILED");
   }
+  private get(operation:string,path:string,context:Record<string,string>={}){return this.request(operation,path,context);}
   async testConnection() { await this.get("test-connection","/setting/get"); }
   async getProduct(supplierProductId: string) {
     const identifier = supplierProductId.trim();
@@ -142,5 +145,15 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     return normalizeCjProduct(product, variants.data, inventory.data);
+  }
+  async calculateFreight(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<CjFreightQuote>{
+    const originCountry=countryCode(input.originCountry),destinationCountry=countryCode(input.destinationCountry),variantId=input.variantId.trim();
+    if(!/^[A-Za-z0-9-]{4,200}$/.test(variantId)||!Number.isSafeInteger(input.quantity)||input.quantity<1||input.quantity>999)throw new CjFreightError("CJ_FREIGHT_INPUT_INVALID");
+    const normalized={originCountry,destinationCountry,variantId,quantity:input.quantity,requestedMethod:input.requestedMethod?.trim()||undefined};
+    const key=freightCacheKey(normalized),cached=readFreightCache(key);if(cached)return cached;
+    const path="/logistic/freightCalculate";
+    const result=await this.request("calculate-freight",path,{originCountry,destinationCountry,variantId,quantity:String(input.quantity)},{startCountryCode:originCountry,endCountryCode:destinationCountry,products:[{quantity:input.quantity,vid:variantId}]});
+    const methods=normalizeCjFreightMethods(result.data,originCountry,destinationCountry),selected=selectCjFreightMethod(methods,normalized.requestedMethod);
+    const quote={selected,methods,variantId,quantity:input.quantity,calculatedAt:new Date().toISOString(),cached:false};writeFreightCache(key,quote);return quote;
   }
 }
