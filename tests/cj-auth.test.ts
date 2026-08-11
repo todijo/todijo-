@@ -79,6 +79,6 @@ test("CJ connectivity is read-only and credentials stay server-only", () => {
   const status = readFileSync(resolve(root, "app/api/supplier/cj/status/route.ts"), "utf8");
   assert.match(client, /\/setting\/get/);
   assert.doesNotMatch(`${client}\n${auth}\n${status}`, /shopping\/order|payBalance|createOrder|NEXT_PUBLIC_CJ/i);
-  assert.match(status, /SELLER.*ADMIN/);
+  assert.match(status, /requirePlatformSupplierAdmin/);
   assert.doesNotMatch(status, /CJ_API_KEY|CJ_ACCESS_TOKEN|accessToken|apiKey/);
 });

@@ -80,6 +80,18 @@ enum SupplierProvider {
   CJ
 }
 
+enum SupplierOwnerType {
+  PLATFORM
+  SELLER
+}
+
+enum SupplierConnectionStatus {
+  DISCONNECTED
+  CONNECTED
+  RECONNECT_REQUIRED
+  REVOKED
+}
+
 enum SupplierSyncStatus {
   HEALTHY
   PRICE_CHANGED
@@ -215,6 +227,7 @@ model Store {
   shippingCarrier String?
   shippingProvider String       @default("MANUAL")
   shippingExternalServiceId String?
+  dropshippingEnabled Boolean @default(false)
 
   ownerId String @unique
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -223,6 +236,7 @@ model Store {
   conversations Conversation[]
   subscription  SellerSubscription?
   accessGrants  StoreAccessGrant[]
+  supplierConnections SupplierConnection[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -353,6 +367,8 @@ model SupplierProductLink {
   id                    String             @id @default(cuid())
   productId             String             @unique
   provider              SupplierProvider
+  ownerType             SupplierOwnerType @default(PLATFORM)
+  connectionId          String?
   supplierProductId     String
   supplierSku           String?
   sourceUrl             String?
@@ -369,9 +385,32 @@ model SupplierProductLink {
   updatedAt             DateTime           @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  connection SupplierConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
 
   @@unique([provider, supplierProductId])
   @@index([provider, syncStatus, lastSyncedAt])
+  @@index([connectionId, syncStatus, lastSyncedAt])
+}
+
+model SupplierConnection {
+  id                String                   @id @default(cuid())
+  provider          SupplierProvider
+  ownerType         SupplierOwnerType
+  storeId           String?
+  status            SupplierConnectionStatus @default(DISCONNECTED)
+  externalAccountId String?
+  connectedAt       DateTime?
+  disconnectedAt    DateTime?
+  lastCheckedAt     DateTime?
+  lastErrorCategory String?                  @db.VarChar(80)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productLinks SupplierProductLink[]
+
+  @@index([ownerType, storeId, provider, status])
+  @@index([provider, status])
 }
 
 model ProductMedia {

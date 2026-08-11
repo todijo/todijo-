@@ -8,26 +8,25 @@ import { readSession } from "@/lib/session";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
 import { canPublish } from "@/lib/seller-subscription";
-import SupplierProductManager from "@/components/SupplierProductManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function SellerProductsPage() {
-  const [t, control, p, common, dashboardText, transparency, compliance, locale, session] = await Promise.all([
+  const [t, control, p, common, dashboardText, transparency, compliance, supplierText, locale, session] = await Promise.all([
     getTranslations("Seller"), getTranslations("SellerControl"), getTranslations("DashboardPremium"),
     getTranslations("Common"), getTranslations("SellerDashboard"), getTranslations("SellerTransparency"),
-    getTranslations("Compliance"), getLocale(), readSession(),
+    getTranslations("Compliance"), getTranslations("Supplier"), getLocale(), readSession(),
   ]);
   if (!session) redirect("/login");
 
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
     select: {
-      name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true,
+      name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true, dropshippingEnabled: true,
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
-      products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true, supplierLink:{select:{provider:true,supplierCost:true,supplierCurrency:true,supplierStock:true,syncStatus:true,lastSyncedAt:true}} } },
+      products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true } },
     },
   });
   if (!store) redirect("/seller/create-store");
@@ -55,7 +54,7 @@ export default async function SellerProductsPage() {
 
     {!subscriptionActive && <section className="subscriptionWarning sellerProductsWarning" role="status"><div><strong>{readinessTitle}</strong><span>{readinessHelp}</span></div><Link href={readinessHref}>{readinessAction}</Link></section>}
 
-    <SupplierProductManager products={store.products.filter((product)=>product.supplierLink).map((product)=>({productId:product.id,name:product.name,provider:product.supplierLink!.provider,supplierCost:product.supplierLink!.supplierCost?.toString()??null,supplierCurrency:product.supplierLink!.supplierCurrency,supplierStock:product.supplierLink!.supplierStock,syncStatus:product.supplierLink!.syncStatus,lastSyncedAt:product.supplierLink!.lastSyncedAt?.toISOString()??null,sellingPrice:product.price.toString(),currency:product.currency}))}/>
+    {store.dropshippingEnabled && <section className="sellerControlSection"><div className="sellerControlSectionHeading"><div><h2>{supplierText("accessTitle")}</h2><p>{supplierText("approvedNotConnected")}</p></div></div><p className="sellerControlFeedback" role="status">{supplierText("connectPending")}</p></section>}
 
     <section className="sellerProductSummary" aria-label={control("productSummary")}>
       <article><Boxes size={20}/><span>{control("totalProducts")}</span><strong>{store.products.length}</strong></article>

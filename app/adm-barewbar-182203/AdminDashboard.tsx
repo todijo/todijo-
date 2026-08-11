@@ -11,12 +11,14 @@ type AdminStore = {
   owner: { id: string; firstName: string; lastName: string; email: string; role: string };
   accessSource: "STRIPE" | "ADMIN_GRANTED" | "ADMIN_EXEMPT" | "NONE";
   expiresAt: string | null; stripeStatus: string | null;
+  dropshippingEnabled: boolean;
 };
 
 export default function AdminDashboard({ adminId, locale, users, stores }: {
   adminId: string; locale: string; users: AdminUser[]; stores: AdminStore[];
 }) {
   const t = useTranslations("Admin");
+  const supplierText = useTranslations("Supplier");
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
@@ -70,6 +72,14 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
     await request("PUT");
   }
 
+  async function setDropshipping(storeId: string, enabled: boolean) {
+    setBusy(true); setMessage("");
+    const response = await fetch(`/api/admin/dropshipping/${storeId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+    const data = await response.json() as { error?: string };
+    setBusy(false); setMessage(response.ok ? t("operationSucceeded") : data.error ?? t("operationFailed"));
+    if (response.ok) router.refresh();
+  }
+
   return <>
     <section className="adminStats" aria-label={t("summary")}>
       <article><Users/><span>{t("users")}</span><strong>{users.length}</strong></article>
@@ -107,6 +117,7 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
             <input type="checkbox" checked={selected.includes(store.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, store.id] : current.filter((id) => id !== store.id))}/>
             <span><strong>{store.name}</strong><small>{store.owner.firstName} {store.owner.lastName} · {store.owner.email}</small></span>
             <span className={`adminBadge source-${store.accessSource.toLowerCase()}`}>{t(`source.${store.accessSource}`)}</span>
+            <button type="button" disabled={busy} onClick={(event)=>{event.preventDefault();void setDropshipping(store.id,!store.dropshippingEnabled);}}>{supplierText(store.dropshippingEnabled?"disablePermission":"enablePermission")}</button>
           </label>)}
           {!sellerStores.length && <p>{t("noSellerStores")}</p>}
         </div>

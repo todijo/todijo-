@@ -1,5 +1,5 @@
 export type SupplierPreflightProduct = {
-  supplierLink?: { supplierAvailable: boolean; syncStatus: string } | null;
+  supplierLink?: { supplierAvailable: boolean; syncStatus: string; ownerType?: string; connection?: { status: string; store?: { dropshippingEnabled: boolean } | null } | null } | null;
 };
 
 export function stripeIsTestMode(secret = process.env.STRIPE_SECRET_KEY) {
@@ -9,6 +9,7 @@ export function stripeIsTestMode(secret = process.env.STRIPE_SECRET_KEY) {
 export function assertSupplierPurchasable(product: SupplierPreflightProduct) {
   const link = product.supplierLink;
   if (!link) return;
+  if (link.ownerType === "SELLER" && (!link.connection || link.connection.status !== "CONNECTED" || !link.connection.store?.dropshippingEnabled)) throw new Error("SUPPLIER_PRODUCT_REQUIRES_REVIEW");
   if (!link.supplierAvailable || ["UNAVAILABLE", "ERROR", "PRICE_CHANGED"].includes(link.syncStatus)) {
     throw new Error("SUPPLIER_PRODUCT_REQUIRES_REVIEW");
   }

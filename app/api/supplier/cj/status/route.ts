@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { readSession } from "@/lib/session";
 import { CjCatalogProvider } from "@/lib/suppliers/cj-client";
+import { prisma } from "@/lib/prisma";
+import { requirePlatformSupplierAdmin } from "@/lib/suppliers/supplier-access";
 
 export async function GET() {
   const session = await readSession();
-  if (!session || !["SELLER", "ADMIN"].includes(session.role)) return NextResponse.json({ status: "ACCESS_DENIED" }, { status: 403 });
+  try { await requirePlatformSupplierAdmin(prisma, session); } catch { return NextResponse.json({ status: "ACCESS_DENIED" }, { status: 403 }); }
   const provider = new CjCatalogProvider();
   if (!provider.isConfigured()) return NextResponse.json({ status: "NOT_CONFIGURED" }, { status: 503 });
   try {

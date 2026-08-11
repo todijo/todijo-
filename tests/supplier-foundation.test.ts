@@ -5,6 +5,7 @@ import { MAX_PRODUCT_IMAGES, validateProductImages } from "../lib/product-images
 import { readProductVideo } from "../lib/product-media";
 import { supplierMessages } from "../i18n/supplier";
 import { productVideoMessages } from "../i18n/product-video";
+import { dropshippingAccessMessages } from "../i18n/dropshipping-access";
 import { normalizeCjProduct } from "../lib/suppliers/cj-client";
 import { assertRealSupplierFulfillmentDisabled, assertSupplierPurchasable, realSupplierFulfillmentAllowed, simulateSupplierHandoff, stripeIsTestMode } from "../lib/suppliers/safety";
 
@@ -28,7 +29,8 @@ test("one controlled-storage product video is validated",()=>{
 test("supplier and video UX have complete 14-locale parity",()=>{
   const locales=["ar","de","en","es","fa","fr","hi","it","ku","nl","pt","ru","tr","zh"];
   assert.deepEqual(Object.keys(supplierMessages).sort(),locales);assert.deepEqual(Object.keys(productVideoMessages).sort(),locales);
-  for(const locale of locales){assert.deepEqual(Object.keys(supplierMessages[locale]).sort(),Object.keys(supplierMessages.en).sort());assert.deepEqual(Object.keys(productVideoMessages[locale]).sort(),Object.keys(productVideoMessages.en).sort());}
+  assert.deepEqual(Object.keys(dropshippingAccessMessages).sort(),locales);
+  for(const locale of locales){assert.deepEqual(Object.keys(supplierMessages[locale]).sort(),Object.keys(supplierMessages.en).sort());assert.deepEqual(Object.keys(productVideoMessages[locale]).sort(),Object.keys(productVideoMessages.en).sort());assert.deepEqual(Object.keys(dropshippingAccessMessages[locale]).sort(),Object.keys(dropshippingAccessMessages.en).sort());}
 });
 
 test("supplier preflight preserves manual products and fails closed for supplier risk",()=>{
@@ -51,7 +53,7 @@ test("real supplier order/payment/fulfilment remains impossible and dry-run is g
 
 test("supplier routes are role and ownership guarded without shopping endpoints",()=>{
  const root=resolve(__dirname,"../..");const importer=readFileSync(resolve(root,"app/api/supplier/cj/import/route.ts"),"utf8"),sync=readFileSync(resolve(root,"app/api/supplier/products/[id]/sync/route.ts"),"utf8"),client=readFileSync(resolve(root,"lib/suppliers/cj-client.ts"),"utf8");
- assert.match(importer,/SELLER.*ADMIN/);assert.match(sync,/store:\{ownerId:session\.userId\}/);assert.doesNotMatch(client,/shopping\/order|payBalance|createOrder/i);
+ assert.match(importer,/requirePlatformSupplierAdmin/);assert.match(sync,/requirePlatformSupplierProduct/);assert.doesNotMatch(client,/shopping\/order|payBalance|createOrder/i);
 });
 
 test("supplier migration is additive and keeps manual products valid",()=>{

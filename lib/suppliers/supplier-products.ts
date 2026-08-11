@@ -33,7 +33,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     const product = await tx.product.create({data:{
       storeId:input.storeId,name:snapshot.title.slice(0,120),slug,description:snapshot.description.slice(0,5000),category:input.category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
       price:input.sellingPrice.toFixed(2),currency:"EUR",stock:snapshot.stock,images,
-      supplierLink:{create:{provider:provider.id,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}},
+      supplierLink:{create:{provider:provider.id,ownerType:"PLATFORM",connectionId:null,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}},
       media:{create:copied.map((item,index)=>({type:item.type,provider:item.provider,publicId:item.publicId,url:item.url,posterUrl:item.posterUrl,position:index,width:item.width,height:item.height,durationMs:item.durationMs,sourceUrl:snapshot.media[index]?.url??null}))},
     }});
     if (snapshot.variants.length) {

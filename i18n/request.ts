@@ -5,6 +5,7 @@ import { advancedShippingMessages } from "./shipping-advanced";
 import { shippingHotfixMessages } from "./shipping-hotfix";
 import { supplierMessages } from "./supplier";
 import { productVideoMessages } from "./product-video";
+import { dropshippingAccessMessages } from "./dropshipping-access";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -37,7 +38,7 @@ export default getRequestConfig(async () => {
   messages.ContactMessage = (await import(`../messages/contact-message/${locale}.json`)).default;
   messages.ReportDialog = (await import(`../messages/report-dialog/${locale}.json`)).default;
   messages.Shipping = { ...(await import(`../messages/shipping/${locale}.json`)).default, ...(advancedShippingMessages[locale] ?? advancedShippingMessages.en), ...(shippingHotfixMessages[locale]??shippingHotfixMessages.en) };
-  messages.Supplier = supplierMessages[locale] ?? supplierMessages.en;
+  messages.Supplier = { ...(supplierMessages[locale] ?? supplierMessages.en), ...(dropshippingAccessMessages[locale] ?? dropshippingAccessMessages.en) };
   messages.ProductVideo = productVideoMessages[locale] ?? productVideoMessages.en;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
