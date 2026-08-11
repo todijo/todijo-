@@ -104,3 +104,12 @@ test("dashboard polish preserves semantic loading and mobile touch targets", () 
   assert.match(css, /premiumMobileDrawer\{left:auto;inset-inline-start:12px/);
   assert.match(css, /premiumDashboardMobileNav a span\{max-width:64px;[^}]*white-space:normal/);
 });
+
+test("seller product titles keep semantic foreground contrast on light cards", () => {
+  const page = readFileSync("app/seller/products/page.tsx", "utf8");
+  const css = readFileSync("app/globals.css", "utf8");
+  assert.match(page, /className="sellerProductCard"[\s\S]*?<h2>\{product\.name\}<\/h2>/);
+  assert.match(page, /product\.status === "PUBLISHED"[\s\S]*?statusDraft/);
+  assert.match(css, /\.sellerProductsGridPremium \.sellerProductBody h2\{color:var\(--dash-text\)\}/);
+  assert.doesNotMatch(css, /\.sellerProductsGridPremium \.sellerProductBody h2:(?:hover|focus)[^{]*\{[^}]*color:\s*#?fff/i);
+});
