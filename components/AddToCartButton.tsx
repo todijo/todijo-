@@ -5,7 +5,7 @@ import { CartProduct, useCart } from "./CartProvider";
 import { useTranslations } from "next-intl";
 import { useToast } from "./ToastProvider";
 
-export default function AddToCartButton({ product, quantity = 1, disabledLabel }: { product: CartProduct; quantity?: number; disabledLabel?: string }) {
+export default function AddToCartButton({ product, quantity = 1, disabledLabel, disabled = false }: { product: CartProduct; quantity?: number; disabledLabel?: string; disabled?: boolean }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
   const t = useTranslations("Product");
@@ -22,10 +22,10 @@ export default function AddToCartButton({ product, quantity = 1, disabledLabel }
     <button
       className={`authSubmit addCartButton${added ? " isAdded" : ""}`}
       type="button"
-      disabled={product.stock === 0}
+      disabled={disabled || product.stock === 0}
       onClick={handleAdd}
     >
-      {product.stock === 0 ? disabledLabel ?? t("unavailable") : added ? t("added") : t("add")}
+      {disabled || product.stock === 0 ? disabledLabel ?? t("unavailable") : added ? t("added") : t("add")}
     </button>
   );
 }

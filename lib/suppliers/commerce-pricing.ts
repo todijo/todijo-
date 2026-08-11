@@ -1,14 +1,15 @@
 import {Prisma,type PrismaClient} from "@prisma/client";
 import {publicProductAccessWhere} from "../admin-access";
-import {requireBuyerCurrency,type SupportedBuyerCurrency} from "../currency";
+import {resolveBuyerCurrency,type SupportedBuyerCurrency} from "../currency";
 import {verifiedFxRate,type VerifiedFxRate} from "../fx";
 import {normalizeCountryCode} from "../shipping";
 import {CjCatalogProvider} from "./cj-client";
 import {calculateSupplierPrice,convertSupplierPriceForBuyer,DEFAULT_SUPPLIER_TARGET_MARGIN} from "./pricing";
+import type {BuyerDropshippingPricingResponse} from "./buyer-pricing";
 
 export type DropshippingPricingMode="AUTOMATIC"|"MANUAL_OVERRIDE"|"NORMAL_MARKETPLACE";
 export type DropshippingEligibility={eligible:boolean;provider:"CJ"|null;authorized:boolean;pricingMode:DropshippingPricingMode;reason:"ELIGIBLE"|"NORMAL_MARKETPLACE"|"SELLER_NOT_AUTHORIZED"|"CONNECTION_UNAVAILABLE"};
-export type BuyerDropshippingPrice={eligible:true;pricingMode:"AUTOMATIC"|"MANUAL_OVERRIDE";provider:"CJ";productId:string;variantId:string;quantity:number;buyerCurrency:SupportedBuyerCurrency;buyerUnitPrice:string;buyerLineTotal:string;shippingIncluded:boolean;freeShipping:boolean;shippingMethod:string;deliveryMinDays:number|null;deliveryMaxDays:number|null;pricedAt:string};
+export type BuyerDropshippingPrice=BuyerDropshippingPricingResponse&{buyerCurrency:SupportedBuyerCurrency};
 export type DropshippingPriceSnapshot={pricingMode:"AUTOMATIC"|"MANUAL_OVERRIDE";provider:"CJ";productId:string;variantId:string;supplierProductId:string;supplierVariantId:string;quantity:number;supplierCurrency:string;supplierUnitCost:string;freightCurrency:string;freightTotal:string;supportedFees:Array<{name:string;amount:string;currency:string}>;includedCost:string;targetMargin:string;calculatedSellingPrice:string;buyerCurrency:SupportedBuyerCurrency;fx:VerifiedFxRate;buyerUnitPrice:string;buyerLineTotal:string;shippingIncluded:boolean;freeShipping:boolean;shippingMethod:string;deliveryMinDays:number|null;deliveryMaxDays:number|null;pricedAt:string;pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"};
 export type ResolvedDropshippingPricing={eligibility:DropshippingEligibility;buyer:BuyerDropshippingPrice|null;snapshot:DropshippingPriceSnapshot|null};
 export class DropshippingCommerceError extends Error{constructor(public readonly code:"DROPSHIPPING_PRODUCT_NOT_FOUND"|"DROPSHIPPING_VARIANT_INVALID"|"DROPSHIPPING_COST_UNAVAILABLE"|"DROPSHIPPING_ORIGIN_UNAVAILABLE"|"DROPSHIPPING_QUANTITY_INVALID"){super(code);}}
@@ -28,7 +29,7 @@ function deliveryDays(value:string){const numbers=value.match(/\d+/g)?.map(Numbe
 function logFailure(error:unknown,input:{productId:string;variantId:string;quantity:number;destinationCountry:string;buyerCurrency:string}){const message=error instanceof Error?error.message:"",errorCode=/^[A-Z][A-Z0-9_]{2,80}$/.test(message)?message:"DROPSHIPPING_PRICING_FAILED";console.error("[dropshipping-pricing]",JSON.stringify({event:"dropshipping_pricing_failure",operation:"resolve-line-price",productId:input.productId,variantId:input.variantId,quantity:input.quantity,destinationCountry:input.destinationCountry,buyerCurrency:input.buyerCurrency,errorCode}));}
 
 export async function resolveDropshippingPricing(db:PrismaClient,input:{productId:string;variantId:string;quantity:number;destinationCountry:unknown;buyerCurrency:unknown},dependencies:{provider?:Provider;fx?:typeof verifiedFxRate}={}):Promise<ResolvedDropshippingPricing>{
- const destinationCountry=normalizeCountryCode(input.destinationCountry),buyerCurrency=requireBuyerCurrency(input.buyerCurrency);
+ const destinationCountry=normalizeCountryCode(input.destinationCountry),buyerCurrency=resolveBuyerCurrency({explicitPreference:input.buyerCurrency,shippingCountry:destinationCountry});
  if(!Number.isSafeInteger(input.quantity)||input.quantity<1||input.quantity>999)throw new DropshippingCommerceError("DROPSHIPPING_QUANTITY_INVALID");
  const product=await db.product.findFirst({where:{id:input.productId,status:"PUBLISHED",...publicProductAccessWhere()},select:{id:true,price:true,currency:true,supplierLink:{select:{provider:true,ownerType:true,connectionId:true,supplierProductId:true,sourceMetadata:true,connection:{select:{status:true,store:{select:{dropshippingEnabled:true}}}}}},variants:{where:{id:input.variantId,active:true},select:{id:true,priceOverride:true,supplierVariantId:true,supplierConnectionId:true}}}});
  if(!product)throw new DropshippingCommerceError("DROPSHIPPING_PRODUCT_NOT_FOUND");

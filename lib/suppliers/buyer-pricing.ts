@@ -1,0 +1,4 @@
+export const SHOPPING_COUNTRY_STORAGE_KEY="todijo-shopping-country-v1";
+export type BuyerDropshippingPricingResponse={eligible:true;pricingMode:"AUTOMATIC"|"MANUAL_OVERRIDE";provider:"CJ";productId:string;variantId:string;quantity:number;buyerCurrency:string;buyerUnitPrice:string;buyerLineTotal:string;shippingIncluded:boolean;freeShipping:boolean;shippingMethod:string;deliveryMinDays:number|null;deliveryMaxDays:number|null;pricedAt:string};
+export type BuyerDropshippingPricingUnavailable={eligible:false;pricingMode:"NORMAL_MARKETPLACE"|"AUTOMATIC"|"MANUAL_OVERRIDE";freeShipping:false;shippingIncluded:false};
+export function dropshippingPricingRequestKey(input:{productId:string;variantId:string;quantity:number;destinationCountry:string}){return [input.productId,input.variantId,input.quantity,input.destinationCountry.toUpperCase()].join(":");}

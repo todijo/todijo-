@@ -16,6 +16,7 @@ export const storageInventory = [
   { id: "todijo-cart-v1:*", category: "essential", medium: "localStorage", purpose: "Provide the shopping cart requested by the visitor", lifetime: "Until cleared" },
   { id: "todijo-pending-checkout:*", category: "essential", medium: "localStorage", purpose: "Reconcile a requested checkout after returning from Stripe", lifetime: "Until checkout reconciliation" },
   { id: "todijo-wishlist-v1:*", category: "essential", medium: "localStorage", purpose: "Provide favorites explicitly requested by the visitor, isolated by account", lifetime: "Until cleared" },
+  { id: "todijo-shopping-country-v1", category: "essential", medium: "localStorage", purpose: "Remember the delivery country selected for product price estimates", lifetime: "Until cleared" },
 ] as const;
 
 function validRecord(value: unknown): value is ConsentRecord {

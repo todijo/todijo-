@@ -7,6 +7,7 @@ import { supplierMessages } from "./supplier";
 import { supplierPricingMessages } from "./supplier-pricing";
 import { productVideoMessages } from "./product-video";
 import { dropshippingAccessMessages } from "./dropshipping-access";
+import {buyerPricingMessages} from "./buyer-pricing";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -43,9 +44,9 @@ export default getRequestConfig(async () => {
   messages.ProductVideo = productVideoMessages[locale] ?? productVideoMessages.en;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
-  messages.ProductDetail = ["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
+  messages.ProductDetail = {...(["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
     ? (await import(`../messages/product-detail/${locale}.json`)).default
-    : (await import("../messages/product-detail/en.json")).default;
+    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale]};
   const adminLocale = ["ar", "en", "fa", "fr", "hi", "ku", "pt", "ru", "zh"].includes(locale) ? locale : "en";
   messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
   return { locale, messages };
