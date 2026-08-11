@@ -24,6 +24,23 @@ test("CJ image normalization filters, deduplicates, preserves order, and caps af
   assert.equal(images.includes("invalid"),false);
 });
 
+test("CJ costs preserve variant prices and derive only a minimum product summary",()=>{
+  const snapshot=normalizeCjProduct(
+    {pid:"cj-cost",productNameEn:"Costed product",sellPrice:null,saleStatus:"3"},
+    {list:[{vid:"low",variantSellPrice:"8.24"},{vid:"high",variantSellPrice:9.5},{vid:"missing",variantSellPrice:null}]},
+    {data:{variantInventories:[]}},
+  );
+  assert.equal(snapshot.cost,8.24);
+  assert.deepEqual(snapshot.variants.map((variant)=>variant.cost),[8.24,9.5,null]);
+  assert.equal(snapshot.currency,"USD");
+});
+
+test("documented CJ product sellPrice remains authoritative over the variant summary",()=>{
+  const snapshot=normalizeCjProduct({pid:"cj-product-cost",productNameEn:"Product cost",sellPrice:"7.75",saleStatus:"3"},{list:[{vid:"variant",variantSellPrice:"8.24"}]},{data:{variantInventories:[]}});
+  assert.equal(snapshot.cost,7.75);
+  assert.equal(snapshot.variants[0].cost,8.24);
+});
+
 test("product image validation supports 30 images but rejects 31",()=>{
   assert.equal(MAX_PRODUCT_IMAGES,30);
   assert.equal(validateProductImages(Array.from({length:30},(_,index)=>`https://example.com/${index}.jpg`)).ok,true);

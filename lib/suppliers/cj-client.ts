@@ -6,7 +6,11 @@ import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
 function text(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
-function number(value: unknown) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
+function number(value: unknown) {
+  if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
 function list(value: unknown) { return Array.isArray(value) ? value : []; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === "object" ? value as Record<string, unknown> : {}; }
 function normalizedIdentifier(value: unknown) { return text(value).toUpperCase(); }
@@ -41,13 +45,16 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
   const videoUrl = text(product.productVideo ?? product.videoUrl);
   const stock = variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, number(product.inventory) ?? 0);
   const productId = text(product.pid ?? product.productId);
+  const productCost = number(product.sellPrice ?? product.productPrice);
+  const variantCosts = variants.map((variant) => variant.cost).filter((cost): cost is number => cost != null);
+  const summaryCost = productCost ?? (variantCosts.length ? Math.min(...variantCosts) : null);
   return {
     provider:"CJ", supplierProductId:productId, sku:text(product.productSku) || null,
     title:text(product.productNameEn ?? product.productName) || "Imported CJ product",
     description:text(product.description) || "Supplier product pending seller review.",
     categoryReference:text(product.categoryId) || null,
     sourceUrl:productId ? `https://cjdropshipping.com/product-${encodeURIComponent(productId)}.html` : null,
-    cost:number(product.sellPrice ?? product.productPrice), currency:"USD", stock,
+    cost:summaryCost, currency:"USD", stock,
     available:text(product.saleStatus) !== "0" && (variants.length ? variants.some((variant) => variant.available) : stock > 0),
     weightGrams:number(product.productWeight), variants,
     media:[...imageUrls.map((url) => ({type:"IMAGE" as const,url})), ...(videoUrl ? [{type:"VIDEO" as const,url:videoUrl}] : [])],

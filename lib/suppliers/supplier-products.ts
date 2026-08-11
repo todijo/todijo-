@@ -65,7 +65,7 @@ export async function syncSupplierProduct(db: Database, provider: SupplierCatalo
     const unavailable = !snapshot.available;
     const status = unavailable ? "UNAVAILABLE" : changed || current.syncStatus === "PRICE_CHANGED" ? "PRICE_CHANGED" : "HEALTHY";
     await db.$transaction(async (tx) => {
-      await tx.supplierProductLink.update({where:{id:current.id},data:{previousSupplierCost:changed?current.supplierCost:undefined,supplierCost:centsSafe(snapshot.cost),supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:status,lastSyncedAt:new Date(),lastSyncError:null,sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}});
+      await tx.supplierProductLink.update({where:{id:current.id},data:{previousSupplierCost:changed?current.supplierCost:undefined,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:status,lastSyncedAt:new Date(),lastSyncError:null,sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}});
       await tx.product.update({where:{id:productId},data:{stock:unavailable?0:snapshot.stock}});
       for (const variant of snapshot.variants) await tx.productVariant.updateMany({where:{productId,supplierConnectionId:current.connectionId,supplierVariantId:variant.supplierVariantId},data:{supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,stock:variant.stock,active:variant.available,supplierLastSyncedAt:new Date()}});
     });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 import { calculateSupplierPrice, calculateSupplierSnapshotPrices, DEFAULT_SUPPLIER_TARGET_MARGIN, SupplierPricingError } from "../lib/suppliers/pricing";
-import { importSupplierProduct } from "../lib/suppliers/supplier-products";
+import { importSupplierProduct, syncSupplierProduct } from "../lib/suppliers/supplier-products";
 
 test("20 percent target margin divides total known cost by one minus margin",()=>{
   const result=calculateSupplierPrice({supplierCost:"8",supplierCurrency:"EUR",sellingCurrency:"EUR",shipping:{status:"KNOWN",amount:"4",currency:"EUR"}});
@@ -69,4 +69,20 @@ test("automatic import persists the base price and variant-specific overrides",a
   await importSupplierProduct(db,{id:"CJ",isConfigured:()=>true,getProduct:async()=>snapshot},{copyRemote:async()=>{throw new Error("unexpected");}},{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID",sellingCurrency:"EUR",category:"Other"});
   assert.equal(productData.price,"10.00");assert.equal(productData.status,"DRAFT");
   assert.deepEqual(variants.map((variant)=>variant.priceOverride),["10.00","12.50"]);
+});
+
+test("explicit resync populates missing costs without repricing or creating a product",async()=>{
+  const updates:{link?:any;product?:any;variants:any[]}={variants:[]};
+  const current={id:"link",provider:"CJ",connectionId:"platform-cj",supplierProductId:"PID",supplierCost:null,syncStatus:"HEALTHY",product:{id:"product",price:new Prisma.Decimal("19.99")}};
+  const tx:any={supplierProductLink:{update:async({data}:any)=>{updates.link=data;}},product:{update:async({data}:any)=>{updates.product=data;}},productVariant:{updateMany:async({where,data}:any)=>{updates.variants.push({where,data});}}};
+  const db:any={supplierProductLink:{findUnique:async()=>current,update:async()=>{}},$transaction:async(callback:any)=>callback(tx)};
+  const provider:any={id:"CJ",getProduct:async()=>({provider:"CJ",supplierProductId:"PID",sku:"SPU",title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:8.24,currency:"USD",stock:12,available:true,weightGrams:null,media:[],rawMetadata:{},variants:[{supplierVariantId:"V1",sku:"SKU-1",title:"Small",cost:8.24,currency:"USD",stock:5,available:true},{supplierVariantId:"V2",sku:"SKU-2",title:"Large",cost:9.5,currency:"USD",stock:7,available:true}]})};
+  const result=await syncSupplierProduct(db,provider,"product");
+  assert.equal(updates.link.supplierCost,"8.24");
+  assert.equal(updates.link.supplierCurrency,"USD");
+  assert.equal(updates.link.supplierStock,12);
+  assert.deepEqual(updates.variants.map(({data})=>data.supplierCost),["8.24","9.50"]);
+  assert.deepEqual(updates.product,{stock:12});
+  assert.equal(result.sellingPricePreserved,"19.99");
+  assert.equal("price" in updates.product,false);
 });
