@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   try {
-    const body = await request.json() as { requestId?: string; destinationCountry?: string; destinationPostalCode?:string; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null }> };
+    const body = await request.json() as { requestId?: string; destinationCountry?: string; destinationPostalCode?:string; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?:string|number|null; displayedCurrency?:string|null }> };
     const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? [], undefined, body.destinationCountry, body.destinationPostalCode);
     return NextResponse.json(checkout);
   } catch (error) {
@@ -22,6 +22,6 @@ export async function POST(request: Request) {
     const code = error instanceof CheckoutError ? error.message : "CHECKOUT_FAILED";
     const message = code === "MULTIPLE_SELLERS" ? "Items from different sellers require separate checkout." : code === "SELLER_STRIPE_NOT_READY" ? "The seller cannot receive Stripe payments yet." : code;
     console.error("Checkout creation failed", error);
-    return NextResponse.json({ error: message, code }, { status });
+    return NextResponse.json({ error: message, code, ...(error instanceof CheckoutError&&error.details?{details:error.details}:{}) }, { status });
   }
 }

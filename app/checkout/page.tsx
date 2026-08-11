@@ -12,7 +12,7 @@ import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 
 export default function CheckoutPage() {
-  const { items, subtotal, currency } = useCart();
+  const { items, subtotal, currency, updateDisplayPricing } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sellerTypes, setSellerTypes] = useState<Record<string, "UNKNOWN" | "PROFESSIONAL" | "PRIVATE">>({});
@@ -43,12 +43,12 @@ export default function CheckoutPage() {
     setQuote(null);setError("");
     if (!items.length || !/^[A-Z]{2}$/.test(destinationCountry)) { setQuoteLoading(false); return; }
     let active = true; setQuoteLoading(true);
-    const timer=window.setTimeout(()=>fetch("/api/shipping/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items:items.map(item=>({productId:item.id,quantity:item.quantity})), destinationCountry,destinationPostalCode }) })
-      .then(async (response) => ({ ok: response.ok, data: await response.json() as { code?: string; method?: string; amount?: string; currency?: string; free?: boolean; estimatedMinDays?: number; estimatedMaxDays?: number; carrier?: string | null } }))
-      .then(({ok,data}) => { if (!active) return; if (!ok) setError(data.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : data.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : data.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : shipping("notConfigured")); else setQuote(data as NonNullable<typeof quote>); })
+    const timer=window.setTimeout(()=>fetch("/api/shipping/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items:items.map(item=>({productId:item.id,variantId:item.variantId,quantity:item.quantity})), destinationCountry,destinationPostalCode }) })
+      .then(async (response) => ({ ok: response.ok, data: await response.json() as { code?: string; method?: string; amount?: string; currency?: string; free?: boolean; estimatedMinDays?: number; estimatedMaxDays?: number; carrier?: string | null;lines?:Array<{lineKey:string;unitPrice:string;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}> } }))
+      .then(({ok,data}) => { if (!active) return; if (!ok) setError(data.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : data.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : data.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : shipping("notConfigured")); else {setQuote(data as NonNullable<typeof quote>);if(data.lines?.length)updateDisplayPricing(data.lines.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));} })
       .catch(()=>{ if (active) setError(shipping("quoteError")); }).finally(()=>{ if (active) setQuoteLoading(false); }),250);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [destinationCountry,destinationPostalCode, items, shipping, connect]);
+  }, [destinationCountry,destinationPostalCode, items, shipping, connect,updateDisplayPricing]);
 
   async function beginCheckout() {
     setLoading(true); setError("");
@@ -57,8 +57,9 @@ export default function CheckoutPage() {
     const requestId = window.localStorage.getItem(storageKey) ?? crypto.randomUUID();
     window.localStorage.setItem(storageKey, requestId);
     try {
-      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, destinationCountry,destinationPostalCode, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId })) }) });
-      const result = await response.json() as { url?: string; error?: string; code?: string };
+      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, destinationCountry,destinationPostalCode, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });
+      const result = await response.json() as { url?: string; error?: string; code?: string; details?:{lines?:Array<{lineKey:string;unitPrice:string;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>} };
+      if(response.status===409&&result.code==="CHECKOUT_PRICE_CHANGED"&&result.details?.lines?.length){updateDisplayPricing(result.details.lines.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));setError(t("startError"));setLoading(false);return;}
       if (!response.ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : result.code === "SELLER_STATUS_REQUIRED" ? sellerTransparency("checkoutBlocked") : result.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : result.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : result.code === "SHIPPING_NOT_CONFIGURED" ? shipping("notConfigured") : t("startError"));
       window.localStorage.setItem(`todijo-pending-checkout:${requestId}`, JSON.stringify({ requestId, lines: items.map((item) => ({ lineKey: item.lineKey ?? cartLineKey(item.id, item.selectedColor, item.selectedSize, item.variantId), quantity: item.quantity })) }));
       window.location.assign(result.url);

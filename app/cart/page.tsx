@@ -12,6 +12,7 @@ import CartRecommendations from "@/components/CartRecommendations";
 export default function CartPage() {
   const { items, subtotal, currency, updateQuantity, removeItem, clearCart } = useCart();
   const t = useTranslations("Cart");
+  const shipping = useTranslations("Shipping");
   const locale = useLocale();
 
   return (
@@ -48,6 +49,7 @@ export default function CartPage() {
                         {item.storeName && <small>{item.storeName}</small>}
                         <Link href={`/product/${item.id}`}><h2>{item.name}</h2></Link>
                         {item.selectedOptions && <p className="cartOptions">{item.selectedOptions}</p>}
+                        {item.freeShipping&&<p className="cartOptions">{shipping("freeLabel")}{item.deliveryMinDays!=null&&item.deliveryMaxDays!=null?` · ${shipping("estimate",{min:item.deliveryMinDays,max:item.deliveryMaxDays})}`:""}</p>}
                       </div>
                       <strong>{formatCurrency(item.price * item.quantity, item.currency, locale)}</strong>
                     </div>

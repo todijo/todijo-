@@ -18,6 +18,9 @@ export type CartProduct = {
   selectedSize?: string | null;
   variantId?: string | null;
   lineKey?: string;
+  freeShipping?: boolean;
+  deliveryMinDays?: number | null;
+  deliveryMaxDays?: number | null;
 };
 
 export type CartItem = CartProduct & { quantity: number };
@@ -30,6 +33,7 @@ type CartContextValue = {
   addItem: (product: CartProduct, quantity?: number) => void;
   updateQuantity: (lineKey: string, quantity: number) => void;
   removeItem: (lineKey: string) => void;
+  updateDisplayPricing: (updates: Array<{lineKey:string;price:number;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>) => void;
   clearCart: () => void;
 };
 
@@ -159,6 +163,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       removeItem(lineKey) {
         setItems((current) => current.filter((item) => item.lineKey !== lineKey));
+      },
+      updateDisplayPricing(updates) {
+        const byLine=new Map(updates.map(update=>[update.lineKey,update]));
+        setItems(current=>{let changed=false;const next=current.map(item=>{const update=byLine.get(item.lineKey??"");if(!update)return item;if(item.price===update.price&&item.currency===update.currency&&item.freeShipping===update.freeShipping&&item.deliveryMinDays===update.deliveryMinDays&&item.deliveryMaxDays===update.deliveryMaxDays)return item;changed=true;return{...item,price:update.price,currency:update.currency,freeShipping:update.freeShipping,deliveryMinDays:update.deliveryMinDays,deliveryMaxDays:update.deliveryMaxDays};});return changed?next:current;});
       },
       clearCart() {
         setItems([]);

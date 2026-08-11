@@ -1,15 +1,27 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 import { cartLineKey, normalizeCartOption } from "./cart-line";
-import { cartShippingQuote, ShippingError } from "./shipping";
+import { cartShippingQuote, normalizeCountryCode, ShippingError } from "./shipping";
 import { assertSupplierPurchasable } from "./suppliers/safety";
+import { resolveBuyerCurrency, stripeMinorAmount, supportedBuyerCurrency, type SupportedBuyerCurrency } from "./currency";
+import { resolveDropshippingEligibility, resolveDropshippingPricing, type DropshippingPriceSnapshot, type ResolvedDropshippingPricing } from "./suppliers/commerce-pricing";
 
 export class CheckoutError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  constructor(message: string, public status = 400, public details?: unknown) { super(message); }
 }
 
-type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null };
+type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?: string | number | null; displayedCurrency?: string | null };
+type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
+
+export function embeddedShippingQuote(lines:Array<{pricingSnapshot:DropshippingPriceSnapshot|null}>,currency:SupportedBuyerCurrency,destinationCountry:unknown){
+  const snapshots=lines.flatMap(line=>line.pricingSnapshot?[line.pricingSnapshot]:[]);
+  if(!snapshots.length||snapshots.some(snapshot=>!snapshot.shippingIncluded||!snapshot.freeShipping))throw new ShippingError("SHIPPING_NOT_CONFIGURED");
+  const minimums=snapshots.flatMap(snapshot=>snapshot.deliveryMinDays==null?[]:[snapshot.deliveryMinDays]);
+  const maximums=snapshots.flatMap(snapshot=>snapshot.deliveryMaxDays==null?[]:[snapshot.deliveryMaxDays]);
+  return{method:snapshots.length===1?snapshots[0].shippingMethod:"Supplier delivery",amount:new Prisma.Decimal(0),currency,destinationCountry:normalizeCountryCode(destinationCountry),free:true,estimatedMinDays:minimums.length?Math.min(...minimums):1,estimatedMaxDays:maximums.length?Math.max(...maximums):30,carrier:null,provider:"CJ",externalServiceId:null,policies:snapshots.map(snapshot=>({productId:snapshot.productId,shippingIncluded:true,freeShipping:true,method:snapshot.shippingMethod}))};
+}
+function displayedPriceMatches(value:unknown,expected:Prisma.Decimal){try{return value!=null&&new Prisma.Decimal(value as Prisma.Decimal.Value).equals(expected);}catch{return false;}}
 
 export async function isBuyerCheckoutComplete(db: PrismaClient, buyerId: string, requestId: string) {
   if (!/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) return false;
@@ -25,6 +37,7 @@ export async function createCheckout(
   stripeCreate = createStripeCheckoutSession,
   destinationCountry?: unknown,
   destinationPostalCode?: unknown,
+  pricingDependencies: CheckoutPricingDependencies = {},
 ) {
   if (!/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) throw new CheckoutError("Invalid checkout request ID.");
   if (!Array.isArray(requestedItems) || requestedItems.length === 0 || requestedItems.length > 100) throw new CheckoutError("Your cart is empty or too large.");
@@ -34,7 +47,7 @@ export async function createCheckout(
     const selectedColor = normalizeCartOption(item.selectedColor), selectedSize = normalizeCartOption(item.selectedSize), variantId = normalizeCartOption(item.variantId);
     const lineKey = cartLineKey(item.productId, selectedColor, selectedSize, variantId);
     const existingLine = quantities.get(lineKey);
-    quantities.set(lineKey, { productId: item.productId, selectedColor, selectedSize, variantId, lineKey, quantity: (existingLine?.quantity ?? 0) + item.quantity });
+    quantities.set(lineKey, { productId: item.productId, selectedColor, selectedSize, variantId, lineKey, quantity: (existingLine?.quantity ?? 0) + item.quantity, displayedUnitPrice: item.displayedUnitPrice, displayedCurrency: item.displayedCurrency });
   }
 
   const existing = await db.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
@@ -46,7 +59,7 @@ export async function createCheckout(
   const lines = [...quantities.values()];
   const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, currency: true, sellerType: true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
   if (products.length !== new Set(lines.map((line) => line.productId)).size) throw new CheckoutError("One or more products are unavailable.", 409);
-  const supplierLinks = db.supplierProductLink ? await db.supplierProductLink.findMany({where:{productId:{in:products.map((product)=>product.id)}},select:{productId:true,supplierAvailable:true,syncStatus:true,ownerType:true,connection:{select:{status:true,store:{select:{dropshippingEnabled:true}}}}}}) : [];
+  const supplierLinks = db.supplierProductLink ? await db.supplierProductLink.findMany({where:{productId:{in:products.map((product)=>product.id)}},select:{productId:true,provider:true,sourceMetadata:true,supplierAvailable:true,syncStatus:true,ownerType:true,connection:{select:{status:true,store:{select:{dropshippingEnabled:true}}}}}}) : [];
   const supplierByProduct = new Map(supplierLinks.map((link)=>[link.productId,link]));
   for (const product of products) {
     try { assertSupplierPurchasable({supplierLink:supplierByProduct.get(product.id)??null}); }
@@ -59,36 +72,57 @@ export async function createCheckout(
   if (products[0].store.sellerType === "PROFESSIONAL" && sellerVat.vatStatus === "UNKNOWN") throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
   const seller = products[0].store.owner;
   if (!seller.stripeAccountId || !seller.stripeOnboardingComplete || !seller.stripeChargesEnabled) throw new CheckoutError("SELLER_STRIPE_NOT_READY", 409);
-  const currencies = new Set(products.map((product) => product.currency.toUpperCase()));
-  if (currencies.size !== 1) throw new CheckoutError("All products must use the same currency.");
-  const resolvedLines = lines.map((line) => {
+  const classifiedLines = lines.map((line) => {
+    const link = supplierByProduct.get(line.productId);
+    return {...line,eligibility:resolveDropshippingEligibility({hasSupplierLink:Boolean(link),provider:link?.provider,ownerType:link?.ownerType,connectionStatus:link?.connection?.status,sellerDropshippingEnabled:link?.connection?.store?.dropshippingEnabled,sourceMetadata:link?.sourceMetadata})};
+  });
+  const normalCurrencies = new Set(classifiedLines.filter(line=>!line.eligibility.eligible).map(line=>products.find(product=>product.id===line.productId)!.currency.toUpperCase()));
+  if(normalCurrencies.size>1)throw new CheckoutError("All products must use the same currency.");
+  const paymentCurrency=supportedBuyerCurrency(normalCurrencies.size===1?[...normalCurrencies][0]:resolveBuyerCurrency({shippingCountry:destinationCountry}));
+  if(!paymentCurrency)throw new CheckoutError("CURRENCY_UNSUPPORTED",409);
+  const baseLines = classifiedLines.map((line) => {
     const product = products.find((candidate) => candidate.id === line.productId)!;
     const variants = product.variants ?? [];
     if (variants.length) {
       const variant = line.variantId ? variants.find((candidate) => candidate.id === line.variantId && candidate.active) : null;
       if (!variant) throw new CheckoutError("Selected product variant is unavailable.", 409);
       const selectedOptions = variant.values.sort((a, b) => a.optionValue.option.position - b.optionValue.option.position).map(({ optionValue }) => ({ name: optionValue.option.name, value: optionValue.value }));
-      return { ...line, product, variant, unitPrice: variant.priceOverride ?? product.price, selectedOptions };
+      return { ...line, product, variant, unitPrice: variant.priceOverride ?? product.price, selectedOptions, pricingSnapshot:null as DropshippingPriceSnapshot|null };
     }
     if (line.variantId || ((product.colors ?? []).length && (!line.selectedColor || !(product.colors ?? []).includes(line.selectedColor))) || ((product.sizes ?? []).length && (!line.selectedSize || !(product.sizes ?? []).includes(line.selectedSize)))) throw new CheckoutError("Selected product options are unavailable.", 409);
-    return { ...line, product, variant: null, unitPrice: product.price, selectedOptions: { color: line.selectedColor, size: line.selectedSize } };
+    return { ...line, product, variant: null, unitPrice: product.price, selectedOptions: { color: line.selectedColor, size: line.selectedSize }, pricingSnapshot:null as DropshippingPriceSnapshot|null };
   });
-  for (const line of resolvedLines) {
+  for (const line of baseLines) {
     const available = line.variant?.stock ?? line.product.stock;
-    const requested = resolvedLines.filter((candidate) => line.variant ? candidate.variant?.id === line.variant.id : !candidate.variant && candidate.product.id === line.product.id).reduce((sum, candidate) => sum + candidate.quantity, 0);
+    const requested = baseLines.filter((candidate) => line.variant ? candidate.variant?.id === line.variant.id : !candidate.variant && candidate.product.id === line.product.id).reduce((sum, candidate) => sum + candidate.quantity, 0);
     if (available < requested) throw new CheckoutError(`Insufficient stock for ${line.product.name}.`, 409);
   }
+  // Product/cart quotes are estimates. This single checkout resolution is the payment
+  // authority and is reused unchanged by OrderItem evidence and Stripe.
+  const resolvedLines=[] as typeof baseLines;
+  for(const line of baseLines){
+    if(!line.eligibility.eligible){resolvedLines.push(line);continue;}
+    if(!line.variant)throw new CheckoutError("DROPSHIPPING_VARIANT_INVALID",409);
+    let resolution:ResolvedDropshippingPricing;
+    try{resolution=await (pricingDependencies.resolveDropshipping??resolveDropshippingPricing)(db,{productId:line.product.id,variantId:line.variant.id,quantity:line.quantity,destinationCountry,buyerCurrency:paymentCurrency});}
+    catch{throw new CheckoutError("DROPSHIPPING_PRICING_UNAVAILABLE",409);}
+    if(!resolution.buyer||!resolution.snapshot)throw new CheckoutError("DROPSHIPPING_PRICING_UNAVAILABLE",409);
+    resolvedLines.push({...line,unitPrice:new Prisma.Decimal(resolution.buyer.buyerUnitPrice),pricingSnapshot:resolution.snapshot});
+  }
+  const changedLines=resolvedLines.filter(line=>line.pricingSnapshot&&(!line.displayedCurrency||line.displayedCurrency.toUpperCase()!==paymentCurrency||!displayedPriceMatches(line.displayedUnitPrice,line.unitPrice))).map(line=>({lineKey:line.lineKey,productId:line.product.id,variantId:line.variant?.id??null,unitPrice:line.unitPrice.toString(),currency:paymentCurrency,lineTotal:line.unitPrice.mul(line.quantity).toString(),freeShipping:line.pricingSnapshot!.freeShipping,deliveryMinDays:line.pricingSnapshot!.deliveryMinDays,deliveryMaxDays:line.pricingSnapshot!.deliveryMaxDays}));
+  if(changedLines.length)throw new CheckoutError("CHECKOUT_PRICE_CHANGED",409,{lines:changedLines,currency:paymentCurrency});
   const subtotal = resolvedLines.reduce((sum, line) => sum.add(line.unitPrice.mul(line.quantity)), new Prisma.Decimal(0));
   let shipping;
-  try { shipping = cartShippingQuote(products[0].store, resolvedLines.map(line=>({product:line.product,subtotal:line.unitPrice.mul(line.quantity)})), destinationCountry, destinationPostalCode); }
+  const marketplaceShippingLines=resolvedLines.filter(line=>!line.pricingSnapshot?.shippingIncluded);
+  try { shipping = marketplaceShippingLines.length?cartShippingQuote(products[0].store, marketplaceShippingLines.map(line=>({product:line.product,subtotal:line.unitPrice.mul(line.quantity)})), destinationCountry, destinationPostalCode):embeddedShippingQuote(resolvedLines,paymentCurrency,destinationCountry); }
   catch (error) { if (error instanceof ShippingError) throw new CheckoutError(error.message, 409); throw error; }
   const total = subtotal.add(shipping.amount);
-  const totalAmount = Number(total.mul(100).toFixed(0));
-  const platformFeeAmount = Math.round(Number(subtotal.mul(100).toFixed(0)) * platformFeePercent() / 100);
+  const totalAmount = stripeMinorAmount(total,paymentCurrency);
+  const platformFeeAmount = Math.round(stripeMinorAmount(subtotal,paymentCurrency) * platformFeePercent() / 100);
   const sellerAmount = totalAmount - platformFeeAmount;
   if (existing) {
     const sameCart = existing.items.length === resolvedLines.length && existing.items.every((item) => resolvedLines.some((line) => line.productId === item.productId && line.quantity === item.quantity && item.variantId === line.variant?.id && item.unitPrice.equals(line.unitPrice)));
-    if (!sameCart || !existing.total.equals(total) || !existing.shippingCost?.equals(shipping.amount) || existing.shippingCountry !== shipping.destinationCountry || existing.currency !== products[0].currency.toUpperCase() || existing.stripeConnectedAccountId !== seller.stripeAccountId || existing.platformFeeAmount !== platformFeeAmount || existing.sellerAmount !== sellerAmount) throw new CheckoutError("This checkout request belongs to a different cart. Start a new checkout.", 409);
+    if (!sameCart || !existing.total.equals(total) || !existing.shippingCost?.equals(shipping.amount) || existing.shippingCountry !== shipping.destinationCountry || existing.currency !== paymentCurrency || existing.stripeConnectedAccountId !== seller.stripeAccountId || existing.platformFeeAmount !== platformFeeAmount || existing.sellerAmount !== sellerAmount) throw new CheckoutError("This checkout request belongs to a different cart. Start a new checkout.", 409);
   }
 
   const buyer = await db.user.findUniqueOrThrow({ where: { id: buyerId }, select: { email: true, firstName: true, lastName: true } });
@@ -96,7 +130,7 @@ export async function createCheckout(
   if (!order) {
     try {
       const store = products[0].store;
-      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: products[0].currency.toUpperCase(), total, subtotal, shippingMethod: shipping.method, shippingCost: shipping.amount, shippingCurrency: shipping.currency, shippingCountry: shipping.destinationCountry, shippingEstimatedMinDays: shipping.estimatedMinDays, shippingEstimatedMaxDays: shipping.estimatedMaxDays, shippingCarrier: shipping.carrier, shippingProvider: shipping.provider, shippingExternalServiceId: shipping.externalServiceId, taxTotal: new Prisma.Decimal(0), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: line.product.currency.toUpperCase(), lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null })) } }, include: { items: true } });
+      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: paymentCurrency, total, subtotal, shippingMethod: shipping.method, shippingCost: shipping.amount, shippingCurrency: paymentCurrency, shippingCountry: shipping.destinationCountry, shippingEstimatedMinDays: shipping.estimatedMinDays, shippingEstimatedMaxDays: shipping.estimatedMaxDays, shippingCarrier: shipping.carrier, shippingProvider: shipping.provider, shippingExternalServiceId: shipping.externalServiceId, taxTotal: new Prisma.Decimal(0), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: paymentCurrency, lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null, supplierPricingSnapshot: line.pricingSnapshot ? { create: { snapshot: line.pricingSnapshot as unknown as Prisma.InputJsonValue } } : undefined })) } }, include: { items: true } });
     } catch (error) {
       if (!isPrismaCode(error, "P2002")) throw error;
       order = await db.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
@@ -104,7 +138,7 @@ export async function createCheckout(
     }
   }
   await db.order.update({where:{id:order.id},data:{sellerVatStatusSnapshot:sellerVat.vatStatus,shippingPolicySnapshot:shipping.policies}});
-  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: Number(shipping.amount.mul(100).toFixed(0)), currency: shipping.currency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: Number(line.unitPrice.mul(100).toFixed(0)), quantity: line.quantity, currency: line.product.currency })) });
+  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: stripeMinorAmount(shipping.amount,paymentCurrency), currency: paymentCurrency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: stripeMinorAmount(line.unitPrice,paymentCurrency), quantity: line.quantity, currency: paymentCurrency })) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
 }
@@ -196,7 +230,9 @@ export async function processStripeEvent(
         if (order.status === "PAID") return { duplicate: true };
         if (order.status !== "PENDING" || (order.stripeCheckoutSessionId && order.stripeCheckoutSessionId !== session.id)) throw new Error("Stripe session does not match the pending order.");
         if (order.stripeConnectedAccountId && session.metadata?.connectedAccountId !== order.stripeConnectedAccountId) throw new Error("Stripe destination account does not match the order.");
-        const expectedAmount = Number(order.total.mul(100).toFixed(0));
+        const orderCurrency=supportedBuyerCurrency(order.currency);
+        if(!orderCurrency)throw new Error("Order currency is unsupported by the payment invariant.");
+        const expectedAmount = stripeMinorAmount(order.total,orderCurrency);
         if (session.amount_total != null && session.amount_total !== expectedAmount) throw new Error("Stripe total does not match the order.");
         if (session.currency && session.currency.toUpperCase() !== order.currency) throw new Error("Stripe currency does not match the order.");
         for (const item of order.items) {
@@ -208,7 +244,7 @@ export async function processStripeEvent(
         const shipping = session.collected_information?.shipping_details ?? session.shipping_details;
         const address = shipping?.address;
         if (order.shippingCountry && (!address?.country || address.country.toUpperCase() !== order.shippingCountry)) throw new Error("Stripe shipping destination does not match the order.");
-        if (order.shippingCost && session.total_details?.amount_shipping != null && !order.shippingCost.equals(new Prisma.Decimal(session.total_details.amount_shipping).div(100))) throw new Error("Stripe shipping amount does not match the order.");
+        if (order.shippingCost && session.total_details?.amount_shipping != null && session.total_details.amount_shipping!==stripeMinorAmount(order.shippingCost,orderCurrency)) throw new Error("Stripe shipping amount does not match the order.");
         await tx.order.update({ where: { id: order.id }, data: { status: "PAID", paidAt: new Date(), stripeCheckoutSessionId: session.id, stripePaymentIntentId: session.payment_intent, recipientName: shipping?.name ?? session.customer_details?.name ?? null, recipientEmail: session.customer_details?.email ?? null, recipientPhone: shipping?.phone ?? session.customer_details?.phone ?? null, shippingAddressLine1: address?.line1 ?? null, shippingAddressLine2: address?.line2 ?? null, shippingCity: address?.city ?? null, shippingPostalCode: address?.postal_code ?? null, shippingState: address?.state ?? null, shippingCountry: address?.country?.toUpperCase() ?? order.shippingCountry, shippingCapturedAt: new Date(), taxTotal: new Prisma.Decimal(session.total_details?.amount_tax ?? 0).div(100) } });
         const paidStore = order.storeIdSnapshot ? await tx.store.findUnique({ where: { id: order.storeIdSnapshot }, select: { ownerId: true } }) : null;
         await tx.notification.create({ data: { userId: order.buyerId, type: "ORDER_PAID", title: "Order confirmed", body: `Payment for order ${order.id} was confirmed.`, href: `/account/orders/${order.id}` } });
