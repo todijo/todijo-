@@ -36,6 +36,29 @@ test("missing, stale and malformed FX data fail closed",async()=>{
   withKey();await assert.rejects(()=>verifiedFxRate("USD","EUR",(async()=>response({base:"USD",timestamp:Math.floor(Date.now()/1000),rates:{EUR:0}})) as typeof fetch),FxError);
 });
 
+test("FX diagnostics classify provider failures without leaking the App ID",async()=>{
+  const original=console.error,lines:string[]=[];console.error=(...values:unknown[])=>lines.push(values.join(" "));
+  try{
+    delete process.env.OPEN_EXCHANGE_RATES_APP_ID;resetFxCacheForTests();
+    await assert.rejects(()=>verifiedFxRate("USD","EUR",(async()=>response()) as typeof fetch),(error:unknown)=>error instanceof FxError&&error.code==="FX_NOT_CONFIGURED");
+    withKey();
+    await assert.rejects(()=>verifiedFxRate("USD","EUR",(async()=>Promise.resolve(new Response(JSON.stringify({error:true,status:401,code:"invalid_app_id",message:"Invalid app_id=test-app-id-never-log"}),{status:401}))) as typeof fetch),(error:unknown)=>error instanceof FxError&&error.code==="FX_UNAVAILABLE");
+    withKey();
+    await assert.rejects(()=>verifiedFxRate("USD","EUR",(async()=>Promise.resolve(new Response("not-json",{status:502}))) as typeof fetch),(error:unknown)=>error instanceof FxError&&error.code==="FX_RESPONSE_INVALID");
+    assert.match(lines.join("\n"),/\[fx-api\]/);assert.match(lines.join("\n"),/MISSING_APP_ID/);assert.match(lines.join("\n"),/INVALID_APP_ID/);assert.match(lines.join("\n"),/MALFORMED_JSON/);
+    assert.doesNotMatch(lines.join("\n"),/test-app-id-never-log/);assert.doesNotMatch(lines.join("\n"),/latest\.json\?app_id/);
+  }finally{console.error=original;}
+});
+
+test("stale FX diagnostics expose timestamps and preserve the stable sanitized error",async()=>{
+  const original=console.error,lines:string[]=[];console.error=(...values:unknown[])=>lines.push(values.join(" "));
+  try{
+    withKey();const timestamp=Math.floor((Date.now()-7*60*60*1000)/1000);
+    await assert.rejects(()=>verifiedFxRate("USD","EUR",(async()=>response({base:"USD",timestamp,rates:{EUR:.9}})) as typeof fetch),(error:unknown)=>error instanceof FxError&&error.code==="FX_RATE_STALE");
+    assert.match(lines.join("\n"),/"freshness":"STALE"/);assert.match(lines.join("\n"),/"internalErrorCode":"FX_RATE_STALE"/);assert.match(lines.join("\n"),new RegExp(String(timestamp)));
+  }finally{console.error=original;}
+});
+
 test("free-shipping eligibility requires platform or approved seller ownership plus embedded verified freight",()=>{
   const pricing={pricing:{shippingStatus:"KNOWN",marginGuaranteed:true,freightEmbedded:true}};
   assert.equal(authorizedEmbeddedFreight({ownerType:"PLATFORM",sourceMetadata:pricing}),true);
