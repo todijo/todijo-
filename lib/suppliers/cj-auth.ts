@@ -1,3 +1,5 @@
+import { logCjFailure } from "./cj-diagnostics";
+
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 const EXPIRY_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 
@@ -88,17 +90,20 @@ export class CjAuthService {
         signal: AbortSignal.timeout(15_000),
         cache: "no-store",
       });
-    } catch {
+    } catch (error) {
+      logCjFailure({ operation:path.includes("refresh")?"refresh-access-token":"get-access-token",stage:"authentication",path,responseMessage:error instanceof Error?error.message:"Network request failed" }, [this.apiKey, body.refreshToken]);
       throw new Error("CJ_UNAVAILABLE");
     }
-    let payload: { result?: boolean; success?: boolean; data?: TokenPayload };
+    let payload: { code?:number|string; result?: boolean; success?: boolean; message?:string; requestId?:string; data?: TokenPayload };
     try {
       payload = await response.json() as typeof payload;
     } catch {
+      logCjFailure({ operation:path.includes("refresh")?"refresh-access-token":"get-access-token",stage:"authentication",path,httpStatus:response.status,responseMessage:"CJ returned a non-JSON response" }, [this.apiKey, body.refreshToken]);
       throw new Error(response.ok ? "CJ_AUTHENTICATION_FAILED" : "CJ_UNAVAILABLE");
     }
     const data = payload.data;
     if (!response.ok || payload.result === false || payload.success === false || !clean(data?.accessToken)) {
+      logCjFailure({ operation:path.includes("refresh")?"refresh-access-token":"get-access-token",stage:"authentication",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId }, [this.apiKey, body.refreshToken, data?.accessToken, data?.refreshToken]);
       throw new Error(response.status >= 500 ? "CJ_UNAVAILABLE" : "CJ_AUTHENTICATION_FAILED");
     }
     const token: CachedToken = {

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CjAuthService } from "../lib/suppliers/cj-auth";
 import { CjCatalogProvider } from "../lib/suppliers/cj-client";
+import { logCjFailure } from "../lib/suppliers/cj-diagnostics";
 
 const tokenResponse = (accessToken: string, accessExpiry: string, refreshToken = "refresh-secret", refreshExpiry = "2030-01-01T00:00:00.000Z") =>
   new Response(JSON.stringify({ result: true, success: true, data: { accessToken, accessTokenExpiryDate: accessExpiry, refreshToken, refreshTokenExpiryDate: refreshExpiry } }), { status: 200 });
@@ -63,13 +64,53 @@ test("CJ read calls invalidate and retry authentication at most once", async () 
     return new Response(JSON.stringify({ result: true, success: true, data: {} }), { status: 200 });
   };
   try {
-    await new CjCatalogProvider(auth).testConnection();
+    await new CjCatalogProvider(auth,{minimumRequestIntervalMs:0}).testConnection();
     assert.equal(calls, 2); assert.equal(tokens, 2); assert.equal(invalidations, 1);
     calls = 0; tokens = 0; invalidations = 0;
     global.fetch = async () => { calls += 1; return new Response(JSON.stringify({ code: 1600001, result: false }), { status: 401 }); };
-    await assert.rejects(() => new CjCatalogProvider(auth).testConnection(), /CJ_AUTHENTICATION_FAILED/);
+    await assert.rejects(() => new CjCatalogProvider(auth,{minimumRequestIntervalMs:0}).testConnection(), /CJ_AUTHENTICATION_FAILED/);
     assert.equal(calls, 2); assert.equal(tokens, 2); assert.equal(invalidations, 1);
   } finally { global.fetch = originalFetch; }
+});
+
+test("CJ product retrieval follows the documented v2 contract sequentially", async () => {
+  const urls: string[] = [];
+  let active = 0;
+  let concurrent = false;
+  const fetcher: typeof fetch = async (input) => {
+    active += 1;
+    if (active > 1) concurrent = true;
+    const url = String(input); urls.push(url);
+    await Promise.resolve();
+    active -= 1;
+    if (url.includes("/product/query?")) return new Response(JSON.stringify({code:200,result:true,success:true,data:{pid:"240626050813160030",productNameEn:"Test",productImageSet:[]}}));
+    if (url.includes("/product/variant/query?")) return new Response(JSON.stringify({code:200,result:true,success:true,data:[]}));
+    return new Response(JSON.stringify({code:200,result:true,success:true,data:{variantInventories:[]}}));
+  };
+  const auth = {isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  const result = await new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0}).getProduct("240626050813160030");
+  assert.equal(result.supplierProductId,"240626050813160030");
+  assert.equal(concurrent,false);
+  assert.equal(urls.length,3);
+  assert.match(urls[0],/\/product\/query\?pid=240626050813160030&features=enable_video$/);
+  assert.doesNotMatch(urls[0],/enable_description/);
+  assert.match(urls[1],/\/product\/variant\/query\?pid=240626050813160030$/);
+  assert.match(urls[2],/\/product\/stock\/getInventoryByPid\?pid=240626050813160030$/);
+});
+
+test("CJ diagnostics identify the failed operation and redact every credential", () => {
+  const original = console.error;
+  const output: string[] = [];
+  console.error = (...values: unknown[]) => output.push(values.map(String).join(" "));
+  try {
+    logCjFailure({operation:"get-product-detail",stage:"product-retrieval",path:"/product/query?pid=240626050813160030",httpStatus:400,responseCode:1600100,responseMessage:"bad api-key-secret access-secret refresh-secret",requestId:"request-123",context:{supplierProductId:"240626050813160030"}},["api-key-secret","access-secret","refresh-secret"]);
+  } finally { console.error = original; }
+  assert.match(output[0],/cj_api_failure/);
+  assert.match(output[0],/get-product-detail/);
+  assert.match(output[0],/1600100/);
+  assert.match(output[0],/request-123/);
+  assert.match(output[0],/\[REDACTED\]/);
+  assert.doesNotMatch(output[0],/api-key-secret|access-secret|refresh-secret/);
 });
 
 test("CJ connectivity is read-only and credentials stay server-only", () => {

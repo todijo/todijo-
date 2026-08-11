@@ -1,5 +1,6 @@
 import type { SupplierCatalogProvider, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
 import { CjAuthService, cjAuth } from "./cj-auth";
+import { logCjFailure } from "./cj-diagnostics";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
@@ -41,35 +42,52 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
 
 export class CjCatalogProvider implements SupplierCatalogProvider {
   readonly id = "CJ" as const;
-  constructor(private readonly auth: Pick<CjAuthService, "isConfigured" | "getAccessToken" | "invalidateAccessToken"> = cjAuth) {}
+  private nextRequestAt = 0;
+  constructor(
+    private readonly auth: Pick<CjAuthService, "isConfigured" | "getAccessToken" | "invalidateAccessToken"> = cjAuth,
+    private readonly options: { fetcher?:typeof fetch; minimumRequestIntervalMs?:number } = {},
+  ) {}
   isConfigured() { return this.auth.isConfigured(); }
-  private async get(path: string) {
+  private async throttle() {
+    const waitMs = Math.max(0, this.nextRequestAt - Date.now());
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    this.nextRequestAt = Date.now() + (this.options.minimumRequestIntervalMs ?? 1_050);
+  }
+  private async get(operation: string, path: string, context: Record<string,string> = {}) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const accessToken = await this.auth.getAccessToken();
+      await this.throttle();
       let response: Response;
       try {
-        response = await fetch(`${CJ_BASE_URL}${path}`, { headers:{"CJ-Access-Token":accessToken,"Accept":"application/json"}, signal:AbortSignal.timeout(15000), cache:"no-store" });
-      } catch { throw new Error("CJ_UNAVAILABLE"); }
-      let payload: { code?:number; result?:boolean; success?:boolean; data?:unknown };
-      try { payload = await response.json() as typeof payload; } catch { throw new Error(response.ok ? "CJ_API_REQUEST_FAILED" : "CJ_UNAVAILABLE"); }
+        response = await (this.options.fetcher ?? fetch)(`${CJ_BASE_URL}${path}`, { headers:{"CJ-Access-Token":accessToken,"Accept":"application/json"}, signal:AbortSignal.timeout(15000), cache:"no-store" });
+      } catch (error) {
+        logCjFailure({operation,stage:"product-retrieval",path,responseMessage:error instanceof Error?error.message:"Network request failed",context},[accessToken]);
+        throw new Error("CJ_UNAVAILABLE");
+      }
+      let payload: { code?:number|string; result?:boolean; success?:boolean; message?:string; requestId?:string; data?:unknown };
+      try { payload = await response.json() as typeof payload; } catch {
+        logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseMessage:"CJ returned a non-JSON response",context},[accessToken]);
+        throw new Error(response.ok ? "CJ_API_REQUEST_FAILED" : "CJ_UNAVAILABLE");
+      }
       const authFailed = response.status === 401 || payload.code === 1600001 || payload.code === 1600002;
       if (authFailed && attempt === 0) { this.auth.invalidateAccessToken(); continue; }
-      if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
-      if (!response.ok) throw new Error(response.status >= 500 ? "CJ_UNAVAILABLE" : "CJ_API_REQUEST_FAILED");
-      if (payload.result === false || payload.success === false) throw new Error("CJ_API_REQUEST_FAILED");
+      if (authFailed || !response.ok || payload.result === false || payload.success === false) {
+        logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);
+        if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
+        throw new Error(response.status >= 500 ? "CJ_UNAVAILABLE" : "CJ_API_REQUEST_FAILED");
+      }
       return payload.data;
     }
     throw new Error("CJ_AUTHENTICATION_FAILED");
   }
-  async testConnection() { await this.get("/setting/get"); }
+  async testConnection() { await this.get("test-connection","/setting/get"); }
   async getProduct(supplierProductId: string) {
     const pid = supplierProductId.trim();
     if (!/^[A-Za-z0-9-]{4,200}$/.test(pid)) throw new Error("CJ_PRODUCT_ID_INVALID");
-    const [product, variants, inventory] = await Promise.all([
-      this.get(`/product/query?pid=${encodeURIComponent(pid)}&features=enable_video,enable_description`),
-      this.get(`/product/variant/query?pid=${encodeURIComponent(pid)}`),
-      this.get(`/product/stock/getInventoryByPid?pid=${encodeURIComponent(pid)}`),
-    ]);
+    const context = { supplierProductId:pid };
+    const product = await this.get("get-product-detail",`/product/query?pid=${encodeURIComponent(pid)}&features=enable_video`,context);
+    const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(pid)}`,context);
+    const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(pid)}`,context);
     return normalizeCjProduct(product, variants, inventory);
   }
 }
