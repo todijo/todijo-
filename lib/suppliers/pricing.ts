@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { SupplierProductSnapshot } from "./types";
+import {roundCurrencyUp,type SupportedBuyerCurrency} from "../currency";
+import type {VerifiedFxRate} from "../fx";
 
 export const DEFAULT_SUPPLIER_TARGET_MARGIN = new Prisma.Decimal("0.20");
 
@@ -129,4 +131,11 @@ export function calculateSupplierVariantPriceWithFreight(snapshot:SupplierProduc
   const variant=snapshot.variants.find((item)=>item.supplierVariantId===supplierVariantId);
   if(!variant)throw new SupplierPricingError("PRICING_COST_INVALID");
   return calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency:variant.currency,shipping:{status:"KNOWN",amount:freight.amount,currency:freight.currency}});
+}
+
+export function convertSupplierPriceForBuyer(calculation:SupplierPriceCalculation,buyerCurrency:SupportedBuyerCurrency,fx:VerifiedFxRate){
+  if(fx.baseCurrency!==calculation.sellingCurrency||fx.quoteCurrency!==buyerCurrency)throw new SupplierPricingError("PRICING_CURRENCY_CONVERSION_REQUIRED");
+  const minimumConverted=new Prisma.Decimal(calculation.finalSellingPrice).mul(fx.rate),finalSellingPrice=roundCurrencyUp(minimumConverted,buyerCurrency);
+  if(finalSellingPrice.lessThan(minimumConverted))throw new SupplierPricingError("PRICING_COST_INVALID");
+  return{buyerCurrency,minimumConvertedPrice:minimumConverted.toString(),finalSellingPrice:finalSellingPrice.toString(),fx,marginGuaranteed:calculation.marginGuaranteed};
 }
