@@ -105,7 +105,11 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
       const canonicalPids = [...new Set(exactCandidates.map((entry)=>text(object(entry).id ?? object(entry).pid)).filter(Boolean))];
       const selectedCanonicalPid = canonicalPids.length===1 ? canonicalPids[0] : undefined;
       const exactMatchFound = canonicalPids.length>0;
-      logCjSkuResolution({operation:"resolve-product-sku-list-v2",stage:"product-retrieval",path:fallbackPath,...fallback.meta,context:{...context,candidateCount:candidates.length,exactMatchFound,selectedCanonicalPid:selectedCanonicalPid??null},candidateCount:candidates.length,exactMatchFound,selectedCanonicalPid,ambiguous:canonicalPids.length>1});
+      const candidateIdentifiers = !exactMatchFound && candidates.length ? candidates.map((entry)=>{
+        const row=object(entry);
+        return {canonicalProductId:text(row.id)||null,sku:text(row.sku)||null,spu:text(row.spu)||null,name:text(row.nameEn)||null};
+      }) : undefined;
+      logCjSkuResolution({operation:"resolve-product-sku-list-v2",stage:"product-retrieval",path:fallbackPath,...fallback.meta,context:{...context,candidateCount:candidates.length,exactMatchFound,selectedCanonicalPid:selectedCanonicalPid??null},candidateCount:candidates.length,exactMatchFound,selectedCanonicalPid,ambiguous:canonicalPids.length>1,candidateIdentifiers});
       if (!canonicalPids.length) throw new Error("CJ_PRODUCT_NOT_FOUND");
       if (canonicalPids.length>1) throw new Error("CJ_PRODUCT_IDENTIFIER_AMBIGUOUS");
       productResult = await this.get("get-product-detail",`/product/query?pid=${encodeURIComponent(selectedCanonicalPid!)}&features=enable_video`,{...context,canonicalPid:selectedCanonicalPid!});

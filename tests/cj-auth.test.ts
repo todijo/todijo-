@@ -148,6 +148,9 @@ test("CJ SKU product-not-found falls back to listV2 exact SPU and canonical pid"
 
 test("CJ listV2 fallback rejects fuzzy-only and ambiguous exact SKU results", async () => {
   const auth={isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  const logs:string[]=[];
+  const originalInfo=console.info;
+  console.info=(...values:unknown[])=>logs.push(values.map(String).join(" "));
   const providerFor=(productList:unknown[])=>{
     let calls=0;
     const fetcher:typeof fetch=async()=>++calls===1
@@ -155,8 +158,12 @@ test("CJ listV2 fallback rejects fuzzy-only and ambiguous exact SKU results", as
       : new Response(JSON.stringify({code:200,result:true,success:true,data:{content:[{productList}]}}));
     return new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0});
   };
-  await assert.rejects(()=>providerFor([{id:"FUZZY",sku:"CJCS206905203CX-OTHER",spu:"NOT-EXACT"}]).getProduct("CJCS206905203CX"),/CJ_PRODUCT_NOT_FOUND/);
-  await assert.rejects(()=>providerFor([{id:"PID-A",sku:"CJCS206905203CX"},{id:"PID-B",spu:"cjcs206905203cx"}]).getProduct("CJCS206905203CX"),/CJ_PRODUCT_IDENTIFIER_AMBIGUOUS/);
+  try {
+    await assert.rejects(()=>providerFor([{id:"FUZZY",sku:"CJCS206905203CX-OTHER",spu:"NOT-EXACT",nameEn:"Pullover candidate",sellPrice:"4.99",supplierCost:"private-cost",accessToken:"never-log-token"}]).getProduct("CJCS206905203CX"),/CJ_PRODUCT_NOT_FOUND/);
+    await assert.rejects(()=>providerFor([{id:"PID-A",sku:"CJCS206905203CX"},{id:"PID-B",spu:"cjcs206905203cx"}]).getProduct("CJCS206905203CX"),/CJ_PRODUCT_IDENTIFIER_AMBIGUOUS/);
+  } finally { console.info=originalInfo; }
+  assert.match(logs[0],/"candidateIdentifiers":\[\{"canonicalProductId":"FUZZY","sku":"CJCS206905203CX-OTHER","spu":"NOT-EXACT","name":"Pullover candidate"\}\]/);
+  assert.doesNotMatch(logs.join("\n"),/4\.99|private-cost|never-log-token|sellPrice|supplierCost|accessToken/);
 });
 
 test("CJ product-not-found stays sanitized and logs the SKU lookup context", async () => {

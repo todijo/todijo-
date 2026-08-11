@@ -31,7 +31,13 @@ export function logCjFailure(failure: CjDiagnostic, secrets: Array<string | unde
   }));
 }
 
-export function logCjSkuResolution(diagnostic: CjDiagnostic & {candidateCount:number;exactMatchFound:boolean;selectedCanonicalPid?:string;ambiguous:boolean}, secrets: Array<string | undefined> = []) {
+export function logCjSkuResolution(diagnostic: CjDiagnostic & {candidateCount:number;exactMatchFound:boolean;selectedCanonicalPid?:string;ambiguous:boolean;candidateIdentifiers?:Array<{canonicalProductId:string|null;sku:string|null;spu:string|null;name:string|null}>}, secrets: Array<string | undefined> = []) {
+  const candidateIdentifiers = diagnostic.candidateIdentifiers?.slice(0,20).map((candidate)=>({
+    canonicalProductId:redact(candidate.canonicalProductId??undefined,secrets)||null,
+    sku:redact(candidate.sku??undefined,secrets)||null,
+    spu:redact(candidate.spu??undefined,secrets)||null,
+    name:redact(candidate.name??undefined,secrets)||null,
+  }));
   console.info("[cj-api]", JSON.stringify({
     event:"cj_sku_resolution",
     operation:diagnostic.operation,
@@ -46,5 +52,6 @@ export function logCjSkuResolution(diagnostic: CjDiagnostic & {candidateCount:nu
     exactMatchFound:diagnostic.exactMatchFound,
     selectedCanonicalPid:diagnostic.selectedCanonicalPid ?? null,
     ambiguous:diagnostic.ambiguous,
+    candidateIdentifiers:candidateIdentifiers?.length ? candidateIdentifiers : undefined,
   }));
 }
