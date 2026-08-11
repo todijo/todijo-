@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CjFulfillmentApiError, CjFulfillmentClient, normalizeOrderDetail, normalizeTracking } from "../lib/suppliers/cj-fulfillment-client";
-import { deterministicSupplierReference, prepareSupplierFulfillments, processSupplierFulfillment } from "../lib/suppliers/supplier-fulfillment";
+import { CjFulfillmentApiError, CjFulfillmentClient, classifyCjFulfillmentFailure, normalizeOrderDetail, normalizeTracking } from "../lib/suppliers/cj-fulfillment-client";
+import { automaticCjFulfillmentEnabled, deterministicSupplierReference, prepareSupplierFulfillments, processSupplierFulfillment, recoverSupplierFulfillment } from "../lib/suppliers/supplier-fulfillment";
 
 const auth = { getAccessToken: async () => "super-secret-token", invalidateAccessToken() {} };
 const input = { fulfillmentId: "ful_1", externalReference: "tdj-order-group", originCountry: "CN", destinationCountry: "FR", shippingMethod: "CJPacket", recipient: { name: "Buyer", address1: "1 street", city: "Paris", postalCode: "75001" }, products: [{ supplierVariantId: "vid_1", quantity: 2 }] };
@@ -31,6 +31,11 @@ test("CJ diagnostics redact access tokens and do not log private payloads", asyn
     await assert.rejects(() => client.createOrder(input));
   } finally { console.info = original; }
   const log = lines.join("\n"); assert.doesNotMatch(log, /super-secret-token|supplierUnitCost|Authorization|CJ-Access-Token/); assert.match(log, /\[REDACTED\]/);
+});
+
+test("CJ insufficient wallet failures use a stable recoverable-manual code", () => {
+  assert.deepEqual(classifyCjFulfillmentFailure({ operation: "create-order-v2", httpStatus: 200, responseCode: 1601001, responseMessage: "Insufficient wallet balance" }), { code: "CJ_WALLET_INSUFFICIENT", retryable: false });
+  assert.deepEqual(classifyCjFulfillmentFailure({ operation: "get-order-detail", httpStatus: 200, responseCode: 1602001, responseMessage: "Order not found" }), { code: "CJ_ORDER_NOT_FOUND", retryable: false });
 });
 
 test("order detail and split tracking normalization are conservative and deduplicated", () => {
@@ -79,8 +84,14 @@ test("fulfillment migration is additive and does not rewrite historical commerce
 
 test("Stripe webhook dispatches supplier work only after paid finalization and isolates supplier failure", () => {
   const source = readFileSync(join(process.cwd(), "app", "api", "stripe", "webhook", "route.ts"), "utf8");
-  assert.match(source, /await processStripeEvent[\s\S]+result\.paid === true[\s\S]+processOrderSupplierFulfillments/);
+  assert.match(source, /await processStripeEvent[\s\S]+result\.paid === true[\s\S]+automaticCjFulfillmentEnabled\(\)[\s\S]+processOrderSupplierFulfillments/);
   assert.match(source, /catch \(error\)[\s\S]+paid_order_fulfillment_dispatch_failed/);
+});
+
+test("automatic CJ fulfillment is disabled unless explicitly enabled", () => {
+  assert.equal(automaticCjFulfillmentEnabled(undefined), false);
+  assert.equal(automaticCjFulfillmentEnabled("false"), false);
+  assert.equal(automaticCjFulfillmentEnabled("TRUE"), true);
 });
 
 test("buyer order payload exposes normalized progress but no supplier-private commerce or retry fields", () => {
@@ -107,4 +118,47 @@ test("concurrent fulfillment claims permit exactly one supplier submission", asy
   const client = { createOrder: async () => { submissions += 1; return { supplierOrderId: "cj_1", supplierOrderNumber: "tdj-race", status: "PROCESSING", tracking: [] }; } } as any;
   const results = await Promise.all([processSupplierFulfillment(db, "ful_race", client), processSupplierFulfillment(db, "ful_race", client)]);
   assert.equal(submissions, 1); assert.equal(results.filter((result) => result.claimed).length, 1);
+});
+
+function recoverableFulfillment(status = "MANUAL_ACTION_REQUIRED", lastErrorCode = "CJ_WALLET_INSUFFICIENT") {
+  return { id: "ful_recover", status, lastErrorCode, externalReference: "tdj-stable-reference", connectionId: "platform-cj", originCountry: "CN", destinationCountry: "FR", shippingMethod: "CJPacket", submittedAt: null, order: { paidAt: new Date(), status: "PAID", recipientName: "Buyer", shippingAddressLine1: "1 street", shippingAddressLine2: null, shippingCity: "Paris", shippingState: null, shippingPostalCode: "75001", recipientPhone: null }, connection: { ownerType: "PLATFORM", status: "CONNECTED" }, items: [{ supplierVariantId: "vid_1", quantity: 1 }], tracking: [] };
+}
+
+test("approved wallet recovery reconciles first, then submits once with the same reference when absent", async () => {
+  const fulfillment = recoverableFulfillment(); const transitions: any[] = []; const calls: string[] = [];
+  const tx = { supplierFulfillment: { update: async () => ({}) }, supplierTracking: { upsert: async () => ({}) } };
+  const db = { supplierFulfillment: {
+    findUnique: async () => ({ status: fulfillment.status, lastErrorCode: fulfillment.lastErrorCode }),
+    findUniqueOrThrow: async () => fulfillment,
+    updateMany: async (args: any) => { transitions.push(args); return { count: 1 }; },
+  }, $transaction: async (callback: any) => callback(tx) } as any;
+  const client = {
+    getOrderDetail: async (_id: string, reference: string) => { calls.push(`reconcile:${reference}`); throw new CjFulfillmentApiError("CJ_ORDER_NOT_FOUND", false, false); },
+    createOrder: async (request: any) => { calls.push(`create:${request.externalReference}`); return { supplierOrderId: "cj_1", supplierOrderNumber: request.externalReference, status: "PROCESSING", tracking: [] }; },
+  } as any;
+  const result = await recoverSupplierFulfillment(db, fulfillment.id, client);
+  assert.deepEqual(calls, ["reconcile:tdj-stable-reference", "create:tdj-stable-reference"]);
+  assert.equal(result.submitted, true); assert.equal(transitions[0].data.status, "RETRYABLE"); assert.equal(transitions[1].data.status, "SUBMITTING");
+});
+
+test("recovery never recreates an ambiguous supplier order that cannot be reconciled", async () => {
+  const fulfillment = recoverableFulfillment("AMBIGUOUS", "CJ_FULFILLMENT_AMBIGUOUS"); let creates = 0;
+  const db = { supplierFulfillment: { findUnique: async () => ({ status: fulfillment.status, lastErrorCode: fulfillment.lastErrorCode }), findUniqueOrThrow: async () => fulfillment } } as any;
+  const client = { getOrderDetail: async () => { throw new CjFulfillmentApiError("CJ_ORDER_NOT_FOUND", false, false); }, createOrder: async () => { creates += 1; } } as any;
+  const result = await recoverSupplierFulfillment(db, fulfillment.id, client);
+  assert.equal(result.status, "AMBIGUOUS"); assert.equal(creates, 0);
+});
+
+test("recovery accepts an existing reconciled order without creating another", async () => {
+  const fulfillment = recoverableFulfillment(); let creates = 0; let persisted: any;
+  const tx = { supplierFulfillment: { update: async (args: any) => { persisted = args; } }, supplierTracking: { upsert: async () => ({}) } };
+  const db = { supplierFulfillment: { findUnique: async () => ({ status: fulfillment.status, lastErrorCode: fulfillment.lastErrorCode }), findUniqueOrThrow: async () => fulfillment }, $transaction: async (callback: any) => callback(tx) } as any;
+  const client = { getOrderDetail: async () => ({ supplierOrderId: "cj_existing", supplierOrderNumber: fulfillment.externalReference, status: "PROCESSING", tracking: [] }), createOrder: async () => { creates += 1; } } as any;
+  const result = await recoverSupplierFulfillment(db, fulfillment.id, client);
+  assert.equal("reconciled" in result && result.reconciled, true); assert.equal(creates, 0); assert.equal(persisted.data.supplierOrderId, "cj_existing");
+});
+
+test("unrelated manual supplier failures remain blocked", async () => {
+  const db = { supplierFulfillment: { findUnique: async () => ({ status: "MANUAL_ACTION_REQUIRED", lastErrorCode: "SUPPLIER_CONNECTION_NOT_AUTHORIZED" }) } } as any;
+  await assert.rejects(() => recoverSupplierFulfillment(db, "ful_blocked", {} as any), /FULFILLMENT_NOT_RETRYABLE/);
 });

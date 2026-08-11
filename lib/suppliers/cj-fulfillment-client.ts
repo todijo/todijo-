@@ -11,6 +11,17 @@ export class CjFulfillmentApiError extends Error {
   constructor(public code: string, public ambiguous: boolean, public retryable: boolean, public safeMessage = code) { super(code); }
 }
 
+export function classifyCjFulfillmentFailure(input: { operation: string; httpStatus: number; responseCode?: number | string; responseMessage?: string }) {
+  const message = (input.responseMessage ?? "").trim();
+  if (/\b(insufficient|not enough)\b.{0,40}\b(wallet|balance|funds?)\b|\b(wallet|balance)\b.{0,40}\b(insufficient|not enough)\b|余额不足/i.test(message)) {
+    return { code: "CJ_WALLET_INSUFFICIENT", retryable: false };
+  }
+  if (input.operation === "get-order-detail" && (input.httpStatus === 404 || /\border\b.{0,30}\bnot found\b|\bno such order\b|\border\b.{0,30}\bdoes not exist\b/i.test(message))) {
+    return { code: "CJ_ORDER_NOT_FOUND", retryable: false };
+  }
+  return { code: `CJ_${input.responseCode ?? input.httpStatus}`, retryable: input.httpStatus === 429 || input.httpStatus >= 500 };
+}
+
 export type CjCreateOrderInput = {
   fulfillmentId: string;
   externalReference: string;
@@ -56,7 +67,8 @@ export class CjFulfillmentClient {
       const failed = authFailed || !response.ok || payload.result === false || payload.success === false || responseCodeFailed;
       if (failed) {
         logCjFulfillment({ operation, stage: "fulfillment", path, fulfillmentId, externalReference, outcome: "rejected", httpStatus: response.status, responseCode: payload.code, responseMessage: payload.message, requestId: payload.requestId }, [token]);
-        throw new CjFulfillmentApiError(authFailed ? "CJ_AUTHENTICATION_FAILED" : `CJ_${payload.code ?? response.status}`, false, response.status === 429 || response.status >= 500);
+        const classified = authFailed ? { code: "CJ_AUTHENTICATION_FAILED", retryable: false } : classifyCjFulfillmentFailure({ operation, httpStatus: response.status, responseCode: payload.code, responseMessage: payload.message });
+        throw new CjFulfillmentApiError(classified.code, false, classified.retryable);
       }
       logCjFulfillment({ operation, stage: "fulfillment", path, fulfillmentId, externalReference, outcome: "success", httpStatus: response.status, responseCode: payload.code, responseMessage: payload.message, requestId: payload.requestId }, [token]);
       return payload.data;

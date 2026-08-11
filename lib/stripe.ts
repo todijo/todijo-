@@ -51,14 +51,34 @@ export type StripeConnectedAccount = {
 export type StripeEvent = {
   id: string;
   type: string;
+  livemode?: boolean;
   data: { object: (StripeCheckoutSession & { last_payment_error?: { message?: string } }) | StripeConnectedAccount | StripeSubscription | StripeInvoice };
 };
 
-function stripeSecret() {
-  const value = process.env.STRIPE_SECRET_KEY;
+export type StripeMode = "test" | "live";
+
+export function configuredStripeMode(env: { STRIPE_MODE?: string; NODE_ENV?: string } = process.env as unknown as { STRIPE_MODE?: string; NODE_ENV?: string }): StripeMode {
+  const mode = env.STRIPE_MODE?.trim().toLowerCase();
+  if (mode === "test" || mode === "live") return mode;
+  if (env.NODE_ENV === "test" && !mode) return "test";
+  throw new Error("STRIPE_MODE must be explicitly configured as test or live.");
+}
+
+export function validateStripeSecretKey(value: string | undefined, mode = configuredStripeMode()) {
   if (!value) throw new Error("STRIPE_SECRET_KEY is not configured.");
-  if (!value.startsWith("sk_test_")) throw new Error("Todijo Stripe Connect must use a TEST MODE secret key.");
+  const expectedPrefix = mode === "live" ? "sk_live_" : "sk_test_";
+  if (!value.startsWith(expectedPrefix)) throw new Error(`STRIPE_SECRET_KEY does not match configured ${mode} mode.`);
   return value;
+}
+
+export function assertStripeWebhookMode(event: Pick<StripeEvent, "livemode">, mode = configuredStripeMode()) {
+  if (typeof event.livemode !== "boolean" || event.livemode !== (mode === "live")) {
+    throw new Error(`Stripe webhook livemode does not match configured ${mode} mode.`);
+  }
+}
+
+function stripeSecret() {
+  return validateStripeSecretKey(process.env.STRIPE_SECRET_KEY);
 }
 
 async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; body?: URLSearchParams; idempotencyKey?: string } = {}) {

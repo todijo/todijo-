@@ -15,6 +15,8 @@ function string(value: unknown) { return typeof value === "string" ? value.trim(
 function country(value: unknown) { const result = string(value).toUpperCase(); return /^[A-Z]{2}$/.test(result) ? result : ""; }
 function snapshot(value: Prisma.JsonValue): Snapshot { return value && typeof value === "object" && !Array.isArray(value) ? value as Snapshot : {}; }
 export function deterministicSupplierReference(orderId: string, groupKey: string) { return `tdj-${orderId.slice(0, 18)}-${createHash("sha256").update(groupKey).digest("hex").slice(0, 16)}`.slice(0, 50); }
+export function automaticCjFulfillmentEnabled(value = process.env.CJ_AUTOMATIC_FULFILLMENT_ENABLED) { return value?.trim().toLowerCase() === "true"; }
+export function isApprovedManualSupplierRetry(code: string | null | undefined) { return code === "CJ_WALLET_INSUFFICIENT"; }
 
 export async function prepareSupplierFulfillments(tx: Database, order: PaidOrder) {
   const groups = new Map<string, { connectionId: string | null; originCountry: string | null; destinationCountry: string | null; shippingMethod: string | null; manual: boolean; errorCode: string | null; items: Array<{ orderItemId: string; supplierProductId: string; supplierVariantId: string; quantity: number }> }>();
@@ -123,4 +125,23 @@ export async function syncSupplierFulfillment(db: PrismaClient, fulfillmentId: s
   const detail = await client.getOrderDetail(fulfillment.id, fulfillment.externalReference);
   await persistSupplierDetail(db, fulfillment.id, detail, fulfillment.submittedAt === null);
   return detail;
+}
+
+export async function recoverSupplierFulfillment(db: PrismaClient, fulfillmentId: string, client = new CjFulfillmentClient()) {
+  const fulfillment = await db.supplierFulfillment.findUnique({ where: { id: fulfillmentId }, select: { status: true, lastErrorCode: true } });
+  if (!fulfillment) throw new Error("FULFILLMENT_NOT_FOUND");
+  if (fulfillment.status === "PENDING" || fulfillment.status === "RETRYABLE") return processSupplierFulfillment(db, fulfillmentId, client);
+  if (fulfillment.status === "AMBIGUOUS" || (fulfillment.status === "MANUAL_ACTION_REQUIRED" && isApprovedManualSupplierRetry(fulfillment.lastErrorCode))) {
+    try {
+      const detail = await syncSupplierFulfillment(db, fulfillmentId, client);
+      return { claimed: false, submitted: true, reconciled: true, supplierStatus: detail.status };
+    } catch (error) {
+      if (!(error instanceof CjFulfillmentApiError) || error.code !== "CJ_ORDER_NOT_FOUND") throw error;
+      if (fulfillment.status === "AMBIGUOUS") return { claimed: false, submitted: false, reconciled: true, status: "AMBIGUOUS" as const, code: error.code };
+      const released = await db.supplierFulfillment.updateMany({ where: { id: fulfillmentId, status: "MANUAL_ACTION_REQUIRED", lastErrorCode: fulfillment.lastErrorCode }, data: { status: "RETRYABLE", lastErrorCategory: "RETRYABLE" } });
+      if (released.count !== 1) return { claimed: false };
+      return processSupplierFulfillment(db, fulfillmentId, client);
+    }
+  }
+  throw new Error("FULFILLMENT_NOT_RETRYABLE");
 }

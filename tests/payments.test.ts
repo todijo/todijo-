@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete, processStripeEvent } from "../lib/payments";
-import { verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
+import { assertStripeWebhookMode, configuredStripeMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
   let order: any = null;
@@ -138,6 +138,27 @@ test("webhook signature rejection blocks altered payloads", () => {
   const signature = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
   assert.equal(verifyStripeWebhook(body, `t=${timestamp},v1=${signature}`, secret).id, "evt_1");
   assert.throws(() => verifyStripeWebhook(`${body} `, `t=${timestamp},v1=${signature}`, secret), /Invalid Stripe webhook signature/);
+});
+
+test("Stripe mode explicitly accepts matching test and live credentials", () => {
+  assert.equal(configuredStripeMode({ STRIPE_MODE: "test", NODE_ENV: "production" }), "test");
+  assert.equal(configuredStripeMode({ STRIPE_MODE: "live", NODE_ENV: "production" }), "live");
+  assert.equal(validateStripeSecretKey("sk_test_example", "test"), "sk_test_example");
+  assert.equal(validateStripeSecretKey("sk_live_example", "live"), "sk_live_example");
+});
+
+test("Stripe mode fails closed for absent production mode and mismatched credentials", () => {
+  assert.throws(() => configuredStripeMode({ NODE_ENV: "production" }), /STRIPE_MODE/);
+  assert.throws(() => validateStripeSecretKey("sk_live_example", "test"), /does not match/);
+  assert.throws(() => validateStripeSecretKey("sk_test_example", "live"), /does not match/);
+});
+
+test("Stripe webhook livemode must match configured mode", () => {
+  assert.doesNotThrow(() => assertStripeWebhookMode({ livemode: false }, "test"));
+  assert.doesNotThrow(() => assertStripeWebhookMode({ livemode: true }, "live"));
+  assert.throws(() => assertStripeWebhookMode({ livemode: true }, "test"), /livemode/);
+  assert.throws(() => assertStripeWebhookMode({ livemode: false }, "live"), /livemode/);
+  assert.throws(() => assertStripeWebhookMode({}, "test"), /livemode/);
 });
 
 test("checkout blocks unknown sellers and snapshots confirmed status", async () => {
