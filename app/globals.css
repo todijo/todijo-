@@ -924,4 +924,4 @@ html[dir="rtl"] .buyerMobileDrawer nav a.active{box-shadow:inset -4px 0 0 #08765
 @media(max-width:900px){.productComplianceLongText{grid-template-columns:1fr}.productComplianceLongText section:only-child{max-width:none}}
 @media(max-width:640px){.productCompliancePublic{width:auto;margin:14px 12px 0}.productComplianceLongText section{padding:15px}.productComplianceLongText p{max-width:none}}
 .productVideoManager{display:grid;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid #dce7e1;color:#294d3d}.productVideoManager video{display:block;width:min(100%,640px);max-height:420px;border-radius:14px;background:#07130e}
-.sellerProductsGridPremium .sellerProductBody h2{color:var(--dash-text)}
+.sellerProductsGridPremium .sellerProductCard{color:var(--ink)}.sellerProductsGridPremium .sellerProductBody h2{color:inherit}

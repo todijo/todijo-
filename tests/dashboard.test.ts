@@ -110,6 +110,8 @@ test("seller product titles keep semantic foreground contrast on light cards", (
   const css = readFileSync("app/globals.css", "utf8");
   assert.match(page, /className="sellerProductCard"[\s\S]*?<h2>\{product\.name\}<\/h2>/);
   assert.match(page, /product\.status === "PUBLISHED"[\s\S]*?statusDraft/);
-  assert.match(css, /\.sellerProductsGridPremium \.sellerProductBody h2\{color:var\(--dash-text\)\}/);
-  assert.doesNotMatch(css, /\.sellerProductsGridPremium \.sellerProductBody h2:(?:hover|focus)[^{]*\{[^}]*color:\s*#?fff/i);
+  assert.match(css, /--ink:\s*#11221d/);
+  assert.match(css, /\.sellerProductsGridPremium \.sellerProductCard\{color:var\(--ink\)\}/);
+  assert.match(css, /\.sellerProductsGridPremium \.sellerProductBody h2\{color:inherit\}/);
+  assert.doesNotMatch(css, /\.sellerProductsGridPremium \.sellerProduct(?:Card|Body h2):(?:hover|focus|focus-visible|visited)[^{]*\{[^}]*color:\s*(?:#?fff|white)/i);
 });
