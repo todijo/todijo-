@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { CjAuthService } from "../lib/suppliers/cj-auth";
 import { PLATFORM_CJ_CONNECTION_ID, requirePlatformSupplierProduct, requireSellerSupplierAccess, sellerConnectionWhere, setSellerDropshippingPermission, supplierIdentityKey } from "../lib/suppliers/supplier-access";
 import { resolveSupplierProvider } from "../lib/suppliers/supplier-provider";
-import { assertSupplierPurchasable } from "../lib/suppliers/safety";
+import { assertProductPublicationEligible, assertSupplierPurchasable } from "../lib/suppliers/safety";
 import { importSupplierProduct } from "../lib/suppliers/supplier-products";
 
 test("normal sellers cannot see platform CJ tools and supplier costs remain admin-only", () => {
@@ -84,6 +84,38 @@ test("checkout preflight fails closed for disconnected, revoked, or disabled sel
   ]) assert.throws(() => assertSupplierPurchasable({ supplierLink: link }), /SUPPLIER_PRODUCT_REQUIRES_REVIEW/);
   assert.doesNotThrow(() => assertSupplierPurchasable({ supplierLink: { ...base, connection: { status: "CONNECTED", store: { dropshippingEnabled: true } } } }));
   assert.doesNotThrow(() => assertSupplierPurchasable({ supplierLink: null }));
+});
+
+test("publication accepts a healthy exact CJ mapping and leaves normal marketplace products unchanged", () => {
+  const supplierLink = { provider: "CJ", ownerType: "PLATFORM", connectionId: PLATFORM_CJ_CONNECTION_ID, supplierProductId: "PID", supplierAvailable: true, syncStatus: "HEALTHY", connection: { id: PLATFORM_CJ_CONNECTION_ID, status: "CONNECTED", store: null } };
+  assert.doesNotThrow(() => assertProductPublicationEligible({ deactivationReason: "SELLER", supplierLink, variants: [{ active: true, supplierConnectionId: PLATFORM_CJ_CONNECTION_ID, supplierVariantId: "VID", supplierAvailable: true }] }));
+  assert.doesNotThrow(() => assertProductPublicationEligible({ deactivationReason: "SELLER", supplierLink: null }));
+});
+
+test("supplier metadata alone cannot publish through an unhealthy or inexact connection", () => {
+  const base = { provider: "CJ", ownerType: "PLATFORM", connectionId: PLATFORM_CJ_CONNECTION_ID, supplierProductId: "PID", supplierAvailable: true, syncStatus: "HEALTHY", connection: { id: PLATFORM_CJ_CONNECTION_ID, status: "CONNECTED", store: null } };
+  for (const supplierLink of [
+    { ...base, supplierAvailable: false },
+    { ...base, syncStatus: "ERROR" },
+    { ...base, connection: { ...base.connection, status: "REVOKED" } },
+    { ...base, connection: { ...base.connection, id: "another-connection" } },
+    { ...base, connectionId: "seller-cj", connection: { id: "seller-cj", status: "CONNECTED", store: null } },
+    { ...base, supplierProductId: "" },
+  ]) assert.throws(() => assertProductPublicationEligible({ deactivationReason: "SELLER", supplierLink }), /SUPPLIER_PRODUCT_REQUIRES_REVIEW/);
+});
+
+test("publication requires one exact available supplier variant and respects admin moderation blocks", () => {
+  const supplierLink = { provider: "CJ", ownerType: "PLATFORM", connectionId: PLATFORM_CJ_CONNECTION_ID, supplierProductId: "PID", supplierAvailable: true, syncStatus: "HEALTHY", connection: { id: PLATFORM_CJ_CONNECTION_ID, status: "CONNECTED", store: null } };
+  assert.throws(() => assertProductPublicationEligible({ deactivationReason: "SELLER", supplierLink, variants: [{ active: true, supplierConnectionId: "wrong", supplierVariantId: "VID", supplierAvailable: true }] }), /SUPPLIER_PRODUCT_REQUIRES_REVIEW/);
+  assert.throws(() => assertProductPublicationEligible({ deactivationReason: "ADMIN", supplierLink, variants: [{ active: true, supplierConnectionId: PLATFORM_CJ_CONNECTION_ID, supplierVariantId: "VID", supplierAvailable: true }] }), /PRODUCT_ADMIN_BLOCKED/);
+});
+
+test("product update publication remains owner-authorized and server validated", () => {
+  const source = readFileSync(resolve(__dirname, "../../app/api/products/[id]/route.ts"), "utf8");
+  assert.match(source, /store:\s*\{ ownerId: session\.userId \}/);
+  assert.match(source, /status === "PUBLISHED"[\s\S]+requirePublishingAccess[\s\S]+assertProductPublicationEligible/);
+  assert.match(source, /COMPLIANCE_DECLARATION_REQUIRED/);
+  assert.doesNotMatch(source, /request[^\n]+update\([^\n]+status/);
 });
 
 test("tenant migration is additive, defaults sellers off, and preserves existing links as platform-owned", () => {

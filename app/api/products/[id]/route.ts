@@ -9,6 +9,7 @@ import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/pro
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
+import { assertProductPublicationEligible } from "@/lib/suppliers/safety";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -23,7 +24,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const { id } = await context.params;
     const product = await prisma.product.findFirst({
       where: { id, store: { ownerId: session.userId } },
-      select: { id: true, complianceDeclaredAt: true },
+      select: {
+        id: true, complianceDeclaredAt: true, deactivationReason: true,
+        supplierLink: { select: { provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
+        variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierAvailable: true } },
+      },
     });
     if (!product) return NextResponse.json({ error: "Produit introuvable ou accès refusé." }, { status: 404 });
 
@@ -36,7 +41,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const compliance = readProductCompliance(body);
     const productShipping = parseProductShipping(body);
     if (status === "PUBLISHED" && !product.complianceDeclaredAt && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
-    if (status === "PUBLISHED") await requirePublishingAccess(prisma, session.userId);
+    if (status === "PUBLISHED") {
+      await requirePublishingAccess(prisma, session.userId);
+      assertProductPublicationEligible(product);
+    }
     const price = Number(body.price);
     const stock = Number(body.stock);
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
@@ -74,6 +82,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof Error && ["PRODUCT_ADMIN_BLOCKED", "SUPPLIER_PRODUCT_REQUIRES_REVIEW"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });
   }
