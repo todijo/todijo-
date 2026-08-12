@@ -27,6 +27,16 @@ test("quantity is line scoped and included in the freight request and line total
  assert.equal(quantity,2);assert.equal(result.buyer?.buyerLineTotal,"28.14");
 });
 
+test("exact variants may price differently while each keeps the true twenty percent margin",async()=>{
+ const variants=[{supplierVariantId:"CJ-A",sku:null,title:"A",cost:8,currency:"USD",stock:5,available:true,originCountryCodes:["CN"]},{supplierVariantId:"CJ-B",sku:null,title:"B",cost:12,currency:"USD",stock:5,available:true,originCountryCodes:["CN"]}];
+ const makeDb=(id:string,supplierVariantId:string)=>db({variants:[{id,priceOverride:null,supplierVariantId,supplierConnectionId:"connection-1"}]});
+ const deps=dependencies({variants}); deps.fx=async(base:unknown,quote:unknown)=>({provider:"OPEN_EXCHANGE_RATES" as const,baseCurrency:base as "USD",quoteCurrency:quote as "EUR",rate:"1",fetchedAt:new Date().toISOString(),effectiveAt:new Date().toISOString()});
+ const a=await resolveDropshippingPricing(makeDb("variant-a","CJ-A"),{productId:"product-1",variantId:"variant-a",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps);
+ const b=await resolveDropshippingPricing(makeDb("variant-b","CJ-B"),{productId:"product-1",variantId:"variant-b",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps);
+ assert.notEqual(a.buyer?.buyerUnitPrice,b.buyer?.buyerUnitPrice);
+ for(const result of [a,b]){assert.equal(result.snapshot?.targetMargin,"0.2");assert.equal(Number(result.snapshot!.calculatedSellingPrice),Math.ceil((Number(result.snapshot!.includedCost)/.8)*100)/100);}
+});
+
 test("invalid or cross-product variants fail before any supplier call",async()=>{
  let called=false;const deps=dependencies();deps.provider.getProduct=async()=>{called=true;return snapshot;};
  await assert.rejects(()=>resolveDropshippingPricing(db({variants:[]}),{productId:"product-1",variantId:"foreign",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps),(error:unknown)=>error instanceof DropshippingCommerceError&&error.code==="DROPSHIPPING_VARIANT_INVALID");assert.equal(called,false);

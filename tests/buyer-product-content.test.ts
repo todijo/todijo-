@@ -15,8 +15,9 @@ const variant = (id: string, valueId: string): BuyerVariant => ({ id, stock: 2, 
 
 test("legacy CJ labels become compact option and size groups without supplier codes", () => {
   const result = buyerVariantPresentation({ productName, supplierManaged: true, options, variants: [variant("v1", "white-s"), variant("v2", "white-m"), variant("v3", "other-s")] });
-  assert.deepEqual(result.options.map((option) => option.name), ["Option", "Size"]);
-  assert.deepEqual(result.options[0].values.map((value) => value.value), ["Option 1", "Option 2"]);
+  assert.deepEqual(result.options.map((option) => option.name), ["Style", "Size"]);
+  assert.deepEqual(result.options[0].values.map((value) => value.value), ["Style 1", "Style 2"]);
+  assert.ok(result.options[0].values.every((value) => value.imageOnly));
   assert.deepEqual(result.options[1].values.map((value) => value.value), ["S", "M"]);
   assert.doesNotMatch(JSON.stringify(result.options), /LC25224353|New Pullover/);
   assert.equal(result.variants.find((entry) => entry.id === "v2")!.values[1].optionValue.value, "M");
@@ -35,6 +36,14 @@ test("single-style CJ products expose sizes without leaking the legacy supplier 
   assert.deepEqual(result.options[0].values.map((value) => value.value), ["S", "M"]);
   assert.deepEqual(result.variants.map((entry) => entry.id), ["v1", "v2"]);
   assert.doesNotMatch(JSON.stringify(result), /LC25224353|New Pullover/);
+});
+
+test("future structured CJ keys retain documented semantic style names", () => {
+  const semanticOptions:BuyerOption[]=[{id:"variant",name:"Variant",position:0,values:[{id:"black-s",value:"Black-S",position:0},{id:"black-m",value:"Black-M",position:1},{id:"white-s",value:"White-S",position:2}]}];
+  const semanticVariant=(id:string,valueId:string):BuyerVariant=>({id,stock:1,active:true,priceOverride:null,values:[{optionValue:{id:valueId,value:semanticOptions[0].values.find((value)=>value.id===valueId)!.value,option:{id:"variant",name:"Variant",position:0}}}]});
+  const result=buyerVariantPresentation({productName:"Product",supplierManaged:true,options:semanticOptions,variants:[semanticVariant("black-s-id","black-s"),semanticVariant("black-m-id","black-m"),semanticVariant("white-s-id","white-s")]});
+  assert.deepEqual(result.options.map((option)=>option.name),["Style","Size"]);
+  assert.deepEqual(result.options[0].values.map((value)=>value.value),["Black","White"]);
 });
 
 test("generic marketplace structured options and variants remain unchanged", () => {
@@ -73,4 +82,10 @@ test("pricing, cart and country continue to use canonical selection identity", (
   assert.match(panel, /variantId=\{selectedVariant\?\.id\?\?null\}/); assert.match(panel, /quantity=\{quantity\}/);
   assert.match(pricing, /variantId,quantity,destinationCountry:country/); assert.match(pricing, /SHOPPING_COUNTRY_STORAGE_KEY/);
   assert.match(panel, /setVerifiedPricing\(pricing\)/); assert.match(panel, /verifiedPricing\.variantId===selectedVariant\?\.id/);
+});
+
+test("the main product heading area never substitutes a country prompt for price", () => {
+  const price = readFileSync("app/product/[id]/ProductDetailPrice.tsx", "utf8");
+  assert.match(price, /if \(!verified\) return null/);
+  assert.doesNotMatch(price, /selectDeliveryCountry/);
 });

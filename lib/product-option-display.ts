@@ -1,4 +1,4 @@
-export type BuyerOption = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[] }> };
+export type BuyerOption = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
 export type BuyerVariant = { id: string; stock: number; active: boolean; priceOverride: number | null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 
 const SIZE = /^(?:XXXS|XXS|XS|S|M|L|XL|XXL|XXXL|\d{1,3}(?:\.5)?|ONE\s*SIZE)$/i;
@@ -7,12 +7,11 @@ const OPAQUE = /^(?:[A-Z]{1,5}\d{4,}[A-Z0-9-]*|[A-Z0-9]{8,})$/i;
 function legacyParts(productName: string, value: string) {
   let compact = value.trim();
   if (compact.toLocaleLowerCase().startsWith(productName.trim().toLocaleLowerCase())) compact = compact.slice(productName.trim().length).trim();
-  const tokens = compact.split(/\s+/).filter(Boolean);
-  const size = tokens.at(-1)?.replace(/^[-/]+|[-/]+$/g, "") ?? "";
-  if (!SIZE.test(size)) return null;
-  const key = tokens.slice(0, -1).join(" ").replace(/[-/]+$/g, "").trim();
-  if (!key || !key.split(/[-/\s]+/).some((part) => OPAQUE.test(part))) return null;
-  return { key, size: size.toUpperCase().replace("ONE SIZE", "One Size") };
+  const match = compact.match(/^(.*?)(?:\s+|[-/])((?:XXXS|XXS|XS|S|M|L|XL|XXL|XXXL|\d{1,3}(?:\.5)?|ONE\s*SIZE))$/i);
+  if (!match || !SIZE.test(match[2])) return null;
+  const key = match[1].replace(/[-/]+$/g, "").trim();
+  if (!key) return null;
+  return { key, opaque: key.split(/[-/\s]+/).some((part) => OPAQUE.test(part)), size: match[2].toUpperCase().replace(/ONE\s*SIZE/, "One Size") };
 }
 
 export function buyerVariantPresentation(input: { productName: string; supplierManaged: boolean; options: BuyerOption[]; variants: BuyerVariant[] }) {
@@ -21,9 +20,9 @@ export function buyerVariantPresentation(input: { productName: string; supplierM
   const original = ordered[0];
   const parts = new Map(original.values.map((value) => [value.id, legacyParts(input.productName, value.value)]));
   if ([...parts.values()].some((part) => !part)) {
-    const values = original.values.map((value, index) => ({ ...value, value: `Option ${index + 1}` }));
+    const values = original.values.map((value, index) => ({ ...value, value: `Style ${index + 1}`, imageOnly: Boolean(value.imageUrls?.length), accessibleLabel: `Style ${index + 1}` }));
     const labels = new Map(values.map((value) => [value.id, value.value]));
-    return { options: [{ ...original, name: "Option", values }], variants: input.variants.map((variant) => ({ ...variant, values: variant.values.map(({ optionValue }) => ({ optionValue: { ...optionValue, value: labels.get(optionValue.id) ?? "Option", option: { ...optionValue.option, name: "Option" } } })) })) };
+    return { options: [{ ...original, name: "Style", values }], variants: input.variants.map((variant) => ({ ...variant, values: variant.values.map(({ optionValue }) => ({ optionValue: { ...optionValue, value: labels.get(optionValue.id) ?? "Style", option: { ...optionValue.option, name: "Style" } } })) })) };
   }
   const keys = [...new Set([...parts.values()].map((part) => part!.key))];
   const sizes = [...new Set([...parts.values()].map((part) => part!.size))];
@@ -32,8 +31,9 @@ export function buyerVariantPresentation(input: { productName: string; supplierM
   for (const value of original.values) { const part = parts.get(value.id)!; if (!imageByKey.has(part!.key) && value.imageUrls?.length) imageByKey.set(part!.key, value.imageUrls); }
   const showStyle = keys.length > 1 || sizes.length === 1;
   const showSize = sizes.length > 1;
+  const styleLabel = (key:string,index:number) => parts.get(original.values.find((value)=>parts.get(value.id)?.key===key)?.id ?? "")?.opaque ? `Style ${index + 1}` : key;
   const options: BuyerOption[] = [
-    ...(showStyle ? [{ id: styleId, name: "Option", position: 0, values: keys.map((key, index) => ({ id: `${styleId}:${index}`, value: keys.length === 1 ? "Standard" : `Option ${index + 1}`, position: index, imageUrls: imageByKey.get(key) })) }] : []),
+    ...(showStyle ? [{ id: styleId, name: "Style", position: 0, values: keys.map((key, index) => ({ id: `${styleId}:${index}`, value: keys.length === 1 ? "Standard" : styleLabel(key,index), position: index, imageUrls: imageByKey.get(key), imageOnly: Boolean(imageByKey.get(key)?.length) && styleLabel(key,index).startsWith("Style "), accessibleLabel: keys.length === 1 ? "Standard style" : styleLabel(key,index) })) }] : []),
     ...(showSize ? [{ id: sizeId, name: "Size", position: showStyle ? 1 : 0, values: sizes.map((size, index) => ({ id: `${sizeId}:${index}`, value: size, position: index })) }] : []),
   ];
   const styleIds = new Map(keys.map((key, index) => [key, `${styleId}:${index}`])), sizeIds = new Map(sizes.map((size, index) => [size, `${sizeId}:${index}`]));
@@ -42,7 +42,7 @@ export function buyerVariantPresentation(input: { productName: string; supplierM
     const part = source ? parts.get(source.optionValue.id) : null;
     if (!part) return { ...variant, values: [] };
     return { ...variant, values: [
-      ...(showStyle ? [{ optionValue: { id: styleIds.get(part.key)!, value: keys.length === 1 ? "Standard" : `Option ${keys.indexOf(part.key) + 1}`, option: { id: styleId, name: "Option", position: 0 } } }] : []),
+      ...(showStyle ? [{ optionValue: { id: styleIds.get(part.key)!, value: keys.length === 1 ? "Standard" : styleLabel(part.key,keys.indexOf(part.key)), option: { id: styleId, name: "Style", position: 0 } } }] : []),
       ...(showSize ? [{ optionValue: { id: sizeIds.get(part.size)!, value: part.size, option: { id: sizeId, name: "Size", position: showStyle ? 1 : 0 } } }] : []),
     ] };
   });

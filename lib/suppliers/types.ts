@@ -9,6 +9,7 @@ export type SupplierVariantSnapshot = {
   stock: number;
   available: boolean;
   originCountryCodes: string[];
+  imageUrl?: string | null;
 };
 
 export type SupplierMediaSource = {

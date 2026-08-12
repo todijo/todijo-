@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {useLocale,useTranslations} from "next-intl";
+import {useLocale} from "next-intl";
 
 type VariantPriceDetail = { price: number;currency?:string;verified?:boolean };
 
 export default function ProductDetailPrice({ price, compareAtPrice, currency, requiresVerifiedPricing=false }: { price: number; compareAtPrice: number | null; currency: string;requiresVerifiedPricing?:boolean }) {
-  const t=useTranslations("ProductDetail"),locale=useLocale(),[selectedPrice, setSelectedPrice] = useState(price),[selectedCurrency,setSelectedCurrency]=useState(currency),[verified,setVerified]=useState(!requiresVerifiedPricing);
+  const locale=useLocale(),[selectedPrice, setSelectedPrice] = useState(price),[selectedCurrency,setSelectedCurrency]=useState(currency),[verified,setVerified]=useState(!requiresVerifiedPricing);
 
   useEffect(() => {
     const updatePrice = (event: Event) => {const detail=(event as CustomEvent<VariantPriceDetail>).detail;setSelectedPrice(detail.price);setSelectedCurrency(detail.currency??currency);setVerified(detail.verified!==false);};
@@ -15,8 +15,9 @@ export default function ProductDetailPrice({ price, compareAtPrice, currency, re
   }, [currency]);
 
   const discount = !requiresVerifiedPricing&&compareAtPrice && compareAtPrice > selectedPrice ? Math.round((1 - selectedPrice / compareAtPrice) * 100) : null;
+  if (!verified) return null;
   return <div className="productPriceRow" aria-live="polite">
-    <strong className="productDetailPrice">{verified?new Intl.NumberFormat(locale,{style:"currency",currency:selectedCurrency}).format(selectedPrice):t("selectDeliveryCountry")}</strong>
+    <strong className="productDetailPrice">{new Intl.NumberFormat(locale,{style:"currency",currency:selectedCurrency}).format(selectedPrice)}</strong>
     {verified&&!requiresVerifiedPricing&&compareAtPrice && compareAtPrice > selectedPrice ? <del>{compareAtPrice.toFixed(2)} {currency}</del> : null}
     {verified&&discount ? <span>-{discount}%</span> : null}
   </div>;

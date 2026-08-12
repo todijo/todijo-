@@ -4,6 +4,7 @@ import { CloudinaryProductMediaProvider, type ProductMediaProvider, type StoredP
 import type { SupplierCatalogProvider } from "./types";
 import { MAX_PRODUCT_IMAGES } from "../product-images";
 import { calculateSupplierSnapshotPrices } from "./pricing";
+import { replaceProductVariantImages } from "../product-variant-images";
 
 type Database = PrismaClient;
 
@@ -43,15 +44,19 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
       supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:{...snapshot.rawMetadata,pricing:automaticPricing??{mode:"MANUAL_OVERRIDE",shippingStatus:"DEFERRED",marginGuaranteed:false}} as Prisma.InputJsonValue}},
       media:{create:copied.map((item,index)=>({type:item.type,provider:item.provider,publicId:item.publicId,url:item.url,posterUrl:item.posterUrl,position:index,width:item.width,height:item.height,durationMs:item.durationMs,sourceUrl:snapshot.media[index]?.url??null}))},
     }});
+    const variantImageAssignments:Array<{optionValueId:string;imageUrls:string[];primaryUrl:string}> = [];
     if (snapshot.variants.length) {
       const option = await tx.productOption.create({data:{productId:product.id,name:"Variant",position:0}});
       for (const [index,variant] of snapshot.variants.entries()) {
         const value = await tx.productOptionValue.create({data:{optionId:option.id,value:variant.title.slice(0,100),position:index}});
+        const copiedVariantImage = variant.imageUrl ? copied.find((item,mediaIndex)=>snapshot.media[mediaIndex]?.url===variant.imageUrl && item.type==="IMAGE")?.url : undefined;
+        if (copiedVariantImage) variantImageAssignments.push({optionValueId:value.id,imageUrls:[copiedVariantImage],primaryUrl:copiedVariantImage});
         const variantPrice = automaticPricing?.variants.find((entry)=>entry.supplierVariantId===variant.supplierVariantId)?.calculation.finalSellingPrice ?? null;
         const created = await tx.productVariant.create({data:{productId:product.id,combinationKey:`variant:${index}`,sku:null,priceOverride:variantPrice,stock:variant.stock,active:variant.available,supplierProvider:provider.id,supplierConnectionId:input.connectionId,supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,supplierLastSyncedAt:new Date()}});
         await tx.productVariantValue.create({data:{variantId:created.id,optionValueId:value.id}});
       }
     }
+    if (variantImageAssignments.length) await replaceProductVariantImages(tx,product.id,images,variantImageAssignments);
     return product;
   });
 }

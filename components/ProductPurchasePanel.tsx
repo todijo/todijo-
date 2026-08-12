@@ -10,7 +10,7 @@ import DropshippingProductPricing from "@/components/DropshippingProductPricing"
 import type {BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
 
 type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
-type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[] }> };
+type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
 
 export default function ProductPurchasePanel({ product, colors, sizes, options = [], variants = [], availabilityLabel, dropshippingEligible = false }: { product: CartProduct; colors: string[]; sizes: string[]; options?: Option[]; variants?: Variant[]; availabilityLabel: string; dropshippingEligible?: boolean }) {
   const t = useTranslations("Product");
@@ -32,7 +32,6 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("todijo:variant-price", { detail: { price: selectedPrice,currency:selectedCurrency,verified:!dropshippingEligible||Boolean(activePricing) } }));
-    setQuantity(1);
   }, [activePricing,dropshippingEligible,selectedCurrency,selectedPrice,selectedVariant?.id]);
 
   function selectOption(optionId: string, valueId: string) {
@@ -62,8 +61,8 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
         const next = { ...selection, [option.id]: value.id };
         const valueAvailable = activeVariants.some((variant) => matches(variant, next) && variant.stock > 0);
         const image = value.imageUrls?.[0];
-        return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selection[option.id] === value.id ? " selected" : ""}`} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-pressed={selection[option.id] === value.id}>
-          {image ? <Image src={image} alt="" width={78} height={64} unoptimized /> : null}<span>{value.value}</span>
+        return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selection[option.id] === value.id ? " selected" : ""}`} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-label={value.accessibleLabel ?? value.value} aria-pressed={selection[option.id] === value.id}>
+          {image ? <Image src={image} alt="" width={78} height={64} unoptimized /> : null}<span className={value.imageOnly ? "srOnly" : undefined}>{value.value}</span>
         </button>;
       })}</div></fieldset>) : <><fieldset className="optionGroup"><legend>{t("color")}</legend><div>{colorChoices.map((value) => <button key={value} className={color === value ? "selected" : ""} onClick={() => setColor(value)} type="button" aria-pressed={color === value}>{value}</button>)}</div></fieldset><fieldset className="optionGroup"><legend>{t("size")}</legend><div>{sizeChoices.map((value) => <button key={value} className={size === value ? "selected" : ""} onClick={() => setSize(value)} type="button" aria-pressed={size === value}>{value}</button>)}</div></fieldset></>}
       <p className="selectedOptions">{t("selection", { value: selectedOptions || detail("chooseCombination") })}</p>
