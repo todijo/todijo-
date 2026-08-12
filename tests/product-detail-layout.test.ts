@@ -4,10 +4,11 @@ import { readFile } from "node:fs/promises";
 
 test("product detail renders one full description below the bounded gallery grid", async () => {
   const source = await readFile("app/product/[id]/page.tsx", "utf8");
-  assert.equal(source.match(/productDetailDescription/g)?.length, 2); // section and paragraph class names
+  assert.equal(source.match(/productDetailDescriptionSection/g)?.length, 1);
+  assert.equal(source.match(/<ProductDescription/g)?.length, 1);
   assert.ok(source.indexOf("productDetailTop") < source.indexOf("productDetailDescriptionSection"));
   assert.ok(source.indexOf("productGallerySticky") < source.indexOf("productDetailDescriptionSection"));
-  assert.equal(source.match(/\{product\.description\}/g)?.length, 2); // metadata/JSON-LD and the visible description
+  assert.equal(source.match(/\{product\.description\}/g)?.length, 2); // metadata/JSON-LD and the safe description component
 });
 
 test("shop wording and Ask Seller order match their actions", async () => {

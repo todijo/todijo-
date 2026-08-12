@@ -41,7 +41,7 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
   const originsByVariant = new Map(variantInventories.map((entry)=>{const row=object(entry);return [text(row.vid),[...new Set(list(row.inventory).map((item)=>text(object(item).countryCode).toUpperCase()).filter((code)=>/^[A-Z]{2}$/.test(code)))]] as const;}));
   const variants: SupplierVariantSnapshot[] = variantsRaw.slice(0, 200).map((entry, index) => {
     const row = object(entry); const id = text(row.vid ?? row.variantId); const stock = inventoryByVariant.get(id) ?? Math.max(0, number(row.variantInventory ?? row.stock) ?? 0);
-    return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantNameEn ?? row.variantName ?? row.variantKey) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0, originCountryCodes:[...(originsByVariant.get(id)??[])] };
+    return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantKey ?? row.variantNameEn ?? row.variantName) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0, originCountryCodes:[...(originsByVariant.get(id)??[])] };
   }).filter((variant) => variant.supplierVariantId);
   const imageUrls = normalizeCjProductImages(product);
   const videoUrl = text(product.productVideo ?? product.videoUrl);
