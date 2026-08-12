@@ -24,7 +24,7 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
   const baseImages = useMemo(() => images.filter(Boolean), [images]);
   const video = media.find((item) => item.type === "VIDEO");
   const [variantImages, setVariantImages] = useState<string[]>([]);
-  const cleanImages = variantImages.length ? variantImages : baseImages;
+  const cleanImages = useMemo(() => [...new Set([...variantImages, ...baseImages])], [baseImages, variantImages]);
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia>(() => baseImages.length ? { type: "IMAGE", index: 0 } : { type: "VIDEO" });
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -78,7 +78,7 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
     requestAnimationFrame(() => openerRef.current?.focus());
   }, []);
 
-  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; const filtered = Array.isArray(next) ? next.filter(Boolean) : []; stopVideo(); setVariantImages(filtered); setSelectedMedia(filtered.length || baseImages.length ? { type: "IMAGE", index: 0 } : { type: "VIDEO" }); setIsZoomed(false); requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [baseImages.length, scrollToIndex, stopVideo]);
+  useEffect(() => { const listener = (event: Event) => { const next = (event as CustomEvent<{ images?: string[] }>).detail?.images; const filtered = Array.isArray(next) ? [...new Set(next.filter(Boolean))] : []; const merged=[...new Set([...filtered,...baseImages])];stopVideo();setVariantImages(filtered);setSelectedMedia(merged.length?{type:"IMAGE",index:0}:{type:"VIDEO"});setIsZoomed(false);requestAnimationFrame(() => scrollToIndex(0, "auto")); }; window.addEventListener("todijo:variant-images", listener); return () => window.removeEventListener("todijo:variant-images", listener); }, [baseImages, scrollToIndex, stopVideo]);
 
   useEffect(() => () => {
     stopVideo();

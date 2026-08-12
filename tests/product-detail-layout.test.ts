@@ -56,7 +56,7 @@ test("legacy and variant image product detail paths remain present", async () =>
   assert.match(page, /images: true, colors: true, sizes: true/);
   assert.match(page, /imageAssignments/);
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
-  assert.match(gallery, /variantImages\.length \? variantImages : baseImages/);
+  assert.match(gallery, /\.\.\.variantImages, \.\.\.baseImages/);
   assert.match(gallery, /productMainImage productMainImageIntrinsic/);
 });
 
@@ -165,7 +165,7 @@ test("gallery index, counter, and thumbnails stay synchronized", async () => {
   assert.match(gallery, /selectedMedia\.type === "IMAGE" && index === selectedIndex \? " isActive" : ""/);
   assert.match(gallery, /selectImage\(index\); scrollToIndex\(index\)/);
   assert.match(gallery, /requestAnimationFrame\(\(\) => scrollToIndex\(0, "auto"\)\)/);
-  assert.match(gallery, /setVariantImages\(filtered\); setSelectedMedia\(filtered\.length \|\| baseImages\.length/);
+  assert.match(gallery, /setVariantImages\(filtered\);setSelectedMedia\(merged\.length/);
   assert.doesNotMatch(gallery, /setTrackHeight|ResizeObserver|active-gallery-height/);
 });
 
@@ -234,4 +234,11 @@ test("quantity and review states retain their real-data boundaries", async () =>
   assert.match(reviews, /data\.reviews\.length===0/);
   assert.match(reviews, /data\.reviews\.map/);
   assert.match(page, /category:product\.category,id:\{not:product\.id\}/);
+});
+
+test("style selection preserves the original gallery and viewer controls", async () => {
+  const gallery=await readFile("app/product/[id]/ProductGallery.tsx","utf8");
+  assert.match(gallery,/\.\.\.variantImages, \.\.\.baseImages/);assert.match(gallery,/\.\.\.filtered,\.\.\.baseImages/);
+  assert.match(gallery,/productThumbs/);assert.match(gallery,/setIsOpen\(true\)/);assert.match(gallery,/productLightbox/);
+  assert.doesNotMatch(gallery,/variantImages\.length \? variantImages : baseImages/);
 });
