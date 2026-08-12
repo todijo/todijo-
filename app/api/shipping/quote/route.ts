@@ -6,9 +6,14 @@ import {cartLineKey} from "@/lib/cart-line";
 import {embeddedShippingQuote} from "@/lib/payments";
 import {cartShippingQuote,effectiveShippingRule,quoteShippingRule,ShippingError} from "@/lib/shipping";
 import {resolveDropshippingEligibility,resolveDropshippingPricing,type DropshippingPriceSnapshot} from "@/lib/suppliers/commerce-pricing";
+import {readSession} from "@/lib/session";
+import {defaultBuyerAddress} from "@/lib/buyer-addresses";
 
 export async function POST(request:Request){
+ const session=await readSession();if(!session)return NextResponse.json({code:"AUTH_REQUIRED"},{status:401});
+ const address=await defaultBuyerAddress(prisma,session.userId);if(!address)return NextResponse.json({code:"ADDRESS_REQUIRED"},{status:409});
  const body=await request.json().catch(()=>({})) as {items?:Array<{productId?:unknown;variantId?:unknown;quantity?:unknown}>;destinationCountry?:unknown;destinationPostalCode?:unknown};
+ body.destinationCountry=address.country;body.destinationPostalCode=address.postalCode;
  const requested=(Array.isArray(body.items)?body.items:[]).slice(0,100).map(item=>({productId:String(item.productId??""),variantId:typeof item.variantId==="string"?item.variantId:null,quantity:Number(item.quantity)})).filter(item=>item.productId&&Number.isInteger(item.quantity)&&item.quantity>0&&item.quantity<=1000);
  const productIds=[...new Set(requested.map(item=>item.productId))];if(!productIds.length)return NextResponse.json({code:"INVALID_CART"},{status:400});
  const products=await prisma.product.findMany({where:{id:{in:productIds},status:"PUBLISHED"},select:{id:true,storeId:true,price:true,currency:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true,variants:{select:{id:true,active:true,priceOverride:true}},supplierLink:{select:{provider:true,ownerType:true,sourceMetadata:true,connection:{select:{status:true,store:{select:{dropshippingEnabled:true}}}}}},store:{select:{currency:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true}}}});

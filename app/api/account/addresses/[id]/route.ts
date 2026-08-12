@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { readSession } from "@/lib/session";
+import { chooseDefaultBuyerAddress, deleteBuyerAddress, validateAddressInput } from "@/lib/buyer-addresses";
+async function context(params:Promise<{id:string}>){const session=await readSession();return{session,id:(await params).id};}
+export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){const {session,id}=await context(params);if(!session)return NextResponse.json({error:"AUTH_REQUIRED"},{status:401});const body=await request.json().catch(()=>({}));if(body?.isDefault===true){const address=await prisma.$transaction(tx=>chooseDefaultBuyerAddress(tx,session.userId,id));return address?NextResponse.json({address}):NextResponse.json({error:"NOT_FOUND"},{status:404});}const parsed=validateAddressInput(body);if(!parsed.ok)return NextResponse.json({error:parsed.code},{status:400});const result=await prisma.buyerShippingAddress.updateMany({where:{id,userId:session.userId},data:parsed.value});return result.count?NextResponse.json({ok:true}):NextResponse.json({error:"NOT_FOUND"},{status:404});}
+export async function DELETE(_:Request,{params}:{params:Promise<{id:string}>}){const {session,id}=await context(params);if(!session)return NextResponse.json({error:"AUTH_REQUIRED"},{status:401});const deleted=await prisma.$transaction(tx=>deleteBuyerAddress(tx,session.userId,id));return deleted?NextResponse.json({ok:true}):NextResponse.json({error:"NOT_FOUND"},{status:404});}

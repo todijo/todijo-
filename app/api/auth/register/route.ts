@@ -8,6 +8,7 @@ import { issueEmailVerificationToken } from "@/lib/auth-tokens";
 import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email/send";
 import { safeEmailError } from "@/lib/email/config";
 import { defaultLocale, isLocale } from "@/i18n/config";
+import { createBuyerAddress } from "@/lib/buyer-addresses";
 
 export async function POST(request: Request) {
   try {
@@ -34,12 +35,11 @@ export async function POST(request: Request) {
     const existing = await prisma.user.findUnique({ where: { email: input.email } });
     if (existing) return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail." }, { status: 409 });
 
-    const user = await prisma.user.create({
-      data: {
-        ...registrationPersistenceData(input),
-        passwordHash: await hash(input.password, 12),
-      },
-      select: { id: true, role: true, email: true, firstName: true },
+    const passwordHash = await hash(input.password, 12);
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({ data: { ...registrationPersistenceData(input), passwordHash }, select: { id: true, role: true, email: true, firstName: true } });
+      if (input.role === "CUSTOMER" && input.shippingAddress) await createBuyerAddress(tx, created.id, input.shippingAddress, true);
+      return created;
     });
 
     try {

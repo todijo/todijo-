@@ -6,6 +6,7 @@ import { assertSupplierPurchasable } from "./suppliers/safety";
 import { resolveBuyerCurrency, stripeMinorAmount, supportedBuyerCurrency, type SupportedBuyerCurrency } from "./currency";
 import { resolveDropshippingEligibility, resolveDropshippingPricing, type DropshippingPriceSnapshot, type ResolvedDropshippingPricing } from "./suppliers/commerce-pricing";
 import { prepareSupplierFulfillments } from "./suppliers/supplier-fulfillment";
+import { defaultBuyerAddress } from "./buyer-addresses";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -42,6 +43,9 @@ export async function createCheckout(
 ) {
   if (!/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) throw new CheckoutError("Invalid checkout request ID.");
   if (!Array.isArray(requestedItems) || requestedItems.length === 0 || requestedItems.length > 100) throw new CheckoutError("Your cart is empty or too large.");
+  const buyerAddress = db.buyerShippingAddress ? await defaultBuyerAddress(db, buyerId) : null;
+  if (db.buyerShippingAddress && !buyerAddress) throw new CheckoutError("ADDRESS_REQUIRED", 409);
+  if (buyerAddress) { destinationCountry = buyerAddress.country; destinationPostalCode = buyerAddress.postalCode; }
   const quantities = new Map<string, CheckoutItem & { lineKey: string }>();
   for (const item of requestedItems) {
     if (typeof item.productId !== "string" || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000) throw new CheckoutError("Invalid cart item.");
@@ -138,7 +142,7 @@ export async function createCheckout(
       if (order.stripeCheckoutSessionId && order.stripeCheckoutUrl) return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
     }
   }
-  await db.order.update({where:{id:order.id},data:{sellerVatStatusSnapshot:sellerVat.vatStatus,shippingPolicySnapshot:shipping.policies}});
+  await db.order.update({where:{id:order.id},data:{sellerVatStatusSnapshot:sellerVat.vatStatus,shippingPolicySnapshot:shipping.policies,...(buyerAddress?{recipientName:buyerAddress.recipientName,recipientPhone:buyerAddress.phone,shippingAddressLine1:buyerAddress.addressLine1,shippingAddressLine2:buyerAddress.addressLine2,shippingCity:buyerAddress.city,shippingPostalCode:buyerAddress.postalCode,shippingState:buyerAddress.state}:{})}});
   const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, connectedAccountId: seller.stripeAccountId, platformFeeAmount, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: stripeMinorAmount(shipping.amount,paymentCurrency), currency: paymentCurrency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: stripeMinorAmount(line.unitPrice,paymentCurrency), quantity: line.quantity, currency: paymentCurrency })) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };

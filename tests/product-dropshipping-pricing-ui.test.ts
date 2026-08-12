@@ -11,8 +11,8 @@ test("eligible product detail enables the authoritative pricing UI while normal 
  assert.match(panel,/!dropshippingEligible\|\|Boolean\(activePricing\)/);assert.match(panel,/pricingRequired=dropshippingEligible/);assert.match(panel,/activePricing\?detail\("pricingUnavailable"\)/);
 });
 
-test("destination is explicit or saved and never inferred from locale, seller, origin, or currency",()=>{
- const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/SHOPPING_COUNTRY_STORAGE_KEY/);assert.match(source("lib/suppliers/buyer-pricing.ts"),new RegExp(SHOPPING_COUNTRY_STORAGE_KEY));assert.match(ui,/LocalizedCountrySelect/);assert.match(ui,/if\(!enabled\|\|!country\|\|!variantId\)/);
+test("saved address drives destination and is never inferred from locale, seller, origin, or currency",()=>{
+ const ui=source("components/DropshippingProductPricing.tsx");assert.doesNotMatch(ui,/SHOPPING_COUNTRY_STORAGE_KEY/);assert.match(source("lib/suppliers/buyer-pricing.ts"),new RegExp(SHOPPING_COUNTRY_STORAGE_KEY));assert.match(ui,/api\/account\/addresses/);assert.match(ui,/if\(!enabled\|\|!country\|\|!variantId\)/);
  assert.doesNotMatch(ui,/setCountry\(locale|sellerCountry|originCountry|preferredCurrencyForCountry/);assert.match(source("lib/privacy-consent.ts"),/todijo-shopping-country-v1/);
 });
 

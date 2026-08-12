@@ -5,7 +5,7 @@ import { adminEntryPath, localeFromReferer, localizedHome, postLoginDestination,
 import { registrationPersistenceData, validateRegistrationInput } from "../lib/auth-registration";
 import { verifyTurnstileTokenWith } from "../lib/turnstile-verification";
 
-const validInput = { firstName: "Ada", lastName: "Lovelace", email: "ADA@EXAMPLE.COM", password: "password-123", confirmPassword: "password-123", role: "buyer", turnstileToken: "token" };
+const validInput = { firstName: "Ada", lastName: "Lovelace", email: "ADA@EXAMPLE.COM", password: "password-123", confirmPassword: "password-123", role: "buyer", turnstileToken: "token", shippingAddress:{recipientName:"Ada Lovelace",addressLine1:"1 Computing Way",addressLine2:"",postalCode:"59000",city:"Lille",country:"fr",state:"",phone:""} };
 
 function validationCode(input: unknown) {
   const result = validateRegistrationInput(input);
@@ -18,12 +18,16 @@ test("registration validation requires matching passwords and never persists con
   if (!result.ok) return;
   assert.equal(result.value.role, "CUSTOMER");
   assert.equal(result.value.email, "ada@example.com");
+  assert.equal(result.value.shippingAddress?.country,"FR");
   assert.deepEqual(registrationPersistenceData(result.value), { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", role: "CUSTOMER", storeName: null });
   assert.equal("password" in registrationPersistenceData(result.value), false);
   assert.equal(validationCode({ ...validInput, confirmPassword: "different" }), "PASSWORD_MISMATCH");
   assert.equal(validationCode({ ...validInput, confirmPassword: "" }), "INVALID_FIELDS");
   assert.equal(validationCode({ ...validInput, role: "seller", storeName: "" }), "STORE_NAME_REQUIRED");
+  assert.equal(validationCode({...validInput,shippingAddress:{...validInput.shippingAddress,postalCode:""}}),"INVALID_ADDRESS");
 });
+
+test("buyer registration creates a localized initial shipping address transactionally while seller registration remains unchanged",()=>{const form=readFileSync("app/register/RegisterForm.tsx","utf8"),route=readFileSync("app/api/auth/register/route.ts","utf8"),messages=readFileSync("i18n/buyer-address.ts","utf8");assert.match(form,/role === "customer"[\s\S]*shippingAddress/);assert.match(route,/prisma\.\$transaction/);assert.match(route,/createBuyerAddress\(tx, created\.id/);assert.match(messages,/Renseignez votre adresse avec précision/);assert.equal(validateRegistrationInput({...validInput,role:"seller",storeName:"Ada Shop",shippingAddress:undefined}).ok,true)});
 
 test("Turnstile verification fails closed for missing, rejected, malformed, and unavailable verification", async () => {
   const accepted = await verifyTurnstileTokenWith("token", "secret", async () => new Response(JSON.stringify({ success: true }), { status: 200 }));

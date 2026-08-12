@@ -8,6 +8,7 @@ import { supplierPricingMessages } from "./supplier-pricing";
 import { productVideoMessages } from "./product-video";
 import { dropshippingAccessMessages } from "./dropshipping-access";
 import {buyerPricingMessages} from "./buyer-pricing";
+import {buyerAddressMessages} from "./buyer-address";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -15,7 +16,7 @@ export default getRequestConfig(async () => {
   const fallback = (await import("../messages/en.json")).default;
   const localized = (await import(`../messages/${locale}.json`)).default;
   const messages: Record<string, unknown> = Object.fromEntries(Object.entries(fallback).map(([namespace, values]) => [namespace, { ...values, ...(localized as Record<string, Record<string, string>>)[namespace] }]));
-  messages.Auth = (await import(`../messages/auth/${locale}.json`)).default;
+  messages.Auth = {...(await import(`../messages/auth/${locale}.json`)).default,...buyerAddressMessages[locale]};
   messages.Connect = (await import(`../messages/connect/${locale}.json`)).default;
   messages.Categories = (await import(`../messages/categories/${locale}.json`)).default;
   messages.CartRecommendations = (await import(`../messages/cart-recommendations/${locale}.json`)).default;
@@ -39,14 +40,14 @@ export default getRequestConfig(async () => {
   messages.NotificationEvents = (await import(`../messages/notification-events/${locale}.json`)).default;
   messages.ContactMessage = (await import(`../messages/contact-message/${locale}.json`)).default;
   messages.ReportDialog = (await import(`../messages/report-dialog/${locale}.json`)).default;
-  messages.Shipping = { ...(await import(`../messages/shipping/${locale}.json`)).default, ...(advancedShippingMessages[locale] ?? advancedShippingMessages.en), ...(shippingHotfixMessages[locale]??shippingHotfixMessages.en) };
+  messages.Shipping = { ...(await import(`../messages/shipping/${locale}.json`)).default, ...(advancedShippingMessages[locale] ?? advancedShippingMessages.en), ...(shippingHotfixMessages[locale]??shippingHotfixMessages.en),changeAddress:locale==="fr"?"Modifier l’adresse":"Change address",addAddress:buyerAddressMessages[locale].addAddress };
   messages.Supplier = { ...(supplierMessages[locale] ?? supplierMessages.en), ...supplierPricingMessages.en, ...(supplierPricingMessages[locale] ?? {}), ...(dropshippingAccessMessages[locale] ?? dropshippingAccessMessages.en) };
   messages.ProductVideo = productVideoMessages[locale] ?? productVideoMessages.en;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = {...(["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
     ? (await import(`../messages/product-detail/${locale}.json`)).default
-    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale]};
+    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale],deliveryTo:locale==="fr"?"Livraison à :":"Delivery to:",changeAddress:locale==="fr"?"Modifier":"Change",addShippingAddress:buyerAddressMessages[locale].addAddress};
   const adminLocale = ["ar", "en", "fa", "fr", "hi", "ku", "pt", "ru", "zh"].includes(locale) ? locale : "en";
   messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
   return { locale, messages };

@@ -100,7 +100,7 @@ test("French pricing copy is UTF-8 and the double-encoded source is gone", () =>
 test("pricing, cart and country continue to use canonical selection identity", () => {
   const panel = readFileSync("components/ProductPurchasePanel.tsx", "utf8"), pricing = readFileSync("components/DropshippingProductPricing.tsx", "utf8");
   assert.match(panel, /variantId=\{selectedVariant\?\.id\?\?null\}/); assert.match(panel, /quantity=\{quantity\}/);
-  assert.match(pricing, /variantId,quantity,destinationCountry:country/); assert.match(pricing, /SHOPPING_COUNTRY_STORAGE_KEY/);
+  assert.match(pricing, /variantId,quantity,destinationCountry:country/); assert.match(pricing, /api\/account\/addresses/);
   assert.match(panel, /setVerifiedPricing\(pricing\)/); assert.match(panel, /verifiedPricing\.variantId===selectedVariant\?\.id/);
   assert.match(panel,/\)\?\.position\?\?0\)<position/);assert.doesNotMatch(panel,/setQuantity\(1\)/);
 });

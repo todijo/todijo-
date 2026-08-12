@@ -9,16 +9,13 @@ import { useCart } from "@/components/CartProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { cartLineKey } from "@/lib/cart-line";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
-import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
-import {SHOPPING_COUNTRY_STORAGE_KEY} from "@/lib/suppliers/buyer-pricing";
 
 export default function CheckoutPage() {
   const { items, subtotal, currency, updateDisplayPricing, removeItem } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sellerTypes, setSellerTypes] = useState<Record<string, "UNKNOWN" | "PROFESSIONAL" | "PRIVATE">>({});
-  const [destinationCountry, setDestinationCountry] = useState("");
-  const [destinationPostalCode,setDestinationPostalCode]=useState("");
+  const [address,setAddress]=useState<{recipientName:string;addressLine1:string;addressLine2:string|null;postalCode:string;city:string;country:string;state:string|null}|null|undefined>(undefined);
   const [quote, setQuote] = useState<{ method: string; amount: string; currency: string; free: boolean; estimatedMinDays: number; estimatedMaxDays: number; carrier: string | null } | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [blockedLines,setBlockedLines]=useState<Record<string,{code:string;allowedCountries:string[]}>>({});
@@ -31,7 +28,7 @@ export default function CheckoutPage() {
   const locale = useLocale();
   const common=useTranslations("Common");
 
-  useEffect(()=>{try{const saved=window.localStorage.getItem(SHOPPING_COUNTRY_STORAGE_KEY)?.toUpperCase()??"";if(/^[A-Z]{2}$/.test(saved))setDestinationCountry(saved);}catch{}},[]);
+  useEffect(()=>{fetch("/api/account/addresses",{cache:"no-store"}).then(async r=>r.ok?await r.json():{addresses:[]}).then(data=>setAddress(data.addresses?.[0]??null)).catch(()=>setAddress(null))},[]);
 
   useEffect(() => {
     if (!items.length) return;
@@ -46,14 +43,14 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setQuote(null);setError("");setBlockedLines({});
-    if (!items.length || !/^[A-Z]{2}$/.test(destinationCountry)) { setQuoteLoading(false); return; }
+    if (!items.length || !address) { setQuoteLoading(false); return; }
     let active = true; setQuoteLoading(true);
-    const timer=window.setTimeout(()=>fetch("/api/shipping/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items:items.map(item=>({productId:item.id,variantId:item.variantId,quantity:item.quantity})), destinationCountry,destinationPostalCode }) })
+    const timer=window.setTimeout(()=>fetch("/api/shipping/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items:items.map(item=>({productId:item.id,variantId:item.variantId,quantity:item.quantity})) }) })
       .then(async (response) => ({ ok: response.ok, data: await response.json() as { code?: string; method?: string; amount?: string; currency?: string; free?: boolean; estimatedMinDays?: number; estimatedMaxDays?: number; carrier?: string | null;lines?:Array<{lineKey:string;available?:boolean;code?:string;allowedCountries?:string[];unitPrice?:string;currency?:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}> } }))
       .then(({ok,data}) => { if (!active) return;const available=data.lines?.filter(line=>line.available!==false&&line.unitPrice&&line.currency)??[];if(available.length)updateDisplayPricing(available.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency!,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));if(!ok){const blocked=data.lines?.filter(line=>line.available===false)??[];setBlockedLines(Object.fromEntries(blocked.map(line=>[line.lineKey,{code:line.code??"SHIPPING_NOT_CONFIGURED",allowedCountries:line.allowedCountries??[]}])));setError(blocked.length?"":data.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : data.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : data.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : shipping("notConfigured"));}else setQuote(data as NonNullable<typeof quote>); })
       .catch(()=>{ if (active) setError(shipping("quoteError")); }).finally(()=>{ if (active) setQuoteLoading(false); }),250);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [destinationCountry,destinationPostalCode, items, shipping, connect,updateDisplayPricing]);
+  }, [address, items, shipping, connect,updateDisplayPricing]);
 
   async function beginCheckout() {
     setLoading(true); setError("");
@@ -62,7 +59,7 @@ export default function CheckoutPage() {
     const requestId = window.localStorage.getItem(storageKey) ?? crypto.randomUUID();
     window.localStorage.setItem(storageKey, requestId);
     try {
-      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, destinationCountry,destinationPostalCode, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });
+      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });
       const result = await response.json() as { url?: string; error?: string; code?: string; details?:{lines?:Array<{lineKey:string;unitPrice:string;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>} };
       if(response.status===409&&result.code==="CHECKOUT_PRICE_CHANGED"&&result.details?.lines?.length){updateDisplayPricing(result.details.lines.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));setError(t("startError"));setLoading(false);return;}
       if (!response.ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : result.code === "SELLER_STATUS_REQUIRED" ? sellerTransparency("checkoutBlocked") : result.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : result.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : result.code === "SHIPPING_NOT_CONFIGURED" ? shipping("notConfigured") : t("startError"));
@@ -83,7 +80,7 @@ export default function CheckoutPage() {
     <div className="checkoutIntro"><p className="dashboardBadge">{t("badge")}</p><h1>{t("title")}</h1><p>{t("intro")}</p></div>
     {items.length === 0 ? <div className="emptyCartCard"><div>🛒</div><h2>{t("empty")}</h2><Link className="primary" href="/">{t("discover")}</Link></div> : <div className="checkoutGrid">
       <section className="checkoutForm">
-        <section className="checkoutShipping"><div className="checkoutStep"><span>1</span><div><h2>{shipping("destination")}</h2><p>{shipping("destinationHelp")}</p></div></div><div className="sellerControlFieldGrid"><LocalizedCountrySelect id="checkout-country" value={destinationCountry} onChange={setDestinationCountry} label={shipping("country")} placeholder={shipping("chooseCountry")}/><label htmlFor="checkout-postal">{shipping("postalCode")}<input id="checkout-postal" value={destinationPostalCode} onChange={event=>setDestinationPostalCode(event.target.value)} maxLength={16} autoComplete="postal-code"/></label></div>{quoteLoading&&<p className="shippingQuoteStatus">{shipping("checking")}</p>}{quote&&<><p className="shippingQuoteStatus isAvailable">{shipping("available")}</p><div className="shippingQuoteCard"><strong>{quote.method}</strong>{quote.carrier&&<span>{quote.carrier}</span>}<span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span><b>{quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)}</b></div></>}</section>
+        <section className="checkoutShipping"><div className="checkoutStep"><span>1</span><div><h2>{shipping("destination")}</h2><p>{shipping("destinationHelp")}</p></div></div>{address?<div className="shippingAddressCard"><strong>{address.recipientName}</strong><span>{address.addressLine1}</span>{address.addressLine2&&<span>{address.addressLine2}</span>}<span>{address.postalCode} {address.city}</span><span>{new Intl.DisplayNames([locale],{type:"region"}).of(address.country)}</span><Link href={`/${locale}/account/addresses`}>{shipping("changeAddress")}</Link></div>:address===null?<Link href={`/${locale}/account/addresses`}>{shipping("addAddress")}</Link>:null}{quoteLoading&&<p className="shippingQuoteStatus">{shipping("checking")}</p>}{quote&&<><p className="shippingQuoteStatus isAvailable">{shipping("available")}</p><div className="shippingQuoteCard"><strong>{quote.method}</strong>{quote.carrier&&<span>{quote.carrier}</span>}<span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span><b>{quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)}</b></div></>}</section>
         <section><div className="checkoutStep"><span>2</span><div><h2>{t("card")}</h2><p>{t("stripeDetails")}</p></div></div><div className="paymentNotice">🔒 {t("notice")}</div></section>
         <aside className="checkoutLegal"><strong>{compliance("precontractTitle")}</strong><p>{compliance("precontractText")}</p><p><Link href={`/${locale}/info/terms`}>{compliance("legalLinks")}</Link></p></aside>
         {error && <p className="formError" role="alert">{error}</p>}
