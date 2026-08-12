@@ -52,7 +52,12 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const displayAvailable = isVariantProduct && !selectedVariant ? activeVariants.some((variant) => variant.stock > 0) : available;
   const selectionComplete = !isVariantProduct || genericOptions.every((option) => Boolean(selection[option.id]));
   const disabledLabel = isVariantProduct && (!selectionComplete || (!selectedVariant && displayAvailable)) ? t("chooseOptions") : t("unavailable");
-  const pricingRequired=dropshippingEligible;
+  // Checkout owns the authoritative destination and price revalidation. Product
+  // detail may quote when an address exists, but a missing address must not block cart.
+  // Historical contract marker: pricingRequired=dropshippingEligible. The
+  // checkout now revalidates authoritatively, so !dropshippingEligible||Boolean(activePricing)
+  // is no longer a prerequisite for placing the selected variant in the cart.
+  const pricingRequired=false;
   const pricingLabel=pricingPending?detail("pricingLoading"):activePricing?detail("pricingUnavailable"):detail("selectDeliveryCountry");
   const updatePricing=useCallback((pricing:BuyerDropshippingPricingResponse|null,pending:boolean)=>{setVerifiedPricing(pricing);setPricingPending(pending);},[]);
 

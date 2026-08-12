@@ -165,8 +165,8 @@ export async function createStripeCheckoutSession(input: {
   idempotencyKey: string;
   email: string;
   items: Array<{ name: string; unitAmount: number; quantity: number; currency: string }>;
-  connectedAccountId: string;
-  platformFeeAmount: number;
+  connectedAccountId?: string;
+  platformFeeAmount?: number;
   allowedCountries?: string[];
   shipping?: { name: string; amount: number; currency: string; minDays: number; maxDays: number };
 }) {
@@ -180,12 +180,14 @@ export async function createStripeCheckoutSession(input: {
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout/cancel?order_id=${encodeURIComponent(input.orderId)}`,
     "metadata[orderId]": input.orderId,
-    "metadata[connectedAccountId]": input.connectedAccountId,
     "payment_intent_data[metadata][orderId]": input.orderId,
-    "payment_intent_data[metadata][connectedAccountId]": input.connectedAccountId,
-    "payment_intent_data[application_fee_amount]": String(input.platformFeeAmount),
-    "payment_intent_data[transfer_data][destination]": input.connectedAccountId,
   });
+  if (input.connectedAccountId) {
+    body.set("metadata[connectedAccountId]", input.connectedAccountId);
+    body.set("payment_intent_data[metadata][connectedAccountId]", input.connectedAccountId);
+    if (input.platformFeeAmount != null) body.set("payment_intent_data[application_fee_amount]", String(input.platformFeeAmount));
+    body.set("payment_intent_data[transfer_data][destination]", input.connectedAccountId);
+  }
   for (const [index, country] of (input.allowedCountries?.length ? input.allowedCountries : ["FR"]).entries()) body.set(`shipping_address_collection[allowed_countries][${index}]`, country);
   if (input.shipping) {
     body.set("shipping_options[0][shipping_rate_data][type]", "fixed_amount");
@@ -207,6 +209,12 @@ export async function createStripeCheckoutSession(input: {
   const json = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", { method: "POST", idempotencyKey: input.idempotencyKey, body });
   if (!json.id || !json.url) throw new Error("Stripe Checkout session creation failed.");
   return { id: json.id, url: json.url };
+}
+
+export function createStripeTransfer(input:{amount:number;currency:string;destination:string;transferGroup:string;sourceTransaction?:string;idempotencyKey:string}){
+  const body=new URLSearchParams({amount:String(input.amount),currency:input.currency.toLowerCase(),destination:input.destination,transfer_group:input.transferGroup});
+  if(input.sourceTransaction)body.set("source_transaction",input.sourceTransaction);
+  return stripeRequest<{id:string}>("/transfers",{method:"POST",idempotencyKey:input.idempotencyKey,body});
 }
 
 export async function createStripeCustomer(input: { storeId: string; userId: string; email: string; name: string }) {

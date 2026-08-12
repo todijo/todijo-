@@ -117,6 +117,7 @@ export async function createManagedStore(db: Database, adminId: string, input: M
       currency: input.currency,
       language: input.language,
       status: "ACTIVE",
+      marketplaceActivatedAt: now,
       ownerId: owner.id,
       accessGrants: {
         create: {

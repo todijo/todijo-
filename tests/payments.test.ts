@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { CheckoutError, createCheckout, isBuyerCheckoutComplete, processStripeEvent } from "../lib/payments";
+import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckoutGroups, processStripeEvent } from "../lib/payments";
 import { assertStripeWebhookMode, configuredStripeMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
@@ -60,12 +60,12 @@ test("duplicate checkout request creates one order and one Stripe session", asyn
   assert.equal(fixture.getCreates(), 1); assert.equal(stripeCalls, 1);
 });
 
-test("destination checkout calculates and stores the platform commission", async () => {
+test("single-seller checkout uses one platform payment and defers seller payout", async () => {
   const fixture = checkoutDb(); let stripeInput: any;
   const stripe: any = async (input: any) => { stripeInput = input; return { id: "cs_fee", url: "https://checkout.stripe.test/cs_fee" }; };
   await createCheckout(fixture.db, "buyer_1", "request_fee", [{ productId: "prod_1", quantity: 2 }], stripe, "FR");
-  assert.equal(stripeInput.connectedAccountId, "acct_seller");
-  assert.equal(stripeInput.platformFeeAmount, 250);
+  assert.equal(stripeInput.connectedAccountId, undefined);
+  assert.equal(stripeInput.platformFeeAmount, undefined);
   assert.equal(stripeInput.shipping.amount, 450);
   assert.deepEqual(stripeInput.allowedCountries, ["FR"]);
   const order = await fixture.db.order.findUnique();
@@ -74,6 +74,16 @@ test("destination checkout calculates and stores the platform commission", async
   assert.equal(order.total.toFixed(2), "29.50");
   assert.equal(order.shippingMethod, "Standard");
   assert.equal(order.shippingCountry, "FR");
+});
+
+test("real checkout group persistence creates Seller A, Seller B and CJ exactly once",async()=>{
+ const items=[{id:"ia",lineKey:"a",orderId:"o",orderGroupId:null},{id:"ib",lineKey:"b",orderId:"o",orderGroupId:null},{id:"icj",lineKey:"cj",orderId:"o",orderGroupId:null}],groups:any[]=[];
+ const tx:any={orderGroup:{upsert:async({where,create}:any)=>{const key=where.orderId_groupKey.groupKey,existing=groups.find(group=>group.groupKey===key);if(existing)return existing;const group={id:`g${groups.length+1}`,...create};groups.push(group);return group}},orderItem:{updateMany:async({where,data}:any)=>{let count=0;for(const item of items)if(item.orderId===where.orderId&&where.lineKey.in.includes(item.lineKey)&&item.orderGroupId===null){item.orderGroupId=data.orderGroupId;count++}return{count}},count:async({where}:any)=>items.filter(item=>item.orderId===where.orderId&&item.orderGroupId===null).length}};
+ const plans=[{groupKey:"store:A",lineKeys:["a"],data:{kind:"MARKETPLACE",storeId:"A",stripeConnectedAccountId:"acct_A"}},{groupKey:"store:B",lineKeys:["b"],data:{kind:"MARKETPLACE",storeId:"B",stripeConnectedAccountId:"acct_B"}},{groupKey:"cj:platform",lineKeys:["cj"],data:{kind:"CJ_PLATFORM",stripeConnectedAccountId:null}}];
+ await persistCheckoutGroups(tx,"o",plans);await persistCheckoutGroups(tx,"o",plans);
+ assert.deepEqual(groups.map(group=>group.groupKey),["store:A","store:B","cj:platform"]);assert.equal(groups.length,3);
+ assert.equal(items.find(item=>item.id==="ia")!.orderGroupId,groups.find(group=>group.groupKey==="store:A").id);assert.notEqual(items.find(item=>item.id==="ia")!.orderGroupId,groups.find(group=>group.groupKey==="store:B").id);
+ assert.equal(items.find(item=>item.id==="icj")!.orderGroupId,groups.find(group=>group.groupKey==="cj:platform").id);assert.equal(groups.find(group=>group.groupKey==="cj:platform").stripeConnectedAccountId,null);
 });
 
 test("checkout reprices an eligible supplier line once, preserves mixed shipping, and snapshots the Stripe amount", async()=>{
