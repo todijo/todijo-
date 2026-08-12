@@ -35,7 +35,9 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   }, [activePricing,dropshippingEligible,selectedCurrency,selectedPrice,selectedVariant?.id]);
 
   function selectOption(optionId: string, valueId: string) {
-    const next = { ...selection, [optionId]: valueId }; setSelection(next);
+    const position=genericOptions.find((option)=>option.id===optionId)?.position??0;
+    const next = Object.fromEntries(Object.entries(selection).filter(([selectedOptionId])=>(genericOptions.find((option)=>option.id===selectedOptionId)?.position??0)<position));
+    next[optionId]=valueId;setSelection(next);
     const selectedValue = genericOptions.flatMap((option) => option.values).find((value) => value.id === valueId);
     const fallback = genericOptions.flatMap((option) => option.values.map((value) => ({ ...value, optionId: option.id }))).find((value) => next[value.optionId] === value.id && value.imageUrls?.length);
     window.dispatchEvent(new CustomEvent("todijo:variant-images", { detail: { images: selectedValue?.imageUrls?.length ? selectedValue.imageUrls : fallback?.imageUrls ?? [] } }));
@@ -58,7 +60,7 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
     <div className={`purchaseAvailability${displayAvailable ? " isAvailable" : " isUnavailable"}`}><span aria-hidden="true" />{displayAvailable ? availabilityLabel : t("unavailable")}</div>
     <div className="purchasePanel variantPurchasePanel">
       {isVariantProduct ? genericOptions.map((option) => <fieldset className="optionGroup" key={option.id}><legend>{option.name}</legend><div>{option.values.slice().sort((a, b) => a.position - b.position).map((value) => {
-        const next = { ...selection, [option.id]: value.id };
+        const next = { ...Object.fromEntries(Object.entries(selection).filter(([selectedOptionId])=>(genericOptions.find((candidate)=>candidate.id===selectedOptionId)?.position??0)<=option.position)), [option.id]: value.id };
         const valueAvailable = activeVariants.some((variant) => matches(variant, next) && variant.stock > 0);
         const image = value.imageUrls?.[0];
         return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selection[option.id] === value.id ? " selected" : ""}`} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-label={value.accessibleLabel ?? value.value} aria-pressed={selection[option.id] === value.id}>

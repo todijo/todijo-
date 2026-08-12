@@ -46,6 +46,26 @@ test("future structured CJ keys retain documented semantic style names", () => {
   assert.deepEqual(result.options[0].values.map((value)=>value.value),["Black","White"]);
 });
 
+test("CJ variant images group eight supplier variants into two styles and four sizes", () => {
+  const values:BuyerOption["values"]=[],variants:BuyerVariant[]=[];
+  for(const [style,image] of [["LC25224353P1","https://images.test/a.jpg"],["LC25224353P2","https://images.test/b.jpg"]] as const)for(const size of ["S","M","L","XL"]){const id=`${style}-${size}`;values.push({id,value:`${productName} ${style} ${size}`,position:values.length});variants.push({id:`canonical-${id}`,stock:2,active:true,priceOverride:null,supplierTitle:`${style},${size}`,supplierImageUrl:image,values:[{optionValue:{id,value:`${style} ${size}`,option:{id:"legacy",name:"Variant",position:0}}}]});}
+  const result=buyerVariantPresentation({productName,supplierManaged:true,options:[{id:"legacy",name:"Variant",position:0,values}],variants});
+  assert.equal(result.options[0].values.length,2);
+  assert.deepEqual(result.options[0].values.map((value)=>value.imageUrls?.[0]),["https://images.test/a.jpg","https://images.test/b.jpg"]);
+  assert.ok(result.options[0].values.every((value)=>value.imageOnly));
+  assert.deepEqual(result.options[1].values.map((value)=>value.value),["S","M","L","XL"]);
+  assert.equal(result.variants.length,8);
+  assert.equal(new Set(result.variants.map((variant)=>variant.id)).size,8);
+});
+
+test("unstructured supplier variants never render visible sequential placeholders", () => {
+  const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:[{id:"raw-a",value:"opaque-one",position:0},{id:"raw-b",value:"opaque-two",position:1}]}];
+  const rawVariant=(id:string,valueId:string,image:string|null):BuyerVariant=>({id,stock:1,active:true,priceOverride:null,supplierImageUrl:image,values:[{optionValue:{id:valueId,value:valueId,option:{id:"legacy",name:"Variant",position:0}}}]});
+  const result=buyerVariantPresentation({productName,supplierManaged:true,options:rawOptions,variants:[rawVariant("a","raw-a","https://images.test/a.jpg"),rawVariant("b","raw-b","https://images.test/b.jpg")]});
+  assert.doesNotMatch(JSON.stringify(result.options),/Option \d|Style \d/);
+  assert.ok(result.options[0].values.every((value)=>value.imageOnly));
+});
+
 test("generic marketplace structured options and variants remain unchanged", () => {
   const genericOptions: BuyerOption[] = [{ id: "material", name: "Material", position: 0, values: [{ id: "cotton", value: "Cotton", position: 0 }] }];
   const genericVariants = [variant("normal", "white-s")];
@@ -82,6 +102,7 @@ test("pricing, cart and country continue to use canonical selection identity", (
   assert.match(panel, /variantId=\{selectedVariant\?\.id\?\?null\}/); assert.match(panel, /quantity=\{quantity\}/);
   assert.match(pricing, /variantId,quantity,destinationCountry:country/); assert.match(pricing, /SHOPPING_COUNTRY_STORAGE_KEY/);
   assert.match(panel, /setVerifiedPricing\(pricing\)/); assert.match(panel, /verifiedPricing\.variantId===selectedVariant\?\.id/);
+  assert.match(panel,/\)\?\.position\?\?0\)<position/);assert.doesNotMatch(panel,/setQuantity\(1\)/);
 });
 
 test("the main product heading area never substitutes a country prompt for price", () => {
