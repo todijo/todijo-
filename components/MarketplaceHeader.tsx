@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Baby, BookOpen, Boxes, Car, ChevronDown, Dumbbell, Heart, House, Menu, Package, Search, Shirt, Smartphone, Sparkles, UserRound } from "lucide-react";
+import { Baby, Car, ChevronDown, ChevronRight, Dumbbell, Gem, Hammer, Heart, House, Menu, Monitor, PawPrint, Search, Shirt, ShoppingBag, Smartphone, Sparkles, UserRound } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
@@ -10,23 +10,23 @@ import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import TodijoLogo from "@/components/TodijoLogo";
 import { isNavigationActive, localizedPath } from "@/lib/navigation";
-import { PRODUCT_CATEGORIES, type CategoryKey } from "@/lib/categories";
+import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref } from "@/lib/desktop-category-taxonomy";
 
-const categoryIcons = { fashion: Shirt, electronics: Smartphone, home: House, beauty: Sparkles, sports: Dumbbell, books: BookOpen, children: Baby, auto: Car, crafts: Package, other: Boxes } satisfies Record<CategoryKey, typeof Package>;
+const categoryIcons = {shirt:Shirt,paw:PawPrint,house:House,sparkles:Sparkles,gem:Gem,"shopping-bag":ShoppingBag,baby:Baby,dumbbell:Dumbbell,smartphone:Smartphone,hammer:Hammer,car:Car,phone:Smartphone,monitor:Monitor} as const;
 
 export default function MarketplaceHeader() {
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<CategoryKey>("fashion");
+  const [activeCategory, setActiveCategory] = useState(DESKTOP_CATEGORY_TAXONOMY[0].id);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const categoryMenuRef=useRef<HTMLDivElement|null>(null);
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const common = useTranslations("Common");
   const header = useTranslations("HomeHeader");
   const ux = useTranslations("Ux");
-  const categoryText = useTranslations("Categories");
   const homeHref = localizedPath(locale);
 
   useEffect(() => { setQuery(new URLSearchParams(window.location.search).get("q") ?? ""); }, [pathname]);
@@ -37,6 +37,7 @@ export default function MarketplaceHeader() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+  useEffect(()=>{const close=(event:MouseEvent)=>{if(categoryMenuRef.current&&!categoryMenuRef.current.contains(event.target as Node))setCategoriesOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -44,7 +45,7 @@ export default function MarketplaceHeader() {
     router.push(value ? `${homeHref}/search?q=${encodeURIComponent(value)}` : `${homeHref}/search`);
   }
 
-  const categoryHref = (value: string) => `${homeHref}/search?category=${encodeURIComponent(value)}`;
+  const categoryHref = (value: string) => categorySearchHref(locale,value);
   const cancelClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
   const scheduleClose = () => { cancelClose(); closeTimer.current = setTimeout(() => setCategoriesOpen(false), 140); };
 
@@ -67,11 +68,11 @@ export default function MarketplaceHeader() {
         <div className="marketMobileActions"><Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-label={accountName ?? common("account")}><UserRound size={22} aria-hidden="true"/></Link><CartLink label={common("cart")} className="homeCartLink"/></div>
       </div></div>
       <nav className="marketSecondaryNav" aria-label={header("categoryNavigation")}><div className="marketSecondaryInner">
-        <div className="marketCategoryMenu" onMouseEnter={() => { cancelClose(); setCategoriesOpen(true); }} onMouseLeave={scheduleClose}>
+        <div className="marketCategoryMenu" ref={categoryMenuRef} onMouseEnter={() => { cancelClose(); setCategoriesOpen(true); }} onMouseLeave={scheduleClose}>
           <button className="marketAllCategories" type="button" aria-expanded={categoriesOpen} aria-controls="market-category-mega-menu" onClick={() => setCategoriesOpen((open) => !open)} onKeyDown={(event) => { if (event.key === "Escape") setCategoriesOpen(false); }}><Menu size={18} aria-hidden="true"/>{common("categories")}</button>
           {categoriesOpen ? <section id="market-category-mega-menu" className="marketCategoryMegaMenu" aria-label={common("categories")} onKeyDown={(event) => { if (event.key === "Escape") setCategoriesOpen(false); }}>
-            <div className="marketCategoryList" role="navigation" aria-label={common("categories")}>{PRODUCT_CATEGORIES.map((category) => { const Icon = categoryIcons[category.key]; return <Link key={category.key} href={categoryHref(category.value)} className={activeCategory === category.key ? "active" : ""} onMouseEnter={() => setActiveCategory(category.key)} onFocus={() => setActiveCategory(category.key)} onClick={() => setCategoriesOpen(false)}><Icon size={18} aria-hidden="true"/>{categoryText(category.key)}</Link>; })}</div>
-            <div className="marketCategoryDetail">{(() => { const category = PRODUCT_CATEGORIES.find((item) => item.key === activeCategory)!; const Icon = categoryIcons[category.key]; return <><span className="marketCategoryIcon"><Icon size={25} aria-hidden="true"/></span><p>{categoryText(category.key)}</p><small>{header("discoverCategories")}</small><Link href={categoryHref(category.value)} onClick={() => setCategoriesOpen(false)}>{header("viewAll")} {categoryText(category.key)}</Link></>; })()}</div>
+            <div className="marketCategoryList" role="navigation" aria-label={common("categories")}>{DESKTOP_CATEGORY_TAXONOMY.map((category) => { const Icon = categoryIcons[category.iconKey as keyof typeof categoryIcons]; return <button type="button" key={category.id} className={activeCategory === category.id ? "active" : ""} aria-pressed={activeCategory===category.id} onMouseEnter={() => setActiveCategory(category.id)} onFocus={() => setActiveCategory(category.id)}><Icon size={17} aria-hidden="true"/><span>{category.label}</span><ChevronRight size={15} aria-hidden="true"/></button>; })}</div>
+            <div className="marketCategoryDetail">{(()=>{const category=DESKTOP_CATEGORY_TAXONOMY.find(item=>item.id===activeCategory)!;return <><header><div><p>{category.label}</p><small>{header("discoverCategories")}</small></div><Link href={categoryHref(category.label)} onClick={()=>setCategoriesOpen(false)}>{header("viewAll")}</Link></header>{category.groups.length?<div className="marketCategoryColumns">{category.groups.map(group=><section key={group.id}><h3>{group.label}</h3>{group.items.map(item=><Link key={item} href={categoryHref(item)} onClick={()=>setCategoriesOpen(false)}>{item}</Link>)}</section>)}</div>:<div className="marketCategoryEmpty"><p>{category.label}</p><Link href={categoryHref(category.label)} onClick={()=>setCategoriesOpen(false)}>{header("viewAll")} {category.label}</Link></div>}</>})()}</div>
           </section> : null}
         </div>
         <Link href={localizedPath(locale, "/messages")} aria-current={isNavigationActive(pathname, "/messages", true) ? "page" : undefined}>{common("messages")}</Link>
