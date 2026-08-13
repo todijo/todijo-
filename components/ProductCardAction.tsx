@@ -10,6 +10,7 @@ type ProductCardActionProduct = Pick<CartProduct, "id" | "name" | "price" | "cur
   stock: number | null;
   hasActiveVariants: boolean;
   isGenerallyAvailable: boolean;
+  requiresAuthoritativePrice?: boolean;
 };
 
 export default function ProductCardAction({ product, className = "" }: { product: ProductCardActionProduct; className?: string }) {
@@ -19,7 +20,7 @@ export default function ProductCardAction({ product, className = "" }: { product
   const action = resolveProductCardAction(product);
   const classes = `cardCartButton ${className}`.trim();
 
-  if (action === "CHOOSE_OPTIONS") {
+  if (action === "CHOOSE_OPTIONS"||product.requiresAuthoritativePrice) {
     return <a className={`${classes} cardChooseOptionsButton`} href={productCardOptionHref(product.id, locale)} aria-label={`${t("chooseOptions")}: ${product.name}`}><SlidersHorizontal size={17} aria-hidden="true"/><span>{t("chooseOptions")}</span></a>;
   }
 

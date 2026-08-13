@@ -5,6 +5,7 @@ import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-ac
 import { buyerVisibleVariantWhere, productGenerallyAvailableWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
+import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,6 +18,7 @@ const productSelect = {
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
   store: { select: { name: true, slug: true, city: true, country: true } },
+  supplierLink:{select:{sourceMetadata:true}},
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
@@ -25,7 +27,7 @@ function serializeProduct(p: ProductRow) {
   const availability = resolveProductAvailability({ stock: p.stock, activeOptionCount: p.options.length, variants: p.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
   return { id: p.id, name: p.name, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
     currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
-    storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString() };
+    storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString(),requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(p.supplierLink?.sourceMetadata) };
 }
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;

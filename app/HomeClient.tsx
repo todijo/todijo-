@@ -55,6 +55,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const d = useTranslations("HomeDiscovery");
   const dashboard = useTranslations("Dashboard");
   const categoryText = useTranslations("Categories");
+  const pricingText=useTranslations("ProductDetail");
   const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), best:h("bestSellers"), low:m("low"), high:m("high"), reviews:dashboard("reviews"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -108,7 +109,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
               {featuredProducts.map((product, index) => <a href={`/${activeLocale}/product/${product.id}`} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
                 <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
-                <span><small>{product.storeName}</small><strong>{product.name}</strong><b>{product.price} {product.currency}</b></span>
+                <span><small>{product.storeName}</small><strong>{product.name}</strong><b>{product.requiresAuthoritativePrice?pricingText("pricingUnavailable"):`${product.price} ${product.currency}`}</b></span>
               </a>)}
             </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
               <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>

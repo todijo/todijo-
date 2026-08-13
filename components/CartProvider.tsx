@@ -21,6 +21,8 @@ export type CartProduct = {
   freeShipping?: boolean;
   deliveryMinDays?: number | null;
   deliveryMaxDays?: number | null;
+  requiresAuthoritativePrice?: boolean;
+  authoritativePrice?: boolean;
 };
 
 export type CartItem = CartProduct & { quantity: number };
@@ -128,7 +130,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<CartContextValue>(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = items.reduce((sum, item) => sum + (item.requiresAuthoritativePrice&&!item.authoritativePrice?0:item.price * item.quantity), 0);
     const currency = items[0]?.currency ?? "EUR";
 
     return {
@@ -166,7 +168,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       updateDisplayPricing(updates) {
         const byLine=new Map(updates.map(update=>[update.lineKey,update]));
-        setItems(current=>{let changed=false;const next=current.map(item=>{const update=byLine.get(item.lineKey??"");if(!update)return item;if(item.price===update.price&&item.currency===update.currency&&item.freeShipping===update.freeShipping&&item.deliveryMinDays===update.deliveryMinDays&&item.deliveryMaxDays===update.deliveryMaxDays)return item;changed=true;return{...item,price:update.price,currency:update.currency,freeShipping:update.freeShipping,deliveryMinDays:update.deliveryMinDays,deliveryMaxDays:update.deliveryMaxDays};});return changed?next:current;});
+        setItems(current=>{let changed=false;const next=current.map(item=>{const update=byLine.get(item.lineKey??"");if(!update)return item;if(item.price===update.price&&item.currency===update.currency&&item.freeShipping===update.freeShipping&&item.deliveryMinDays===update.deliveryMinDays&&item.deliveryMaxDays===update.deliveryMaxDays&&item.authoritativePrice===true)return item;changed=true;return{...item,price:update.price,currency:update.currency,authoritativePrice:true,freeShipping:update.freeShipping,deliveryMinDays:update.deliveryMinDays,deliveryMaxDays:update.deliveryMaxDays};});return changed?next:current;});
       },
       clearCart() {
         setItems([]);

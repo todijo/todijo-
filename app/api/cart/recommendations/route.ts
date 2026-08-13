@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { CART_RECOMMENDATION_LIMIT, mergeCartRecommendations } from "@/lib/cart-recommendations";
+import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 
 const recommendationSelect = {
   id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true,
@@ -11,6 +12,7 @@ const recommendationSelect = {
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
   store: { select: { name: true, slug: true } },
+  supplierLink:{select:{sourceMetadata:true}},
 } satisfies Prisma.ProductSelect;
 
 type RecommendationRow = Prisma.ProductGetPayload<{ select: typeof recommendationSelect }>;
@@ -19,7 +21,7 @@ function serializeProduct(product: RecommendationRow) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
   return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency,
     category: product.category, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
-    condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug };
+    condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) };
 }
 
 export async function POST(request: Request) {

@@ -26,6 +26,7 @@ import {resolveDropshippingEligibility} from "@/lib/suppliers/commerce-pricing";
 import { buyerVariantPresentation } from "@/lib/product-option-display";
 import ProductDescription from "@/components/ProductDescription";
 import {CjCatalogProvider} from "@/lib/suppliers/cj-client";
+import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -76,7 +77,7 @@ export default async function ProductPage({ params }: Props) {
     },
   });
   if (!product) notFound();
-  const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true} });
+  const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true,supplierLink:{select:{sourceMetadata:true}}} });
   const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   const productJsonLd = productStructuredData({ ...product, available: availability.isGenerallyAvailable }, locale);
@@ -89,6 +90,7 @@ export default async function ProductPage({ params }: Props) {
   const hasPublicProductInfo = publicProductInfo.length > 0 || Boolean(safetyInformation || complianceInformation);
   const shippingRule=product.shippingOverrideEnabled?product:product.store;
   const dropshippingEligibility=resolveDropshippingEligibility({hasSupplierLink:Boolean(product.supplierLink),provider:product.supplierLink?.provider,ownerType:product.supplierLink?.ownerType,connectionStatus:product.supplierLink?.connection?.status,sellerDropshippingEnabled:product.supplierLink?.connection?.store?.dropshippingEnabled,sourceMetadata:product.supplierLink?.sourceMetadata});
+  const requiresAuthoritativePrice=dropshippingEligibility.eligible&&requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata);
   let liveSupplierVariants=new Map<string,{title:string;imageUrl:string|null}>();
   if(product.supplierLink?.provider==="CJ"&&product.supplierLink.ownerType==="PLATFORM"&&product.options.some((option)=>option.values.some((value)=>!value.imageAssignments.length))){try{const snapshot=await new CjCatalogProvider().getProduct(product.supplierLink.supplierProductId);liveSupplierVariants=new Map(snapshot.variants.map((variant)=>[variant.supplierVariantId,{title:variant.title,imageUrl:variant.imageUrl??null}]));}catch{liveSupplierVariants=new Map();}}
   const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size")},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>{const supplier=variant.supplierVariantId?liveSupplierVariants.get(variant.supplierVariantId):undefined;return{...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride),supplierTitle:supplier?.title??null,supplierImageUrl:supplier?.imageUrl??null};})});
@@ -99,13 +101,13 @@ export default async function ProductPage({ params }: Props) {
         <Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link>
         <SellerTypeDisclosure sellerType={product.store.sellerType} notice/>
         <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
-        <h1>{product.name}</h1><ProductDetailPrice requiresVerifiedPricing={dropshippingEligibility.eligible} price={price} compareAtPrice={compare} currency={product.currency}/>
+        <h1>{product.name}</h1><ProductDetailPrice requiresVerifiedPricing={requiresAuthoritativePrice} price={price} compareAtPrice={compare} currency={product.currency}/>
         <div className="productMobileSecondaryActions"><ShareButton title={product.name}/></div>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
         <dl className="productFacts productFactsDesktop" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div><div><dt>{detailText("viewShop")}</dt><dd><Link href={`/store/${product.store.slug}`}>{product.store.name}</Link></dd></div><div><dt>{market("city")}</dt><dd>{product.store.city}, {product.store.country}</dd></div></dl>
       </article>
       <div className="productPurchaseColumn">
-        <ProductPurchasePanel dropshippingEligible={dropshippingEligibility.eligible} availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={buyerVariants.options} variants={buyerVariants.variants} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
+        <ProductPurchasePanel dropshippingEligible={dropshippingEligibility.eligible} requiresAuthoritativePrice={requiresAuthoritativePrice} availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={buyerVariants.options} variants={buyerVariants.variants} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug}}/>
         <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
         {shippingRule.shippingEnabled&&shippingRule.shippingMethodName&&shippingRule.shippingMinDays&&shippingRule.shippingMaxDays&&<aside className="productShippingSummary"><strong>{shippingText("productTitle")}</strong><span>{shippingRule.shippingMethodName}{shippingRule.shippingCarrier?` · ${shippingRule.shippingCarrier}`:""}</span><span>{shippingText("estimate",{min:shippingRule.shippingMinDays,max:shippingRule.shippingMaxDays})}</span><span>{shippingRule.shippingWorldwide?shippingText("worldwide"):shippingRule.shippingPostalCodes.length?shippingText("postalZones"):shippingText("selectedDestinations")}</span><b>{shippingRule.shippingFree?shippingText("freeLabel"):shippingRule.shippingFreeThreshold?shippingText("freeThreshold",{currency:new Intl.NumberFormat(locale,{style:"currency",currency:product.store.currency}).format(Number(shippingRule.shippingFreeThreshold))}):shippingText("fromPrice",{price:new Intl.NumberFormat(locale,{style:"currency",currency:product.store.currency}).format(Number(shippingRule.shippingPrice??0))})}</b></aside>}
       </div>
@@ -122,6 +124,6 @@ export default async function ProductPage({ params }: Props) {
       <ProductReportButton productId={product.id} loggedIn={Boolean(session)}/>
     </div>
   </section>
-  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{Number(item.price).toFixed(2)} {item.currency}</strong></Link>)}</div></section>}
+  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?detailText("pricingUnavailable"):`${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }

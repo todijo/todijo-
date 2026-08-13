@@ -12,6 +12,7 @@ export type MarketplaceCardProduct = {
   id: string; name: string; price: string; compareAtPrice: string | null; currency: string;
   category: string; stock: number | null; hasActiveVariants: boolean; isGenerallyAvailable: boolean;
   condition: string; image: string | null; storeName: string; storeSlug: string;
+  requiresAuthoritativePrice?: boolean;
 };
 
 export default function MarketplaceProductCard({ product, soldOut, showCategory = false }: { product: MarketplaceCardProduct; soldOut: string; showCategory?: boolean }) {
@@ -19,6 +20,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
   const common = useTranslations("Common");
   const cart = useTranslations("Cart");
   const categories = useTranslations("Categories");
+  const detail = useTranslations("ProductDetail");
   const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
   const price = Number(product.price);
   const discount = oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0;
@@ -35,7 +37,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
       <a className="marketplaceStore" href={`/${locale}/store/${product.storeSlug}`}>{product.storeName}</a>
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
       <div className="productAvailability"><span className={!product.isGenerallyAvailable ? "outStock" : product.stock != null && product.stock <= 3 ? "lowStock" : "inStock"}>{!product.isGenerallyAvailable ? soldOut : product.stock != null && product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div>
-      <div className="cardBottom"><div><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div>
+      <div className="cardBottom"><div>{product.requiresAuthoritativePrice?<strong>{detail("pricingUnavailable")}</strong>:<><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</>}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div>
     </div>
   </article>;
 }
