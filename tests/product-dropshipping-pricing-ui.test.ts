@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {buyerPricingMessages} from "../i18n/buyer-pricing";
-import {dropshippingPricingRequestKey,SHOPPING_COUNTRY_STORAGE_KEY} from "../lib/suppliers/buyer-pricing";
+import {dropshippingPricingRequestKey,normalizeShoppingCountry,persistShoppingCountry,readShoppingCountry,SHOPPING_COUNTRY_STORAGE_KEY} from "../lib/suppliers/buyer-pricing";
 
 const source=(path:string)=>readFileSync(path,"utf8");
 test("eligible product detail enables the authoritative pricing UI while normal products retain the old path",()=>{
@@ -11,15 +11,26 @@ test("eligible product detail enables the authoritative pricing UI while normal 
  assert.match(panel,/disabled=\{!available\|\|!pricingReady\}/);assert.doesNotMatch(panel,/ADDRESS_REQUIRED|account\/addresses/);
 });
 
-test("saved address drives destination and is never inferred from locale, seller, origin, or currency",()=>{
- const ui=source("components/DropshippingProductPricing.tsx");assert.doesNotMatch(ui,/SHOPPING_COUNTRY_STORAGE_KEY/);assert.match(source("lib/suppliers/buyer-pricing.ts"),new RegExp(SHOPPING_COUNTRY_STORAGE_KEY));assert.match(ui,/api\/account\/addresses/);assert.match(ui,/if\(!enabled\|\|!country\|\|!variantId\)/);
+test("shopping-country preference drives the estimate and is never inferred from locale, seller, origin, or currency",()=>{
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/readShoppingCountry\(window\.localStorage\)/);assert.match(source("lib/suppliers/buyer-pricing.ts"),new RegExp(SHOPPING_COUNTRY_STORAGE_KEY));assert.doesNotMatch(ui,/api\/account\/addresses/);assert.match(ui,/!country\|\|!variantId/);
  assert.doesNotMatch(ui,/setCountry\(locale|sellerCountry|originCountry|preferredCurrencyForCountry/);assert.match(source("lib/privacy-consent.ts"),/todijo-shopping-country-v1/);
 });
 
-test("product detail renders no address-management UI and deferred pricing fails closed without a quote",()=>{
+test("product detail renders a localized estimate-country selector and no address-management CTA",()=>{
  const ui=source("components/DropshippingProductPricing.tsx"),panel=source("components/ProductPurchasePanel.tsx"),checkout=source("app/checkout/page.tsx");
- assert.doesNotMatch(ui,/next\/link|href=.*account\/addresses|addShippingAddress|changeAddress|deliveryTo/);assert.match(ui,/if\(!country\)return null/);
+ assert.doesNotMatch(ui,/next\/link|href=.*account\/addresses|addShippingAddress|changeAddress|deliveryTo/);assert.match(ui,/LocalizedCountrySelect/);assert.match(ui,/destinationRequired/);
  assert.doesNotMatch(panel,/address|destinationCountry/);assert.match(panel,/disabled=\{!available\|\|!pricingReady\}/);assert.match(checkout,/api\/account\/addresses/);assert.match(checkout,/shipping\("destination"\)/);
+});
+
+test("shopping-country values are normalized, restricted to ISO destinations and persisted safely",()=>{
+ const values=new Map<string,string>(),storage={getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>{values.set(key,value)}};
+ assert.equal(normalizeShoppingCountry(" fr "),"FR");assert.equal(normalizeShoppingCountry("XX"),null);assert.equal(normalizeShoppingCountry("France"),null);
+ assert.equal(persistShoppingCountry(storage," de "),"DE");assert.equal(readShoppingCountry(storage),"DE");assert.equal(values.get(SHOPPING_COUNTRY_STORAGE_KEY),"DE");
+});
+
+test("public estimate route validates destination and accepts no client financial override",()=>{
+ const route=source("app/api/products/[id]/dropshipping-pricing/route.ts");assert.match(route,/normalizeShoppingCountry\(body\.destinationCountry\)/);assert.match(route,/INVALID_DESTINATION/);assert.doesNotMatch(route,/readSession|defaultBuyerAddress|body\.buyerCurrency/);assert.match(route,/buyerCurrency:undefined/);
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/JSON\.stringify\(\{variantId,quantity,destinationCountry:country\}\)/);assert.doesNotMatch(ui,/supplierCost|freightTotal|includedCost|targetMargin|fxRate|buyerCurrency:/);
 });
 
 test("request identity changes for country, exact variant and quantity",()=>{

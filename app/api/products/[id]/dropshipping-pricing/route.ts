@@ -6,15 +6,13 @@ import {ShippingError} from "@/lib/shipping";
 import {CjFreightError} from "@/lib/suppliers/cj-freight";
 import {buyerSafeDropshippingResult,DropshippingCommerceError,resolveDropshippingPricing} from "@/lib/suppliers/commerce-pricing";
 import {SupplierPricingError} from "@/lib/suppliers/pricing";
-import {readSession} from "@/lib/session";
-import {defaultBuyerAddress} from "@/lib/buyer-addresses";
+import {normalizeShoppingCountry} from "@/lib/suppliers/buyer-pricing";
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
-  const session=await readSession();if(!session)return NextResponse.json({error:"ADDRESS_REQUIRED"},{status:401});
-  const address=await defaultBuyerAddress(prisma,session.userId);if(!address)return NextResponse.json({error:"ADDRESS_REQUIRED"},{status:409});
-  const {id}=await params,body=await request.json() as {variantId?:unknown;quantity?:unknown;buyerCurrency?:unknown};
-  const result=await resolveDropshippingPricing(prisma,{productId:id,variantId:String(body.variantId??""),quantity:Number(body.quantity),destinationCountry:address.country,buyerCurrency:body.buyerCurrency});
+  const {id}=await params,body=await request.json() as {variantId?:unknown;quantity?:unknown;destinationCountry?:unknown};
+  const destinationCountry=normalizeShoppingCountry(body.destinationCountry);if(!destinationCountry)return NextResponse.json({error:"INVALID_DESTINATION"},{status:400});
+  const result=await resolveDropshippingPricing(prisma,{productId:id,variantId:String(body.variantId??""),quantity:Number(body.quantity),destinationCountry,buyerCurrency:undefined});
   return NextResponse.json(buyerSafeDropshippingResult(result));
  }catch(error){
   const known=error instanceof DropshippingCommerceError||error instanceof CurrencyError||error instanceof FxError||error instanceof ShippingError||error instanceof CjFreightError||error instanceof SupplierPricingError;
