@@ -8,12 +8,18 @@ const source=(path:string)=>readFileSync(path,"utf8");
 test("eligible product detail enables the authoritative pricing UI while normal products retain the old path",()=>{
  const page=source("app/product/[id]/page.tsx"),panel=source("components/ProductPurchasePanel.tsx");
  assert.match(page,/resolveDropshippingEligibility/);assert.match(page,/dropshippingEligible=\{dropshippingEligibility\.eligible\}/);assert.match(panel,/enabled=\{dropshippingEligible\}/);
- assert.match(panel,/!dropshippingEligible\|\|Boolean\(activePricing\)/);assert.match(panel,/pricingRequired=dropshippingEligible/);assert.match(panel,/activePricing\?detail\("pricingUnavailable"\)/);
+ assert.match(panel,/disabled=\{!available\}/);assert.doesNotMatch(panel,/pricingRequired|ADDRESS_REQUIRED|account\/addresses/);
 });
 
 test("saved address drives destination and is never inferred from locale, seller, origin, or currency",()=>{
  const ui=source("components/DropshippingProductPricing.tsx");assert.doesNotMatch(ui,/SHOPPING_COUNTRY_STORAGE_KEY/);assert.match(source("lib/suppliers/buyer-pricing.ts"),new RegExp(SHOPPING_COUNTRY_STORAGE_KEY));assert.match(ui,/api\/account\/addresses/);assert.match(ui,/if\(!enabled\|\|!country\|\|!variantId\)/);
  assert.doesNotMatch(ui,/setCountry\(locale|sellerCountry|originCountry|preferredCurrencyForCountry/);assert.match(source("lib/privacy-consent.ts"),/todijo-shopping-country-v1/);
+});
+
+test("product detail renders no address-management UI and missing address never blocks cart",()=>{
+ const ui=source("components/DropshippingProductPricing.tsx"),panel=source("components/ProductPurchasePanel.tsx"),checkout=source("app/checkout/page.tsx");
+ assert.doesNotMatch(ui,/next\/link|href=.*account\/addresses|addShippingAddress|changeAddress|deliveryTo/);assert.match(ui,/if\(!country\)return null/);
+ assert.doesNotMatch(panel,/address|destinationCountry/);assert.match(panel,/disabled=\{!available\}/);assert.match(checkout,/api\/account\/addresses/);assert.match(checkout,/shipping\("destination"\)/);
 });
 
 test("request identity changes for country, exact variant and quantity",()=>{
