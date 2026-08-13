@@ -6,6 +6,7 @@ import { MAX_PRODUCT_IMAGES } from "../product-images";
 import { calculateSupplierSnapshotPrices } from "./pricing";
 import { replaceProductVariantImages } from "../product-variant-images";
 import { syncSupplierReviews } from "./supplier-reviews";
+import { verifiedFxRate } from "../fx";
 
 type Database = PrismaClient;
 
@@ -46,7 +47,13 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   if (!connection) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
   const snapshot = await provider.getProduct(input.supplierProductId);
   if (!snapshot.supplierProductId) throw new Error("SUPPLIER_PRODUCT_INVALID");
-  const automaticPricing = manualPrice == null ? calculateSupplierSnapshotPrices(snapshot,input.sellingCurrency??"EUR") : null;
+  const sellingCurrency=(input.sellingCurrency??"EUR").trim().toUpperCase();
+  const exchangeRates:Record<string,string>={};
+  if(manualPrice==null){
+    const supplierCurrencies=new Set([snapshot.currency,...snapshot.variants.map((variant)=>variant.currency)].map((currency)=>currency.trim().toUpperCase()).filter((currency)=>currency!==sellingCurrency));
+    for(const supplierCurrency of supplierCurrencies)exchangeRates[supplierCurrency]=(await verifiedFxRate(supplierCurrency,sellingCurrency)).rate;
+  }
+  const automaticPricing = manualPrice == null ? calculateSupplierSnapshotPrices(snapshot,sellingCurrency,exchangeRates) : null;
   const sellingPrice = manualPrice == null ? automaticPricing!.basePrice : manualPrice.toFixed(2);
   const exists = await db.supplierProductLink.findUnique({where:{connectionId_supplierProductId:{connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId}},select:{productId:true}});
   if (exists) throw new Error("SUPPLIER_PRODUCT_ALREADY_IMPORTED");
@@ -63,7 +70,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   const product=await db.$transaction(async (tx) => {
     const product = await tx.product.create({data:{
       storeId:input.storeId,name:snapshot.title.slice(0,120),slug,description:snapshot.description.slice(0,5000),category:input.category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
-      price:sellingPrice,currency:(input.sellingCurrency??"EUR").toUpperCase(),stock:snapshot.stock,images,
+      price:sellingPrice,currency:sellingCurrency,stock:snapshot.stock,images,
       supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:{...snapshot.rawMetadata,pricing:automaticPricing??{mode:"MANUAL_OVERRIDE",shippingStatus:"DEFERRED",marginGuaranteed:false}} as Prisma.InputJsonValue}},
       media:{create:copied.map((item,index)=>({type:item.type,provider:item.provider,publicId:item.publicId,url:item.url,posterUrl:item.posterUrl,position:index,width:item.width,height:item.height,durationMs:item.durationMs,sourceUrl:copiedSources[index]?.url??null}))},
     }});

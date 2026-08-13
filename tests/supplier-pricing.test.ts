@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 import { calculateSupplierPrice, calculateSupplierSnapshotPrices, DEFAULT_SUPPLIER_TARGET_MARGIN, SupplierPricingError } from "../lib/suppliers/pricing";
 import { importSupplierProduct, syncSupplierProduct } from "../lib/suppliers/supplier-products";
+import { resetFxCacheForTests } from "../lib/fx";
 
 test("20 percent target margin divides total known cost by one minus margin",()=>{
   const result=calculateSupplierPrice({supplierCost:"8",supplierCurrency:"EUR",sellingCurrency:"EUR",shipping:{status:"KNOWN",amount:"4",currency:"EUR"}});
@@ -69,6 +70,50 @@ test("automatic import persists the base price and variant-specific overrides",a
   await importSupplierProduct(db,{id:"CJ",isConfigured:()=>true,getProduct:async()=>snapshot},{copyRemote:async()=>{throw new Error("unexpected");}},{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID",sellingCurrency:"EUR",category:"Other"});
   assert.equal(productData.price,"10.00");assert.equal(productData.status,"DRAFT");
   assert.deepEqual(variants.map((variant)=>variant.priceOverride),["10.00","12.50"]);
+});
+
+test("automatic import resolves verified FX and maps each supplier currency independently",async()=>{
+  const originalFetch=globalThis.fetch,originalKey=process.env.OPEN_EXCHANGE_RATES_APP_ID;
+  let fetchCalls=0,productData:any;const variants:any[]=[];
+  globalThis.fetch=(async()=>{fetchCalls++;return new Response(JSON.stringify({base:"USD",timestamp:Math.floor(Date.now()/1000),rates:{USD:1,EUR:.9,GBP:.75}}),{status:200});}) as typeof fetch;
+  process.env.OPEN_EXCHANGE_RATES_APP_ID="test-app-id";
+  resetFxCacheForTests();
+  const tx:any={product:{create:async({data}:any)=>{productData=data;return{id:"product"};}},productOption:{create:async()=>({id:"option"})},productOptionValue:{create:async({data}:any)=>({id:`value-${data.position}`})},productVariant:{create:async({data}:any)=>{variants.push(data);return{id:`variant-${variants.length}`};}},productVariantValue:{create:async()=>({})}};
+  const db:any={supplierConnection:{findFirst:async()=>({id:"platform-cj"})},supplierProductLink:{findUnique:async()=>null},product:{findUnique:async()=>null},$transaction:async(callback:any)=>callback(tx)};
+  const snapshot:any={provider:"CJ",supplierProductId:"PID-FX",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:"8",currency:"USD",stock:2,available:true,weightGrams:null,media:[],rawMetadata:{},variants:[{supplierVariantId:"USD",sku:null,title:"USD",cost:"8",currency:"USD",stock:1,available:true},{supplierVariantId:"GBP",sku:null,title:"GBP",cost:"8",currency:"GBP",stock:1,available:true}]};
+  try{
+    await importSupplierProduct(db,{id:"CJ",isConfigured:()=>true,getProduct:async()=>snapshot},{copyRemote:async()=>{throw new Error("unexpected");}},{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID-FX",sellingCurrency:"EUR",category:"Other"});
+    assert.equal(productData.price,"9.00");assert.equal(productData.currency,"EUR");
+    assert.deepEqual(variants.map((variant)=>variant.priceOverride),["9.00","12.00"]);
+    assert.equal(fetchCalls,1);
+  }finally{globalThis.fetch=originalFetch;if(originalKey===undefined)delete process.env.OPEN_EXCHANGE_RATES_APP_ID;else process.env.OPEN_EXCHANGE_RATES_APP_ID=originalKey;}
+});
+
+test("same-currency automatic import does not call the FX provider",async()=>{
+  const originalFetch=globalThis.fetch;let productCreated=0;
+  globalThis.fetch=(async()=>{throw new Error("FX must not be called");}) as typeof fetch;
+  const tx:any={product:{create:async()=>{productCreated++;return{id:"product"};}},productOption:{create:async()=>({id:"option"})},productOptionValue:{create:async()=>({id:"value"})},productVariant:{create:async()=>({id:"variant"})},productVariantValue:{create:async()=>({})}};
+  const db:any={supplierConnection:{findFirst:async()=>({id:"platform-cj"})},supplierProductLink:{findUnique:async()=>null},product:{findUnique:async()=>null},$transaction:async(callback:any)=>callback(tx)};
+  const snapshot:any={provider:"CJ",supplierProductId:"PID-EUR",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:"8",currency:"EUR",stock:1,available:true,weightGrams:null,media:[],rawMetadata:{},variants:[{supplierVariantId:"EUR",sku:null,title:"EUR",cost:"8",currency:"EUR",stock:1,available:true}]};
+  try{await importSupplierProduct(db,{id:"CJ",isConfigured:()=>true,getProduct:async()=>snapshot},{copyRemote:async()=>{throw new Error("unexpected");}},{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID-EUR",sellingCurrency:"EUR",category:"Other"});assert.equal(productCreated,1);}
+  finally{globalThis.fetch=originalFetch;}
+});
+
+test("automatic import fails before media or database creation when verified FX is unavailable stale or invalid",async()=>{
+  const originalFetch=globalThis.fetch,originalKey=process.env.OPEN_EXCHANGE_RATES_APP_ID;
+  let mediaCopies=0,transactions=0;
+  const db:any={supplierConnection:{findFirst:async()=>({id:"platform-cj"})},supplierProductLink:{findUnique:async()=>null},product:{findUnique:async()=>null},$transaction:async()=>{transactions++;throw new Error("unexpected transaction");}};
+  const snapshot:any={provider:"CJ",supplierProductId:"PID-FAIL",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:"8",currency:"USD",stock:1,available:true,weightGrams:null,media:[{type:"IMAGE",url:"https://example.com/image.jpg"}],rawMetadata:{},variants:[{supplierVariantId:"USD",sku:null,title:"USD",cost:"8",currency:"USD",stock:1,available:true}]};
+  const provider:any={id:"CJ",isConfigured:()=>true,getProduct:async()=>snapshot};
+  const media:any={copyRemote:async()=>{mediaCopies++;throw new Error("unexpected media copy");}};
+  async function attempt(payload:unknown,key=true,status=200){if(key)process.env.OPEN_EXCHANGE_RATES_APP_ID="test-app-id";else delete process.env.OPEN_EXCHANGE_RATES_APP_ID;resetFxCacheForTests();globalThis.fetch=(async()=>new Response(JSON.stringify(payload),{status})) as typeof fetch;await assert.rejects(()=>importSupplierProduct(db,provider,media,{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID-FAIL",sellingCurrency:"EUR",category:"Other"}));}
+  try{
+    await attempt({},false);
+    await attempt({error:true,code:"service_unavailable"},true,503);
+    await attempt({base:"USD",timestamp:Math.floor((Date.now()-7*60*60*1000)/1000),rates:{EUR:.9}});
+    await attempt({base:"USD",timestamp:Math.floor(Date.now()/1000),rates:{EUR:0}});
+    assert.equal(mediaCopies,0);assert.equal(transactions,0);
+  }finally{globalThis.fetch=originalFetch;if(originalKey===undefined)delete process.env.OPEN_EXCHANGE_RATES_APP_ID;else process.env.OPEN_EXCHANGE_RATES_APP_ID=originalKey;}
 });
 
 test("explicit resync populates missing costs without repricing or creating a product",async()=>{

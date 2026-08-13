@@ -111,15 +111,15 @@ export function calculateSupplierPrice(input: PricingInput): SupplierPriceCalcul
   };
 }
 
-export function calculateSupplierSnapshotPrices(snapshot: SupplierProductSnapshot, sellingCurrency: string) {
+export function calculateSupplierSnapshotPrices(snapshot: SupplierProductSnapshot, sellingCurrency: string, exchangeRates: Readonly<Record<string, Prisma.Decimal.Value>> = {}) {
   const deferredShipping = { status:"DEFERRED", required:true } as const;
   const variants = snapshot.variants.map((variant) => ({
     supplierVariantId:variant.supplierVariantId,
-    calculation:calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency,shipping:deferredShipping}),
+    calculation:calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[variant.currency.trim().toUpperCase()]}),
   }));
   const product = snapshot.cost == null
     ? null
-    : calculateSupplierPrice({supplierCost:snapshot.cost,supplierCurrency:snapshot.currency,sellingCurrency,shipping:deferredShipping});
+    : calculateSupplierPrice({supplierCost:snapshot.cost,supplierCurrency:snapshot.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[snapshot.currency.trim().toUpperCase()]});
   if (!product && !variants.length) throw new SupplierPricingError("PRICING_COST_INVALID");
   const basePrice = variants.length
     ? variants.reduce((minimum, variant) => Prisma.Decimal.min(minimum, variant.calculation.finalSellingPrice), new Prisma.Decimal(variants[0].calculation.finalSellingPrice))
