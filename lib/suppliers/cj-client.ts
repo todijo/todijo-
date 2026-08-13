@@ -1,4 +1,5 @@
-import type { SupplierCatalogProvider, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
+import type { SupplierCatalogProvider, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
+import { mapCjColorSizeVariants } from "./cj-variant-mapping";
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
@@ -7,6 +8,7 @@ import { CjFreightError, countryCode, freightCacheKey, normalizeCjFreightMethods
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 
 function text(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
+function identifier(value: unknown) { return typeof value === "string" || typeof value === "number" ? String(value).trim() : ""; }
 function number(value: unknown) {
   if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return null;
   const parsed = Number(value);
@@ -15,6 +17,7 @@ function number(value: unknown) {
 function list(value: unknown) { return Array.isArray(value) ? value : []; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === "object" ? value as Record<string, unknown> : {}; }
 function normalizedIdentifier(value: unknown) { return text(value).toUpperCase(); }
+function reviewText(value:unknown){return text(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,"").slice(0,2000);}
 
 export function normalizeCjProductImages(productValue: unknown) {
   const product = object(productValue);
@@ -39,10 +42,11 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     return [text(row.vid), total] as const;
   }));
   const originsByVariant = new Map(variantInventories.map((entry)=>{const row=object(entry);return [text(row.vid),[...new Set(list(row.inventory).map((item)=>text(object(item).countryCode).toUpperCase()).filter((code)=>/^[A-Z]{2}$/.test(code)))]] as const;}));
-  const variants: SupplierVariantSnapshot[] = variantsRaw.slice(0, 200).map((entry, index) => {
+  const parsedVariants: Array<SupplierVariantSnapshot & {variantKey?:string|null;variantName?:string|null}> = variantsRaw.slice(0, 200).map((entry, index) => {
     const row = object(entry); const id = text(row.vid ?? row.variantId); const stock = inventoryByVariant.get(id) ?? Math.max(0, number(row.variantInventory ?? row.stock) ?? 0);
-    return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantKey ?? row.variantNameEn ?? row.variantName) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0, originCountryCodes:[...(originsByVariant.get(id)??[])], imageUrl:text(row.variantImage ?? row.variantImageUrl ?? row.image) || null };
+    return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantKey ?? row.variantNameEn ?? row.variantName) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0, originCountryCodes:[...(originsByVariant.get(id)??[])], imageUrl:text(row.variantImage ?? row.variantImageUrl ?? row.image) || null, variantKey:text(row.variantKey)||null, variantName:text(row.variantNameEn??row.variantName)||null };
   }).filter((variant) => variant.supplierVariantId);
+  const variants = mapCjColorSizeVariants({productTitle:text(product.productNameEn??product.productName),productKeyEn:product.productKeyEn,productKeySet:product.productKeySet,variants:parsedVariants}) ?? parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,sku:variant.sku,title:variant.title,cost:variant.cost,currency:variant.currency,stock:variant.stock,available:variant.available,originCountryCodes:variant.originCountryCodes,imageUrl:variant.imageUrl}));
   const imageUrls = normalizeCjProductImages(product);
   for (const variant of variants) if (variant.imageUrl && isValidProductImageUrl(variant.imageUrl) && !imageUrls.includes(variant.imageUrl) && imageUrls.length < MAX_PRODUCT_IMAGES) imageUrls.push(variant.imageUrl);
   const videoUrl = text(product.productVideo ?? product.videoUrl);
@@ -146,6 +150,14 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     return normalizeCjProduct(product, variants.data, inventory.data);
+  }
+  async getProductReviews(supplierProductId:string,page=1,pageSize=20):Promise<SupplierProductReviewsPage>{
+    const pid=supplierProductId.trim();
+    if(!/^[A-Za-z0-9-]{4,200}$/.test(pid)||!Number.isSafeInteger(page)||page<1||!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>100)throw new Error("CJ_REVIEW_INPUT_INVALID");
+    const result=await this.get("get-product-reviews",`/product/productComments?pid=${encodeURIComponent(pid)}&pageNum=${page}&pageSize=${pageSize}`,{supplierProductId:pid});
+    const data=object(result.data),rows=list(data.list);
+    const reviews=rows.flatMap((entry)=>{const row=object(entry),id=identifier(row.commentId),body=reviewText(row.comment),rating=number(row.score),reviewPid=identifier(row.pid);if(!id||!body||rating==null||!Number.isInteger(rating)||rating<1||rating>5||reviewPid!==pid)return[];const date=text(row.commentDate),flagIconUrl=text(row.flagIconUrl);return[{supplierReviewId:id,supplierProductId:reviewPid,rating,body,reviewedAt:date&&!Number.isNaN(Date.parse(date))?new Date(date).toISOString():null,reviewerDisplayName:text(row.commentUser).slice(0,200)||null,mediaUrls:list(row.commentUrls).map(text).filter(isValidProductImageUrl),countryCode:/^[A-Z]{2}$/.test(text(row.countryCode).toUpperCase())?text(row.countryCode).toUpperCase():null,sourceMetadata:{flagIconUrl:isValidProductImageUrl(flagIconUrl)?flagIconUrl:null}}];});
+    return{reviews,total:Math.max(0,number(data.total)??reviews.length),page:Math.max(1,number(data.pageNum)??page),pageSize:Math.max(1,number(data.pageSize)??pageSize)};
   }
   async calculateFreight(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<CjFreightQuote>{
     const originCountry=countryCode(input.originCountry),destinationCountry=countryCode(input.destinationCountry),variantId=input.variantId.trim();

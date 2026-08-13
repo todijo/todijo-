@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useLocale } from "next-intl";
 import { useToast } from "./ToastProvider";
 
 type Review = { id: string; rating: number; title: string | null; body: string; sellerReply: string | null; createdAt: string; authorName: string; isOwn: boolean };
-type Payload = { reviews: Review[]; summary: { average: number; count: number }; canReview: boolean; loggedIn: boolean };
+type SupplierReview = { id: string; rating: number; body: string; reviewerDisplayName: string | null; reviewedAt: string | null; countryCode: string | null; mediaUrls: string[]; flagIconUrl: string | null; provenance: "CJ" };
+type Payload = { reviews: Review[]; summary: { average: number; count: number }; supplierReviews: SupplierReview[]; supplierSummary: { average: number; count: number; provider: "CJ" }; canReview: boolean; loggedIn: boolean };
 
 export default function ReviewSection({ productId }: { productId: string }) {
   const locale = useLocale();
@@ -18,12 +20,13 @@ export default function ReviewSection({ productId }: { productId: string }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [visibleSupplierReviews, setVisibleSupplierReviews] = useState(6);
   const load = useCallback(async () => {
     setLoadError(false);
     try {
       const response = await fetch(`/api/products/${productId}/reviews`, { cache: "no-store" });
       if (!response.ok) throw new Error();
-      setData(await response.json());
+      setData(await response.json()); setVisibleSupplierReviews(6);
     } catch { setLoadError(true); }
   }, [productId]);
   useEffect(() => { void load(); }, [load]);
@@ -56,5 +59,10 @@ export default function ReviewSection({ productId }: { productId: string }) {
       </div>
       <div className="reviewList">{loadError ? <div className="noReviews"><p>Réessayez pour afficher les avis.</p></div> : !data ? skeleton : data.reviews.length===0 ? <div className="noReviews"><span>☆</span><h3>Aucun avis vérifié</h3><p>Les futurs avis proviendront uniquement d’acheteurs ayant réellement commandé ce produit.</p><Link className="primary" href={`/${locale}`}>Découvrir d’autres produits</Link></div> : data.reviews.map((review)=><article key={review.id}><div><strong>{review.authorName} <em className="verifiedPurchaseBadge">✓ Achat vérifié</em></strong><span>{"★".repeat(review.rating)}{"☆".repeat(5-review.rating)}</span></div>{review.title&&<h4>{review.title}</h4>}<p>{review.body}</p><footer><small>{new Date(review.createdAt).toLocaleDateString(locale)}</small>{!review.isOwn&&<button type="button" onClick={()=>report(review.id)}>Signaler</button>}</footer>{review.sellerReply&&<div className="sellerReviewReply"><strong>Réponse du vendeur</strong><p>{review.sellerReply}</p></div>}</article>)}</div>
     </div>
+    {data?.supplierSummary.count ? <section className="supplierReviews" aria-labelledby="supplier-reviews-title">
+      <div className="supplierReviewsHeading"><div><p className="dashboardBadge">Avis clients du fournisseur</p><h3 id="supplier-reviews-title">Avis provenant du fournisseur CJ Dropshipping</h3><p>Ces avis concernent ce produit chez le fournisseur et n’ont pas nécessairement été publiés après un achat sur Todijo.</p></div><div className="ratingSummary"><strong>{data.supplierSummary.average.toFixed(1)} / 5</strong><span>{"★".repeat(Math.round(data.supplierSummary.average))}{"☆".repeat(5-Math.round(data.supplierSummary.average))}</span><small>{data.supplierSummary.count} avis fournisseur synchronisé{data.supplierSummary.count > 1 ? "s" : ""}</small></div></div>
+      <div className="supplierReviewList">{data.supplierReviews.slice(0, visibleSupplierReviews).map((review) => <article key={review.id}><header><strong>{review.reviewerDisplayName ?? "Client du fournisseur"}</strong><span>{"★".repeat(review.rating)}{"☆".repeat(5-review.rating)}</span></header><p>{review.body}</p>{review.mediaUrls.length ? <div className="supplierReviewMedia">{review.mediaUrls.slice(0,4).map((url,index)=><Image key={url} src={url} width={96} height={96} alt={`Photo de l’avis ${index+1}`} unoptimized/>)}</div> : null}<footer><small>{review.reviewedAt ? new Date(review.reviewedAt).toLocaleDateString(locale) : null}{review.countryCode ? `${review.reviewedAt ? " · " : ""}${review.countryCode}` : ""}</small><em>Avis fournisseur CJ Dropshipping</em></footer></article>)}</div>
+      {visibleSupplierReviews < data.supplierReviews.length ? <button className="supplierReviewsMore" type="button" onClick={() => setVisibleSupplierReviews((count) => count + 6)}>Voir plus</button> : null}
+    </section> : null}
   </section>;
 }

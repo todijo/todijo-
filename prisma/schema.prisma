@@ -449,6 +449,7 @@ model Product {
   conversations Conversation[]
   orderItems    OrderItem[]
   reviews       Review[]
+  supplierReviews SupplierReview[]
   options       ProductOption[]
   variants      ProductVariant[]
   imageRecords  ProductImage[]
@@ -478,12 +479,16 @@ model SupplierProductLink {
   syncStatus            SupplierSyncStatus @default(HEALTHY)
   lastSyncedAt          DateTime?
   lastSyncError         String?            @db.VarChar(500)
+  reviewSyncStatus      String             @default("PENDING") @db.VarChar(20)
+  reviewLastSyncedAt    DateTime?
+  reviewSyncError       String?            @db.VarChar(500)
   sourceMetadata        Json?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   connection SupplierConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  reviews SupplierReview[]
 
   @@unique([connectionId, supplierProductId])
   @@index([provider, syncStatus, lastSyncedAt])
@@ -677,6 +682,32 @@ model Order {
   @@index([buyerId, status, createdAt])
   @@index([storeIdSnapshot])
   @@index([fulfillmentStatus])
+}
+
+model SupplierReview {
+  id                    String           @id @default(cuid())
+  provider              SupplierProvider
+  supplierReviewId      String           @db.VarChar(200)
+  supplierProductId     String           @db.VarChar(200)
+  productId             String
+  supplierProductLinkId String
+  rating                Int
+  comment               String           @db.VarChar(2000)
+  supplierDisplayName   String?          @db.VarChar(200)
+  reviewedAt            DateTime?
+  countryCode           String?          @db.VarChar(2)
+  mediaUrls             String[]         @default([])
+  sourceMetadata        Json?
+  syncedAt              DateTime         @default(now())
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierProductLink SupplierProductLink @relation(fields: [supplierProductLinkId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, supplierReviewId])
+  @@index([productId, reviewedAt])
+  @@index([supplierProductLinkId, reviewedAt])
 }
 
 model OrderGroup {

@@ -16,7 +16,7 @@ function suspicious(text: string) {
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await readSession();
-  const [reviews, aggregate, eligibleOrderItem] = await Promise.all([
+  const [reviews, aggregate, eligibleOrderItem, supplierReviews, supplierAggregate] = await Promise.all([
     prisma.review.findMany({
       where: { productId: id, status: "PUBLISHED" },
       orderBy: { createdAt: "desc" },
@@ -27,10 +27,17 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       where: { productId: id, order: { buyerId: session.userId, status: { in: ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"] } }, review: null },
       select: { id: true },
     }) : null,
+    prisma.supplierReview.findMany({ where: { productId: id }, orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }], take: 20, select: { id: true, rating: true, comment: true, supplierDisplayName: true, reviewedAt: true, countryCode: true, mediaUrls: true, sourceMetadata: true } }),
+    prisma.supplierReview.aggregate({ where: { productId: id }, _avg: { rating: true }, _count: { _all: true } }),
   ]);
   return NextResponse.json({
     reviews: reviews.map((r) => ({ ...r, authorName: publicName(r.author.firstName, r.author.lastName), author: undefined, isOwn: r.authorId === session?.userId })),
     summary: { average: aggregate._avg.rating || 0, count: aggregate._count._all },
+    supplierReviews: supplierReviews.map((review) => {
+      const metadata = review.sourceMetadata && typeof review.sourceMetadata === "object" && !Array.isArray(review.sourceMetadata) ? review.sourceMetadata as Record<string, unknown> : {};
+      return { id: review.id, rating: review.rating, body: review.comment, reviewerDisplayName: review.supplierDisplayName, reviewedAt: review.reviewedAt, countryCode: review.countryCode, mediaUrls: review.mediaUrls, flagIconUrl: typeof metadata.flagIconUrl === "string" ? metadata.flagIconUrl : null, provenance: "CJ" as const };
+    }),
+    supplierSummary: { average: supplierAggregate._avg.rating || 0, count: supplierAggregate._count._all, provider: "CJ" as const },
     canReview: Boolean(eligibleOrderItem),
     loggedIn: Boolean(session),
   });

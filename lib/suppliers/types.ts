@@ -10,7 +10,22 @@ export type SupplierVariantSnapshot = {
   available: boolean;
   originCountryCodes: string[];
   imageUrl?: string | null;
+  optionValues?: Array<{ name: "Color" | "Size"; value: string }>;
 };
+
+export type SupplierProductReview = {
+  supplierReviewId: string;
+  supplierProductId: string;
+  rating: number;
+  body: string;
+  reviewedAt: string | null;
+  reviewerDisplayName: string | null;
+  mediaUrls: string[];
+  countryCode: string | null;
+  sourceMetadata: Record<string, unknown>;
+};
+
+export type SupplierProductReviewsPage = { reviews: SupplierProductReview[]; total: number; page: number; pageSize: number };
 
 export type SupplierMediaSource = {
   type: "IMAGE" | "VIDEO";
@@ -40,4 +55,5 @@ export interface SupplierCatalogProvider {
   readonly id: SupplierProviderId;
   isConfigured(): boolean;
   getProduct(supplierProductId: string): Promise<SupplierProductSnapshot>;
+  getProductReviews?(supplierProductId: string, page?: number, pageSize?: number): Promise<SupplierProductReviewsPage>;
 }
