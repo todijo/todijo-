@@ -13,13 +13,13 @@ const options: BuyerOption[] = [{ id: "legacy", name: "Variant", position: 0, va
 ] }];
 const variant = (id: string, valueId: string): BuyerVariant => ({ id, stock: 2, active: true, priceOverride: null, values: [{ optionValue: { id: valueId, value: options[0].values.find((value) => value.id === valueId)!.value, option: { id: "legacy", name: "Variant", position: 0 } } }] });
 
-test("legacy CJ labels become compact option and size groups without supplier codes", () => {
-  const result = buyerVariantPresentation({ productName, supplierManaged: true, options, variants: [variant("v1", "white-s"), variant("v2", "white-m"), variant("v3", "other-s")] });
-  assert.deepEqual(result.options.map((option) => option.name), ["Style", "Size"]);
-  assert.deepEqual(result.options[0].values.map((value) => value.value), ["Style 1", "Style 2"]);
+test("legacy CJ labels become localized color and size groups without supplier codes", () => {
+  const result = buyerVariantPresentation({ productName, supplierManaged: true, optionLabels:{color:"Couleur",size:"Taille"}, options, variants: [variant("v1", "white-s"), variant("v2", "white-m"), variant("v3", "other-s")] });
+  assert.deepEqual(result.options.map((option) => option.name), ["Couleur", "Taille"]);
+  assert.deepEqual(result.options[0].values.map((value) => value.value), ["Couleur 1", "Couleur 2"]);
   assert.ok(result.options[0].values.every((value) => value.imageOnly));
   assert.deepEqual(result.options[1].values.map((value) => value.value), ["S", "M"]);
-  assert.doesNotMatch(JSON.stringify(result.options), /LC25224353|New Pullover/);
+  assert.doesNotMatch(JSON.stringify(result.options), /LC25224353|New Pullover|Style|Variant/);
   assert.equal(result.variants.find((entry) => entry.id === "v2")!.values[1].optionValue.value, "M");
 });
 
@@ -41,8 +41,8 @@ test("single-style CJ products expose sizes without leaking the legacy supplier 
 test("future structured CJ keys retain documented semantic style names", () => {
   const semanticOptions:BuyerOption[]=[{id:"variant",name:"Variant",position:0,values:[{id:"black-s",value:"Black-S",position:0},{id:"black-m",value:"Black-M",position:1},{id:"white-s",value:"White-S",position:2}]}];
   const semanticVariant=(id:string,valueId:string):BuyerVariant=>({id,stock:1,active:true,priceOverride:null,values:[{optionValue:{id:valueId,value:semanticOptions[0].values.find((value)=>value.id===valueId)!.value,option:{id:"variant",name:"Variant",position:0}}}]});
-  const result=buyerVariantPresentation({productName:"Product",supplierManaged:true,options:semanticOptions,variants:[semanticVariant("black-s-id","black-s"),semanticVariant("black-m-id","black-m"),semanticVariant("white-s-id","white-s")]});
-  assert.deepEqual(result.options.map((option)=>option.name),["Style","Size"]);
+  const result=buyerVariantPresentation({productName:"Product",supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille"},options:semanticOptions,variants:[semanticVariant("black-s-id","black-s"),semanticVariant("black-m-id","black-m"),semanticVariant("white-s-id","white-s")]});
+  assert.deepEqual(result.options.map((option)=>option.name),["Couleur","Taille"]);
   assert.deepEqual(result.options[0].values.map((value)=>value.value),["Black","White"]);
 });
 
@@ -107,6 +107,15 @@ test("pricing, cart and country continue to use canonical selection identity", (
 
 test("the main product heading area never substitutes a country prompt for price", () => {
   const price = readFileSync("app/product/[id]/ProductDetailPrice.tsx", "utf8");
-  assert.match(price, /if \(!verified\) return null/);
+  assert.doesNotMatch(price, /if \(!verified\) return null/);
+  assert.match(price, /useState\(price\)/);
+  assert.match(price, /setSelectedPrice\(detail\.price\)/);
   assert.doesNotMatch(price, /selectDeliveryCountry/);
+});
+
+test("CJ price display preserves persisted and canonical variant prices without inventing loading values",()=>{
+  const price=readFileSync("app/product/[id]/ProductDetailPrice.tsx","utf8"),panel=readFileSync("components/ProductPurchasePanel.tsx","utf8"),live=readFileSync("components/DropshippingProductPricing.tsx","utf8");
+  assert.match(price,/selectedPrice, setSelectedPrice\] = useState\(price\)/);assert.doesNotMatch(price,/return null/);
+  assert.match(panel,/selectedVariant\?\.priceOverride \?\? product\.price/);assert.match(panel,/activePricing\?Number\(activePricing\.buyerUnitPrice\)/);assert.match(panel,/detail: \{ price: selectedPrice,currency:selectedCurrency/);
+  assert.match(live,/state\.status==="loading"/);assert.match(live,/state\.status==="error"/);assert.doesNotMatch(live,/status==="loading"[\s\S]{0,120}buyerUnitPrice/);
 });

@@ -29,25 +29,26 @@ export function buyerVariantPresentation(input: { productName: string; supplierM
   const styleIdentity = (value:BuyerOption["values"][number]) => {const part=parts.get(value.id)!,supplierImage=supplierByValue.get(value.id)?.imageUrl;return part!.opaque&&supplierImage?`image:${supplierImage}`:`label:${part!.key.toLocaleLowerCase()}`;};
   const keys = [...new Set(original.values.map(styleIdentity))];
   const sizes = [...new Set([...parts.values()].map((part) => part!.size))];
-  const styleId = `${original.id}:legacy-style`, sizeId = `${original.id}:legacy-size`;
+  const colorName=input.optionLabels?.color??"Color",sizeName=input.optionLabels?.size??"Size";
+  const colorId = `${original.id}:legacy-color`, sizeId = `${original.id}:legacy-size`;
   const imageByKey = new Map<string, string[]>();
   for (const value of original.values) { const key=styleIdentity(value),supplierImage=supplierByValue.get(value.id)?.imageUrl,images=value.imageUrls?.length?value.imageUrls:supplierImage?[supplierImage]:[];if (!imageByKey.has(key) && images.length) imageByKey.set(key, images); }
-  const showStyle = keys.length > 1 || sizes.length === 1;
+  const showColor = keys.length > 1 || sizes.length === 1;
   const showSize = sizes.length > 1;
-  const styleLabel = (key:string,index:number) => {const value=original.values.find((candidate)=>styleIdentity(candidate)===key),part=value?parts.get(value.id):null;return part?.opaque ? `Style ${index + 1}` : part?.key??"Style";};
+  const colorLabel = (key:string,index:number) => {const value=original.values.find((candidate)=>styleIdentity(candidate)===key),part=value?parts.get(value.id):null;return part?.opaque ? `${colorName} ${index + 1}` : part?.key??`${colorName} ${index + 1}`;};
   const options: BuyerOption[] = [
-    ...(showStyle ? [{ id: styleId, name: "Style", position: 0, values: keys.map((key, index) => ({ id: `${styleId}:${index}`, value: keys.length === 1 ? "Standard" : styleLabel(key,index), position: index, imageUrls: imageByKey.get(key), imageOnly: Boolean(imageByKey.get(key)?.length) && styleLabel(key,index).startsWith("Style "), accessibleLabel: keys.length === 1 ? "Standard style" : styleLabel(key,index) })) }] : []),
-    ...(showSize ? [{ id: sizeId, name: "Size", position: showStyle ? 1 : 0, values: sizes.map((size, index) => ({ id: `${sizeId}:${index}`, value: size, position: index })) }] : []),
+    ...(showColor ? [{ id: colorId, name: colorName, position: 0, values: keys.map((key, index) => ({ id: `${colorId}:${index}`, value: colorLabel(key,index), position: index, imageUrls: imageByKey.get(key), imageOnly: Boolean(imageByKey.get(key)?.length) && parts.get(original.values.find((candidate)=>styleIdentity(candidate)===key)!.id)?.opaque, accessibleLabel: colorLabel(key,index) })) }] : []),
+    ...(showSize ? [{ id: sizeId, name: sizeName, position: showColor ? 1 : 0, values: sizes.map((size, index) => ({ id: `${sizeId}:${index}`, value: size, position: index })) }] : []),
   ];
-  const styleIds = new Map(keys.map((key, index) => [key, `${styleId}:${index}`])), sizeIds = new Map(sizes.map((size, index) => [size, `${sizeId}:${index}`]));
+  const colorIds = new Map(keys.map((key, index) => [key, `${colorId}:${index}`])), sizeIds = new Map(sizes.map((size, index) => [size, `${sizeId}:${index}`]));
   const variants = input.variants.map((variant) => {
     const source = variant.values.find(({ optionValue }) => optionValue.option.id === original.id);
     const part = source ? parts.get(source.optionValue.id) : null;
     if (!part) return { ...variant, values: [] };
     const key=styleIdentity(original.values.find((value)=>value.id===source!.optionValue.id)!);
     return { ...variant, values: [
-      ...(showStyle ? [{ optionValue: { id: styleIds.get(key)!, value: keys.length === 1 ? "Standard" : styleLabel(key,keys.indexOf(key)), option: { id: styleId, name: "Style", position: 0 } } }] : []),
-      ...(showSize ? [{ optionValue: { id: sizeIds.get(part.size)!, value: part.size, option: { id: sizeId, name: "Size", position: showStyle ? 1 : 0 } } }] : []),
+      ...(showColor ? [{ optionValue: { id: colorIds.get(key)!, value: colorLabel(key,keys.indexOf(key)), option: { id: colorId, name: colorName, position: 0 } } }] : []),
+      ...(showSize ? [{ optionValue: { id: sizeIds.get(part.size)!, value: part.size, option: { id: sizeId, name: sizeName, position: showColor ? 1 : 0 } } }] : []),
     ] };
   });
   return { options, variants };
