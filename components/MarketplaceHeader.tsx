@@ -21,6 +21,7 @@ export default function MarketplaceHeader() {
   const [activeCategory, setActiveCategory] = useState(DESKTOP_CATEGORY_TAXONOMY[0].id);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const categoryMenuRef=useRef<HTMLDivElement|null>(null);
+  const categoryDetailRef=useRef<HTMLDivElement|null>(null);
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function MarketplaceHeader() {
     return () => { active = false; };
   }, []);
   useEffect(()=>{const close=(event:MouseEvent)=>{if(categoryMenuRef.current&&!categoryMenuRef.current.contains(event.target as Node))setCategoriesOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
+  useEffect(()=>{categoryDetailRef.current?.scrollTo({top:0,left:0,behavior:"auto"})},[activeCategory]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -72,7 +74,7 @@ export default function MarketplaceHeader() {
           <button className="marketAllCategories" type="button" aria-expanded={categoriesOpen} aria-controls="market-category-mega-menu" onClick={() => setCategoriesOpen((open) => !open)} onKeyDown={(event) => { if (event.key === "Escape") setCategoriesOpen(false); }}><Menu size={18} aria-hidden="true"/>{common("categories")}</button>
           {categoriesOpen ? <section id="market-category-mega-menu" className="marketCategoryMegaMenu" aria-label={common("categories")} onKeyDown={(event) => { if (event.key === "Escape") setCategoriesOpen(false); }}>
             <div className="marketCategoryList" role="navigation" aria-label={common("categories")}>{DESKTOP_CATEGORY_TAXONOMY.map((category) => { const Icon = categoryIcons[category.iconKey as keyof typeof categoryIcons]; return <button type="button" key={category.id} className={activeCategory === category.id ? "active" : ""} aria-pressed={activeCategory===category.id} onMouseEnter={() => setActiveCategory(category.id)} onFocus={() => setActiveCategory(category.id)}><Icon size={17} aria-hidden="true"/><span>{category.label}</span><ChevronRight size={15} aria-hidden="true"/></button>; })}</div>
-            <div className="marketCategoryDetail">{(()=>{const category=DESKTOP_CATEGORY_TAXONOMY.find(item=>item.id===activeCategory)!;return <><header><div><p>{category.label}</p><small>{header("discoverCategories")}</small></div><Link href={categoryHref(category.label)} onClick={()=>setCategoriesOpen(false)}>{header("viewAll")}</Link></header>{category.groups.length?<div className="marketCategoryColumns">{category.groups.map(group=><section key={group.id}><h3>{group.label}</h3>{group.items.map(item=><Link key={item} href={categoryHref(item)} onClick={()=>setCategoriesOpen(false)}>{item}</Link>)}</section>)}</div>:<div className="marketCategoryEmpty"><p>{category.label}</p><Link href={categoryHref(category.label)} onClick={()=>setCategoriesOpen(false)}>{header("viewAll")} {category.label}</Link></div>}</>})()}</div>
+            <div className="marketCategoryDetail" ref={categoryDetailRef}>{(()=>{const category=DESKTOP_CATEGORY_TAXONOMY.find(item=>item.id===activeCategory)!;return <><header className="marketCategoryDetailHeader"><div><p>{category.label}</p><small>{header("discoverCategories")}</small></div><Link className="marketCategoryViewAll" href={categoryHref(category.label)} onClick={()=>setCategoriesOpen(false)}>{header("viewAll")}</Link></header>{category.groups.length?<div className="marketCategoryColumns">{category.groups.map(group=><section key={group.id}><h3 className="marketCategoryGroupHeading">{group.label}</h3>{group.items.map(item=><Link className="marketCategoryChildLink" key={item} href={categoryHref(item)} onClick={()=>setCategoriesOpen(false)}>{item}</Link>)}</section>)}</div>:<div className="marketCategoryEmpty"><p>{category.label}</p><Link href={categoryHref(category.label)} onClick={()=>setCategoriesOpen(false)}>{header("viewAll")} {category.label}</Link></div>}</>})()}</div>
           </section> : null}
         </div>
         <Link href={localizedPath(locale, "/messages")} aria-current={isNavigationActive(pathname, "/messages", true) ? "page" : undefined}>{common("messages")}</Link>

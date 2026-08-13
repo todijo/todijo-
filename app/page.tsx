@@ -4,6 +4,7 @@ import HomeClient from "./HomeClient";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, productGenerallyAvailableWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
+import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,7 +44,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const baseWhere: Prisma.ProductWhereInput = {
     status: "PUBLISHED",
     ...publicProductAccess,
-    ...(category ? { category } : {}),
+    ...(category ? { category: { in: categoryFilterValues(category) } } : {}),
     ...(condition ? { condition } : {}),
     ...(availability === "in-stock" ? { AND: [productGenerallyAvailableWhere()] } : {}),
     ...(!invalidPriceRange && filters.minPrice ? { price: { gte: minPrice } } : {}),
