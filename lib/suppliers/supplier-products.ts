@@ -13,12 +13,14 @@ type Database = PrismaClient;
 function slugify(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0,70) || "supplier-product"; }
 function centsSafe(value: number | null) { return value != null && Number.isFinite(value) && value >= 0 ? value.toFixed(2) : null; }
 function semanticVariants(variants: Awaited<ReturnType<SupplierCatalogProvider["getProduct"]>>["variants"]) {
-  return variants.length > 0 && variants.every((variant)=>variant.optionValues?.length===2&&variant.optionValues[0].name==="Color"&&variant.optionValues[1].name==="Size") ? variants : null;
+  if(!variants.length||variants.some((variant)=>!variant.optionValues?.length))return null;
+  const names=variants[0].optionValues!.map((item)=>item.name);
+  return names.length>0&&new Set(names).size===names.length&&variants.every((variant)=>variant.optionValues!.length===names.length&&variant.optionValues!.every((item,index)=>item.name===names[index]))?variants:null;
 }
 
 async function createVariantStructure(tx: Prisma.TransactionClient, input:{productId:string;variants:Awaited<ReturnType<SupplierCatalogProvider["getProduct"]>>["variants"];connectionId:string;provider:"CJ";automaticPricing:ReturnType<typeof calculateSupplierSnapshotPrices>|null;imageBySource:Map<string,string>}) {
-  const semantic=semanticVariants(input.variants),valueIds=new Map<string,string>(),colorImages=new Map<string,string>();
-  const optionNames=semantic?["Color","Size"] as const:["Variant"] as const;
+  const semantic=semanticVariants(input.variants),valueIds=new Map<string,string>(),visualImages=new Map<string,string>();
+  const optionNames=semantic?semantic[0].optionValues!.map((item)=>item.name):["Variant"];
   const options=new Map<string,string>();
   for(const [position,name] of optionNames.entries())options.set(name,(await tx.productOption.create({data:{productId:input.productId,name,position}})).id);
   for(const [index,variant] of input.variants.entries()){
@@ -28,9 +30,9 @@ async function createVariantStructure(tx: Prisma.TransactionClient, input:{produ
     const variantPrice=input.automaticPricing?.variants.find((entry)=>entry.supplierVariantId===variant.supplierVariantId)?.calculation.finalSellingPrice??null;
     const created=await tx.productVariant.create({data:{productId:input.productId,combinationKey:`variant:${index}`,sku:null,priceOverride:variantPrice,stock:variant.stock,active:variant.available,supplierProvider:input.provider,supplierConnectionId:input.connectionId,supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,supplierLastSyncedAt:new Date()}});
     for(const optionValueId of linked)await tx.productVariantValue.create({data:{variantId:created.id,optionValueId}});
-    if(semantic&&variant.imageUrl){const colorId=linked[0],stored=input.imageBySource.get(variant.imageUrl);if(stored&&!colorImages.has(colorId))colorImages.set(colorId,stored);}
+    if(semantic&&variant.imageUrl){const visualIndex=variant.optionValues!.findIndex((item)=>item.visual);if(visualIndex>=0){const visualId=linked[visualIndex],stored=input.imageBySource.get(variant.imageUrl);if(stored&&!visualImages.has(visualId))visualImages.set(visualId,stored);}}
   }
-  return [...colorImages].map(([optionValueId,primaryUrl])=>({optionValueId,imageUrls:[primaryUrl],primaryUrl}));
+  return [...visualImages].map(([optionValueId,primaryUrl])=>({optionValueId,imageUrls:[primaryUrl],primaryUrl}));
 }
 
 async function uniqueSlug(db: Database, storeId: string, title: string) {
@@ -94,7 +96,8 @@ export async function syncSupplierProduct(db: Database, provider: SupplierCatalo
     const unavailable = !snapshot.available;
     const status = unavailable ? "UNAVAILABLE" : changed || current.syncStatus === "PRICE_CHANGED" ? "PRICE_CHANGED" : "HEALTHY";
     await db.$transaction(async (tx) => {
-      await tx.supplierProductLink.update({where:{id:current.id},data:{previousSupplierCost:changed?current.supplierCost:undefined,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:status,lastSyncedAt:new Date(),lastSyncError:null,sourceMetadata:snapshot.rawMetadata as Prisma.InputJsonValue}});
+      const previousMetadata=current.sourceMetadata&&typeof current.sourceMetadata==="object"&&!Array.isArray(current.sourceMetadata)?current.sourceMetadata as Record<string,unknown>:{};
+      await tx.supplierProductLink.update({where:{id:current.id},data:{previousSupplierCost:changed?current.supplierCost:undefined,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:status,lastSyncedAt:new Date(),lastSyncError:null,sourceMetadata:{...previousMetadata,...snapshot.rawMetadata} as Prisma.InputJsonValue}});
       await tx.product.update({where:{id:productId},data:{stock:unavailable?0:snapshot.stock}});
       for (const variant of snapshot.variants) await tx.productVariant.updateMany({where:{productId,supplierConnectionId:current.connectionId,supplierVariantId:variant.supplierVariantId},data:{supplierSku:variant.sku,supplierCost:centsSafe(variant.cost),supplierStock:variant.stock,supplierAvailable:variant.available,stock:variant.stock,active:variant.available,supplierLastSyncedAt:new Date()}});
       const currentOptions=current.product.options??[],currentVariants=current.product.variants??[];
@@ -104,11 +107,12 @@ export async function syncSupplierProduct(db: Database, provider: SupplierCatalo
         await tx.productVariantValue.deleteMany({where:{variant:{productId}}});
         await tx.productOption.deleteMany({where:{productId}});
         const optionIds=new Map<string,string>(),valueIds=new Map<string,string>();
-        for(const [position,name] of (["Color","Size"] as const).entries())optionIds.set(name,(await tx.productOption.create({data:{productId,name,position}})).id);
+        const optionNames=semantic[0].optionValues!.map((item)=>item.name);
+        for(const [position,name] of optionNames.entries())optionIds.set(name,(await tx.productOption.create({data:{productId,name,position}})).id);
         const imageBySource=new Map((current.product.media??[]).flatMap((media)=>media.sourceUrl?[[media.sourceUrl,media.url] as const]:[]));
         const productImages=await tx.productImage.findMany({where:{productId},select:{id:true,url:true}}),productImageByUrl=new Map(productImages.map((image)=>[image.url,image.id]));
-        const assignedColors=new Set<string>();
-        for(const variant of semantic){const canonical=currentVariants.find((item)=>item.supplierVariantId===variant.supplierVariantId)!;for(const item of variant.optionValues!){const key=`${item.name}\0${item.value.toLocaleLowerCase()}`;let valueId=valueIds.get(key);if(!valueId){const position=[...valueIds.keys()].filter((candidate)=>candidate.startsWith(`${item.name}\0`)).length;valueId=(await tx.productOptionValue.create({data:{optionId:optionIds.get(item.name)!,value:item.value.slice(0,100),position}})).id;valueIds.set(key,valueId);}await tx.productVariantValue.create({data:{variantId:canonical.id,optionValueId:valueId}});if(item.name==="Color"&&!assignedColors.has(valueId)&&variant.imageUrl){const url=imageBySource.get(variant.imageUrl),imageId=url?productImageByUrl.get(url):undefined;if(imageId){await tx.productOptionValueImage.create({data:{optionValueId:valueId,imageId,position:0,isPrimary:true}});assignedColors.add(valueId);}}}}
+        const assignedVisuals=new Set<string>();
+        for(const variant of semantic){const canonical=currentVariants.find((item)=>item.supplierVariantId===variant.supplierVariantId)!;for(const item of variant.optionValues!){const key=`${item.name}\0${item.value.toLocaleLowerCase()}`;let valueId=valueIds.get(key);if(!valueId){const position=[...valueIds.keys()].filter((candidate)=>candidate.startsWith(`${item.name}\0`)).length;valueId=(await tx.productOptionValue.create({data:{optionId:optionIds.get(item.name)!,value:item.value.slice(0,100),position}})).id;valueIds.set(key,valueId);}await tx.productVariantValue.create({data:{variantId:canonical.id,optionValueId:valueId}});if(item.visual&&!assignedVisuals.has(valueId)&&variant.imageUrl){const url=imageBySource.get(variant.imageUrl),imageId=url?productImageByUrl.get(url):undefined;if(imageId){await tx.productOptionValueImage.create({data:{optionValueId:valueId,imageId,position:0,isPrimary:true}});assignedVisuals.add(valueId);}}}}
       }
     });
     const reviewSync=provider.getProductReviews?await syncSupplierReviews(db,provider,{productId,supplierProductLinkId:current.id,supplierProductId:current.supplierProductId}):{status:"UNSUPPORTED" as const,synced:0,total:0};

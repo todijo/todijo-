@@ -1,5 +1,5 @@
 import type { SupplierCatalogProvider, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
-import { mapCjColorSizeVariants } from "./cj-variant-mapping";
+import { mapCjSemanticVariants } from "./cj-variant-mapping";
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
@@ -51,7 +51,8 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     const row = object(entry); const id = text(row.vid ?? row.variantId); const stock = inventoryByVariant.get(id) ?? Math.max(0, number(row.variantInventory ?? row.stock) ?? 0);
     return { supplierVariantId:id, sku:text(row.variantSku ?? row.sku) || null, title:text(row.variantKey ?? row.variantNameEn ?? row.variantName) || `Variant ${index + 1}`, cost:number(row.variantSellPrice ?? row.sellPrice), currency:"USD", stock, available:Boolean(id) && stock > 0, originCountryCodes:[...(originsByVariant.get(id)??[])], imageUrl:text(row.variantImage ?? row.variantImageUrl ?? row.image) || null, variantKey:text(row.variantKey)||null, variantName:text(row.variantNameEn??row.variantName)||null };
   }).filter((variant) => variant.supplierVariantId);
-  const variants = mapCjColorSizeVariants({productTitle:text(product.productNameEn??product.productName),productKeyEn:product.productKeyEn,productKeySet:product.productKeySet,variants:parsedVariants}) ?? parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,sku:variant.sku,title:variant.title,cost:variant.cost,currency:variant.currency,stock:variant.stock,available:variant.available,originCountryCodes:variant.originCountryCodes,imageUrl:variant.imageUrl}));
+  const semantic = mapCjSemanticVariants({productTitle:text(product.productNameEn??product.productName),productKeyEn:product.productKeyEn,productKeySet:product.productKeySet,variants:parsedVariants});
+  const variants = semantic?.variants ?? parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,sku:variant.sku,title:variant.title,cost:variant.cost,currency:variant.currency,stock:variant.stock,available:variant.available,originCountryCodes:variant.originCountryCodes,imageUrl:variant.imageUrl}));
   const imageUrls = normalizeCjProductImages(product);
   for (const variant of variants) if (variant.imageUrl && isValidProductImageUrl(variant.imageUrl) && !imageUrls.includes(variant.imageUrl) && imageUrls.length < MAX_PRODUCT_IMAGES) imageUrls.push(variant.imageUrl);
   const videoUrl = text(product.productVideo ?? product.videoUrl);
@@ -70,7 +71,7 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     available:text(product.saleStatus) !== "0" && (variants.length ? variants.some((variant) => variant.available) : stock > 0),
     weightGrams:number(product.productWeight), variants,
     media:[...imageUrls.map((url) => ({type:"IMAGE" as const,url})), ...(videoUrl ? [{type:"VIDEO" as const,url:videoUrl}] : [])],
-    rawMetadata:{ categoryId:product.categoryId ?? null, productType:product.productType ?? null, deliveryCycle:product.deliveryCycle ?? null },
+    rawMetadata:{categoryId:product.categoryId??null,productType:product.productType??null,deliveryCycle:product.deliveryCycle??null,cjOptionNormalization:{version:1,status:semantic?"SEMANTIC":"AMBIGUOUS",reason:semantic?null:"AUTHORITATIVE_DIMENSIONS_OR_VARIANT_KEYS_INSUFFICIENT",source:semantic?.source??null,dimensions:semantic?.dimensions??null,productKeyEn:typeof product.productKeyEn==="string"?product.productKeyEn.slice(0,500):null,productKeySet:list(product.productKeySet).slice(0,20).map((value)=>{if(typeof value==="string")return value.slice(0,100);const row=object(value);return{keyEn:text(row.keyEn).slice(0,100)||null,nameEn:text(row.nameEn).slice(0,100)||null,key:text(row.key).slice(0,100)||null,name:text(row.name).slice(0,100)||null};}),variants:parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,variantKey:variant.variantKey,variantName:variant.variantName,optionValues:semantic?.variants.find((item)=>item.supplierVariantId===variant.supplierVariantId)?.optionValues??null,imageUrl:variant.imageUrl})).slice(0,200)}},
   };
 }
 

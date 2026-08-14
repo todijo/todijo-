@@ -1,5 +1,13 @@
 export type SupplierProviderId = "CJ";
 
+export type SupplierOptionValueSnapshot = {
+  name: string;
+  value: string;
+  sourceName?: string;
+  sourceValue?: string;
+  visual?: boolean;
+};
+
 export type SupplierVariantSnapshot = {
   supplierVariantId: string;
   sku: string | null;
@@ -10,7 +18,7 @@ export type SupplierVariantSnapshot = {
   available: boolean;
   originCountryCodes: string[];
   imageUrl?: string | null;
-  optionValues?: Array<{ name: "Color" | "Size"; value: string }>;
+  optionValues?: SupplierOptionValueSnapshot[];
 };
 
 export type SupplierProductReview = {

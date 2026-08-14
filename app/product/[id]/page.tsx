@@ -53,9 +53,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const [common, market, productText, detailText, compliance, categoryText, shippingText, resolvedParams, session, locale] = await Promise.all([
+  const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, resolvedParams, session, locale] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
-    getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"),
+    getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"), getTranslations("SellerControl"),
     params, readSession(), getLocale(),
   ]);
   const { id } = resolvedParams;
@@ -94,7 +94,7 @@ export default async function ProductPage({ params }: Props) {
   const dropshippingEligibility=resolveDropshippingEligibility({hasSupplierLink:Boolean(product.supplierLink),provider:product.supplierLink?.provider,ownerType:product.supplierLink?.ownerType,connectionStatus:product.supplierLink?.connection?.status,sellerDropshippingEnabled:product.supplierLink?.connection?.store?.dropshippingEnabled,sourceMetadata:product.supplierLink?.sourceMetadata});
   const requiresAuthoritativePrice=dropshippingEligibility.eligible&&requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata);
   const cachedSupplierProduct=product.supplierLink?.provider==="CJ"?readCjProductCache(product.supplierLink.supplierProductId):null,cachedSupplierVariants=new Map<string,SupplierVariantSnapshot>(cachedSupplierProduct?.variants.map(variant=>[variant.supplierVariantId,variant])??[]);
-  const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size"),model:detailText("genericModel")},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>{const supplier=variant.supplierVariantId?cachedSupplierVariants.get(variant.supplierVariantId):undefined;return{...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride),supplierTitle:supplier?.title,supplierImageUrl:supplier?.imageUrl,supplierOptionValues:supplier?.optionValues};})});
+  const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size"),model:detailText("genericModel"),semantic:{Material:sellerControlText("optionPresets.material"),Style:sellerControlText("optionPresets.style"),Capacity:sellerControlText("optionPresets.capacity"),Storage:sellerControlText("optionPresets.storage")}},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>{const supplier=variant.supplierVariantId?cachedSupplierVariants.get(variant.supplierVariantId):undefined;return{...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride),supplierTitle:supplier?.title,supplierImageUrl:supplier?.imageUrl,supplierOptionValues:supplier?.optionValues};})});
   return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name} media={product.media}/></div>

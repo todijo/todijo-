@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CjCatalogProvider } from "../lib/suppliers/cj-client";
-import { mapCjColorSizeVariants } from "../lib/suppliers/cj-variant-mapping";
+import { CjCatalogProvider, normalizeCjProduct } from "../lib/suppliers/cj-client";
+import { mapCjColorSizeVariants, mapCjSemanticVariants } from "../lib/suppliers/cj-variant-mapping";
 import { syncSupplierReviews } from "../lib/suppliers/supplier-reviews";
 import { importSupplierProduct, syncSupplierProduct } from "../lib/suppliers/supplier-products";
 import { buyerVariantPresentation, type BuyerOption, type BuyerVariant } from "../lib/product-option-display";
@@ -70,6 +70,13 @@ test("flattened existing product repair preserves canonical variants and is a se
   await syncSupplierProduct(db,provider,"product");assert.equal(options.length,2);assert.equal(associations.length,6);assert.equal(deleteRuns,1);assert.deepEqual(canonical,original);
 });
 
+test("flattened repair fails closed for supplier identity mismatch and ambiguous option evidence",async()=>{
+  const semantic=mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Color-Size",productKeySet:null,variants:referenceVariants().slice(0,2).map((variant,index)=>({...variant,variantKey:`Black-${index?"M":"S"}`}))})!;
+  async function run(snapshotVariants:any[],canonicalIds:Array<string|null>){let optionDeletes=0,valueDeletes=0;const current={id:"link",provider:"CJ",connectionId:"platform-cj",supplierProductId:"PID",supplierCost:null,sourceMetadata:{pricing:{mode:"AUTOMATIC"}},syncStatus:"HEALTHY",product:{id:"product",price:{toString:()=>"20.00"},images:[],options:[{id:"legacy",name:"Variant",values:[{id:"old"}]}],variants:canonicalIds.map((supplierVariantId,index)=>({id:`canonical-${index}`,supplierVariantId})),media:[]}};const tx:any={supplierProductLink:{update:async()=>({})},product:{update:async()=>({})},productVariant:{updateMany:async()=>({count:1})},productVariantValue:{deleteMany:async()=>{valueDeletes++;}},productOption:{deleteMany:async()=>{optionDeletes++;}}};const db:any={supplierProductLink:{findUnique:async()=>current,update:async()=>({})},$transaction:async(callback:any)=>callback(tx)};await syncSupplierProduct(db,{id:"CJ",getProduct:async()=>({provider:"CJ",supplierProductId:"PID",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:8,currency:"USD",stock:2,available:true,weightGrams:null,media:[],rawMetadata:{cjOptionNormalization:{status:snapshotVariants.every((variant)=>variant.optionValues)?"SEMANTIC":"AMBIGUOUS"}},variants:snapshotVariants})} as any,"product");return{optionDeletes,valueDeletes};}
+  assert.deepEqual(await run(semantic,[semantic[0].supplierVariantId,"DIFFERENT-ID"]),{optionDeletes:0,valueDeletes:0});
+  const ambiguous=semantic.map((variant)=>({...variant,optionValues:undefined}));assert.deepEqual(await run(ambiguous,ambiguous.map((variant)=>variant.supplierVariantId)),{optionDeletes:0,valueDeletes:0});
+});
+
 test("review failure does not break the real product import path",async()=>{
   let reviewState:any;const tx:any={product:{create:async()=>({id:"product"})}};const snapshot:any={provider:"CJ",supplierProductId:"PID",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:8,currency:"EUR",stock:1,available:true,weightGrams:null,media:[],rawMetadata:{},variants:[]};
   const db:any={supplierConnection:{findFirst:async()=>({id:"platform-cj"})},supplierProductLink:{findUnique:async({where}:any)=>where.productId?{id:"link"}:null,update:async({data}:any)=>{reviewState=data;}},product:{findUnique:async()=>null},supplierReview:{},$transaction:async(callback:any)=>callback(tx)};
@@ -80,7 +87,35 @@ test("review failure does not break the real product import path",async()=>{
 test("CJ size aliases normalize and ambiguous metadata fails closed",()=>{
   const variants=referenceVariants().slice(0,1);for(const [input,expected] of [["S","S"],["M","M"],["L","L"],["XL","XL"],["2XL","2XL"],["3XL","3XL"],["XXL","2XL"],["XXXL","3XL"]]){const value={...variants[0],variantKey:`Blue-${input}`,imageUrl:"https://images.test/blue.jpg"};assert.equal(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Color-Size",productKeySet:null,variants:[value]})![0].optionValues![1].value,expected);}
   assert.ok(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Variant",productKeySet:null,variants}));assert.equal(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Color-Size",productKeySet:null,variants:[{...variants[0],variantKey:"ambiguous"}]}),null);
-  const reversed={...variants[0],variantKey:"XL-Black",imageUrl:"https://images.test/black.jpg"},mapped=mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Size-Color",productKeySet:null,variants:[reversed]})!;assert.deepEqual(mapped[0].optionValues,[{name:"Color",value:"Black"},{name:"Size",value:"XL"}]);
+  const reversed={...variants[0],variantKey:"XL-Black",imageUrl:"https://images.test/black.jpg"},mapped=mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Size-Color",productKeySet:null,variants:[reversed]})!;assert.deepEqual(mapped[0].optionValues?.map(({name,value})=>({name,value})),[{name:"Size",value:"XL"},{name:"Color",value:"Black"}]);
+});
+
+test("supplier-declared Model and Size dimensions deduplicate values without collapsing canonical combinations",()=>{
+  const variants=["Black-S","Black-M","Black 240g-S","Black 240g-M"].map((variantKey,index)=>({...referenceVariants()[index],supplierVariantId:`model-${index}`,variantKey,imageUrl:index<2?"https://images.test/black.jpg":"https://images.test/black-240.jpg"}));
+  const mapping=mapCjSemanticVariants({productTitle:"Cotton shirt",productKeyEn:"Model-Size",productKeySet:null,variants})!;
+  assert.deepEqual(mapping.dimensions.map((dimension)=>dimension.name),["Model","Size"]);
+  assert.equal(new Set(mapping.variants.map((variant)=>variant.optionValues![0].value)).size,2);
+  assert.equal(new Set(mapping.variants.map((variant)=>variant.optionValues![1].value)).size,2);
+  assert.equal(new Set(mapping.variants.map((variant)=>variant.optionValues!.map((value)=>value.value).join("/"))).size,4);
+  assert.deepEqual(mapping.variants.map((variant)=>variant.supplierVariantId),variants.map((variant)=>variant.supplierVariantId));
+});
+
+test("one-dimensional and other declared dimensions are preserved while unsupported ambiguity fails closed",()=>{
+  const base=referenceVariants()[0];
+  const one=mapCjSemanticVariants({productTitle:"Bottle",productKeyEn:"Capacity",productKeySet:null,variants:[{...base,variantKey:"500 ml"},{...base,supplierVariantId:"capacity-2",variantKey:"1 litre"}]})!;
+  assert.deepEqual(one.dimensions.map((dimension)=>dimension.name),["Capacity"]);assert.deepEqual(one.variants.map((variant)=>variant.optionValues![0].value),["500 ml","1 litre"]);
+  const other=mapCjSemanticVariants({productTitle:"Bag",productKeyEn:"Material-Style",productKeySet:null,variants:[{...base,variantKey:"Cotton-Casual"}]})!;
+  assert.deepEqual(other.dimensions.map((dimension)=>dimension.name),["Material","Style"]);
+  assert.equal(mapCjSemanticVariants({productTitle:"Unknown",productKeyEn:null,productKeySet:null,variants:[base]}),null);
+  assert.equal(mapCjSemanticVariants({productTitle:"Broken",productKeyEn:"Model-Size",productKeySet:null,variants:[{...base,variantKey:"Black"}]}),null);
+});
+
+test("CJ normalization retains bounded authoritative option evidence for future repair",()=>{
+  const snapshot=normalizeCjProduct({pid:"PID",productSku:"SPU",productNameEn:"Shirt",productKeyEn:"Model-Size",productKeySet:[{keyEn:"Model"},{keyEn:"Size"}],saleStatus:"1"},{list:[{vid:"V-S",variantSku:"SKU-S",variantKey:"Black-S",variantNameEn:"Black S",variantSellPrice:8,variantInventory:2,variantImage:"https://images.test/black.jpg"},{vid:"V-M",variantSku:"SKU-M",variantKey:"Black-M",variantNameEn:"Black M",variantSellPrice:9,variantInventory:2,variantImage:"https://images.test/black.jpg"}]},{});
+  const evidence=snapshot.rawMetadata.cjOptionNormalization as any;
+  assert.equal(evidence.version,1);assert.equal(evidence.status,"SEMANTIC");assert.equal(evidence.source,"productKeyEn");assert.deepEqual(evidence.dimensions.map((dimension:any)=>dimension.name),["Model","Size"]);
+  assert.deepEqual(evidence.variants.map((variant:any)=>variant.supplierVariantId),["V-S","V-M"]);assert.equal(evidence.variants[0].optionValues[0].sourceValue,"Black");
+  assert.equal(JSON.stringify(evidence).includes("supplierCost"),false);
 });
 
 test("structured supplier presentation localizes labels, preserves IDs, and keeps missing combinations absent",()=>{
