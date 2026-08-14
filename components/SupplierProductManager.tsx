@@ -12,6 +12,7 @@ type PricingResponse={error?:string;warning?:string;variants?:FreightVariant[];s
 export default function SupplierProductManager({products}:{products:ManagedSupplierProduct[]}){
  const t=useTranslations("Supplier"),router=useRouter();
  const [working,setWorking]=useState(false),[message,setMessage]=useState(""),[manual,setManual]=useState(false),[pricing,setPricing]=useState<PricingPreview|null>(null),[variants,setVariants]=useState<FreightVariant[]>([]),[currencies,setCurrencies]=useState<string[]>([]);
+ const [bulkIds,setBulkIds]=useState(""),[bulkCategory,setBulkCategory]=useState(""),[bulkProgress,setBulkProgress]=useState<{done:number;total:number;imported:number;skipped:number;failed:number}|null>(null);
  function pricingError(code?:string){return code==="PRICING_CURRENCY_CONVERSION_REQUIRED"?t("currencyConversionRequired"):code??"SUPPLIER_PRICING_FAILED";}
  async function preview(form:HTMLFormElement){
   const data=new FormData(form),identifier=String(data.get("supplierProductId")??"").trim();if(!identifier)return;
@@ -24,8 +25,28 @@ export default function SupplierProductManager({products}:{products:ManagedSuppl
  }
  async function importProduct(event:FormEvent<HTMLFormElement>){event.preventDefault();setWorking(true);setMessage("");const form=new FormData(event.currentTarget);const response=await fetch("/api/supplier/cj/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({supplierProductId:form.get("supplierProductId"),pricingMode:manual?"MANUAL":"AUTOMATIC",sellingPrice:manual?form.get("sellingPrice"):null,category:form.get("category")})});const data=await response.json() as {error?:string};setWorking(false);setMessage(response.ok?t("imported"):data.error==="SUPPLIER_NOT_CONFIGURED"?t("notConfigured"):pricingError(data.error));if(response.ok){event.currentTarget.reset();setManual(false);setPricing(null);setVariants([]);router.refresh();}}
  async function sync(productId:string){setWorking(true);setMessage("");const response=await fetch(`/api/supplier/products/${productId}/sync`,{method:"POST"});const data=await response.json() as {error?:string};setWorking(false);setMessage(response.ok?"OK":data.error??"SUPPLIER_SYNC_FAILED");if(response.ok)router.refresh();}
+ async function bulkImport(){
+  const category=bulkCategory.trim();if(!bulkIds.trim()||!category)return;
+  setWorking(true);setMessage("");setBulkProgress(null);
+  try{
+   const response=await fetch("/api/admin/supplier-products/bulk-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identifiers:bulkIds,category})});
+   const data=await response.json() as {error?:string;total?:number;imported?:number;alreadyImported?:number;invalid?:number;failed?:number};
+   if(!response.ok){setMessage(data.error??"SUPPLIER_BULK_IMPORT_FAILED");return;}
+   const total=data.total??0,imported=data.imported??0,skipped=data.alreadyImported??0,failed=(data.invalid??0)+(data.failed??0);
+   setBulkProgress({done:total,total,imported,skipped,failed});setMessage(`${t("bulkComplete")}: ${imported} ${t("bulkImported")}, ${skipped} ${t("bulkSkipped")}, ${failed} ${t("bulkFailed")}`);router.refresh();
+  }catch{setMessage("SUPPLIER_BULK_IMPORT_FAILED");}finally{setWorking(false);}
+ }
+ async function syncAll(){setWorking(true);setMessage("");const response=await fetch("/api/admin/supplier-products/sync-stale",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({limit:20,staleMinutes:1})});const data=await response.json() as {error?:string;synced?:number;failed?:number};setWorking(false);setMessage(response.ok?`${t("syncComplete")}: ${data.synced??0} ${t("synced")}, ${data.failed??0} ${t("bulkFailed")}`:data.error??"SUPPLIER_SYNC_FAILED");if(response.ok)router.refresh();}
  return <section className="sellerControlSection supplierManager">
   <div className="sellerControlSectionHeading"><div><h2>{t("title")}</h2><p>{t("help")}</p></div></div>
+  <div className="supplierBulkImport" aria-labelledby="supplier-bulk-title">
+   <div className="sellerControlSectionHeading"><div><h3 id="supplier-bulk-title">{t("bulkTitle")}</h3><p>{t("bulkHelp")}</p></div><button type="button" className="sellerControlButton secondary" disabled={working} onClick={()=>void syncAll()}>{t("syncAll")}</button></div>
+   <label>{t("bulkProductIds")}<textarea value={bulkIds} onChange={(event)=>setBulkIds(event.target.value)} rows={6} maxLength={20000} placeholder={t("bulkPlaceholder")}/></label>
+   <label>{t("category")}<input value={bulkCategory} onChange={(event)=>setBulkCategory(event.target.value)} maxLength={80}/></label>
+   <button type="button" className="sellerControlButton primary" disabled={working||!bulkIds.trim()||!bulkCategory.trim()} onClick={()=>void bulkImport()}>{working&&bulkProgress?t("working"):t("bulkImportAction")}</button>
+   {bulkProgress&&<div className="supplierBulkProgress" role="status"><progress max={bulkProgress.total} value={bulkProgress.done}/><span>{bulkProgress.done}/{bulkProgress.total} · {bulkProgress.imported} {t("bulkImported")} · {bulkProgress.skipped} {t("bulkSkipped")} · {bulkProgress.failed} {t("bulkFailed")}</span></div>}
+   <p className="supplierBulkSafety">{t("bulkSafety")}</p>
+  </div>
   <form className="supplierImportForm supplierPricingForm" onSubmit={importProduct}>
    <label>{t("productId")}<input name="supplierProductId" required maxLength={200}/></label><label>{t("category")}<input name="category" required maxLength={80}/></label>
    <div className="supplierAutomaticPricing"><strong>{t("automaticPricing")}</strong><span>{t("targetMargin")}</span><span>{t("freightInputHelp")}</span></div>

@@ -10,6 +10,7 @@ import { dropshippingAccessMessages } from "./dropshipping-access";
 import {buyerPricingMessages} from "./buyer-pricing";
 import {buyerAddressMessages} from "./buyer-address";
 import {genericModelMessages} from "./generic-model";
+import {supplierBulkMessages} from "./supplier-bulk";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -42,7 +43,7 @@ export default getRequestConfig(async () => {
   messages.ContactMessage = (await import(`../messages/contact-message/${locale}.json`)).default;
   messages.ReportDialog = (await import(`../messages/report-dialog/${locale}.json`)).default;
   messages.Shipping = { ...(await import(`../messages/shipping/${locale}.json`)).default, ...(advancedShippingMessages[locale] ?? advancedShippingMessages.en), ...(shippingHotfixMessages[locale]??shippingHotfixMessages.en),changeAddress:locale==="fr"?"Modifier l’adresse":"Change address",addAddress:buyerAddressMessages[locale].addAddress };
-  messages.Supplier = { ...(supplierMessages[locale] ?? supplierMessages.en), ...supplierPricingMessages.en, ...(supplierPricingMessages[locale] ?? {}), ...(dropshippingAccessMessages[locale] ?? dropshippingAccessMessages.en) };
+  messages.Supplier = { ...(supplierMessages[locale] ?? supplierMessages.en), ...supplierPricingMessages.en, ...(supplierPricingMessages[locale] ?? {}), ...(dropshippingAccessMessages[locale] ?? dropshippingAccessMessages.en), ...supplierBulkMessages.en, ...(supplierBulkMessages[locale] ?? {}) };
   messages.ProductVideo = productVideoMessages[locale] ?? productVideoMessages.en;
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
