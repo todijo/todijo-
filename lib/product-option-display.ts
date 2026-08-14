@@ -27,7 +27,7 @@ export function buyerVariantPresentation(input: { productName: string; supplierM
     const labels = new Map(values.map((value) => [value.id, value.value]));
     return { options: [{ ...original, name: modelName, values }], variants: input.variants.map((variant) => ({ ...variant, values: variant.values.map(({ optionValue }) => ({ optionValue: { ...optionValue, value: labels.get(optionValue.id) ?? modelName, option: { ...optionValue.option, name: modelName } } })) })) };
   }
-  const styleIdentity = (value:BuyerOption["values"][number]) => {const part=parts.get(value.id)!,supplierImage=supplierByValue.get(value.id)?.imageUrl;return part!.opaque&&supplierImage?`image:${supplierImage}`:`label:${part!.key.toLocaleLowerCase()}`;};
+  const styleIdentity = (value:BuyerOption["values"][number]) => `label:${parts.get(value.id)!.key.toLocaleLowerCase()}`;
   const keys = [...new Set(original.values.map(styleIdentity))];
   const sizes = [...new Set([...parts.values()].map((part) => part!.size))];
   const colorName=input.optionLabels?.color??"Color",sizeName=input.optionLabels?.size??"Size";

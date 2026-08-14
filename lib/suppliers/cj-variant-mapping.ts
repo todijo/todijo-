@@ -46,8 +46,8 @@ export function mapCjColorSizeVariants(input: {
     return parsed ? { ...variant, optionValues: [{ name: "Color" as const, value: parsed.color }, { name: "Size" as const, value: parsed.size }] } : null;
   });
   if (mapped.some((variant) => !variant)) return null;
-  const visualColors=new Map<string,string>();
-  for(const variant of mapped){const raw=variant!.optionValues![0].value;if(!OPAQUE_COLOR.test(raw))continue;if(!variant!.imageUrl)return null;const identity=variant!.imageUrl.trim();if(!visualColors.has(identity))visualColors.set(identity,`Color ${visualColors.size+1}`);variant!.optionValues![0].value=visualColors.get(identity)!;}
+  const opaqueColors=new Map<string,string>();
+  for(const variant of mapped){const raw=variant!.optionValues![0].value;if(!OPAQUE_COLOR.test(raw))continue;if(!variant!.imageUrl)return null;const identity=clean(raw).toLocaleLowerCase();if(!opaqueColors.has(identity))opaqueColors.set(identity,`Color ${opaqueColors.size+1}`);variant!.optionValues![0].value=opaqueColors.get(identity)!;}
   const combinations = mapped.map((variant) => variant!.optionValues!.map((value) => value.value.toLocaleLowerCase()).join("\0"));
   if (new Set(combinations).size !== combinations.length) return null;
   return mapped as SupplierVariantSnapshot[];

@@ -42,6 +42,14 @@ test("reference CJ matrix yields four visual colors, six sizes, and exactly 23 c
   const combinations=new Set(mapped.map((variant)=>variant.optionValues!.map((value)=>value.value).join("/")));assert.equal(combinations.has("Color 4/3XL"),false);
 });
 
+test("future CJ imports group opaque colors by supplier identity even when size images differ",()=>{
+  const variants=referenceVariants().slice(0,8).map((variant,index)=>({...variant,variantKey:`LC25224353${index<4?"P1":"P2"}-${["S","M","L","XL"][index%4]}`,imageUrl:`https://images.test/size-${index}.jpg`}));
+  const mapped=mapCjColorSizeVariants({productTitle:"New Pullover",productKeyEn:"Color-Size",productKeySet:null,variants})!;
+  assert.deepEqual([...new Set(mapped.map(variant=>variant.optionValues![0].value))],["Color 1","Color 2"]);
+  assert.deepEqual([...new Set(mapped.map(variant=>variant.optionValues![1].value))],["S","M","L","XL"]);
+  assert.equal(new Set(mapped.map(variant=>variant.optionValues!.map(value=>value.value).join("/"))).size,8);
+});
+
 test("real supplier import path persists the 4 color, 6 size, 23 variant matrix",async()=>{
   const variants=mapCjColorSizeVariants({productTitle:"New Pullover",productKeyEn:"Color-Size",productKeySet:null,variants:referenceVariants()})!,options:any[]=[],values:any[]=[],canonical:any[]=[],associations:any[]=[];let sequence=0;
   const tx:any={product:{create:async()=>({id:"product"})},productOption:{create:async({data}:any)=>{const row={id:`option-${++sequence}`,...data};options.push(row);return row;}},productOptionValue:{create:async({data}:any)=>{const row={id:`value-${++sequence}`,...data};values.push(row);return row;}},productVariant:{create:async({data}:any)=>{const row={id:`canonical-${++sequence}`,...data};canonical.push(row);return row;}},productVariantValue:{create:async({data}:any)=>{associations.push(data);return data;}}};

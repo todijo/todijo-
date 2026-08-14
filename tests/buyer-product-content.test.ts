@@ -59,6 +59,16 @@ test("CJ variant images group eight supplier variants into two styles and four s
   assert.equal(new Set(result.variants.map((variant)=>variant.id)).size,8);
 });
 
+test("opaque CJ colors remain deduplicated when every size has a different supplier image URL", () => {
+  const values:BuyerOption["values"]=[],variants:BuyerVariant[]=[];
+  for(const color of ["LC25224353P1","LC25224353P2"] as const)for(const size of ["S","M","L","XL"]){const id=`${color}-${size}`;values.push({id,value:`${productName} ${color} ${size}`,position:values.length});variants.push({id:`canonical-${id}`,stock:2,active:true,priceOverride:null,supplierTitle:`${color},${size}`,supplierImageUrl:`https://images.test/${color}-${size}.jpg`,values:[{optionValue:{id,value:`${color} ${size}`,option:{id:"legacy",name:"Variant",position:0}}}]});}
+  const result=buyerVariantPresentation({productName,supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille"},options:[{id:"legacy",name:"Variant",position:0,values}],variants});
+  assert.deepEqual(result.options.map(option=>[option.name,option.values.length]),[["Couleur",2],["Taille",4]]);
+  assert.deepEqual(result.options[0].values.map(value=>value.value),["Couleur 1","Couleur 2"]);
+  assert.deepEqual(result.options[0].values.map(value=>value.imageUrls?.[0]),["https://images.test/LC25224353P1-S.jpg","https://images.test/LC25224353P2-S.jpg"]);
+  assert.equal(result.variants.length,8);assert.equal(new Set(result.variants.map(variant=>variant.id)).size,8);
+});
+
 test("unstructured supplier variants never render visible sequential placeholders", () => {
   const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:[{id:"raw-a",value:"opaque-one",position:0},{id:"raw-b",value:"opaque-two",position:1}]}];
   const rawVariant=(id:string,valueId:string,image:string|null):BuyerVariant=>({id,stock:1,active:true,priceOverride:null,supplierImageUrl:image,values:[{optionValue:{id:valueId,value:valueId,option:{id:"legacy",name:"Variant",position:0}}}]});
