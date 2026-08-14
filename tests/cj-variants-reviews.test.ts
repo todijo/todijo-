@@ -118,6 +118,15 @@ test("CJ normalization retains bounded authoritative option evidence for future 
   assert.equal(JSON.stringify(evidence).includes("supplierCost"),false);
 });
 
+test("authoritative variant names preserve real supplier values while gallery-only images never manufacture options",()=>{
+  const base=referenceVariants()[0],variants=[{...base,supplierVariantId:"black-s",variantKey:"Black-S",variantName:"Black-S",imageUrl:"https://images.test/black.jpg"},{...base,supplierVariantId:"white-s",variantKey:null,variantName:"White-S",imageUrl:"https://images.test/white.jpg"}];
+  const mapping=mapCjSemanticVariants({productTitle:"Shirt",productKeyEn:"Color-Size",productKeySet:null,variants})!;
+  assert.deepEqual(mapping.variants.map((variant)=>variant.optionValues![0].value),["Black","White"]);assert.deepEqual(mapping.variants.map((variant)=>variant.supplierVariantId),["black-s","white-s"]);
+  const withoutWhite=mapCjSemanticVariants({productTitle:"Shirt",productKeyEn:"Color-Size",productKeySet:null,variants:[variants[0]]})!;
+  assert.deepEqual(withoutWhite.variants.map((variant)=>variant.optionValues![0].value),["Black"]);assert.equal(JSON.stringify(withoutWhite).includes("white.jpg"),false);
+  assert.equal(mapCjSemanticVariants({productTitle:"Shirt",productKeyEn:"Color-Size",productKeySet:null,variants:[{...variants[0],variantName:"White-S"}]}),null);
+});
+
 test("structured supplier presentation localizes labels, preserves IDs, and keeps missing combinations absent",()=>{
   const options:BuyerOption[]=[{id:"color",name:"Color",position:0,values:[{id:"pink",value:"Pink",position:0,imageUrls:["https://images.test/pink.jpg"]},{id:"green",value:"Green",position:1,imageUrls:["https://images.test/green.jpg"]}]},{id:"size",name:"Size",position:1,values:[{id:"s",value:"S",position:0},{id:"m",value:"M",position:1}]}];
   const variant=(id:string,color:string,size:string,price:number,stock:number):BuyerVariant=>({id,active:true,priceOverride:price,stock,values:[{optionValue:{id:color,value:color,option:{id:"color",name:"Color",position:0}}},{optionValue:{id:size,value:size,option:{id:"size",name:"Size",position:1}}}]});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback,useEffect,useMemo,useState } from "react";
+import { useCallback,useEffect,useLayoutEffect,useMemo,useState } from "react";
 import Image from "next/image";
 import AddToCartButton from "@/components/AddToCartButton";
 import type { CartProduct } from "@/components/CartProvider";
@@ -32,9 +32,9 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const selectedCurrency = dropshippingEligible&&activePricing?activePricing.buyerCurrency:product.currency;
   const stock = isVariantProduct ? selectedVariant?.stock ?? 0 : product.stock;
 
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("todijo:variant-price", { detail: { price: selectedPrice,currency:selectedCurrency,verified:!dropshippingEligible||Boolean(activePricing) } }));
-  }, [activePricing,dropshippingEligible,selectedCurrency,selectedPrice,selectedVariant?.id]);
+  useLayoutEffect(() => {
+    window.dispatchEvent(new CustomEvent("todijo:variant-price", { detail: activePricing||!requiresAuthoritativePrice?{price:selectedPrice,currency:selectedCurrency,verified:true}:{verified:false} }));
+  }, [activePricing,requiresAuthoritativePrice,selectedCurrency,selectedPrice,selectedVariant?.id]);
 
   useEffect(()=>{
     const selectedValues=genericOptions.flatMap((option)=>option.values.filter((value)=>selection[option.id]===value.id));

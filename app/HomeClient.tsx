@@ -109,7 +109,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
               {featuredProducts.map((product, index) => <a href={`/${activeLocale}/product/${product.id}`} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
                 <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
-                <span><small>{product.storeName}</small><strong>{product.name}</strong><b>{product.requiresAuthoritativePrice?<AuthoritativeProductCardPrice productId={product.id} fallbackPrice={Number(product.price)} fallbackCurrency={product.currency}/>:`${product.price} ${product.currency}`}</b></span>
+                <span><small>{product.storeName}</small><strong>{product.name}</strong><b>{product.requiresAuthoritativePrice?<AuthoritativeProductCardPrice productId={product.id}/>:`${product.price} ${product.currency}`}</b></span>
               </a>)}
             </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
               <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>
