@@ -10,7 +10,7 @@ import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-pr
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 40;
 
 const productSelect = {
   id: true, name: true, price: true, compareAtPrice: true, currency: true,

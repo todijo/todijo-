@@ -28,9 +28,9 @@ const categoryIcons: Record<string, string> = {
   phones: "📱", gaming: "🎮", books: "📚", services: "🧰", vehicles: "🚙",
 };
 
-function ProductRail({ id, title, products, soldOut, viewAll }: { id?: string; title: string; products: MarketplaceProduct[]; soldOut: string; viewAll: string }) {
+function ProductRail({ id, title, titleHref, products, soldOut }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string }) {
   if (!products.length) return null;
-  return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2>{title}</h2><a href="#products">{viewAll}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
+  return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2><a className="marketplaceRailTitleLink" href={titleHref}>{title}</a></h2></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
 }
 
 export default function HomeClient({ products, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters, resultsOnly = false }: {
@@ -59,6 +59,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), best:h("bestSellers"), low:m("low"), high:m("high"), reviews:dashboard("reviews"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const moreProductsLabel = activeLocale === "fr" ? "Voir plus de produits" : activeLocale === "ku" ? "کاڵای زیاتر ببینە" : "See more products";
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             <span className="badge">Todijo Marketplace</span>
             <h1>{t.title}</h1>
             <p>{t.subtitle}</p>
-            <div className="discoveryHeroActions"><a className="discoveryHeroCta" href="#products">{h("exploreProducts")}<ArrowRight size={18} aria-hidden="true"/></a><a className="discoveryHeroCta discoveryHeroSellerCta" href={`/${activeLocale}/register?role=seller`}>{h("sellerCta")}</a></div>
+            <div className="discoveryHeroActions"><a className="discoveryHeroCta" href="#products">{h("exploreProducts")}<ArrowRight size={18} aria-hidden="true"/></a><a className="discoveryHeroCta discoveryHeroSellerCta" href={`/${activeLocale}/sell`}>{h("sellerCta")}</a></div>
           </div>
           <div className="discoveryHeroVisual" aria-label={h("marketplaceVisual")}>
             {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
@@ -133,10 +134,10 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
       </section>}
 
       <div className="marketplaceDiscoverySections">
-        <ProductRail title={h("newArrivals")} products={newArrivals} soldOut={t.soldOut} viewAll={h("viewAll")}/>
+        <ProductRail title={h("newArrivals")} titleHref={`/${activeLocale}#products`} products={newArrivals} soldOut={t.soldOut}/>
+        <ProductRail id="best-sellers" title={h("bestSellers")} titleHref={`/${activeLocale}/best-sellers`} products={bestSellers} soldOut={t.soldOut}/>
         <aside className="container discoveryPromoBanner"><div><span>{d("discoverLabel")}</span><h2>{d("discoverTitle")}</h2><p>{d("discoverText")}</p></div><a href={`/${activeLocale}/store`}>{d("storesTitle")}<ArrowRight size={17} aria-hidden="true"/></a><ShoppingBag size={82} aria-hidden="true"/></aside>
         {stores.length > 0 && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading"><div><span>{d("storesLabel")}</span><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></div></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={52} height={52} unoptimized/> : <span><Store size={24} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="90px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
-        <ProductRail id="best-sellers" title={h("bestSellers")} products={bestSellers} soldOut={t.soldOut} viewAll={h("viewAll")}/>
       </div>
 
       <section id="products" className="container discoveryLayout">
@@ -165,17 +166,17 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
             {products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
           </div>}
 
-          {totalPages > 1 && <nav className="pagination" aria-label={t.products}>
+          {totalPages > 1 && <nav className={`pagination${page === 1 ? " firstPagePagination" : ""}`} aria-label={t.products}>
             {page > 1 ? <a href={buildUrl(filters, page - 1)}>← {t.previous}</a> : <span />}
-            <strong>{page} / {totalPages}</strong>
-            {page < totalPages ? <a href={buildUrl(filters, page + 1)}>{t.next} →</a> : <span />}
+            {page > 1 ? <strong>{page} / {totalPages}</strong> : <span />}
+            {page < totalPages ? <a className={page === 1 ? "moreProductsLink" : undefined} href={buildUrl(filters, page + 1)}>{page === 1 ? moreProductsLabel : t.next} →</a> : <span />}
           </nav>}
         </div>
       </section>
 
       <section className="container todijoTrust" aria-labelledby="todijo-trust-title"><div className="marketplaceRailHeading"><div><span>{d("trustLabel")}</span><h2 id="todijo-trust-title">{d("trustTitle")}</h2></div></div><div className="todijoTrustGrid"><article><LockKeyhole/><h3>{d("secureTitle")}</h3><p>{d("secureText")}</p></article><article><Store/><h3>{d("independentTitle")}</h3><p>{d("independentText")}</p></article><article><MessageCircle/><h3>{d("messagesTitle")}</h3><p>{d("messagesText")}</p></article><article><Languages/><h3>{d("languagesTitle")}</h3><p>{d("languagesText")}</p></article></div></section>
 
-      <section className="container sellerGrowthCta" aria-labelledby="seller-growth-title"><div><span>{d("sellerLabel")}</span><h2 id="seller-growth-title">{d("sellerTitle")}</h2><p>{d("sellerText")}</p></div><div><a className="sellerGrowthPrimary" href={`/${activeLocale}/register?role=seller`}>{d("sellerPrimary")}<ArrowRight size={17} aria-hidden="true"/></a><a className="sellerGrowthSecondary" href={`/${activeLocale}/dashboard`}>{d("sellerSecondary")}</a></div></section>
+      <section className="container sellerGrowthCta" aria-labelledby="seller-growth-title"><div><span>{d("sellerLabel")}</span><h2 id="seller-growth-title">{d("sellerTitle")}</h2><p>{d("sellerText")}</p></div><div><a className="sellerGrowthPrimary" href={`/${activeLocale}/sell`}>{d("sellerPrimary")}<ArrowRight size={17} aria-hidden="true"/></a><a className="sellerGrowthSecondary" href={`/${activeLocale}/store`}>{d("sellerSecondary")}</a></div></section>
 
       <MobileAppPromotion/>
       <MarketplaceFooter/>
