@@ -25,7 +25,6 @@ import { productStructuredData } from "@/lib/product-seo";
 import {resolveDropshippingEligibility} from "@/lib/suppliers/commerce-pricing";
 import { buyerVariantPresentation } from "@/lib/product-option-display";
 import ProductDescription from "@/components/ProductDescription";
-import {CjCatalogProvider} from "@/lib/suppliers/cj-client";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
 
@@ -72,7 +71,7 @@ export default async function ProductPage({ params }: Props) {
           imageAssignments: { orderBy: { position: "asc" }, select: { image: { select: { url: true } } } },
         } },
       } },
-      variants: { where: buyerVisibleVariantWhere(), orderBy:{createdAt:"asc"}, select: { id: true, stock: true, active: true, priceOverride: true, supplierVariantId:true, values: { select: { optionValue: { select: { id: true, value: true, option: { select: { id: true, name: true, position: true } } } } } } } },
+      variants: { where: buyerVisibleVariantWhere(), orderBy:{createdAt:"asc"}, select: { id: true, stock: true, active: true, priceOverride: true, supplierVariantId:true, supplierSku:true, values: { select: { optionValue: { select: { id: true, value: true, option: { select: { id: true, name: true, position: true } } } } } } } },
       supplierLink:{select:{provider:true,ownerType:true,supplierProductId:true,sourceMetadata:true,connection:{select:{status:true,store:{select:{dropshippingEnabled:true}}}}}},
       store: { select: { name: true, slug: true, city: true, country: true, sellerType: true, currency: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true } },
     },
@@ -92,9 +91,7 @@ export default async function ProductPage({ params }: Props) {
   const shippingRule=product.shippingOverrideEnabled?product:product.store;
   const dropshippingEligibility=resolveDropshippingEligibility({hasSupplierLink:Boolean(product.supplierLink),provider:product.supplierLink?.provider,ownerType:product.supplierLink?.ownerType,connectionStatus:product.supplierLink?.connection?.status,sellerDropshippingEnabled:product.supplierLink?.connection?.store?.dropshippingEnabled,sourceMetadata:product.supplierLink?.sourceMetadata});
   const requiresAuthoritativePrice=dropshippingEligibility.eligible&&requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata);
-  let liveSupplierVariants=new Map<string,{title:string;imageUrl:string|null}>();
-  if(product.supplierLink?.provider==="CJ"&&product.supplierLink.ownerType==="PLATFORM"&&product.options.some((option)=>option.values.some((value)=>!value.imageAssignments.length))){try{const snapshot=await new CjCatalogProvider().getProduct(product.supplierLink.supplierProductId);liveSupplierVariants=new Map(snapshot.variants.map((variant)=>[variant.supplierVariantId,{title:variant.title,imageUrl:variant.imageUrl??null}]));}catch{liveSupplierVariants=new Map();}}
-  const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size"),model:detailText("genericModel")},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>{const supplier=variant.supplierVariantId?liveSupplierVariants.get(variant.supplierVariantId):undefined;return{...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride),supplierTitle:supplier?.title??null,supplierImageUrl:supplier?.imageUrl??null};})});
+  const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size"),model:detailText("genericModel")},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>({...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
   return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name} media={product.media}/></div>

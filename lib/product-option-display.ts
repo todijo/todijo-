@@ -1,12 +1,12 @@
 export type BuyerOption = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
-export type BuyerVariant = { id: string; stock: number; active: boolean; priceOverride: number | null; supplierVariantId?: string | null; supplierTitle?: string | null; supplierImageUrl?: string | null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
+export type BuyerVariant = { id: string; stock: number; active: boolean; priceOverride: number | null; supplierVariantId?: string | null; supplierSku?: string | null; supplierTitle?: string | null; supplierImageUrl?: string | null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 
 const SIZE = /^(?:XXXS|XXS|XS|S|M|L|XL|XXL|2XL|XXXL|3XL|\d{1,3}(?:\.5)?|ONE\s*SIZE)$/i;
 const OPAQUE = /^(?:[A-Z]{1,5}\d{4,}[A-Z0-9-]*|[A-Z0-9]{8,})$/i;
 
 function legacyParts(productName: string, value: string) {
   let compact = value.trim();
-  if (compact.toLocaleLowerCase().startsWith(productName.trim().toLocaleLowerCase())) compact = compact.slice(productName.trim().length).trim();
+  if (compact.toLocaleLowerCase().startsWith(productName.trim().toLocaleLowerCase())) compact = compact.slice(productName.trim().length).replace(/^[-/,|\s]+/, "").trim();
   const match = compact.match(/^(.*?)(?:\s+|[-/,])((?:XXXS|XXS|XS|S|M|L|XL|XXL|2XL|XXXL|3XL|\d{1,3}(?:\.5)?|ONE\s*SIZE))$/i);
   if (!match || !SIZE.test(match[2])) return null;
   const key = match[1].replace(/[-/]+$/g, "").trim();
@@ -19,11 +19,11 @@ export function buyerVariantPresentation(input: { productName: string; supplierM
   if(input.supplierManaged&&ordered.length===2&&ordered[0].name==="Color"&&ordered[1].name==="Size"&&input.optionLabels){const names=new Map([[ordered[0].id,input.optionLabels.color],[ordered[1].id,input.optionLabels.size]]);return{options:ordered.map((option)=>({...option,name:names.get(option.id)!,values:option.name==="Color"?option.values.map((value)=>value.value.startsWith("Color ")&&value.imageUrls?.length?{...value,imageOnly:true,accessibleLabel:`${input.optionLabels!.color} ${value.value.slice(6)}`} : value):option.values})),variants:input.variants.map((variant)=>({...variant,values:variant.values.map(({optionValue})=>({optionValue:{...optionValue,option:{...optionValue.option,name:names.get(optionValue.option.id)??optionValue.option.name}}}))}))};}
   if (!input.supplierManaged || ordered.length !== 1 || ordered[0].name.toLowerCase() !== "variant") return { options: ordered, variants: input.variants };
   const original = ordered[0];
-  const supplierByValue = new Map(input.variants.flatMap((variant)=>variant.values.map(({optionValue})=>[optionValue.id,{title:variant.supplierTitle,imageUrl:variant.supplierImageUrl}] as const)));
-  const parts = new Map(original.values.map((value) => [value.id, legacyParts(input.productName, supplierByValue.get(value.id)?.title || value.value)]));
+  const supplierByValue = new Map(input.variants.flatMap((variant)=>variant.values.map(({optionValue})=>[optionValue.id,{title:variant.supplierTitle,sku:variant.supplierSku,imageUrl:variant.supplierImageUrl}] as const)));
+  const parts = new Map(original.values.map((value) => [value.id, [supplierByValue.get(value.id)?.title,supplierByValue.get(value.id)?.sku,value.value].flatMap((candidate)=>candidate?[legacyParts(input.productName,candidate)]:[]).find(Boolean)??null]));
   if ([...parts.values()].some((part) => !part)) {
     const modelName=input.optionLabels?.model??"Model";
-    const values = original.values.map((value,index) => ({ ...value, value: `${modelName} ${index+1}`, imageUrls:value.imageUrls?.length?value.imageUrls:supplierByValue.get(value.id)?.imageUrl?[supplierByValue.get(value.id)!.imageUrl!]:undefined, imageOnly: true, accessibleLabel: `${modelName} ${index+1}` }));
+    const values = original.values.map((value,index) => {const imageUrls=value.imageUrls?.length?value.imageUrls:supplierByValue.get(value.id)?.imageUrl?[supplierByValue.get(value.id)!.imageUrl!]:undefined;return{ ...value, value: `${modelName} ${index+1}`, imageUrls, imageOnly: Boolean(imageUrls?.length), accessibleLabel: `${modelName} ${index+1}` }});
     const labels = new Map(values.map((value) => [value.id, value.value]));
     return { options: [{ ...original, name: modelName, values }], variants: input.variants.map((variant) => ({ ...variant, values: variant.values.map(({ optionValue }) => ({ optionValue: { ...optionValue, value: labels.get(optionValue.id) ?? modelName, option: { ...optionValue.option, name: modelName } } })) })) };
   }

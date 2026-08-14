@@ -78,6 +78,20 @@ test("unstructured supplier variants never render visible sequential placeholder
   assert.ok(result.options[0].values.every((value)=>value.imageOnly));
 });
 
+test("persisted CJ supplier SKUs recover color and size without a live supplier request",()=>{
+  const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:["black-s","black-m","white-s"].map((id,position)=>({id,value:`Legacy ${position+1}`,position}))}];
+  const variants:BuyerVariant[]=[{id:"canonical-black-s",supplierSku:"Cotton-Black-S",stock:2,active:true,priceOverride:null,values:[{optionValue:{id:"black-s",value:"Legacy 1",option:{id:"legacy",name:"Variant",position:0}}}]},{id:"canonical-black-m",supplierSku:"Cotton-Black-M",stock:2,active:true,priceOverride:null,values:[{optionValue:{id:"black-m",value:"Legacy 2",option:{id:"legacy",name:"Variant",position:0}}}]},{id:"canonical-white-s",supplierSku:"Cotton-White-S",stock:2,active:true,priceOverride:null,values:[{optionValue:{id:"white-s",value:"Legacy 3",option:{id:"legacy",name:"Variant",position:0}}}]}];
+  const result=buyerVariantPresentation({productName:"Cotton",supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille / modèle"},options:rawOptions,variants});
+  assert.deepEqual(result.options.map(option=>[option.name,option.values.map(value=>value.value)]),[["Couleur",["Black","White"]],["Taille / modèle",["S","M"]]]);
+  assert.deepEqual(result.variants.map(variant=>variant.id),["canonical-black-s","canonical-black-m","canonical-white-s"]);
+});
+
+test("unstructured CJ fallback buttons always retain a visible model indication when no image exists",()=>{
+  const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:[{id:"raw-a",value:"opaque-one",position:0}]}];
+  const result=buyerVariantPresentation({productName:"Product",supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille",model:"Modèle"},options:rawOptions,variants:[{id:"a",stock:1,active:true,priceOverride:null,values:[{optionValue:{id:"raw-a",value:"opaque-one",option:{id:"legacy",name:"Variant",position:0}}}]}]});
+  assert.equal(result.options[0].values[0].value,"Modèle 1");assert.equal(result.options[0].values[0].imageOnly,false);
+});
+
 test("generic model label is dedicated and localized in all supported languages",()=>{
   assert.equal(Object.keys(genericModelMessages).length,14);assert.equal(genericModelMessages.fr,"Modèle");
   for(const [locale,label] of Object.entries(genericModelMessages))assert.ok(label.trim()&&label!=="Style"&&label!=="Variant",locale);
@@ -103,6 +117,7 @@ test("ordinary marketplace plain-text descriptions preserve their content", () =
 test("buyer content rendering has no unsanitized HTML path and remains mobile scoped", () => {
   const component = readFileSync("components/ProductDescription.tsx", "utf8"), page = readFileSync("app/product/[id]/page.tsx", "utf8"), css = readFileSync("app/globals.css", "utf8");
   assert.match(page, /buyerVariantPresentation/); assert.match(page, /<ProductDescription/);
+  assert.match(page,/supplierSku:true/);assert.doesNotMatch(page,/CjCatalogProvider|liveSupplierVariants|getProduct\(product\.supplierLink/);
   assert.doesNotMatch(component, /dangerouslySetInnerHTML/);
   assert.match(css, /@media\(max-width:760px\)[\s\S]+\.optionGroup>div[^}]*overflow-x:auto/);
   assert.match(css, /\.productDetailDescription>p/);
