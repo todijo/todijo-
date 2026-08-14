@@ -110,6 +110,25 @@ test("one-dimensional and other declared dimensions are preserved while unsuppor
   assert.equal(mapCjSemanticVariants({productTitle:"Broken",productKeyEn:"Model-Size",productKeySet:null,variants:[{...base,variantKey:"Black"}]}),null);
 });
 
+test("CJ option keys remain authoritative when verbose variant names disagree (Djellaba-shaped fixture)",()=>{
+  const base=referenceVariants()[0];
+  const rows=[
+    ["skin-m","Skin color-M","Djellaba Jelaba Femme Marocaine Skin color M"],
+    ["skin-l","Skin color-L","Djellaba Jelaba Femme Marocaine Skin color L"],
+    ["skin-xl","Skin color-XL","Djellaba Jelaba Femme Marocaine Skin color XL"],
+    ["skin-2xl","Skin color-2XL","Djellaba Jelaba Femme Marocaine Skin color 2XL"],
+    ["blue-m","Blue-M","Djellaba Jelaba Femme Marocaine Blue M"],
+    ["blue-l","Blue-L","Djellaba Jelaba Femme Marocaine Blue L"],
+    ["blue-xl","Blue-XL","Djellaba Jelaba Femme Marocaine Blue XL"],
+    ["blue-2xl","Blue-2XL","Djellaba Jelaba Femme Marocaine Blue 2XL"],
+  ] as const;
+  const mapping=mapCjSemanticVariants({productTitle:"Djellaba Jelaba Femme Marocaine",productKeyEn:"Color-Size",productKeySet:["Color","Size"],variants:rows.map(([id,key,name],index)=>({...base,supplierVariantId:id,sku:`SKU-${index}`,variantKey:key,variantName:name,imageUrl:key.startsWith("Blue")?"https://images.test/blue.jpg":"https://images.test/skin.jpg"}))})!;
+  assert.deepEqual(mapping.dimensions.map((dimension)=>dimension.name),["Color","Size"]);
+  assert.deepEqual([...new Set(mapping.variants.map((variant)=>variant.optionValues![0].value))],["Skin color","Blue"]);
+  assert.deepEqual([...new Set(mapping.variants.map((variant)=>variant.optionValues![1].value))],["M","L","XL","2XL"]);
+  assert.equal(mapping.variants.length,8);
+});
+
 test("CJ normalization retains bounded authoritative option evidence for future repair",()=>{
   const snapshot=normalizeCjProduct({pid:"PID",productSku:"SPU",productNameEn:"Shirt",productKeyEn:"Model-Size",productKeySet:[{keyEn:"Model"},{keyEn:"Size"}],saleStatus:"1"},{list:[{vid:"V-S",variantSku:"SKU-S",variantKey:"Black-S",variantNameEn:"Black S",variantSellPrice:8,variantInventory:2,variantImage:"https://images.test/black.jpg"},{vid:"V-M",variantSku:"SKU-M",variantKey:"Black-M",variantNameEn:"Black M",variantSellPrice:9,variantInventory:2,variantImage:"https://images.test/black.jpg"}]},{});
   const evidence=snapshot.rawMetadata.cjOptionNormalization as any;
@@ -124,7 +143,8 @@ test("authoritative variant names preserve real supplier values while gallery-on
   assert.deepEqual(mapping.variants.map((variant)=>variant.optionValues![0].value),["Black","White"]);assert.deepEqual(mapping.variants.map((variant)=>variant.supplierVariantId),["black-s","white-s"]);
   const withoutWhite=mapCjSemanticVariants({productTitle:"Shirt",productKeyEn:"Color-Size",productKeySet:null,variants:[variants[0]]})!;
   assert.deepEqual(withoutWhite.variants.map((variant)=>variant.optionValues![0].value),["Black"]);assert.equal(JSON.stringify(withoutWhite).includes("white.jpg"),false);
-  assert.equal(mapCjSemanticVariants({productTitle:"Shirt",productKeyEn:"Color-Size",productKeySet:null,variants:[{...variants[0],variantName:"White-S"}]}),null);
+  const keyWins=mapCjSemanticVariants({productTitle:"Shirt",productKeyEn:"Color-Size",productKeySet:null,variants:[{...variants[0],variantName:"Verbose supplier name White-S"}]});
+  assert.equal(keyWins?.variants[0].optionValues?.[0].value,"Black");
 });
 
 test("structured supplier presentation localizes labels, preserves IDs, and keeps missing combinations absent",()=>{

@@ -42,7 +42,21 @@ export function mapCjSemanticVariants(input: {
 }) : CjSemanticMapping|null {
   const declared=dimensions(input.productKeyEn,input.productKeySet);if(!input.variants.length||!declared)return null;
   const visualIndex=declared.names.findIndex((name)=>["Color","Model","Style"].includes(name));
-  const mapped=input.variants.map((variant)=>{const candidates=[variant.variantKey,variant.variantName].flatMap((value)=>value?.trim()?[value.trim()]:[]),parsed=candidates.map((value)=>splitCombination(value,declared.names)).filter((value):value is string[]=>Boolean(value));if(!parsed.length)return null;const identities=new Set(parsed.map((parts)=>parts.map((value)=>clean(value).toLocaleLowerCase()).join("\0")));if(identities.size!==1)return null;const parts=parsed[0],optionValues:SupplierOptionValueSnapshot[]=parts.map((raw,index)=>({name:declared.names[index],value:declared.names[index]==="Size"?size(raw)??raw:raw,sourceName:declared.raw[index],sourceValue:raw,visual:index===visualIndex}));return{...variant,optionValues};});
+  const mapped=input.variants.map((variant)=>{
+    // CJ documents `variantKey` as the actual option combination (for example
+    // `Black-XXL`) while `variantNameEn/variantName` is only the human-readable
+    // variant name. Prefer the authoritative option key whenever it can be
+    // parsed; use the name only as a compatibility fallback for products where
+    // CJ omits or malforms variantKey. Treating both as equal evidence caused
+    // valid products to collapse to the generic `Variant` option when a verbose
+    // variantName contained extra product text.
+    const keyParts=variant.variantKey?.trim()?splitCombination(variant.variantKey.trim(),declared.names):null;
+    const nameParts=!keyParts&&variant.variantName?.trim()?splitCombination(variant.variantName.trim(),declared.names):null;
+    const parts=keyParts??nameParts;
+    if(!parts)return null;
+    const optionValues:SupplierOptionValueSnapshot[]=parts.map((raw,index)=>({name:declared.names[index],value:declared.names[index]==="Size"?size(raw)??raw:raw,sourceName:declared.raw[index],sourceValue:raw,visual:index===visualIndex}));
+    return{...variant,optionValues};
+  });
   if(mapped.some((variant)=>!variant))return null;
   const opaqueColors=new Map<string,string>();
   for(const variant of mapped){const color=variant!.optionValues!.find((item)=>item.name==="Color");if(!color||!OPAQUE_COLOR.test(color.value))continue;if(!variant!.imageUrl)return null;const identity=clean(color.value).toLocaleLowerCase();if(!opaqueColors.has(identity))opaqueColors.set(identity,`Color ${opaqueColors.size+1}`);color.value=opaqueColors.get(identity)!;}
