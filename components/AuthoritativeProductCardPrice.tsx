@@ -18,7 +18,7 @@ function loadQuote(productId:string,destinationCountry:string){
   pendingQuotes.set(key,request);return request;
 }
 
-export default function AuthoritativeProductCardPrice({productId,className=""}:{productId:string;className?:string}){
+export default function AuthoritativeProductCardPrice({productId,fallbackPrice,fallbackCurrency,className=""}:{productId:string;fallbackPrice:number;fallbackCurrency:string;className?:string}){
   const locale=useLocale(),common=useTranslations("Common"),root=useRef<HTMLSpanElement>(null),[state,setState]=useState<State>({status:"idle",price:null});
   useEffect(()=>{
     const element=root.current;if(!element)return;
@@ -34,5 +34,6 @@ export default function AuthoritativeProductCardPrice({productId,className=""}:{
     observer.observe(element);
     return()=>{active=false;observer.disconnect()};
   },[productId]);
-  return <span ref={root} className={className} aria-live="polite">{state.status==="ready"?new Intl.NumberFormat(locale,{style:"currency",currency:state.currency}).format(state.price):state.status==="loading"?common("loading"):common("view")}</span>;
+  const displayPrice=state.status==="ready"?state.price:fallbackPrice,displayCurrency=state.status==="ready"?state.currency:fallbackCurrency;
+  return <span ref={root} className={className} aria-live="polite">{new Intl.NumberFormat(locale,{style:"currency",currency:displayCurrency}).format(displayPrice)}<span className="srOnly">{state.status==="loading"?common("loading"):""}</span></span>;
 }

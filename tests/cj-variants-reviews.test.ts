@@ -79,7 +79,8 @@ test("review failure does not break the real product import path",async()=>{
 
 test("CJ size aliases normalize and ambiguous metadata fails closed",()=>{
   const variants=referenceVariants().slice(0,1);for(const [input,expected] of [["S","S"],["M","M"],["L","L"],["XL","XL"],["2XL","2XL"],["3XL","3XL"],["XXL","2XL"],["XXXL","3XL"]]){const value={...variants[0],variantKey:`Blue-${input}`,imageUrl:"https://images.test/blue.jpg"};assert.equal(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Color-Size",productKeySet:null,variants:[value]})![0].optionValues![1].value,expected);}
-  assert.equal(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Variant",productKeySet:null,variants}),null);assert.equal(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Color-Size",productKeySet:null,variants:[{...variants[0],variantKey:"ambiguous"}]}),null);
+  assert.ok(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Variant",productKeySet:null,variants}));assert.equal(mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Color-Size",productKeySet:null,variants:[{...variants[0],variantKey:"ambiguous"}]}),null);
+  const reversed={...variants[0],variantKey:"XL-Black",imageUrl:"https://images.test/black.jpg"},mapped=mapCjColorSizeVariants({productTitle:"Product",productKeyEn:"Size-Color",productKeySet:null,variants:[reversed]})!;assert.deepEqual(mapped[0].optionValues,[{name:"Color",value:"Black"},{name:"Size",value:"XL"}]);
 });
 
 test("structured supplier presentation localizes labels, preserves IDs, and keeps missing combinations absent",()=>{

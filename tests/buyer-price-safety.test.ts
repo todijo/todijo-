@@ -22,6 +22,7 @@ test("all public product-card sources propagate the deferred-price safety marker
  assert.match(cardPrice,/readShoppingCountry\(window\.localStorage\)/);
  assert.match(cardPrice,/IntersectionObserver/);
  assert.match(cardPrice,/pendingQuotes/);
+ assert.match(cardPrice,/fallbackPrice/);assert.match(cardPrice,/displayPrice=state\.status==="ready"\?state\.price:fallbackPrice/);
  assert.match(action,/CHOOSE_OPTIONS"\|\|product\.requiresAuthoritativePrice/);
  assert.match(home,/requiresAuthoritativePrice\?<AuthoritativeProductCardPrice/);
  assert.doesNotMatch(card+home,/pricingUnavailable/);
@@ -29,7 +30,7 @@ test("all public product-card sources propagate the deferred-price safety marker
 
 test("product detail hides deferred values and invalidates price and cart eligibility until a matching quote",()=>{
  const price=source("app/product/[id]/ProductDetailPrice.tsx"),panel=source("components/ProductPurchasePanel.tsx"),live=source("components/DropshippingProductPricing.tsx");
- assert.match(price,/requiresVerifiedPricing&&!verified\?t\("pricingLoading"\)/);
+ assert.match(price,/Intl\.NumberFormat/);assert.doesNotMatch(price,/requiresVerifiedPricing&&!verified\?t\("pricingLoading"\)/);
  assert.match(panel,/verifiedPricing\.variantId===selectedVariant\?\.id&&verifiedPricing\.quantity===quantity/);
  assert.match(panel,/pricingReady=!requiresAuthoritativePrice\|\|Boolean\(activePricing\)/);
  assert.match(panel,/disabled=\{!available\|\|!pricingReady\}/);

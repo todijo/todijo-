@@ -26,6 +26,8 @@ import {resolveDropshippingEligibility} from "@/lib/suppliers/commerce-pricing";
 import { buyerVariantPresentation } from "@/lib/product-option-display";
 import ProductDescription from "@/components/ProductDescription";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
+import {readCjProductCache} from "@/lib/suppliers/cj-client";
+import type {SupplierVariantSnapshot} from "@/lib/suppliers/types";
 import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +93,8 @@ export default async function ProductPage({ params }: Props) {
   const shippingRule=product.shippingOverrideEnabled?product:product.store;
   const dropshippingEligibility=resolveDropshippingEligibility({hasSupplierLink:Boolean(product.supplierLink),provider:product.supplierLink?.provider,ownerType:product.supplierLink?.ownerType,connectionStatus:product.supplierLink?.connection?.status,sellerDropshippingEnabled:product.supplierLink?.connection?.store?.dropshippingEnabled,sourceMetadata:product.supplierLink?.sourceMetadata});
   const requiresAuthoritativePrice=dropshippingEligibility.eligible&&requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata);
-  const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size"),model:detailText("genericModel")},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>({...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
+  const cachedSupplierProduct=product.supplierLink?.provider==="CJ"?readCjProductCache(product.supplierLink.supplierProductId):null,cachedSupplierVariants=new Map<string,SupplierVariantSnapshot>(cachedSupplierProduct?.variants.map(variant=>[variant.supplierVariantId,variant])??[]);
+  const buyerVariants=buyerVariantPresentation({productName:product.name,supplierManaged:Boolean(product.supplierLink),optionLabels:{color:productText("color"),size:productText("size"),model:detailText("genericModel")},options:product.options.map((option)=>({...option,values:option.values.map((value)=>({...value,imageUrls:value.imageAssignments.map((assignment)=>assignment.image.url)}))})),variants:product.variants.map((variant)=>{const supplier=variant.supplierVariantId?cachedSupplierVariants.get(variant.supplierVariantId):undefined;return{...variant,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride),supplierTitle:supplier?.title,supplierImageUrl:supplier?.imageUrl,supplierOptionValues:supplier?.optionValues};})});
   return <main className="productDetailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}/><SiteHeader storeName={product.store.name} storeSlug={product.store.slug}/><section className="productDetailShell">
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name} media={product.media}/></div>
@@ -122,6 +125,6 @@ export default async function ProductPage({ params }: Props) {
       <ProductReportButton productId={product.id} loggedIn={Boolean(session)}/>
     </div>
   </section>
-  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?<AuthoritativeProductCardPrice productId={item.id}/>:`${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
+  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?<AuthoritativeProductCardPrice productId={item.id} fallbackPrice={Number(item.price)} fallbackCurrency={item.currency}/>:`${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }

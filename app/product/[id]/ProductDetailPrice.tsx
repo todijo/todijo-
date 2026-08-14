@@ -16,7 +16,7 @@ export default function ProductDetailPrice({ price, compareAtPrice, currency, re
 
   const discount = !requiresVerifiedPricing&&compareAtPrice && compareAtPrice > selectedPrice ? Math.round((1 - selectedPrice / compareAtPrice) * 100) : null;
   return <div className="productPriceRow" aria-live="polite">
-    <strong className="productDetailPrice">{requiresVerifiedPricing&&!verified?t("pricingLoading"):new Intl.NumberFormat(locale,{style:"currency",currency:selectedCurrency}).format(selectedPrice)}</strong>
+    <strong className="productDetailPrice">{new Intl.NumberFormat(locale,{style:"currency",currency:selectedCurrency}).format(selectedPrice)}{requiresVerifiedPricing&&!verified?<span className="srOnly">{t("pricingLoading")}</span>:null}</strong>
     {verified&&!requiresVerifiedPricing&&compareAtPrice && compareAtPrice > selectedPrice ? <del>{compareAtPrice.toFixed(2)} {currency}</del> : null}
     {verified&&discount ? <span>-{discount}%</span> : null}
   </div>;

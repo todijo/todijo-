@@ -86,6 +86,15 @@ test("persisted CJ supplier SKUs recover color and size without a live supplier 
   assert.deepEqual(result.variants.map(variant=>variant.id),["canonical-black-s","canonical-black-m","canonical-white-s"]);
 });
 
+test("normalized cached CJ option values restore image colors and sizes without changing canonical IDs",()=>{
+  const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:[{id:"old-a",value:"Variant 1",position:0},{id:"old-b",value:"Variant 2",position:1}]}];
+  const variants:BuyerVariant[]=[{id:"canonical-a",supplierVariantId:"supplier-a",supplierImageUrl:"https://images.test/pink.jpg",supplierOptionValues:[{name:"Color",value:"Pink"},{name:"Size",value:"S"}],stock:2,active:true,priceOverride:10,values:[{optionValue:{id:"old-a",value:"Variant 1",option:{id:"legacy",name:"Variant",position:0}}}]},{id:"canonical-b",supplierVariantId:"supplier-b",supplierImageUrl:"https://images.test/pink-m.jpg",supplierOptionValues:[{name:"Color",value:"Pink"},{name:"Size",value:"M"}],stock:3,active:true,priceOverride:11,values:[{optionValue:{id:"old-b",value:"Variant 2",option:{id:"legacy",name:"Variant",position:0}}}]}];
+  const result=buyerVariantPresentation({productName:"Product",supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille / modèle"},options:rawOptions,variants});
+  assert.deepEqual(result.options.map(option=>[option.name,option.values.map(value=>value.value)]),[["Couleur",["Pink"]],["Taille / modèle",["S","M"]]]);
+  assert.equal(result.options[0].values[0].imageUrls?.[0],"https://images.test/pink.jpg");assert.equal(result.options[0].values[0].imageOnly,true);
+  assert.deepEqual(result.variants.map(variant=>[variant.id,variant.priceOverride,variant.stock]),[["canonical-a",10,2],["canonical-b",11,3]]);
+});
+
 test("unstructured CJ fallback buttons always retain a visible model indication when no image exists",()=>{
   const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:[{id:"raw-a",value:"opaque-one",position:0}]}];
   const result=buyerVariantPresentation({productName:"Product",supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille",model:"Modèle"},options:rawOptions,variants:[{id:"a",stock:1,active:true,priceOverride:null,values:[{optionValue:{id:"raw-a",value:"opaque-one",option:{id:"legacy",name:"Variant",position:0}}}]}]});

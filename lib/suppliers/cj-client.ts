@@ -6,6 +6,11 @@ import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
 import { CjFreightError, countryCode, freightCacheKey, normalizeCjFreightMethods, readFreightCache, selectCjFreightMethod, writeFreightCache, type CjFreightQuote } from "./cj-freight";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
+const PRODUCT_CACHE_TTL_MS=5*60*1000;
+const cjCacheGlobal=globalThis as typeof globalThis&{__todijoCjProductCache?:Map<string,{expiresAt:number;value:SupplierProductSnapshot}>;__todijoCjPendingProducts?:Map<string,Promise<SupplierProductSnapshot>>};
+const productCache=cjCacheGlobal.__todijoCjProductCache??=new Map();
+const pendingProducts=cjCacheGlobal.__todijoCjPendingProducts??=new Map();
+export function readCjProductCache(identifier:string):SupplierProductSnapshot|null{const key=identifier.trim().toUpperCase(),entry=productCache.get(key);if(!entry||entry.expiresAt<=Date.now()){productCache.delete(key);return null;}return entry.value;}
 
 function text(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
 function identifier(value: unknown) { return typeof value === "string" || typeof value === "number" ? String(value).trim() : ""; }
@@ -112,9 +117,15 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
   }
   private get(operation:string,path:string,context:Record<string,string>={}){return this.request(operation,path,context);}
   async testConnection() { await this.get("test-connection","/setting/get"); }
-  async getProduct(supplierProductId: string) {
+  async getProduct(supplierProductId: string):Promise<SupplierProductSnapshot> {
     const identifier = supplierProductId.trim();
     if (!/^[A-Za-z0-9-]{4,200}$/.test(identifier)) throw new Error("CJ_PRODUCT_ID_INVALID");
+    if(this.options.fetcher)return this.loadProduct(identifier);
+    const key=identifier.toUpperCase(),cached=readCjProductCache(key);if(cached)return cached;
+    const pending=pendingProducts.get(key);if(pending)return pending;
+    const request=this.loadProduct(identifier).then(value=>{productCache.set(key,{expiresAt:Date.now()+PRODUCT_CACHE_TTL_MS,value});return value;}).finally(()=>pendingProducts.delete(key));pendingProducts.set(key,request);return request;
+  }
+  private async loadProduct(identifier:string):Promise<SupplierProductSnapshot> {
     const isSku = /^CJ[A-Za-z0-9-]+$/i.test(identifier);
     const context = { supplierProductIdentifier:identifier, identifierType:isSku?"productSku":"pid" };
     const query = isSku ? `productSku=${encodeURIComponent(identifier)}` : `pid=${encodeURIComponent(identifier)}`;
