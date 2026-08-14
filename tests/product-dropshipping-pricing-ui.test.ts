@@ -30,6 +30,7 @@ test("shopping-country values are normalized, restricted to ISO destinations and
 
 test("public estimate route validates destination and accepts no client financial override",()=>{
  const route=source("app/api/products/[id]/dropshipping-pricing/route.ts");assert.match(route,/normalizeShoppingCountry\(body\.destinationCountry\)/);assert.match(route,/INVALID_DESTINATION/);assert.doesNotMatch(route,/readSession|defaultBuyerAddress|body\.buyerCurrency/);assert.match(route,/buyerCurrency:undefined/);
+ assert.match(route,/productVariant\.findFirst/);assert.match(route,/active:true,stock:\{gt:0\},supplierVariantId:\{not:null\}/);assert.match(route,/orderBy:\[\{createdAt:"asc"\},\{id:"asc"\}\]/);
  const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/JSON\.stringify\(\{variantId:input\.variantId,quantity:input\.quantity,destinationCountry:input\.destinationCountry\}\)/);assert.doesNotMatch(ui,/supplierCost|freightTotal|includedCost|targetMargin|fxRate|buyerCurrency:/);
 });
 
@@ -50,8 +51,12 @@ test("buyer UI performs no money, freight, margin or FX calculation",()=>{
  const ui=source("components/DropshippingProductPricing.tsx");assert.doesNotMatch(ui,/supplierCost|freightTotal|includedCost|targetMargin|fxRate|OPEN_EXCHANGE_RATES|CJ_API_KEY/);assert.match(ui,/buyerUnitPrice/);assert.match(ui,/freeShipping/);assert.match(ui,/deliveryMinDays/);
 });
 
-test("free shipping, delivery, localized error and EUR formatting derive only from buyer-safe response",()=>{
- const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/state\.data\.freeShipping/);assert.match(ui,/shipping\("estimate"/);assert.match(ui,/pricingUnavailable/);assert.match(ui,/Intl\.NumberFormat/);assert.doesNotMatch(ui,/freeShipping:\s*true/);
+test("free shipping, delivery and EUR formatting derive only from buyer-safe response without exposing the unavailable-price sentence",()=>{
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/state\.data\.freeShipping/);assert.match(ui,/shipping\("estimate"/);assert.doesNotMatch(ui,/pricingUnavailable/);assert.match(ui,/Intl\.NumberFormat/);assert.doesNotMatch(ui,/freeShipping:\s*true/);
+});
+
+test("deferred-price buyer surfaces never render the temporary-unavailable translation",()=>{
+ for(const path of ["app/HomeClient.tsx","components/MarketplaceProductCard.tsx","components/DropshippingProductPricing.tsx","components/ProductPurchasePanel.tsx","app/product/[id]/ProductDetailPrice.tsx","app/product/[id]/page.tsx","app/cart/page.tsx"])assert.doesNotMatch(source(path),/pricingUnavailable/);
 });
 
 test("all 14 locales provide product pricing states and the scoped mobile path is present",()=>{

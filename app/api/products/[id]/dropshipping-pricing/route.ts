@@ -12,7 +12,10 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
  try{
   const {id}=await params,body=await request.json() as {variantId?:unknown;quantity?:unknown;destinationCountry?:unknown};
   const destinationCountry=normalizeShoppingCountry(body.destinationCountry);if(!destinationCountry)return NextResponse.json({error:"INVALID_DESTINATION"},{status:400});
-  const result=await resolveDropshippingPricing(prisma,{productId:id,variantId:String(body.variantId??""),quantity:Number(body.quantity),destinationCountry,buyerCurrency:undefined});
+  const requestedVariantId=typeof body.variantId==="string"?body.variantId.trim():"";
+  const defaultVariant=requestedVariantId?null:await prisma.productVariant.findFirst({where:{productId:id,active:true,stock:{gt:0},supplierVariantId:{not:null}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true}});
+  const variantId=requestedVariantId||defaultVariant?.id||"";
+  const result=await resolveDropshippingPricing(prisma,{productId:id,variantId,quantity:Number(body.quantity),destinationCountry,buyerCurrency:undefined});
   return NextResponse.json(buyerSafeDropshippingResult(result));
  }catch(error){
   const known=error instanceof DropshippingCommerceError||error instanceof CurrencyError||error instanceof FxError||error instanceof ShippingError||error instanceof CjFreightError||error instanceof SupplierPricingError;

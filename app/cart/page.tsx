@@ -52,7 +52,7 @@ export default function CartPage() {
                         {item.selectedOptions && <p className="cartOptions">{item.selectedOptions}</p>}
                         {item.freeShipping&&<p className="cartOptions">{shipping("freeLabel")}{item.deliveryMinDays!=null&&item.deliveryMaxDays!=null?` · ${shipping("estimate",{min:item.deliveryMinDays,max:item.deliveryMaxDays})}`:""}</p>}
                       </div>
-                      <strong>{item.requiresAuthoritativePrice&&!item.authoritativePrice?pricing("pricingUnavailable"):formatCurrency(item.price * item.quantity, item.currency, locale)}</strong>
+                      <strong>{item.requiresAuthoritativePrice&&!item.authoritativePrice?pricing("pricingLoading"):formatCurrency(item.price * item.quantity, item.currency, locale)}</strong>
                     </div>
                     <div className="cartItemBottom">
                       <div className="cartQuantity" aria-label={t("quantity", {name:item.name})}>

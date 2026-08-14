@@ -17,15 +17,19 @@ test("all public product-card sources propagate the deferred-price safety marker
  for(const path of ["app/page.tsx","app/api/products/route.ts","app/api/cart/recommendations/route.ts","app/store/[slug]/page.tsx","app/product/[id]/page.tsx"]){
   assert.match(source(path),/requiresAuthoritativeDropshippingPrice/);
  }
- const card=source("components/MarketplaceProductCard.tsx"),action=source("components/ProductCardAction.tsx"),home=source("app/HomeClient.tsx");
- assert.match(card,/requiresAuthoritativePrice\?[^:]+pricingUnavailable/);
+ const card=source("components/MarketplaceProductCard.tsx"),cardPrice=source("components/AuthoritativeProductCardPrice.tsx"),action=source("components/ProductCardAction.tsx"),home=source("app/HomeClient.tsx");
+ assert.match(card,/requiresAuthoritativePrice\?<strong><AuthoritativeProductCardPrice/);
+ assert.match(cardPrice,/readShoppingCountry\(window\.localStorage\)/);
+ assert.match(cardPrice,/IntersectionObserver/);
+ assert.match(cardPrice,/pendingQuotes/);
  assert.match(action,/CHOOSE_OPTIONS"\|\|product\.requiresAuthoritativePrice/);
- assert.match(home,/requiresAuthoritativePrice\?pricingText\("pricingUnavailable"\)/);
+ assert.match(home,/requiresAuthoritativePrice\?<AuthoritativeProductCardPrice/);
+ assert.doesNotMatch(card+home,/pricingUnavailable/);
 });
 
 test("product detail hides deferred values and invalidates price and cart eligibility until a matching quote",()=>{
  const price=source("app/product/[id]/ProductDetailPrice.tsx"),panel=source("components/ProductPurchasePanel.tsx"),live=source("components/DropshippingProductPricing.tsx");
- assert.match(price,/requiresVerifiedPricing&&!verified\?t\("pricingUnavailable"\)/);
+ assert.match(price,/requiresVerifiedPricing&&!verified\?t\("pricingLoading"\)/);
  assert.match(panel,/verifiedPricing\.variantId===selectedVariant\?\.id&&verifiedPricing\.quantity===quantity/);
  assert.match(panel,/pricingReady=!requiresAuthoritativePrice\|\|Boolean\(activePricing\)/);
  assert.match(panel,/disabled=\{!available\|\|!pricingReady\}/);
@@ -37,7 +41,7 @@ test("cart excludes unverified deferred lines and records authoritative server u
  const provider=source("components/CartProvider.tsx"),cart=source("app/cart/page.tsx");
  assert.match(provider,/requiresAuthoritativePrice&&!item\.authoritativePrice\?0:item\.price \* item\.quantity/);
  assert.match(provider,/authoritativePrice:true/);
- assert.match(cart,/requiresAuthoritativePrice&&!item\.authoritativePrice\?pricing\("pricingUnavailable"\)/);
+ assert.match(cart,/requiresAuthoritativePrice&&!item\.authoritativePrice\?pricing\("pricingLoading"\)/);
 });
 
 test("reference freight-inclusive prices replace rather than reuse deferred snapshots",()=>{

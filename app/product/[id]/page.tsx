@@ -27,6 +27,7 @@ import { buyerVariantPresentation } from "@/lib/product-option-display";
 import ProductDescription from "@/components/ProductDescription";
 import {CjCatalogProvider} from "@/lib/suppliers/cj-client";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
+import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -124,6 +125,6 @@ export default async function ProductPage({ params }: Props) {
       <ProductReportButton productId={product.id} loggedIn={Boolean(session)}/>
     </div>
   </section>
-  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?detailText("pricingUnavailable"):`${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
+  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?<AuthoritativeProductCardPrice productId={item.id}/>:`${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }
