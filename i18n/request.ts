@@ -9,6 +9,7 @@ import { productVideoMessages } from "./product-video";
 import { dropshippingAccessMessages } from "./dropshipping-access";
 import {buyerPricingMessages} from "./buyer-pricing";
 import {buyerAddressMessages} from "./buyer-address";
+import {genericModelMessages} from "./generic-model";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -47,7 +48,7 @@ export default getRequestConfig(async () => {
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = {...(["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
     ? (await import(`../messages/product-detail/${locale}.json`)).default
-    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale],deliveryTo:locale==="fr"?"Livraison à :":"Delivery to:",changeAddress:locale==="fr"?"Modifier":"Change",addShippingAddress:buyerAddressMessages[locale].addAddress};
+    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale],genericModel:genericModelMessages[locale],deliveryTo:locale==="fr"?"Livraison à :":"Delivery to:",changeAddress:locale==="fr"?"Modifier":"Change",addShippingAddress:buyerAddressMessages[locale].addAddress};
   const adminLocale = ["ar", "en", "fa", "fr", "hi", "ku", "pt", "ru", "zh"].includes(locale) ? locale : "en";
   messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
   return { locale, messages };

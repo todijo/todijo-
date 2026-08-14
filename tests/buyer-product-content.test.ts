@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { buyerSafeProductDescription } from "../lib/product-description";
 import { buyerVariantPresentation, type BuyerOption, type BuyerVariant } from "../lib/product-option-display";
 import { buyerPricingMessages } from "../i18n/buyer-pricing";
+import {genericModelMessages} from "../i18n/generic-model";
 
 const productName = "New Pullover Round Neck T-shirt Women";
 const options: BuyerOption[] = [{ id: "legacy", name: "Variant", position: 0, values: [
@@ -61,9 +62,15 @@ test("CJ variant images group eight supplier variants into two styles and four s
 test("unstructured supplier variants never render visible sequential placeholders", () => {
   const rawOptions:BuyerOption[]=[{id:"legacy",name:"Variant",position:0,values:[{id:"raw-a",value:"opaque-one",position:0},{id:"raw-b",value:"opaque-two",position:1}]}];
   const rawVariant=(id:string,valueId:string,image:string|null):BuyerVariant=>({id,stock:1,active:true,priceOverride:null,supplierImageUrl:image,values:[{optionValue:{id:valueId,value:valueId,option:{id:"legacy",name:"Variant",position:0}}}]});
-  const result=buyerVariantPresentation({productName,supplierManaged:true,options:rawOptions,variants:[rawVariant("a","raw-a","https://images.test/a.jpg"),rawVariant("b","raw-b","https://images.test/b.jpg")]});
-  assert.doesNotMatch(JSON.stringify(result.options),/Option \d|Style \d/);
+  const result=buyerVariantPresentation({productName,supplierManaged:true,optionLabels:{color:"Couleur",size:"Taille",model:"Modèle"},options:rawOptions,variants:[rawVariant("a","raw-a","https://images.test/a.jpg"),rawVariant("b","raw-b","https://images.test/b.jpg")]});
+  assert.equal(result.options[0].name,"Modèle");assert.doesNotMatch(JSON.stringify(result.options),/Variant|Style/);
+  assert.deepEqual(result.options[0].values.map((value)=>value.value),["Modèle 1","Modèle 2"]);
   assert.ok(result.options[0].values.every((value)=>value.imageOnly));
+});
+
+test("generic model label is dedicated and localized in all supported languages",()=>{
+  assert.equal(Object.keys(genericModelMessages).length,14);assert.equal(genericModelMessages.fr,"Modèle");
+  for(const [locale,label] of Object.entries(genericModelMessages))assert.ok(label.trim()&&label!=="Style"&&label!=="Variant",locale);
 });
 
 test("generic marketplace structured options and variants remain unchanged", () => {
@@ -103,6 +110,12 @@ test("pricing, cart and country continue to use canonical selection identity", (
   assert.match(pricing, /variantId,quantity,destinationCountry:country/); assert.match(pricing, /readShoppingCountry\(window\.localStorage\)/); assert.doesNotMatch(pricing,/api\/account\/addresses|addShippingAddress|changeAddress/);
   assert.match(panel, /setVerifiedPricing\(pricing\)/); assert.match(panel, /verifiedPricing\.variantId===selectedVariant\?\.id/);
   assert.match(panel,/\)\?\.position\?\?0\)<position/);assert.doesNotMatch(panel,/setQuantity\(1\)/);
+});
+
+test("automatic CJ pricing starts from the first real available canonical variant",()=>{
+  const page=readFileSync("app/product/[id]/page.tsx","utf8"),panel=readFileSync("components/ProductPurchasePanel.tsx","utf8");
+  assert.match(page,/orderBy:\{createdAt:"asc"\}/);assert.match(panel,/initialVariant=variants\.find/);assert.match(panel,/variant\.active&&variant\.stock>0/);assert.match(panel,/Boolean\(variant\.supplierVariantId\)/);
+  assert.match(panel,/Object\.fromEntries\(initialVariant\.values/);assert.match(panel,/variantId=\{selectedVariant\?\.id\?\?null\}/);
 });
 
 test("the main product heading area never substitutes a country prompt for price", () => {

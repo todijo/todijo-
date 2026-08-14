@@ -30,7 +30,7 @@ test("shopping-country values are normalized, restricted to ISO destinations and
 
 test("public estimate route validates destination and accepts no client financial override",()=>{
  const route=source("app/api/products/[id]/dropshipping-pricing/route.ts");assert.match(route,/normalizeShoppingCountry\(body\.destinationCountry\)/);assert.match(route,/INVALID_DESTINATION/);assert.doesNotMatch(route,/readSession|defaultBuyerAddress|body\.buyerCurrency/);assert.match(route,/buyerCurrency:undefined/);
- const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/JSON\.stringify\(\{variantId,quantity,destinationCountry:country\}\)/);assert.doesNotMatch(ui,/supplierCost|freightTotal|includedCost|targetMargin|fxRate|buyerCurrency:/);
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/JSON\.stringify\(\{variantId:input\.variantId,quantity:input\.quantity,destinationCountry:input\.destinationCountry\}\)/);assert.doesNotMatch(ui,/supplierCost|freightTotal|includedCost|targetMargin|fxRate|buyerCurrency:/);
 });
 
 test("request identity changes for country, exact variant and quantity",()=>{
@@ -39,6 +39,11 @@ test("request identity changes for country, exact variant and quantity",()=>{
 
 test("late requests are aborted and stale pricing cannot become active for a new line selection",()=>{
  const ui=source("components/DropshippingProductPricing.tsx"),panel=source("components/ProductPurchasePanel.tsx");assert.match(ui,/AbortController/);assert.match(ui,/controller\.abort\(\)/);assert.match(ui,/requestKey\.current===key/);assert.match(panel,/verifiedPricing&&verifiedPricing\.variantId===selectedVariant\?\.id&&verifiedPricing\.quantity===quantity/);
+});
+
+test("only exact successful authoritative quotes are cached and variant prefetch is sequential",()=>{
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/authoritativeQuoteCache=new Map/);assert.match(ui,/validQuote\(data,input\)/);assert.match(ui,/authoritativeQuoteCache\.set\(dropshippingPricingRequestKey\(input\),data\)/);
+ assert.match(ui,/productId,variantId:id,quantity,destinationCountry:country/);assert.match(ui,/for\(const id of prefetchIds\)/);assert.match(ui,/await requestQuote/);assert.match(ui,/PREFETCH_DELAY_MS=900/);assert.doesNotMatch(ui,/Promise\.all\(prefetchIds/);
 });
 
 test("buyer UI performs no money, freight, margin or FX calculation",()=>{
@@ -55,5 +60,5 @@ test("all 14 locales provide product pricing states and the scoped mobile path i
 });
 
 test("manual override and errors cannot enable embedded shipping client-side",()=>{
- const service=source("lib/suppliers/commerce-pricing.ts"),ui=source("components/DropshippingProductPricing.tsx");assert.match(service,/shippingIncluded=mode==="AUTOMATIC"/);assert.match(ui,/data\.eligible!==true/);assert.match(ui,/setState\(\{status:"error",data:null\}\)/);
+ const service=source("lib/suppliers/commerce-pricing.ts"),ui=source("components/DropshippingProductPricing.tsx");assert.match(service,/shippingIncluded=mode==="AUTOMATIC"/);assert.match(ui,/data\.eligible===true/);assert.match(ui,/!validQuote\(data,input\)/);assert.match(ui,/setState\(\{status:"error",data:null\}\)/);
 });

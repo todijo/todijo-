@@ -30,7 +30,8 @@ test("buyer option selection emits gallery image changes", async () => {
   assert.match(purchase, /todijo:variant-images/);
   assert.match(purchase, /className=\{`\$\{image \? "optionImageChoice"/);
   assert.match(purchase, /disabled=\{!valueAvailable\}/);
-  assert.match(purchase, /useState<Record<string, string>>\(\{\}\)/);
+  assert.match(purchase, /useState<Record<string, string>>\(\(\)=>initialVariant/);
+  assert.match(purchase, /selectedValues=genericOptions\.flatMap/);
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
   assert.match(gallery, /setSelectedMedia\([^)]*type:\s*"IMAGE",\s*index:\s*0/);
   assert.match(gallery, /scrollToIndex\(0, "auto"\)/);
