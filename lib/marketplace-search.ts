@@ -11,6 +11,9 @@ export type MarketplaceFilters = {
   minPrice: string;
   maxPrice: string;
   availability: "" | "in-stock";
+  color: string;
+  size: string;
+  season: string;
 };
 
 const text = (value: string | string[] | undefined, max = 120) =>
@@ -36,6 +39,7 @@ export function normalizeMarketplaceSearch(params: Record<string, string | strin
       q: text(params.q), category: text(params.category, 80), condition: text(params.condition, 80),
       country: text(params.country, 80), rating, sort, minPrice, maxPrice,
       availability: text(params.availability, 20) === "in-stock" ? "in-stock" as const : "" as const,
+      color: text(params.color, 100), size: text(params.size, 100), season: text(params.season, 100),
     },
     page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
     invalidPriceRange: Boolean(minPrice && maxPrice && Number(minPrice) > Number(maxPrice)),
@@ -47,7 +51,7 @@ export function marketplaceUrl(locale: string, filters: MarketplaceFilters, page
   const entries: Array<[keyof MarketplaceFilters, string]> = [
     ["q", filters.q.trim()], ["category", filters.category], ["condition", filters.condition],
     ["country", filters.country], ["rating", filters.rating], ["minPrice", filters.minPrice],
-    ["maxPrice", filters.maxPrice], ["availability", filters.availability],
+    ["maxPrice", filters.maxPrice], ["availability", filters.availability], ["color", filters.color], ["size", filters.size], ["season", filters.season],
   ];
   for (const [key, value] of entries) if (value) params.set(key, value);
   if (filters.sort !== "newest") params.set("sort", filters.sort);
@@ -57,5 +61,5 @@ export function marketplaceUrl(locale: string, filters: MarketplaceFilters, page
 }
 
 export function clearMarketplaceFilters(filters: MarketplaceFilters): MarketplaceFilters {
-  return { ...filters, category: "", condition: "", country: "", rating: "", sort: "newest", minPrice: "", maxPrice: "", availability: "" };
+  return { ...filters, category: "", condition: "", country: "", rating: "", sort: "newest", minPrice: "", maxPrice: "", availability: "", color: "", size: "", season: "" };
 }

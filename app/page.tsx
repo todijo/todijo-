@@ -36,19 +36,24 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const params = await searchParams;
   const resultsOnly = params.__resultsOnly === "1";
   const { filters, page, invalidPriceRange } = normalizeMarketplaceSearch(params);
-  const { q, category, condition, country, sort, availability } = filters;
+  const { q, category, condition, country, sort, availability, color, size, season } = filters;
   const minPrice = Number(filters.minPrice);
   const maxPrice = Number(filters.maxPrice);
   const now = new Date();
   const publicProductAccess = publicProductAccessWhere(now);
   const publicStoreAccess = publicStoreAccessWhere(now);
+  const refinements: Prisma.ProductWhereInput[] = [];
+  if (availability === "in-stock") refinements.push(productGenerallyAvailableWhere());
+  if (color) refinements.push({ OR: [{ colors: { has: color } }, { options: { some: { active: true, values: { some: { active: true, value: color } } } } }] });
+  if (size) refinements.push({ OR: [{ sizes: { has: size } }, { options: { some: { active: true, values: { some: { active: true, value: size } } } } }] });
+  if (season) refinements.push({ options: { some: { active: true, name: { in: ["Season", "Saison", "season", "saison"] }, values: { some: { active: true, value: season } } } } });
 
   const baseWhere: Prisma.ProductWhereInput = {
     status: "PUBLISHED",
     ...publicProductAccess,
+    ...(refinements.length ? { AND: refinements } : {}),
     ...(category ? { category: { in: categoryFilterValues(category) } } : {}),
     ...(condition ? { condition } : {}),
-    ...(availability === "in-stock" ? { AND: [productGenerallyAvailableWhere()] } : {}),
     ...(!invalidPriceRange && filters.minPrice ? { price: { gte: minPrice } } : {}),
     ...(!invalidPriceRange && filters.maxPrice
       ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } }
@@ -123,7 +128,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     return ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product));
   }
 
-  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows, heroProductCount] = await Promise.all([
+  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows, heroProductCount, facetRows] = await Promise.all([
     productsForPage(page),
     prisma.product.count({ where: isBestSelling ? { ...where, orderItems: { some: { order: { status: { in: qualifyingOrderStatuses } } } } } : where }),
     prisma.product.findMany({
@@ -146,6 +151,11 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
+    prisma.product.findMany({
+      where: { status: "PUBLISHED", ...publicProductAccess },
+      take: 500,
+      select: { colors: true, sizes: true, store: { select: { country: true } }, options: { where: { active: true }, select: { name: true, values: { where: { active: true }, select: { value: true } } } } },
+    }),
   ]);
   const availablePages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const normalizedPage = Math.min(page, availablePages);
@@ -165,6 +175,18 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const bestSellerById = new Map(bestSellerRows.map((product) => [product.id, product]));
   const bestSellers = bestSellerIds.map((id) => bestSellerById.get(id)).filter((product): product is ProductRow => Boolean(product)).map(serializeProduct);
   const products = rows.map(serializeProduct);
+  const isColorName = (name: string) => /^(color|colour|couleur|farbe|لون|ڕەنگ)$/i.test(name.trim());
+  const isSizeName = (name: string) => /^(size|taille|größe|groesse|قەبارە)$/i.test(name.trim());
+  const isSeasonName = (name: string) => /^(season|saison)$/i.test(name.trim());
+  const facetValues = (kind: "color" | "size" | "season") => [...new Set(facetRows.flatMap((product) => {
+    const legacy = kind === "color" ? product.colors : kind === "size" ? product.sizes : [];
+    const semantic = product.options.filter((option) => kind === "color" ? isColorName(option.name) : kind === "size" ? isSizeName(option.name) : isSeasonName(option.name)).flatMap((option) => option.values.map((value) => value.value));
+    return [...legacy, ...semantic].map((value) => value.trim()).filter(Boolean);
+  }))].sort((a,b) => a.localeCompare(b));
+  const facets = {
+    countries: [...new Set(facetRows.map((product) => product.store.country.trim()).filter(Boolean))],
+    colors: facetValues("color"), sizes: facetValues("size"), seasons: facetValues("season"),
+  };
 
   return (
     <HomeClient
@@ -178,6 +200,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       page={normalizedPage}
       pageSize={PAGE_SIZE}
       initialFilters={filters}
+      facets={facets}
       resultsOnly={resultsOnly}
     />
   );

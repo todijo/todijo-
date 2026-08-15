@@ -44,7 +44,7 @@ test("cart excludes unverified deferred lines and records authoritative server u
  const provider=source("components/CartProvider.tsx"),cart=source("app/cart/page.tsx");
  assert.match(provider,/requiresAuthoritativePrice&&!item\.authoritativePrice\?0:item\.price \* item\.quantity/);
  assert.match(provider,/authoritativePrice:true/);
- assert.match(cart,/requiresAuthoritativePrice&&!item\.authoritativePrice\?pricing\("pricingLoading"\)/);
+ assert.match(cart,/requiresAuthoritativePrice && !item\.authoritativePrice \? pricing\("pricingLoading"\)/);
 });
 
 test("reference freight-inclusive prices replace rather than reuse deferred snapshots",()=>{

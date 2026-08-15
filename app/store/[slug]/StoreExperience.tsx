@@ -38,7 +38,7 @@ export default function StoreExperience({ store }: Props) {
   }
 
   return <>
-    <section className="premiumStoreHero premiumStoreHeroPolished" style={store.banner ? {backgroundImage:`linear-gradient(100deg,rgba(3,31,24,.92),rgba(3,31,24,.58)),url(${store.banner})`} : undefined}>
+    <section className="premiumStoreHero premiumStoreHeroPolished" style={store.banner ? {backgroundImage:`linear-gradient(100deg,rgba(45,13,83,.92),rgba(93,38,153,.58)),url(${store.banner})`} : undefined}>
       <div className="premiumStoreHeroInner"><div className="premiumStoreIdentity"><div className="premiumStoreLogo">{store.logo ? <img src={store.logo} alt=""/> : <span>{store.sellerInitials}</span>}</div><div className="premiumStoreTitleBlock"><div className="premiumStoreOfficial"><span>Todijo</span>{store.emailConfirmed && <span className="verifiedPill">✓ {transparency("emailConfirmed")}</span>}</div><h1>{store.name}</h1><SellerTypeDisclosure sellerType={store.sellerType} compact/><p><MapPin size={17} aria-hidden="true"/>{store.city}, {store.country}</p></div></div>
       <div className="premiumStoreActions"><button className={followed?"storeActionButton followed":"storeActionButton primaryAction"} type="button" onClick={()=>setFollowed(value=>!value)}><Heart size={18} aria-hidden="true"/>{storeText(followed?"following":"follow")}</button><a className="storeActionButton" href="#products"><MessageCircle size={18} aria-hidden="true"/>{productText("ask")}</a><button className="storeActionButton" type="button" onClick={shareStore}><Share2 size={18} aria-hidden="true"/>{copied?productText("copied"):productText("share")}</button></div></div>
     </section>

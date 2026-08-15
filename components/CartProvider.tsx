@@ -21,6 +21,9 @@ export type CartProduct = {
   freeShipping?: boolean;
   deliveryMinDays?: number | null;
   deliveryMaxDays?: number | null;
+  shippingPrice?: number | null;
+  shippingFreeThreshold?: number | null;
+  shippingMethodName?: string | null;
   requiresAuthoritativePrice?: boolean;
   authoritativePrice?: boolean;
 };

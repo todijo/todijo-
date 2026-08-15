@@ -6,7 +6,7 @@ const source = (path: string) => readFileSync(path, "utf8");
 
 test("homepage keeps filters and every category before the five-product hero mosaic", () => {
   const home = source("app/HomeClient.tsx");
-  const filters = home.indexOf('className="marketFilterDock"');
+  const filters = home.indexOf("<MarketplaceFilterDock");
   const categories = home.indexOf("<MarketplaceCategoryNavigation");
   const hero = home.indexOf('className="discoveryHero"');
   assert.ok(filters >= 0 && categories > filters && hero > categories);
