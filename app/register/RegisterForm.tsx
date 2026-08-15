@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { localizedHome } from "@/lib/auth-redirects";
 import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
+import SocialLoginButtons from "@/components/SocialLoginButtons";
 
 export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const params = useSearchParams();
@@ -81,13 +82,14 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
     </section>
     <section className="authPanel"><div className="authBox">
       <a className="authBack" href={localizedHome(locale)}>← {t("back")}</a><h2>{t("create")}</h2>
+      <SocialLoginButtons/>
       <form className="authForm" onSubmit={submit} aria-busy={loading}>
         <div className="roleOptions">
           <label className="roleCard"><input type="radio" name="role" checked={role === "customer"} onChange={() => setRole("customer")} /><strong>🛍️ {t("buyer")}</strong><span>{t("buyerHelp")}</span></label>
           <label className="roleCard"><input type="radio" name="role" checked={role === "seller"} onChange={() => setRole("seller")} /><strong>🏪 {t("seller")}</strong><span>{t("sellerHelp")}</span></label>
         </div>
         <div className="formRow"><div className="formField"><label htmlFor="firstName">{t("firstName")}</label><input id="firstName" name="firstName" autoComplete="given-name" required /></div><div className="formField"><label htmlFor="lastName">{t("lastName")}</label><input id="lastName" name="lastName" autoComplete="family-name" required /></div></div>
-        <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></div>
+        <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" aria-describedby="email-security-guidance" required /><small id="email-security-guidance">{t("emailSecurityGuidance")}</small></div>
         {role === "seller" && <div className="formField"><label htmlFor="storeName">{t("shopName")}</label><input id="storeName" name="storeName" placeholder="Todijo Shop" required /></div>}
         {role === "customer" && <fieldset className="registrationAddress"><legend>{t("shippingAddress")}</legend><p className="authHelper">{t("shippingAddressHelp")}</p>
           <div className="formField"><label htmlFor="recipientName">{t("recipientName")}</label><input id="recipientName" name="recipientName" autoComplete="name" required /></div>
@@ -98,8 +100,8 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
           <div className="formField"><label htmlFor="state">{t("state")}</label><input id="state" name="state" autoComplete="address-level1" /></div>
           <div className="formField"><label htmlFor="phone">{t("phone")}</label><input id="phone" name="phone" type="tel" autoComplete="tel" /></div>
         </fieldset>}
-        <div className="formField"><label htmlFor="password">{t("password")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
-        <div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && password !== confirmPassword)} aria-describedby={confirmPassword && password !== confirmPassword ? "password-mismatch" : undefined} required /></div>
+        <div className="formField"><label htmlFor="password">{t("password")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={10} value={password} onChange={(event) => setPassword(event.target.value)} required /><small>{t("passwordGuidance")}</small></div>
+        <div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={10} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && password !== confirmPassword)} aria-describedby={confirmPassword && password !== confirmPassword ? "password-mismatch" : undefined} required /></div>
         {confirmPassword && password !== confirmPassword && <p className="authMessage" id="password-mismatch" role="alert">{t("passwordMismatch")}</p>}
         <div className="turnstileField" tabIndex={-1}><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
         <label className="terms"><input type="checkbox" required /><span>{t("terms")}</span></label>

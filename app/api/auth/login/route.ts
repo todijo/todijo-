@@ -2,6 +2,7 @@ import { compare } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, readSession } from "@/lib/session";
+import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +12,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
-
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !(await compare(password, user.passwordHash))) {
+    if (!allowAuthRequest(authRequestKey("login", email, request))) {
       return NextResponse.json({ error: "Adresse e-mail ou mot de passe incorrect." }, { status: 401 });
     }
 
-    await createSession({ userId: user.id, role: user.role });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user?.passwordHash || !(await compare(password, user.passwordHash))) {
+      return NextResponse.json({ error: "Adresse e-mail ou mot de passe incorrect." }, { status: 401 });
+    }
+
+    await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
     return NextResponse.json({ ok: true, role: user.role });
   } catch (error) {
     console.error(error);

@@ -1,0 +1,2 @@
+import{NextResponse}from"next/server";import{prisma}from"@/lib/prisma";import{readSession}from"@/lib/session";import{validateAccountProfile}from"@/lib/account-profile";
+export async function PATCH(request:Request){const session=await readSession();if(!session)return NextResponse.json({error:"AUTH_REQUIRED"},{status:401});const validation=validateAccountProfile(await request.json());if(!validation.ok)return NextResponse.json({error:"INVALID_PROFILE"},{status:400});await prisma.user.update({where:{id:session.userId},data:validation.value});return NextResponse.json({ok:true});}

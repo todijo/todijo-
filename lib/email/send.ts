@@ -33,3 +33,9 @@ export async function sendPasswordResetEmail(input: { to: string; firstName: str
   const message = layout(input.locale, input.firstName, { preview: copy.resetSubject, heading: copy.resetHeading, body: copy.resetBody, ctaLabel: copy.resetCta, ctaUrl: url.toString() });
   await sendTodijoMail({ to: input.to, subject: copy.resetSubject, ...message });
 }
+
+export async function sendEmailChangeVerification(input:{to:string;firstName:string;locale:string;rawToken:string}){
+  const copy=emailCopy(input.locale),url=new URL("/api/account/email/confirm",publicAppUrl());url.searchParams.set("token",input.rawToken);url.searchParams.set("locale",input.locale);
+  const message=layout(input.locale,input.firstName,{preview:copy.verifySubject,heading:copy.verifyHeading,body:copy.verifyBody,ctaLabel:copy.verifyCta,ctaUrl:url.toString()});
+  await sendTodijoMail({to:input.to,subject:copy.verifySubject,...message});
+}

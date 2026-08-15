@@ -1,0 +1,6 @@
+import {NextResponse} from "next/server";
+import {prisma} from "@/lib/prisma";
+import {readSession} from "@/lib/session";
+import {requireAdmin} from "@/lib/admin-access";
+const allowed=["VERIFIED","REJECTED","NEEDS_INFORMATION"] as const;
+export async function PATCH(request:Request,{params}:{params:Promise<{storeId:string}>}){const session=await readSession();if(!session)return NextResponse.json({error:"AUTH_REQUIRED"},{status:401});try{await requireAdmin(prisma,session)}catch{return NextResponse.json({error:"ADMIN_REQUIRED"},{status:403})}const{storeId}=await params,body=await request.json(),status=allowed.find(value=>value===body.status),reason=String(body.reason??"").trim();if(!status||!reason||reason.length>500)return NextResponse.json({error:"INVALID_REVIEW"},{status:400});const store=await prisma.store.findUnique({where:{id:storeId},select:{ownerId:true}});if(!store)return NextResponse.json({error:"NOT_FOUND"},{status:404});await prisma.$transaction([prisma.store.update({where:{id:storeId},data:{onboardingStatus:status}}),prisma.accountSecurityEvent.create({data:{userId:store.ownerId,type:`SELLER_REVIEW_${status}_BY_${session.userId}`}})]);return NextResponse.json({ok:true});}

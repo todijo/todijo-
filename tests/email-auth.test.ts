@@ -82,15 +82,14 @@ test("shared Todijo email template escapes names and URLs and includes text fall
 
 test("all authentication locales have exact translation parity and localized recovery routes", () => {
   const locales = ["ar", "de", "en", "es", "fr", "it", "ku", "nl", "tr"];
-  const messages = locales.map((locale) => JSON.parse(readFileSync(`messages/auth/${locale}.json`, "utf8")) as Record<string, string>);
+  const messages = locales.map((locale) => JSON.parse(readFileSync(`messages/auth/${locale}.json`, "utf8")) as Record<string, unknown>);
   const keys = Object.keys(messages[2]).sort();
   for (const message of messages) assert.deepEqual(Object.keys(message).sort(), keys);
-  assert.equal(messages[4].verificationTitle, "Vérification de l’e-mail");
-  assert.equal(messages[4].verificationSuccessResult, "Votre e-mail a été vérifié avec succès.");
+  assert.equal(String(messages[4].verificationTitle), "Vérification de l’e-mail");
+  assert.equal(String(messages[4].verificationSuccessResult), "Votre e-mail a été vérifié avec succès.");
   const corruption = /ï¿½|Ãƒ|Ã¢|â€™|�|\?{2,}|[A-Za-zÀ-ÿ]\?[A-Za-zÀ-ÿ]/;
-  for (const message of messages) {
-    for (const value of Object.values(message)) assert.doesNotMatch(value, corruption);
-  }
+  const stringValues = (value: unknown): string[] => typeof value === "string" ? [value] : value && typeof value === "object" ? Object.values(value).flatMap(stringValues) : [];
+  for (const message of messages) for (const value of stringValues(message)) assert.doesNotMatch(value, corruption);
   assert.match(readFileSync("app/login/page.tsx", "utf8"), /localizedHome\(locale\)\}\/forgot-password/);
   assert.match(readFileSync("app/reset-password/page.tsx", "utf8"), /localizedHome\(locale\)\}\/login\?reset=success/);
 });

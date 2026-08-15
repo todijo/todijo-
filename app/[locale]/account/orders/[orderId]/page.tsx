@@ -21,11 +21,8 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   const { locale, orderId } = await params;
   const session = await readSession();
   if (!session) redirect(`/${locale}/login?next=/${locale}/account/orders/${encodeURIComponent(orderId)}`);
-  if (session.role !== "CUSTOMER") redirect(`/${locale}/dashboard`);
-
-  const buyer = await prisma.user.findUnique({ where: { id: session.userId }, select: { role: true } });
+  const buyer = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true } });
   if (!buyer) redirect(`/${locale}/login`);
-  if (buyer.role !== "CUSTOMER") redirect(`/${locale}/dashboard`);
 
   const order = await getBuyerOrder(prisma, session.userId, orderId);
   if (!order) notFound();

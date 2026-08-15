@@ -50,10 +50,10 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
 }
 
 export default async function DashboardPage() {
-  const [t, p, s, common, ordersText, control, privacy, transparency, compliance, locale, session] = await Promise.all([
+  const [t, p, s, common, ordersText, control, privacy, transparency, compliance, auth, locale, session] = await Promise.all([
     getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
     getTranslations("Common"), getTranslations("Orders"), getTranslations("SellerControl"),
-    getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"),
+    getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"), getTranslations("Auth"),
     getLocale(), readSession(),
   ]);
   if (!session) redirect("/login");
@@ -81,6 +81,7 @@ export default async function DashboardPage() {
     { label: p("nav.dashboard"), href: paths.dashboard, icon: Home, active: true },
     { label: p("nav.orders"), href: buyerOrdersHref, icon: ReceiptText },
     { label: p("nav.messages"), href: paths.messages, icon: MessageCircle, badge: unreadMessages },
+    { label: common("account"), href: `/${locale}/account`, icon: Settings },
     { label: common("cart"), href: paths.cart, icon: ShoppingCart },
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
@@ -94,6 +95,7 @@ export default async function DashboardPage() {
     { label: p("nav.reviews"), href: user.store ? `/${locale}/seller/reviews` : `/${locale}/dashboard`, icon: Star },
     { label: p("nav.store"), href: user.store ? `/${locale}/store/${user.store.slug}` : `/${locale}/seller/create-store`, icon: Store },
     { label: p("nav.settings"), href: `/${locale}/seller/store-settings`, icon: Settings },
+    { label: common("account"), href: `/${locale}/account`, icon: ShieldCheck },
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
   const sellerCanAddProduct = Boolean(user.store && canPublish(user.store));
@@ -125,7 +127,7 @@ export default async function DashboardPage() {
                 : <DashboardEmptyState title={p("buyer.emptyOrders")} description={p("buyer.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={homeHref}>{p("browseProducts")}</Link>}/>
               }
             </DashboardSection>
-            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={p("browseProducts")} href={homeHref} icon={ShoppingBag} primary/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/><DashboardQuickAction label={p("myCart")} href={paths.cart} icon={ShoppingCart}/></div></DashboardSection>
+            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={auth("becomeSeller")} href={`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
           </div>
           <section className="premiumDiscoveryBanner"><div><span>{p("discoverBadge")}</span><h2>{p("discoverTitle")}</h2><p>{p("discoverText")}</p></div><Link href={homeHref}>{p("exploreNow")}</Link></section>
         </div>

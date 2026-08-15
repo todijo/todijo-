@@ -1,6 +1,6 @@
 import { validateAddressInput, type AddressInput } from "./buyer-addresses";
 
-export const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 10;
 
 export type RegistrationInput = {
   firstName: string;

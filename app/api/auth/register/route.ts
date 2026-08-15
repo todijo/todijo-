@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     const passwordHash = await hash(input.password, 12);
     const user = await prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({ data: { ...registrationPersistenceData(input), passwordHash }, select: { id: true, role: true, email: true, firstName: true } });
+      const created = await tx.user.create({ data: { ...registrationPersistenceData(input), passwordHash }, select: { id: true, role: true, email: true, firstName: true, authVersion: true } });
       if (input.role === "CUSTOMER" && input.shippingAddress) await createBuyerAddress(tx, created.id, input.shippingAddress, true);
       return created;
     });
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       console.error("Registration email preparation failed.", safeEmailError(emailError));
     }
 
-    await createSession({ userId: user.id, role: user.role });
+    await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
     return NextResponse.json({ ok: true, role: user.role });
   } catch (error) {
     console.error(error);

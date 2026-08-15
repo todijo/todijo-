@@ -59,8 +59,33 @@ export async function consumePasswordResetToken(rawToken: string, passwordHash: 
       const current = await tx.passwordResetToken.findUnique({ where: { id: token.id } });
       return authTokenState(current, now) === "success" ? "invalid" : authTokenState(current, now);
     }
-    await tx.user.update({ where: { id: token.userId }, data: { passwordHash } });
+    await tx.user.update({ where: { id: token.userId }, data: { passwordHash, authVersion: { increment: 1 } } });
+    await tx.accountSecurityEvent.create({ data: { userId: token.userId, type: "PASSWORD_RESET" } });
     await tx.passwordResetToken.updateMany({ where: { userId: token.userId, id: { not: token.id }, usedAt: null }, data: { usedAt: now } });
     return "success";
+  });
+}
+
+export async function issueEmailChangeToken(userId:string,newEmail:string,now=new Date()){
+  const rawToken=generateRawAuthToken(),tokenHash=hashAuthToken(rawToken);
+  await prisma.$transaction(async tx=>{
+    await tx.emailChangeToken.updateMany({where:{userId,usedAt:null},data:{usedAt:now}});
+    await tx.emailChangeToken.create({data:{userId,newEmail,tokenHash,expiresAt:new Date(now.getTime()+VERIFICATION_TOKEN_TTL_MS)}});
+  });
+  return rawToken;
+}
+
+export async function consumeEmailChangeToken(rawToken:string,now=new Date()):Promise<AuthTokenResult>{
+  if(!validRawAuthToken(rawToken))return"invalid";
+  return prisma.$transaction(async tx=>{
+    const token=await tx.emailChangeToken.findUnique({where:{tokenHash:hashAuthToken(rawToken)}}),state=authTokenState(token,now);
+    if(state!=="success"||!token)return state;
+    const duplicate=await tx.user.findUnique({where:{email:token.newEmail},select:{id:true}});
+    if(duplicate&&duplicate.id!==token.userId)return"invalid";
+    const consumed=await tx.emailChangeToken.updateMany({where:{id:token.id,usedAt:null,expiresAt:{gt:now}},data:{usedAt:now}});
+    if(consumed.count!==1)return"invalid";
+    await tx.user.update({where:{id:token.userId},data:{email:token.newEmail,emailVerified:true,emailVerifiedAt:now,authVersion:{increment:1}}});
+    await tx.accountSecurityEvent.create({data:{userId:token.userId,type:"EMAIL_CHANGED"}});
+    return"success";
   });
 }

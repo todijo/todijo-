@@ -131,6 +131,29 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum AuthProvider {
+  GOOGLE
+  APPLE
+  FACEBOOK
+}
+
+enum SellerOnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+  NEEDS_INFORMATION
+}
+
+enum SellerLegalForm {
+  PRIVATE
+  SOLE_TRADER
+  COMPANY
+  ASSOCIATION
+  OTHER
+}
+
 enum SellerRiskPolicy {
  AUTOMATIC
  HIGH_RISK_HOLD
@@ -203,7 +226,7 @@ model User {
   firstName                String
   lastName                 String
   email                    String   @unique
-  passwordHash             String
+  passwordHash             String?
   role                     UserRole @default(CUSTOMER)
   storeName                String?
   emailVerified            Boolean  @default(false)
@@ -214,6 +237,12 @@ model User {
   stripePayoutsEnabled     Boolean  @default(false)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
+  phone                    String?  @db.VarChar(40)
+  profileAddress           String?  @db.VarChar(240)
+  profilePostalCode        String?  @db.VarChar(32)
+  profileCity              String?  @db.VarChar(120)
+  profileCountry           String?  @db.VarChar(2)
+  authVersion              Int      @default(0)
 
   store               Store?
   buyerConversations  Conversation[] @relation("ConversationBuyer")
@@ -233,6 +262,72 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
   shippingAddresses   BuyerShippingAddress[]
+  oauthAccounts       OAuthAccount[]
+  emailChangeTokens   EmailChangeToken[]
+  securityEvents      AccountSecurityEvent[]
+  sellerOnboardingDraft SellerOnboardingDraft?
+}
+
+model SellerOnboardingDraft {
+  id                         String          @id @default(cuid())
+  userId                     String          @unique
+  storeName                  String?         @db.VarChar(120)
+  country                    String?         @db.VarChar(2)
+  city                       String?         @db.VarChar(120)
+  phone                      String?         @db.VarChar(40)
+  address                    String?         @db.VarChar(240)
+  postalCode                 String?         @db.VarChar(32)
+  sellerType                 SellerType      @default(UNKNOWN)
+  legalForm                  SellerLegalForm?
+  businessRegistrationNumber String?         @db.VarChar(80)
+  legalBusinessName          String?         @db.VarChar(160)
+  vatStatus                  SellerVatStatus @default(UNKNOWN)
+  vatNumber                  String?         @db.VarChar(80)
+  step                       Int             @default(1)
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  user                       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OAuthAccount {
+  id                String       @id @default(cuid())
+  userId            String
+  provider          AuthProvider
+  providerAccountId String       @db.VarChar(255)
+  providerEmail     String?      @db.VarChar(320)
+  emailVerified     Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider])
+}
+
+model EmailChangeToken {
+  id        String    @id @default(cuid())
+  userId    String
+  newEmail  String    @db.VarChar(320)
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model AccountSecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @db.VarChar(80)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model BuyerShippingAddress {
@@ -325,6 +420,9 @@ model Store {
   legacyStandardOverrideAt DateTime?
   legacyStandardOverrideById String?
   legacyStandardOverrideReason String? @db.VarChar(1000)
+  onboardingStatus SellerOnboardingStatus @default(NOT_STARTED)
+  onboardingStep Int @default(0)
+  sellerLegalForm SellerLegalForm?
 
   ownerId String @unique
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)

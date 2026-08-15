@@ -1,0 +1,3 @@
+import{redirect}from"next/navigation";import{prisma}from"@/lib/prisma";import{readSession}from"@/lib/session";import AccountSettings from"./AccountSettings";
+export const dynamic="force-dynamic";
+export default async function AccountPage(){const session=await readSession();if(!session)redirect("/login?next=/account");const user=await prisma.user.findUnique({where:{id:session.userId},select:{firstName:true,lastName:true,email:true,phone:true,profileAddress:true,profilePostalCode:true,profileCity:true,profileCountry:true,emailVerified:true,passwordHash:true,oauthAccounts:{select:{provider:true}}}});if(!user)redirect("/login");return <AccountSettings profile={{...user,hasPassword:Boolean(user.passwordHash),providers:user.oauthAccounts.map(item=>item.provider)}}/>}

@@ -1,0 +1,2 @@
+import{NextResponse}from"next/server";import{consumeEmailChangeToken}from"@/lib/auth-tokens";import{deleteSession}from"@/lib/session";import{publicAppUrl}from"@/lib/email/config";
+export async function GET(request:Request){const status=await consumeEmailChangeToken(new URL(request.url).searchParams.get("token")??"");if(status==="success")await deleteSession();return NextResponse.redirect(new URL(`/login?email-change=${status}`,publicAppUrl()),303);}
