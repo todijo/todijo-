@@ -39,6 +39,7 @@ test("mega menu remains closed, keyboard-safe, and lavender rather than legacy g
   const css = read("app/globals.css");
   assert.match(nav, /useState\(false\)/);
   assert.match(nav, /event\.key === "Escape"/);
-  assert.match(css, /marketQuickMegaColumns a:hover[^}]*#f2eaff[^}]*#5b21b6/);
-  assert.doesNotMatch(css, /marketQuickMegaColumns a[^}]*background:#0[0-9a-f]{5}/i);
+  assert.match(nav, /className="marketQuickMegaSubcategoryLink"/);
+  assert.match(css, /marketQuickMegaColumns a\.marketQuickMegaSubcategoryLink:hover[^}]*#f2eaff[^}]*#5b21b6/);
+  assert.doesNotMatch(css, /a\.marketQuickMegaSubcategoryLink[^}]*background:#0[0-9a-f]{5}/i);
 });

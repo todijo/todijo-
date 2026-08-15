@@ -1119,8 +1119,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
   .buyerHomePage>.marketFilterDockV3 .marketFacetPopover{top:188px}
 }
 .marketQuickMegaMenu{border-color:#eadff8;background:#fff}
-.marketQuickMegaColumns a{padding:6px 8px;border-radius:8px;color:#5a4b6f;background:transparent;text-decoration:none!important}
-.marketQuickMegaColumns a:hover,.marketQuickMegaColumns a:focus-visible{background:#f2eaff;color:#5b21b6;outline:none}
+.marketQuickMegaColumns a.marketQuickMegaSubcategoryLink{padding:6px 8px;border:1px solid #eadff8;border-radius:8px;background:#fdfbff;color:#49395e;font-weight:550;text-decoration:none!important;transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+.marketQuickMegaColumns a.marketQuickMegaSubcategoryLink:hover{border-color:#c9b2ea;background:#f2eaff;color:#5b21b6;text-decoration:none!important}
+.marketQuickMegaColumns a.marketQuickMegaSubcategoryLink:focus-visible{border-color:#8b5cf6;background:#f2eaff;color:#4c1d95;outline:3px solid rgba(124,58,237,.3);outline-offset:2px}
+.marketQuickMegaColumns a.marketQuickMegaSubcategoryLink[aria-current="page"]{border-color:#a98add;background:#ece2ff;color:#4c1d95;font-weight:700}
 .marketQuickMegaSidebar button.active{background:#efe7ff;color:#5b21b6}
 .productDetailLoadingSkeleton .pageSkeleton{background:linear-gradient(180deg,#f7f2ff,#fcfaff)}
 .productDetailLoadingSkeleton .pageSkeleton article{border-color:#e6dcf2;background:#fff}

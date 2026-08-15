@@ -52,7 +52,7 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
       </div>
       <div className="marketQuickMegaContent" ref={contentRef}>
         <header><div><strong>{active.label}</strong><small>{header("discoverCategories")}</small></div><Link href={categoryHref(active.label)} onClick={() => setOpen(false)}>{header("viewAll")}</Link></header>
-        <div className="marketQuickMegaColumns">{active.groups.map((group) => <section key={group.id}><h3>{group.label}</h3>{group.items.map((item) => <Link key={item} href={categoryHref(item)} onClick={() => setOpen(false)}>{item}</Link>)}</section>)}</div>
+        <div className="marketQuickMegaColumns">{active.groups.map((group) => <section key={group.id}><h3>{group.label}</h3>{group.items.map((item) => <Link className="marketQuickMegaSubcategoryLink" key={item} href={categoryHref(item)} onClick={() => setOpen(false)}>{item}</Link>)}</section>)}</div>
       </div>
     </section> : null}
   </div>;
