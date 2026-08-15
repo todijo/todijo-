@@ -7,6 +7,7 @@ import type { CartProduct } from "@/components/CartProvider";
 import { useTranslations } from "next-intl";
 import { isSelectedVariantAvailable } from "@/lib/product-availability";
 import DropshippingProductPricing from "@/components/DropshippingProductPricing";
+import ShareButton from "@/components/ShareButton";
 import type {BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
 
 type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null;supplierVariantId?:string|null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
@@ -63,7 +64,7 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const updatePricing=useCallback((pricing:BuyerDropshippingPricingResponse|null)=>{setVerifiedPricing(pricing);},[]);
 
   return <aside className="productPurchaseCard" aria-label={detail("purchaseOptions")}>
-    <div className={`purchaseAvailability${displayAvailable ? " isAvailable" : " isUnavailable"}`}><span aria-hidden="true" />{displayAvailable ? availabilityLabel : t("unavailable")}</div>
+    <div className={`purchaseAvailability${displayAvailable ? " isAvailable" : " isUnavailable"}`}><span aria-hidden="true" /><span className="purchaseAvailabilityLabel">{displayAvailable ? availabilityLabel : t("unavailable")}</span><ShareButton title={product.name}/></div>
     <div className="purchasePanel variantPurchasePanel">
       <div className="purchaseOptionsScroll">
       {isVariantProduct ? genericOptions.map((option) => <fieldset className="optionGroup" key={option.id}><legend>{option.name}</legend><div>{option.values.slice().sort((a, b) => a.position - b.position).map((value) => {

@@ -7,7 +7,6 @@ import ProductGallery from "./ProductGallery";
 import ProductDetailPrice from "./ProductDetailPrice";
 import SiteHeader from "@/components/SiteHeader";
 import WishlistButton from "@/components/WishlistButton";
-import ShareButton from "@/components/ShareButton";
 import ProductPurchasePanel from "@/components/ProductPurchasePanel";
 import ReviewSection from "@/components/ReviewSection";
 import AskSellerButton from "@/components/AskSellerButton";
@@ -100,9 +99,8 @@ export default async function ProductPage({ params }: Props) {
     <div className="productDetailTop">
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name} media={product.media}/></div>
       <article className="productDetailInfo">
-        <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/><ShareButton title={product.name}/></div></div>
+        <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/></div></div>
         <h1>{product.name}</h1><ProductDetailPrice requiresVerifiedPricing={requiresAuthoritativePrice} price={price} compareAtPrice={compare} currency={product.currency}/>
-        <div className="productMobileSecondaryActions"><ShareButton title={product.name}/></div>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
         <dl className="productFacts productFactsDesktop" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div></dl>
       </article>

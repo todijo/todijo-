@@ -73,13 +73,18 @@ test("mobile product gallery has no floating actions and keeps a live counter", 
   assert.ok(page.indexOf("productGallery productGallerySticky") < page.indexOf("productDetailInfo"));
   assert.doesNotMatch(page, /className="productGalleryActions"/);
   assert.match(page, /<WishlistButton productId=\{product\.id\}/);
-  assert.match(page, /<ShareButton title=\{product\.name\}/);
+  const [purchase, share] = await Promise.all([readFile("components/ProductPurchasePanel.tsx", "utf8"), readFile("components/ShareButton.tsx", "utf8")]);
+  assert.match(purchase, /purchaseAvailability[\s\S]*<ShareButton title=\{product\.name\}/);
+  assert.equal((purchase.match(/<ShareButton title=\{product\.name\}/g) ?? []).length, 1);
+  assert.match(share, /url: window\.location\.href/);
+  assert.match(share, /navigator\.share/);
+  assert.match(share, /navigator\.clipboard\.writeText\(window\.location\.href\)/);
+  assert.match(share, /aria-label=\{copied \? t\("copied"\) : t\("share"\)\}/);
   assert.match(gallery, /className="productGalleryCounter"[^>]*>\{selectedPosition\} \/ \{mediaCount\}/);
   assert.match(gallery, /mediaCount > 1/);
   assert.match(gallery, /window\.matchMedia\("\(max-width: 860px\)"\)/);
   assert.match(gallery, /openerRef\.current = event\.currentTarget;[\s\S]*?setIsOpen\(true\)/);
-  assert.match(page, /className="productMobileSecondaryActions"><ShareButton title=\{product\.name\}/);
-  assert.doesNotMatch(page, /productMobileSecondaryActions[^\n]*WishlistButton/);
+  assert.doesNotMatch(page, /productMobileSecondaryActions/);
 });
 
 test("mobile purchase bar keeps one visible primary action and safe content clearance", async () => {
