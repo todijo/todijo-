@@ -3,15 +3,16 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, Languages, LockKeyhole, MapPin, Menu, MessageCircle, Package, SearchX, ShoppingBag, Store, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Languages, LockKeyhole, MapPin, Menu, MessageCircle, Package, SearchX, ShoppingBag, SlidersHorizontal, Store, X } from "lucide-react";
 import { rtlLocales, type Locale } from "@/i18n/config";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
 import MarketplaceProductCard, { type MarketplaceCardProduct } from "@/components/MarketplaceProductCard";
 import MarketplaceHeader from "@/components/MarketplaceHeader";
+import MarketplaceCategoryNavigation from "@/components/MarketplaceCategoryNavigation";
 import { EmptyState } from "@/components/FeedbackState";
 import { clearMarketplaceFilters, marketplaceUrl, type MarketplaceFilters } from "@/lib/marketplace-search";
-import { categoryKey, categoryLabel } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
@@ -22,11 +23,6 @@ type MarketplaceProduct = MarketplaceCardProduct & {
 
 type MarketplaceStore = { id: string; name: string; slug: string; description: string | null; logo: string | null; city: string; country: string; products: Array<{ id: string; name: string; image: string | null }> };
 
-const categoryIcons: Record<string, string> = {
-  fashion: "👕", mode: "👕", clothing: "👕", electronics: "📱", électronique: "📱", electronique: "📱",
-  home: "🏠", maison: "🏠", beauty: "💄", beauté: "💄", sports: "⚽", toys: "🧸", automotive: "🚗",
-  phones: "📱", gaming: "🎮", books: "📚", services: "🧰", vehicles: "🚙",
-};
 
 function ProductRail({ id, title, titleHref, products, soldOut }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string }) {
   if (!products.length) return null;
@@ -96,7 +92,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
 
   return (
     <main className={`buyerHomePage${resultsOnly ? " searchResultsPage" : ""}`} dir={t.dir}>
-      <MarketplaceHeader/>
+      <MarketplaceHeader showCategoryNav={false}/>
 
       <section className="discoveryHero">
         <div className="container discoveryHeroGrid">
@@ -120,13 +116,19 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         </div>
       </section>
 
-      <section id="categories" className="container categoryStripSection">
-        <div className="sectionTitle"><h2>{t.categories}</h2></div>
-        <div className="categoryStrip">
-          <button className={!filters.category ? "active" : ""} onClick={() => chooseCategory("")}><span>🛍️</span>{t.all}</button>
-          {categories.map((name) => <button className={filters.category === name ? "active" : ""} key={name} onClick={() => chooseCategory(name)}><span>{categoryIcons[categoryKey(name) ?? name.toLowerCase()] || "📦"}</span>{displayCategory(name)}</button>)}
-        </div>
+      <section className="marketFilterDock" aria-label={t.filters}>
+        <form className="marketFilterDockInner" onSubmit={submit}>
+          <button ref={filterTriggerRef} className="marketFilterAll" type="button" aria-expanded={showFilters} aria-controls="filter-panel" onClick={() => setShowFilters(true)}><SlidersHorizontal size={16} aria-hidden="true"/><span>{t.filters}</span>{activeCount > 0 ? <b>{activeCount}</b> : null}</button>
+          <label className="marketFilterPill"><span>{t.condition}</span><input value={filters.condition} onChange={(e) => setFilters({ ...filters, condition: e.target.value })}/><ChevronDown size={13} aria-hidden="true"/></label>
+          <label className="marketFilterPill"><span>{t.country}</span><input value={filters.country} onChange={(e) => setFilters({ ...filters, country: e.target.value })}/><ChevronDown size={13} aria-hidden="true"/></label>
+          <label className="marketFilterPill marketFilterPrice"><span>{t.min}</span><input type="number" min="0" value={filters.minPrice} onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })} placeholder="0"/></label>
+          <label className="marketFilterPill marketFilterPrice"><span>{t.max}</span><input type="number" min="0" value={filters.maxPrice} onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })} placeholder="5000"/></label>
+          <label className="marketFilterPill marketFilterSelect"><select aria-label={t.sort} value={filters.sort} onChange={(e) => setFilters({ ...filters, sort: e.target.value as MarketplaceFilters["sort"] })}><option value="newest">{t.newest}</option><option value="best-selling">{t.best}</option><option value="price-asc">{t.low}</option><option value="price-desc">{t.high}</option></select><ChevronDown size={13} aria-hidden="true"/></label>
+          <button className="marketFilterApply" type="submit">{t.apply}</button>
+          {activeCount > 0 ? <a className="marketFilterReset" href={buildUrl(clearMarketplaceFilters(filters))}>{t.reset}</a> : null}
+        </form>
       </section>
+      <div id="categories"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters"/></div>
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>

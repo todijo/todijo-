@@ -18,8 +18,6 @@ export type MarketplaceCardProduct = {
 
 export default function MarketplaceProductCard({ product, soldOut, showCategory = false }: { product: MarketplaceCardProduct; soldOut: string; showCategory?: boolean }) {
   const locale = useLocale();
-  const common = useTranslations("Common");
-  const cart = useTranslations("Cart");
   const categories = useTranslations("Categories");
   const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
   const price = Number(product.price);
@@ -34,9 +32,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
     <ProductCardWishlist productId={product.id}/>
     <div className="discoveryCardBody">
       {showCategory && <span className="cartRecommendationCategory">{categoryLabel(product.category, (key) => categories(key))}</span>}
-      <a className="marketplaceStore" href={`/${locale}/store/${product.storeSlug}`}>{product.storeName}</a>
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
-      <div className="productAvailability"><span className={!product.isGenerallyAvailable ? "outStock" : product.stock != null && product.stock <= 3 ? "lowStock" : "inStock"}>{!product.isGenerallyAvailable ? soldOut : product.stock != null && product.stock <= 3 ? cart("stock", {count:product.stock}) : common("available")}</span><small>{product.condition}</small></div>
       <div className="cardBottom"><div>{product.requiresAuthoritativePrice?<strong><AuthoritativeProductCardPrice productId={product.id}/></strong>:<><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</>}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div>
     </div>
   </article>;
