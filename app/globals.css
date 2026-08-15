@@ -765,7 +765,7 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
 }
 
 .productMobileSecondaryActions{display:none}
-.purchaseAvailability .productIconButton{margin-inline-start:auto;min-width:44px;min-height:40px;padding:7px 11px;flex:none}.purchaseAvailabilityLabel{min-width:0}
+.purchaseAvailability .productIconButton{margin-inline-start:auto;min-width:44px;min-height:40px;padding:7px 11px;flex:none}.purchaseAvailability>span[aria-hidden="true"]{flex:none}.purchaseAvailabilityLabel{min-width:0;white-space:nowrap}
 @media(max-width:860px){
   .productDetailShell{margin-top:0;padding-top:0}
   .productDetailTop{margin-top:0}
@@ -782,6 +782,7 @@ html[dir="rtl"] .buyerOrderBadges{justify-content:flex-start}html[dir="rtl"] .bu
 @media(max-width:860px){.productSellerLink,.productTopMeta,.productFactsDesktop,.productFactsDesktopLink{display:none}.productFactsMobile,.productFactsMobileLink{display:flex}.productFactsMobile{margin:16px 0 0;padding:12px 0 0;border-top:1px solid var(--line);border-radius:0;flex-direction:column}.productDetailInfo h1{margin:0 0 7px;font-size:clamp(20px,5.5vw,22px);line-height:1.1}.productDetailPrice{font-size:clamp(22px,6vw,25px)}}
 @media(max-width:760px){.productMobileSecondaryActions{display:flex;justify-content:flex-end;margin:0 0 10px}.productMobileSecondaryActions .productIconButton{min-width:44px;min-height:44px;padding:8px 12px}}
 @media(max-width:760px){.purchaseAvailability .productIconButton{width:44px;height:40px;padding:0;justify-content:center}.purchaseAvailability .productIconButton span{display:none}}
+@media(max-width:360px){.purchaseAvailabilityLabel{white-space:normal}}
 
 /* Product detail desktop gallery: a larger canvas with a contained thumbnail rail. */
 @media(min-width:1101px){
