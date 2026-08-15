@@ -4,18 +4,9 @@ import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from "rea
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { MarketplaceFilters } from "@/lib/marketplace-search";
+import { MARKETPLACE_COUNTRY_CODES, marketplaceColorSwatch } from "@/lib/marketplace-facets";
 
-const PRIORITY_COUNTRY_PATTERNS: Array<RegExp> = [
-  /^(france|fr)$/i,
-  /^(germany|allemagne|deutschland|de)$/i,
-  /^(italy|italie|italia|it)$/i,
-  /^(spain|espagne|españa|es)$/i,
-  /^(belgium|belgique|belgië|be)$/i,
-  /^(netherlands|pays-bas|nederland|nl)$/i,
-  /^(united kingdom|royaume-uni|uk|gb)$/i,
-  /^(united states|états-unis|etats-unis|usa|us)$/i,
-  /^(china|chine|中国|cn)$/i,
-];
+const PRIORITY_COUNTRY_CODES = ["FR","DE","IT","ES","BE","NL","GB","US","CN"] as const;
 
 export type MarketplaceFacets = {
   countries: string[];
@@ -89,20 +80,15 @@ export default function MarketplaceFilterDock({
   });
 
   const countries = useMemo(() => {
-    const collator = new Intl.Collator(locale, { sensitivity: "base" });
-    const unique = [...new Set(facets.countries.filter(Boolean))];
-    const rank = (country: string) => {
-      const normalized = country.trim();
-      const index = PRIORITY_COUNTRY_PATTERNS.findIndex((pattern) => pattern.test(normalized));
-      return index === -1 ? Number.POSITIVE_INFINITY : index;
-    };
-    return unique.sort((a, b) => {
-      const rankA = rank(a);
-      const rankB = rank(b);
+    const display = new Intl.DisplayNames([locale], { type: "region" });
+    const priority = new Map<string, number>(PRIORITY_COUNTRY_CODES.map((code, index) => [code, index]));
+    return MARKETPLACE_COUNTRY_CODES.map((code) => ({ code, name: display.of(code) ?? code })).sort((a, b) => {
+      const rankA = priority.get(a.code) ?? Number.POSITIVE_INFINITY;
+      const rankB = priority.get(b.code) ?? Number.POSITIVE_INFINITY;
       if (rankA !== rankB) return rankA - rankB;
-      return collator.compare(a, b);
+      return a.name.localeCompare(b.name, locale, { sensitivity: "base" });
     });
-  }, [facets.countries, locale]);
+  }, [locale]);
 
   const activeCount = [filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length;
   const update = <K extends keyof MarketplaceFilters>(key: K, value: MarketplaceFilters[K]) => setFilters({ ...filters, [key]: value });
@@ -125,9 +111,9 @@ export default function MarketplaceFilterDock({
         ] as const).map(([value, text]) => <label key={value || "all"}><input type="radio" name="condition-dock" checked={filters.condition === value} onChange={() => update("condition", value)}/><span>{text}</span></label>)}
       </div></details>
 
-      <details className="marketFacetMenu" open={openFacet === "country"}><summary onClick={facetSummary("country").onClick}>{labels.country}{filters.country ? <b>{filters.country}</b> : null}<ChevronDown size={14}/></summary><div className="marketFacetPopover countryFacetPopover">
+      <details className="marketFacetMenu" open={openFacet === "country"}><summary onClick={facetSummary("country").onClick}>{labels.country}{filters.country ? <b>{countries.find((item) => item.code === filters.country)?.name ?? filters.country}</b> : null}<ChevronDown size={14}/></summary><div className="marketFacetPopover countryFacetPopover">
         <button type="button" className={!filters.country ? "selected" : ""} onClick={() => update("country", "")}>{labels.all}</button>
-        {countries.map((country) => <button type="button" className={filters.country === country ? "selected" : ""} key={country} onClick={() => update("country", country)}>{country}</button>)}
+        {countries.map((country) => <button type="button" className={filters.country === country.code ? "selected" : ""} key={country.code} onClick={() => update("country", country.code)}>{country.name}</button>)}
       </div></details>
 
       <button type="button" className={`marketAvailabilityToggle${filters.availability === "in-stock" ? " selected" : ""}`} onClick={() => update("availability", filters.availability === "in-stock" ? "" : "in-stock")} aria-pressed={filters.availability === "in-stock"}>{labels.availability}</button>
@@ -137,7 +123,7 @@ export default function MarketplaceFilterDock({
       </div></details>}
 
       {facets.colors.length > 0 && <details className="marketFacetMenu" open={openFacet === "color"}><summary onClick={facetSummary("color").onClick}>{product("color")}{filters.color ? <b>{filters.color}</b> : null}<ChevronDown size={14}/></summary><div className="marketFacetPopover colorFacetPopover">
-        {facets.colors.map((value) => <button type="button" className={filters.color === value ? "selected" : ""} key={value} onClick={() => update("color", filters.color === value ? "" : value)}><span className="colorFacetSwatch" aria-hidden="true" style={{ background: colorCss(value) }}/><span>{value}</span></button>)}
+        {facets.colors.map((value) => <button type="button" className={filters.color === value ? "selected" : ""} key={value} onClick={() => update("color", filters.color === value ? "" : value)}><span className="colorFacetSwatch" aria-hidden="true" style={{ background: marketplaceColorSwatch(value) }}/><span>{seller(`variantColors.${value}`)}</span></button>)}
       </div></details>}
 
       {facets.seasons.length > 0 && <details className="marketFacetMenu" open={openFacet === "season"}><summary onClick={facetSummary("season").onClick}>{labels.season}{filters.season ? <b>{filters.season}</b> : null}<ChevronDown size={14}/></summary><div className="marketFacetPopover chipFacetPopover">
@@ -155,21 +141,4 @@ export default function MarketplaceFilterDock({
       {activeCount > 0 && <a className="marketFilterReset" href={resetHref}>{labels.reset}</a>}
     </form>
   </section>;
-}
-
-function colorCss(value: string) {
-  const v = value.toLowerCase();
-  if (/black|noir|schwarz|أسود|ڕەش/.test(v)) return "#111";
-  if (/white|blanc|weiß|أبيض|سپی/.test(v)) return "#f7f7f7";
-  if (/gray|grey|gris|grau|رمادي|خۆڵەمێشی/.test(v)) return "#8b9097";
-  if (/blue|bleu|blau|أزرق|شین/.test(v)) return "#2563eb";
-  if (/red|rouge|rot|أحمر|سور/.test(v)) return "#dc2626";
-  if (/green|vert|grün|أخضر|سەوز/.test(v)) return "#16a34a";
-  if (/yellow|jaune|gelb|أصفر|زەرد/.test(v)) return "#facc15";
-  if (/orange/.test(v)) return "#f97316";
-  if (/pink|rose|rosa|وردي|پەمەیی/.test(v)) return "#ec4899";
-  if (/purple|violet|lila|بنفسجي|مۆر|بەنەوشە/.test(v)) return "#7c3aed";
-  if (/brown|marron|braun|بني/.test(v)) return "#8b5e3c";
-  if (/beige|cream|crème/.test(v)) return "#e7d6b5";
-  return "#e5e7eb";
 }

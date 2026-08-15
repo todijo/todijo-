@@ -9,10 +9,11 @@ import BuyerMobileHeader from "@/components/BuyerMobileHeader";
 import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import MarketplaceCategoryNavigation from "@/components/MarketplaceCategoryNavigation";
+import MarketplaceBrowseFilterBar from "@/components/MarketplaceBrowseFilterBar";
 import TodijoLogo from "@/components/TodijoLogo";
 import { isNavigationActive, localizedPath } from "@/lib/navigation";
 
-export default function MarketplaceHeader({ showCategoryNav = true }: { showCategoryNav?: boolean }) {
+export default function MarketplaceHeader({ showCategoryNav = true, showFilterDock = false }: { showCategoryNav?: boolean; showFilterDock?: boolean }) {
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
   const locale = useLocale();
@@ -57,7 +58,8 @@ export default function MarketplaceHeader({ showCategoryNav = true }: { showCate
         </nav>
         <div className="marketMobileActions"><Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-label={accountName ?? common("account")}><UserRound size={22} aria-hidden="true"/></Link><CartLink label={common("cart")} className="homeCartLink"/></div>
       </div></div>
-      {showCategoryNav ? <MarketplaceCategoryNavigation/> : null}
+      {showFilterDock ? <MarketplaceBrowseFilterBar/> : null}
+      {showCategoryNav ? <MarketplaceCategoryNavigation className={showFilterDock ? "marketCategoryNavigationBelowFilters" : ""}/> : null}
     </header>
   </>;
 }

@@ -8,7 +8,7 @@ const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8")
 
 test("marketplace search uses a dedicated localized, refresh-safe results route", () => {
   const normalized = normalizeMarketplaceSearch({ q: "camera", country: "France", sort: "price-asc", page: "2" });
-  assert.equal(marketplaceUrl("fr", normalized.filters, normalized.page), "/fr/search?q=camera&country=France&sort=price-asc&page=2");
+  assert.equal(marketplaceUrl("fr", normalized.filters, normalized.page), "/fr/search?q=camera&country=FR&sort=price-asc&page=2");
   assert.doesNotMatch(marketplaceUrl("en", normalized.filters), /#products/);
   assert.match(source("app/search/page.tsx"), /resultsOnly|__resultsOnly/);
 });

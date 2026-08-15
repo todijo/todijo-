@@ -1,3 +1,5 @@
+import { canonicalMarketplaceColor, canonicalMarketplaceCountry } from "./marketplace-facets";
+
 export const MARKETPLACE_SORTS = ["newest", "best-selling", "price-asc", "price-desc"] as const;
 export type MarketplaceSort = typeof MARKETPLACE_SORTS[number];
 
@@ -37,9 +39,9 @@ export function normalizeMarketplaceSearch(params: Record<string, string | strin
   return {
     filters: {
       q: text(params.q), category: text(params.category, 80), condition: text(params.condition, 80),
-      country: text(params.country, 80), rating, sort, minPrice, maxPrice,
+      country: canonicalMarketplaceCountry(text(params.country, 80)), rating, sort, minPrice, maxPrice,
       availability: text(params.availability, 20) === "in-stock" ? "in-stock" as const : "" as const,
-      color: text(params.color, 100), size: text(params.size, 100), season: text(params.season, 100),
+      color: canonicalMarketplaceColor(text(params.color, 100)) ?? "", size: text(params.size, 100), season: text(params.season, 100),
     },
     page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
     invalidPriceRange: Boolean(minPrice && maxPrice && Number(minPrice) > Number(maxPrice)),
@@ -47,17 +49,28 @@ export function normalizeMarketplaceSearch(params: Record<string, string | strin
 }
 
 export function marketplaceUrl(locale: string, filters: MarketplaceFilters, page = 1) {
+  const normalizedFilters = normalizeMarketplacePriceRange(filters);
   const params = new URLSearchParams();
   const entries: Array<[keyof MarketplaceFilters, string]> = [
-    ["q", filters.q.trim()], ["category", filters.category], ["condition", filters.condition],
-    ["country", filters.country], ["rating", filters.rating], ["minPrice", filters.minPrice],
-    ["maxPrice", filters.maxPrice], ["availability", filters.availability], ["color", filters.color], ["size", filters.size], ["season", filters.season],
+    ["q", normalizedFilters.q.trim()], ["category", normalizedFilters.category], ["condition", normalizedFilters.condition],
+    ["country", normalizedFilters.country], ["rating", normalizedFilters.rating], ["minPrice", normalizedFilters.minPrice],
+    ["maxPrice", normalizedFilters.maxPrice], ["availability", normalizedFilters.availability], ["color", normalizedFilters.color], ["size", normalizedFilters.size], ["season", normalizedFilters.season],
   ];
   for (const [key, value] of entries) if (value) params.set(key, value);
-  if (filters.sort !== "newest") params.set("sort", filters.sort);
+  if (normalizedFilters.sort !== "newest") params.set("sort", normalizedFilters.sort);
   if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return `/${locale}/search${query ? `?${query}` : ""}`;
+}
+
+export function normalizeMarketplacePriceRange(filters: MarketplaceFilters): MarketplaceFilters {
+  const canonical = {
+    ...filters,
+    country: filters.country ? canonicalMarketplaceCountry(filters.country) : "",
+    color: filters.color ? canonicalMarketplaceColor(filters.color) ?? "" : "",
+  };
+  if (!canonical.minPrice || !canonical.maxPrice || Number(canonical.minPrice) <= Number(canonical.maxPrice)) return canonical;
+  return { ...canonical, minPrice: canonical.maxPrice, maxPrice: canonical.minPrice };
 }
 
 export function clearMarketplaceFilters(filters: MarketplaceFilters): MarketplaceFilters {

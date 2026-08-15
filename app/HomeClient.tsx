@@ -11,7 +11,7 @@ import MarketplaceProductCard, { type MarketplaceCardProduct } from "@/component
 import MarketplaceHeader from "@/components/MarketplaceHeader";
 import MarketplaceCategoryNavigation from "@/components/MarketplaceCategoryNavigation";
 import { EmptyState } from "@/components/FeedbackState";
-import { clearMarketplaceFilters, marketplaceUrl, type MarketplaceFilters } from "@/lib/marketplace-search";
+import { clearMarketplaceFilters, marketplaceUrl, normalizeMarketplacePriceRange, type MarketplaceFilters } from "@/lib/marketplace-search";
 import { categoryLabel } from "@/lib/categories";
 import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
 import MarketplaceFilterDock, { type MarketplaceFacets } from "@/components/MarketplaceFilterDock";
@@ -64,8 +64,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (filters.minPrice && filters.maxPrice && Number(filters.minPrice) > Number(filters.maxPrice)) return;
-    window.location.href = buildUrl(filters);
+    window.location.href = buildUrl(normalizeMarketplacePriceRange(filters));
   }
 
   function chooseCategory(category: string) {

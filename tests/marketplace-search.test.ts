@@ -10,8 +10,8 @@ const filters: MarketplaceFilters = {
 };
 
 test("marketplace URLs preserve locale and encode deterministic shareable state", () => {
-  assert.equal(marketplaceUrl("ku", filters, 3), "/ku/search?q=camera+%26+lens&category=Electronics&condition=NEW&country=France&rating=4&minPrice=10&maxPrice=500&availability=in-stock&color=Blue&size=M&season=Summer&sort=best-selling&page=3");
-  assert.equal(marketplaceUrl("fr", { ...filters, q: "", sort: "newest" }), "/fr/search?category=Electronics&condition=NEW&country=France&rating=4&minPrice=10&maxPrice=500&availability=in-stock&color=Blue&size=M&season=Summer");
+  assert.equal(marketplaceUrl("ku", filters, 3), "/ku/search?q=camera+%26+lens&category=Electronics&condition=NEW&country=FR&rating=4&minPrice=10&maxPrice=500&availability=in-stock&color=blue&size=M&season=Summer&sort=best-selling&page=3");
+  assert.equal(marketplaceUrl("fr", { ...filters, q: "", sort: "newest" }), "/fr/search?category=Electronics&condition=NEW&country=FR&rating=4&minPrice=10&maxPrice=500&availability=in-stock&color=blue&size=M&season=Summer");
 });
 
 test("unsupported and malformed search parameters normalize safely", () => {
@@ -22,6 +22,7 @@ test("unsupported and malformed search parameters normalize safely", () => {
 test("invalid price ranges are explicit and clearing filters preserves query and sort", () => {
   const result = normalizeMarketplaceSearch({ q: "camera", minPrice: "500", maxPrice: "10", sort: "best-selling", rating: "4" });
   assert.equal(result.invalidPriceRange, true);
+  assert.match(marketplaceUrl("fr", result.filters), /minPrice=10&maxPrice=500/);
   assert.deepEqual(clearMarketplaceFilters(result.filters), { ...result.filters, category: "", condition: "", country: "", rating: "", sort: "newest", minPrice: "", maxPrice: "", availability: "", color: "", size: "", season: "" });
   assert.equal(clearMarketplaceFilters(result.filters).q, "camera");
   assert.equal(clearMarketplaceFilters(result.filters).sort, "newest");

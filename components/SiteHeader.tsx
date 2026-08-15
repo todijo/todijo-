@@ -70,5 +70,5 @@ export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }:
   const pathname = usePathname();
   const path = pathWithoutLocale(pathname);
   if (path.startsWith("/seller") || path.startsWith("/adm-barewbar-182203")) return <LegacySiteHeader storeName={storeName} storeSlug={storeSlug} buyerMobile={buyerMobile}/>;
-  return <MarketplaceHeader/>;
+  return <MarketplaceHeader showFilterDock/>;
 }

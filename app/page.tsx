@@ -6,6 +6,7 @@ import { buyerVisibleVariantWhere, productGenerallyAvailableWhere, resolveProduc
 import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
+import { canonicalMarketplaceColor, countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplace-facets";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,7 +45,13 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const publicStoreAccess = publicStoreAccessWhere(now);
   const refinements: Prisma.ProductWhereInput[] = [];
   if (availability === "in-stock") refinements.push(productGenerallyAvailableWhere());
-  if (color) refinements.push({ OR: [{ colors: { has: color } }, { options: { some: { active: true, values: { some: { active: true, value: color } } } } }] });
+  if (color) {
+    const aliases = marketplaceColorAliases(color);
+    refinements.push({ OR: [
+      { colors: { hasSome: aliases } },
+      ...aliases.map((alias) => ({ options: { some: { active: true, values: { some: { active: true, value: { contains: alias, mode: "insensitive" as const } } } } } })),
+    ] });
+  }
   if (size) refinements.push({ OR: [{ sizes: { has: size } }, { options: { some: { active: true, values: { some: { active: true, value: size } } } } }] });
   if (season) refinements.push({ options: { some: { active: true, name: { in: ["Season", "Saison", "season", "saison"] }, values: { some: { active: true, value: season } } } } });
 
@@ -62,7 +69,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       ? {
           store: {
             ...publicStoreAccess,
-            ...(country ? { country: { contains: country, mode: "insensitive" } } : {}),
+            OR: countryAliasesForCode(country).map((alias) => ({ country: { equals: alias, mode: "insensitive" as const } })),
           },
         }
       : {}),
@@ -185,7 +192,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   }))].sort((a,b) => a.localeCompare(b));
   const facets = {
     countries: [...new Set(facetRows.map((product) => product.store.country.trim()).filter(Boolean))],
-    colors: facetValues("color"), sizes: facetValues("size"), seasons: facetValues("season"),
+    colors: [...new Set(facetValues("color").map(canonicalMarketplaceColor).filter((value): value is NonNullable<typeof value> => Boolean(value)))],
+    sizes: facetValues("size"), seasons: facetValues("season"),
   };
 
   return (

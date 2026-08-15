@@ -53,5 +53,5 @@ test("visible category surfaces use the shared resolver while values and queries
     assert.match(source, /categoryLabel\(value/);
   }
   assert.match(fs.readFileSync(path.join(root, "app/page.tsx"), "utf8"), /category: \{ contains: q/);
-  assert.match(fs.readFileSync(path.join(root, "lib/marketplace-search.ts"), "utf8"), /\["category", filters\.category\]/);
+  assert.match(fs.readFileSync(path.join(root, "lib/marketplace-search.ts"), "utf8"), /\["category", normalizedFilters\.category\]/);
 });

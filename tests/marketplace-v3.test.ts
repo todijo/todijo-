@@ -12,7 +12,7 @@ test("marketplace facets are real query-backed controls with one accessible open
   assert.match(dock, /setOpenFacet\(\(current\) => current === id \? null : id\)/);
   assert.match(dock, /document\.addEventListener\("pointerdown", closeOutside\)/);
   assert.match(dock, /event\.key === "Escape"/);
-  assert.match(page, /options: \{ some: \{ active: true, values: \{ some: \{ active: true, value: color \}/);
+  assert.match(page, /aliases\.map\(\(alias\).*value: \{ contains: alias/);
   assert.match(page, /options: \{ some: \{ active: true, values: \{ some: \{ active: true, value: size \}/);
   assert.match(page, /isSeasonName/);
 });

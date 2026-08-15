@@ -1110,3 +1110,26 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 .buyerMobileCategoriesButton{border-color:#d8c8ec!important;background:#f7f2ff!important;color:#5b21b6!important}.buyerMobileCategoryList a:hover,.buyerMobileCategoryList a.active{background:#efe7ff!important;color:#5b21b6!important}.buyerMobileBottomNav{border-color:#e2d8ee!important;box-shadow:0 -8px 25px rgba(61,28,95,.09)!important}.buyerMobileBottomNav a{color:#6e627a!important}.buyerMobileBottomNav a.active{background:#f0e8ff!important;color:#6d28d9!important}.buyerMobileBottomNav strong{background:#6d28d9!important;color:#fff!important}
 
 @media(max-width:860px){.marketAvailabilityToggle{min-height:38px;padding-inline:10px}.marketFacetPopover{z-index:980}.marketInfoHero{padding-top:46px}.marketInfoHero h1{font-size:clamp(32px,10vw,48px);letter-spacing:-1.4px}.legalInfoPage .marketInfoLayout{grid-template-columns:1fr}.marketInfoLegalNav{position:static}}
+
+/* Marketplace V3.1 navigation + facet corrections */
+@media(min-width:861px){
+  .marketHeader>.marketFilterDockV3{top:70px}
+  .marketHeader>.marketFilterDockV3+.marketCategoryNavigationBelowFilters{top:134px}
+  .marketHeader>.marketFilterDockV3 .marketFacetPopover{top:188px}
+  .buyerHomePage>.marketFilterDockV3 .marketFacetPopover{top:188px}
+}
+.marketQuickMegaMenu{border-color:#eadff8;background:#fff}
+.marketQuickMegaColumns a{padding:6px 8px;border-radius:8px;color:#5a4b6f;background:transparent;text-decoration:none!important}
+.marketQuickMegaColumns a:hover,.marketQuickMegaColumns a:focus-visible{background:#f2eaff;color:#5b21b6;outline:none}
+.marketQuickMegaSidebar button.active{background:#efe7ff;color:#5b21b6}
+.productDetailLoadingSkeleton .pageSkeleton{background:linear-gradient(180deg,#f7f2ff,#fcfaff)}
+.productDetailLoadingSkeleton .pageSkeleton article{border-color:#e6dcf2;background:#fff}
+.productDetailLoadingSkeleton .pageSkeleton i{background:linear-gradient(100deg,#e9e0f5 20%,#faf7ff 38%,#e9e0f5 56%);background-size:220% 100%}
+.productDetailPage .marketHeader,.marketInfoPage .marketHeader{position:sticky;top:0}
+.marketInfoPage{overflow-x:clip}
+.productDetailPage .marketFilterDockV3,.marketInfoPage .marketFilterDockV3{position:sticky;top:70px}
+.productDetailPage .marketCategoryNavigationBelowFilters,.marketInfoPage .marketCategoryNavigationBelowFilters{position:sticky;top:134px}
+@media(max-width:860px){
+  .productDetailPage .marketFilterDockV3,.marketInfoPage .marketFilterDockV3{top:103px}
+  .productDetailPage .marketCategoryNavigationBelowFilters,.marketInfoPage .marketCategoryNavigationBelowFilters{top:157px}
+}
