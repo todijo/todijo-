@@ -1127,6 +1127,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 .productDetailLoadingSkeleton .pageSkeleton i{background:linear-gradient(100deg,#e9e0f5 20%,#faf7ff 38%,#e9e0f5 56%);background-size:220% 100%}
 .productDetailPage .marketHeader,.marketInfoPage .marketHeader{position:sticky;top:0}
 .marketInfoPage{overflow-x:clip}
+.buyerHomePage>.marketCategoryStickyBoundary{position:sticky;top:134px;z-index:110}
+.buyerHomePage>.marketCategoryStickyBoundary>.marketCategoryNavigationBelowFilters{position:relative;top:auto}
 .productDetailPage .marketFilterDockV3,.marketInfoPage .marketFilterDockV3{position:sticky;top:70px}
 .productDetailPage .marketCategoryNavigationBelowFilters,.marketInfoPage .marketCategoryNavigationBelowFilters{position:sticky;top:134px}
 @media(max-width:860px){

@@ -25,6 +25,6 @@ export default function MarketplaceBrowseFilterBar() {
 
   const submit = (event: FormEvent) => { event.preventDefault(); router.push(marketplaceUrl(locale, filters)); };
   const resetHref = marketplaceUrl(locale, clearMarketplaceFilters(filters));
-  return <MarketplaceFilterDock filters={filters} setFilters={setFilters} onSubmit={submit} resetHref={resetHref} facets={EMPTY_FACETS}
+  return <MarketplaceFilterDock filters={filters} setFilters={setFilters} onSubmit={submit} onSelect={(next) => router.push(marketplaceUrl(locale, next))} resetHref={resetHref} facets={EMPTY_FACETS}
     labels={{ filters:t("filters"), condition:t("condition"), country:t("country"), sort:t("sort"), newest:t("newest"), best:h("bestSellers"), low:t("low"), high:t("high"), reviews:d("reviews"), availability:c("available"), season:t("season"), all:t("all"), min:t("min"), max:t("max"), apply:t("apply"), reset:t("reset") }}/>
 }

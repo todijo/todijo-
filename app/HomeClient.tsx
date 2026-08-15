@@ -79,11 +79,12 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
         filters={filters}
         setFilters={setFilters}
         onSubmit={submit}
+        onSelect={(next) => { window.location.href = buildUrl(next); }}
         resetHref={buildUrl(clearMarketplaceFilters(filters))}
         facets={facets}
         labels={{ filters:t.filters, condition:t.condition, country:t.country, sort:t.sort, newest:t.newest, best:t.best, low:t.low, high:t.high, reviews:t.reviews, availability:t.availability, season:t.season, all:t.all, min:t.min, max:t.max, apply:t.apply, reset:t.reset }}
       />
-      <div id="categories"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters"/></div>
+      <div id="categories" className="marketCategoryStickyBoundary"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters"/></div>
 
       <section className="discoveryHero">
         <div className="container discoveryHeroGrid">

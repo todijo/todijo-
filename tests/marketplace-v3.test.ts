@@ -8,7 +8,7 @@ const source = (path: string) => readFileSync(path, "utf8");
 test("marketplace facets are real query-backed controls with one accessible open panel", () => {
   const dock = source("components/MarketplaceFilterDock.tsx");
   const page = source("app/page.tsx");
-  for (const token of ['name="sort-dock"', 'name="condition-dock"', 'name="rating-dock"', 'update("country"', 'update("availability"', 'update("size"', 'update("color"', 'update("season"']) assert.match(dock, new RegExp(token.replace(/[()]/g, "\\$&")));
+  for (const token of ['name="sort-dock"', 'name="condition-dock"', 'name="rating-dock"', 'select("country"', 'update("availability"', 'select("size"', 'select("color"', 'select("season"']) assert.match(dock, new RegExp(token.replace(/[()]/g, "\\$&")));
   assert.match(dock, /setOpenFacet\(\(current\) => current === id \? null : id\)/);
   assert.match(dock, /document\.addEventListener\("pointerdown", closeOutside\)/);
   assert.match(dock, /event\.key === "Escape"/);
