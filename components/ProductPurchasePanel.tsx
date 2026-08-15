@@ -65,6 +65,7 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   return <aside className="productPurchaseCard" aria-label={detail("purchaseOptions")}>
     <div className={`purchaseAvailability${displayAvailable ? " isAvailable" : " isUnavailable"}`}><span aria-hidden="true" />{displayAvailable ? availabilityLabel : t("unavailable")}</div>
     <div className="purchasePanel variantPurchasePanel">
+      <div className="purchaseOptionsScroll">
       {isVariantProduct ? genericOptions.map((option) => <fieldset className="optionGroup" key={option.id}><legend>{option.name}</legend><div>{option.values.slice().sort((a, b) => a.position - b.position).map((value) => {
         const next = { ...Object.fromEntries(Object.entries(selection).filter(([selectedOptionId])=>(genericOptions.find((candidate)=>candidate.id===selectedOptionId)?.position??0)<=option.position)), [option.id]: value.id };
         const valueAvailable = activeVariants.some((variant) => matches(variant, next) && variant.stock > 0);
@@ -74,12 +75,15 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
         </button>;
       })}</div></fieldset>) : <><fieldset className="optionGroup"><legend>{t("color")}</legend><div>{colorChoices.map((value) => <button key={value} className={color === value ? "selected" : ""} onClick={() => setColor(value)} type="button" aria-pressed={color === value}>{value}</button>)}</div></fieldset><fieldset className="optionGroup"><legend>{t("size")}</legend><div>{sizeChoices.map((value) => <button key={value} className={size === value ? "selected" : ""} onClick={() => setSize(value)} type="button" aria-pressed={size === value}>{value}</button>)}</div></fieldset></>}
       <p className="selectedOptions">{t("selection", { value: selectedOptions || detail("chooseCombination") })}</p>
+      </div>
+      <div className="purchaseActionFooter">
       <div className="productQuantityControl">
         <span>{detail("quantity")}</span>
         <div><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity <= 1} aria-label={detail("decreaseQuantity")}>−</button><output aria-live="polite">{quantity}</output><button type="button" onClick={() => setQuantity((value) => Math.min(stock, value + 1))} disabled={!available || quantity >= stock} aria-label={detail("increaseQuantity")}>+</button></div>
       </div>
       <DropshippingProductPricing enabled={dropshippingEligible} prefetchEnabled={requiresAuthoritativePrice} productId={product.id} variantId={selectedVariant?.id??null} availableVariantIds={availableVariantIds} quantity={quantity} onChange={updatePricing}/>
       <AddToCartButton disabled={!available||!pricingReady} disabledLabel={!pricingReady?detail("pricingLoading"):disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
+      </div>
     </div>
     <div className="mobilePurchaseBar"><span aria-live="polite">{selectedOptions || detail("chooseCombination")}</span><AddToCartButton disabled={!available||!pricingReady} disabledLabel={!pricingReady?detail("pricingLoading"):disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
   </aside>;

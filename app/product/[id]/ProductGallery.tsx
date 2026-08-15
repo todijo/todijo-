@@ -29,6 +29,8 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
   const [isOpen, setIsOpen] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isMobileGallery, setIsMobileGallery] = useState(false);
+  const [hoverZoomEnabled, setHoverZoomEnabled] = useState(false);
+  const [hoverZoomActive, setHoverZoomActive] = useState(false);
   const [mobileImageMetrics, setMobileImageMetrics] = useState<Record<string, MobileImageMetrics>>({});
   const touchStartX = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -36,6 +38,9 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
+  const mainImageRef = useRef<HTMLImageElement | null>(null);
+  const zoomLensRef = useRef<HTMLSpanElement | null>(null);
+  const zoomPanelRef = useRef<HTMLDivElement | null>(null);
 
   const selectedIndex = selectedMedia.type === "IMAGE" ? selectedMedia.index : 0;
   const stopVideo = useCallback(() => {
@@ -94,12 +99,37 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
     return () => query.removeEventListener("change", update);
   }, []);
 
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1201px) and (hover: hover) and (pointer: fine)");
+    const update = () => { setHoverZoomEnabled(query.matches); if (!query.matches) setHoverZoomActive(false); };
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
   const hasImages = cleanImages.length > 0;
   const hasMedia = hasImages || Boolean(video);
   const mediaCount = cleanImages.length + (video ? 1 : 0);
   const selectedPosition = selectedMedia.type === "VIDEO" ? cleanImages.length + 1 : selectedIndex + 1;
   const selectedImage = cleanImages[selectedIndex];
   const selectedMobileMetrics = mobileImageMetrics[selectedImage] ?? { aspectRatio: 1, orientation: "square" as const };
+
+  const updateHoverZoom = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const image = mainImageRef.current, lens = zoomLensRef.current, panel = zoomPanelRef.current;
+    if (!hoverZoomEnabled || !image || !lens || !panel || !image.naturalWidth || !image.naturalHeight) return;
+    const rect = image.getBoundingClientRect(), fit = getComputedStyle(image).objectFit;
+    const scale = fit === "cover" ? Math.max(rect.width / image.naturalWidth, rect.height / image.naturalHeight) : Math.min(rect.width / image.naturalWidth, rect.height / image.naturalHeight);
+    const renderedWidth = image.naturalWidth * scale, renderedHeight = image.naturalHeight * scale;
+    const offsetX = (rect.width - renderedWidth) / 2, offsetY = (rect.height - renderedHeight) / 2;
+    const visibleLeft = Math.max(0, offsetX), visibleTop = Math.max(0, offsetY), visibleRight = Math.min(rect.width, offsetX + renderedWidth), visibleBottom = Math.min(rect.height, offsetY + renderedHeight);
+    const pointerX = Math.min(visibleRight, Math.max(visibleLeft, event.clientX - rect.left)), pointerY = Math.min(visibleBottom, Math.max(visibleTop, event.clientY - rect.top));
+    const zoom = 2.35, lensWidth = Math.min(150, (visibleRight - visibleLeft) * .42), lensHeight = Math.min(120, (visibleBottom - visibleTop) * .36);
+    const lensLeft = Math.min(visibleRight - lensWidth, Math.max(visibleLeft, pointerX - lensWidth / 2)), lensTop = Math.min(visibleBottom - lensHeight, Math.max(visibleTop, pointerY - lensHeight / 2));
+    lens.style.cssText = `left:${lensLeft}px;top:${lensTop}px;width:${lensWidth}px;height:${lensHeight}px`;
+    panel.style.backgroundImage = `url(${JSON.stringify(selectedImage)})`;
+    panel.style.backgroundSize = `${renderedWidth * zoom}px ${renderedHeight * zoom}px`;
+    panel.style.backgroundPosition = `${panel.clientWidth / 2 - (pointerX - offsetX) * zoom}px ${panel.clientHeight / 2 - (pointerY - offsetY) * zoom}px`;
+  }, [hoverZoomEnabled, selectedImage]);
 
   useEffect(() => {
     if (!isMobileGallery) return;
@@ -249,17 +279,10 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
             })}
           </div>
         ) : (
-          <button
-            type="button"
-            className="productMainImageButton"
-            onClick={(event) => {
-              openerRef.current = event.currentTarget;
-              setIsOpen(true);
-            }}
-            aria-label={`Agrandir l'image ${selectedIndex + 1} de ${productName}`}
-          >
+          <div className="productMainImageZoomSurface" onPointerEnter={() => hoverZoomEnabled && setHoverZoomActive(true)} onPointerMove={updateHoverZoom} onPointerLeave={() => setHoverZoomActive(false)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
+              ref={mainImageRef}
               key={selectedImage}
               className="productMainImage productMainImageIntrinsic"
               src={selectedImage}
@@ -270,8 +293,8 @@ export default function ProductGallery({ images, productName, media = [] }: Prod
                 image.dataset.orientation = image.naturalWidth >= image.naturalHeight ? "landscape" : "portrait";
               }}
             />
-            <span className="productZoomHint">⛶ Agrandir</span>
-          </button>
+            {hoverZoomEnabled&&hoverZoomActive&&<><span ref={zoomLensRef} className="productHoverZoomLens" aria-hidden="true"/><div ref={zoomPanelRef} className="productHoverZoomPanel" aria-hidden="true"/></>}
+          </div>
           )}
           <span className="productGalleryCounter" aria-live="polite">{selectedPosition} / {mediaCount}</span>
         </div>

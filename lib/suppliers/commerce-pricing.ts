@@ -9,6 +9,8 @@ import type {BuyerDropshippingPricingResponse} from "./buyer-pricing";
 
 export type DropshippingPricingMode="AUTOMATIC"|"MANUAL_OVERRIDE"|"NORMAL_MARKETPLACE";
 export type DropshippingEligibility={eligible:boolean;provider:"CJ"|null;authorized:boolean;pricingMode:DropshippingPricingMode;reason:"ELIGIBLE"|"NORMAL_MARKETPLACE"|"SELLER_NOT_AUTHORIZED"|"CONNECTION_UNAVAILABLE"};
+
+export function usesEmbeddedDropshippingShipping(eligibility:DropshippingEligibility){return eligibility.eligible&&eligibility.pricingMode==="AUTOMATIC";}
 export type BuyerDropshippingPrice=BuyerDropshippingPricingResponse&{buyerCurrency:SupportedBuyerCurrency};
 export type DropshippingPriceSnapshot={pricingMode:"AUTOMATIC"|"MANUAL_OVERRIDE";provider:"CJ";productId:string;variantId:string;supplierProductId:string;supplierVariantId:string;originCountry:string;quantity:number;supplierCurrency:string;supplierUnitCost:string;freightCurrency:string;freightTotal:string;supportedFees:Array<{name:string;amount:string;currency:string}>;includedCost:string;targetMargin:string;calculatedSellingPrice:string;buyerCurrency:SupportedBuyerCurrency;fx:VerifiedFxRate;buyerUnitPrice:string;buyerLineTotal:string;shippingIncluded:boolean;freeShipping:boolean;shippingMethod:string;deliveryMinDays:number|null;deliveryMaxDays:number|null;pricedAt:string;pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"};
 export type ResolvedDropshippingPricing={eligibility:DropshippingEligibility;buyer:BuyerDropshippingPrice|null;snapshot:DropshippingPriceSnapshot|null};
