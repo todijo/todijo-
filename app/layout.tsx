@@ -10,7 +10,7 @@ import { WishlistProvider } from "@/components/WishlistProvider";
 import CookieConsent from "@/components/CookieConsent";
 
 export const viewport: Viewport = {
-  themeColor: "#063d2d",
+  themeColor: "#5b21b6",
 };
 
 export async function generateMetadata(): Promise<Metadata> {

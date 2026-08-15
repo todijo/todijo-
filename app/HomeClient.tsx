@@ -29,8 +29,9 @@ function ProductRail({ id, title, titleHref, products, soldOut }: { id?: string;
   return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2><a className="marketplaceRailTitleLink" href={titleHref}>{title}</a></h2></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
 }
 
-export default function HomeClient({ products, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters, resultsOnly = false }: {
+export default function HomeClient({ products, heroProducts, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters, resultsOnly = false }: {
   products: MarketplaceProduct[];
+  heroProducts: MarketplaceProduct[];
   newArrivals: MarketplaceProduct[];
   bestSellers: MarketplaceProduct[];
   stores: MarketplaceStore[];
@@ -77,7 +78,7 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
   }, [showFilters]);
 
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability].filter(Boolean).length, [filters]);
-  const featuredProducts = products.filter((product) => product.image).slice(0, 3);
+  const featuredProducts = heroProducts.filter((product) => product.image).slice(0, 5);
   const featuredCategories = categories.slice(0, 4);
 
   function submit(event: React.FormEvent) {
@@ -94,28 +95,6 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
     <main className={`buyerHomePage${resultsOnly ? " searchResultsPage" : ""}`} dir={t.dir}>
       <MarketplaceHeader showCategoryNav={false}/>
 
-      <section className="discoveryHero">
-        <div className="container discoveryHeroGrid">
-          <div className="discoveryHeroContent">
-            <span className="badge">Todijo Marketplace</span>
-            <h1>{t.title}</h1>
-            <p>{t.subtitle}</p>
-            <div className="discoveryHeroActions"><a className="discoveryHeroCta" href="#products">{h("exploreProducts")}<ArrowRight size={18} aria-hidden="true"/></a><a className="discoveryHeroCta discoveryHeroSellerCta" href={`/${activeLocale}/sell`}>{h("sellerCta")}</a></div>
-          </div>
-          <div className="discoveryHeroVisual" aria-label={h("marketplaceVisual")}>
-            {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
-              {featuredProducts.map((product, index) => <a href={`/${activeLocale}/product/${product.id}`} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
-                <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
-                <span><small>{product.storeName}</small><strong>{product.name}</strong><b>{product.requiresAuthoritativePrice?<AuthoritativeProductCardPrice productId={product.id}/>:`${product.price} ${product.currency}`}</b></span>
-              </a>)}
-            </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
-              <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>
-              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><Package size={18} aria-hidden="true"/>{displayCategory(category)}</button>)}
-            </div> : <div className="heroMarketplaceFallback"><Store size={54} aria-hidden="true"/><strong>Todijo Marketplace</strong><span>{h("marketplaceVisual")}</span></div>}
-          </div>
-        </div>
-      </section>
-
       <section className="marketFilterDock" aria-label={t.filters}>
         <form className="marketFilterDockInner" onSubmit={submit}>
           <button ref={filterTriggerRef} className="marketFilterAll" type="button" aria-expanded={showFilters} aria-controls="filter-panel" onClick={() => setShowFilters(true)}><SlidersHorizontal size={16} aria-hidden="true"/><span>{t.filters}</span>{activeCount > 0 ? <b>{activeCount}</b> : null}</button>
@@ -129,6 +108,29 @@ export default function HomeClient({ products, newArrivals, bestSellers, stores,
         </form>
       </section>
       <div id="categories"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters"/></div>
+
+      <section className="discoveryHero">
+        <div className="container discoveryHeroGrid">
+          <div className="discoveryHeroContent">
+            <span className="badge">Todijo Marketplace</span>
+            <h1>{t.title}</h1>
+            <p>{t.subtitle}</p>
+            <div className="discoveryHeroActions"><a className="discoveryHeroCta" href="#products">{h("exploreProducts")}<ArrowRight size={18} aria-hidden="true"/></a><a className="discoveryHeroCta discoveryHeroSellerCta" href={`/${activeLocale}/sell`}>{h("sellerCta")}</a></div>
+          </div>
+          <div className="discoveryHeroVisual" aria-label={h("marketplaceVisual")}>
+            {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
+              {featuredProducts.map((product, index) => <a href={`/${activeLocale}/product/${product.id}`} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
+                <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
+                <span><strong>{product.name}</strong><b>{product.requiresAuthoritativePrice?<AuthoritativeProductCardPrice productId={product.id}/>:`${product.price} ${product.currency}`}</b></span>
+              </a>)}
+            </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
+              <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>
+              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><Package size={18} aria-hidden="true"/>{displayCategory(category)}</button>)}
+            </div> : <div className="heroMarketplaceFallback"><Store size={54} aria-hidden="true"/><strong>Todijo Marketplace</strong><span>{h("marketplaceVisual")}</span></div>}
+          </div>
+        </div>
+      </section>
+
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>

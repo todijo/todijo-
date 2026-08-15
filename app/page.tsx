@@ -123,7 +123,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     return ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product));
   }
 
-  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows] = await Promise.all([
+  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows, heroProductCount] = await Promise.all([
     productsForPage(page),
     prisma.product.count({ where: isBestSelling ? { ...where, orderItems: { some: { order: { status: { in: qualifyingOrderStatuses } } } } } : where }),
     prisma.product.findMany({
@@ -145,10 +145,20 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
         products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
     }),
+    prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
   ]);
   const availablePages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const normalizedPage = Math.min(page, availablePages);
   const rows = normalizedPage === page ? initialRows : await productsForPage(normalizedPage);
+
+  // The hero is merchandising, not a "latest products" rail: choose a fresh random window
+  // on every server render while preserving all public-access rules.
+  const heroTake = Math.min(5, heroProductCount);
+  const heroSkip = heroProductCount > heroTake ? Math.floor(Math.random() * (heroProductCount - heroTake + 1)) : 0;
+  const heroRows = heroTake > 0 ? await prisma.product.findMany({
+    where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } },
+    orderBy: [{ id: "asc" }], skip: heroSkip, take: heroTake, select: productSelect,
+  }) : [];
 
   const bestSellerIds = bestSellerCounts.map((item) => item.productId);
   const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED", ...publicProductAccess }, select: productSelect }) : [];
@@ -159,6 +169,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   return (
     <HomeClient
       products={products}
+      heroProducts={heroRows.map(serializeProduct)}
       newArrivals={newArrivalRows.map(serializeProduct)}
       bestSellers={bestSellers}
       stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: product.name, image: product.images[0] ?? null })) }))}

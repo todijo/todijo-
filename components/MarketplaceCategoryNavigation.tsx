@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Baby, Car, ChevronDown, ChevronRight, Dumbbell, Gem, Hammer, House, Monitor, PawPrint, Shirt, ShoppingBag, Smartphone, Sparkles } from "lucide-react";
+import { Baby, Car, ChevronDown, ChevronLeft, ChevronRight, Dumbbell, Gem, Hammer, House, Monitor, PawPrint, Shirt, ShoppingBag, Smartphone, Sparkles } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref } from "@/lib/desktop-category-taxonomy";
 
@@ -17,16 +17,20 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
   const categoryHref = (value: string) => categorySearchHref(locale, value);
   const active = DESKTOP_CATEGORY_TAXONOMY.find((item) => item.id === activeCategory) ?? DESKTOP_CATEGORY_TAXONOMY[0];
 
   useLayoutEffect(() => { contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" }); }, [activeCategory]);
   const cancelClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
   const scheduleClose = () => { cancelClose(); closeTimer.current = setTimeout(() => setOpen(false), 170); };
+  const scrollCategories = (direction: -1 | 1) => railRef.current?.scrollBy({ left: direction * Math.max(280, railRef.current.clientWidth * 0.72), behavior: "smooth" });
 
   return <div ref={rootRef} className={`marketCategoryNavigation ${className}`.trim()} onMouseEnter={cancelClose} onMouseLeave={scheduleClose} onKeyDown={(event) => { if (event.key === "Escape") { cancelClose(); setOpen(false); } }}>
-    <div className="marketCategoryNavigationInner" role="navigation" aria-label={common("categories")}>
-      {DESKTOP_CATEGORY_TAXONOMY.slice(0, 10).map((category) => {
+    <div className="marketCategoryNavigationShell">
+      <button className="marketCategoryScrollButton previous" type="button" onClick={() => scrollCategories(-1)} aria-label={`${common("categories")} ←`}><ChevronLeft size={18} aria-hidden="true"/></button>
+      <div ref={railRef} className="marketCategoryNavigationInner" role="navigation" aria-label={common("categories")}>
+      {DESKTOP_CATEGORY_TAXONOMY.map((category) => {
         const Icon = categoryIcons[category.iconKey as keyof typeof categoryIcons];
         return <Link
           key={category.id}
@@ -39,6 +43,8 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
         ><Icon size={16} aria-hidden="true"/><span>{category.label}</span><ChevronDown size={13} aria-hidden="true"/></Link>;
       })}
       <button className="marketQuickCategory marketQuickMore" type="button" aria-haspopup="true" aria-expanded={open} onMouseEnter={() => setOpen(true)} onFocus={() => setOpen(true)} onClick={() => setOpen((value) => !value)}><span>{common("categories")}</span><ChevronDown size={13} aria-hidden="true"/></button>
+      </div>
+      <button className="marketCategoryScrollButton next" type="button" onClick={() => scrollCategories(1)} aria-label={`${common("categories")} →`}><ChevronRight size={18} aria-hidden="true"/></button>
     </div>
     {open ? <section className="marketQuickMegaMenu" aria-label={active.label}>
       <div className="marketQuickMegaSidebar">
