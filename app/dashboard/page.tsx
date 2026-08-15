@@ -99,7 +99,7 @@ export default async function DashboardPage() {
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
   const sellerCanAddProduct = Boolean(user.store && canPublish(user.store));
-  const sellerNav = sellerCanAddProduct ? [sellerNavBase[0], sellerNavBase[1], { label: p("nav.addProduct"), href: `/${locale}/seller/products/new`, icon: Plus }, ...sellerNavBase.slice(2)] : sellerNavBase;
+  const sellerNav = [sellerNavBase[0], sellerNavBase[1], { label: p("nav.addProduct"), href: `/${locale}/seller/products/new`, icon: Plus }, ...sellerNavBase.slice(2)];
   const sellerMobileNav = sellerNav;
 
   if (!isSeller) {

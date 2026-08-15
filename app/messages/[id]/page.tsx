@@ -4,6 +4,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MessageComposer from "@/components/MessageComposer";
+import SellerRouteShell from "@/components/SellerRouteShell";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 
@@ -38,9 +39,7 @@ export default async function ConversationPage({ params }: Props) {
   ]);
   const other = conversation.buyerId === session.userId ? conversation.seller : conversation.buyer;
 
-  return <main className="conversationPage scopedPublicPage">
-    <SiteHeader storeName={conversation.store.name} storeSlug={conversation.store.slug}/>
-    <section className="threadShell">
+  const content=<section className="threadShell">
       <nav className="threadNavigation" aria-label={common("messages")}><Link className="threadBack" href={`/${locale}/messages`}>← {dashboard("myConversations")}</Link><Link className="threadBack" href={`/${locale}/dashboard`}>{conversation.buyerId === session.userId ? dashboard("buyerArea") : dashboard("sellerDashboard")} →</Link></nav>
       <header className="threadHeader">
         <div className="conversationImage">{conversation.product.images[0] ? <img src={conversation.product.images[0]} alt=""/> : <span>📦</span>}</div>
@@ -49,7 +48,7 @@ export default async function ConversationPage({ params }: Props) {
       <div className="threadPrivacy">🔒 {productText("private")}</div>
       <div className="messageThread">{conversation.messages.map((message) => <div className={`messageBubble ${message.senderId === session.userId ? "mine" : "theirs"}`} key={message.id}><p>{message.body}</p><time>{message.createdAt.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}</time></div>)}</div>
       <MessageComposer conversationId={id}/>
-    </section>
-    <MarketplaceFooter />
-  </main>;
+    </section>;
+  if(session.role==="SELLER")return <SellerRouteShell userId={session.userId} locale={locale} active="messages">{content}</SellerRouteShell>;
+  return <main className="conversationPage scopedPublicPage"><SiteHeader storeName={conversation.store.name} storeSlug={conversation.store.slug}/>{content}<MarketplaceFooter /></main>;
 }
