@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { BarChart3, Boxes, CircleDollarSign, CreditCard, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
+import { Boxes, CreditCard, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
 import { DashboardEmptyState, DashboardHeader, DashboardQuickAction, DashboardSection, DashboardSidebar, DashboardStatCard, DashboardStatusBadge, type DashboardNavItem } from "@/components/DashboardUI";
 import StripeConnectSection from "@/components/StripeConnectSection";
 import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer-orders";
@@ -15,6 +15,7 @@ import SellerAnalytics from "@/components/SellerAnalytics";
 import { SellerFulfillmentControl } from "@/components/SellerFulfillmentControl";
 import { fulfillmentStepFor, sellerFulfillmentActionFor } from "@/lib/order-status";
 import { canPublish } from "@/lib/seller-subscription";
+import { sellerDashboardNavItems } from "@/components/SellerDashboardLayout";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -85,21 +86,8 @@ export default async function DashboardPage() {
     { label: common("cart"), href: paths.cart, icon: ShoppingCart },
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
-  const sellerNavBase: DashboardNavItem[] = [
-    { label: p("nav.dashboard"), href: paths.dashboard, icon: Home, active: true },
-    { label: p("nav.products"), href: `/${locale}/seller/products`, icon: Boxes },
-    { label: p("nav.orders"), href: `/${locale}/seller/orders`, icon: ReceiptText },
-    { label: p("nav.messages"), href: paths.messages, icon: MessageCircle, badge: unreadMessages },
-    { label: p("nav.statistics"), href: `/${locale}/dashboard#analytics`, icon: BarChart3 },
-    { label: p("nav.revenue"), href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign },
-    { label: p("nav.reviews"), href: user.store ? `/${locale}/seller/reviews` : `/${locale}/dashboard`, icon: Star },
-    { label: p("nav.store"), href: user.store ? `/${locale}/store/${user.store.slug}` : `/${locale}/seller/create-store`, icon: Store },
-    { label: p("nav.settings"), href: `/${locale}/seller/store-settings`, icon: Settings },
-    { label: common("account"), href: `/${locale}/account`, icon: ShieldCheck },
-    { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
-  ];
   const sellerCanAddProduct = Boolean(user.store && canPublish(user.store));
-  const sellerNav = [sellerNavBase[0], sellerNavBase[1], { label: p("nav.addProduct"), href: `/${locale}/seller/products/new`, icon: Plus }, ...sellerNavBase.slice(2)];
+  const sellerNav = sellerDashboardNavItems({ locale, storeSlug: user.store?.slug, labels: { dashboard:p("nav.dashboard"), products:p("nav.products"), addProduct:p("nav.addProduct"), orders:p("nav.orders"), messages:p("nav.messages"), statistics:p("nav.statistics"), revenue:p("nav.revenue"), reviews:p("nav.reviews"), store:p("nav.store"), settings:p("nav.settings"), notifications:p("notifications"), eyebrow:p("seller.eyebrow"), logout:common("logout"), menu:s("menu"), collapse:s("collapse") }, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active: "dashboard", unreadMessages });
   const sellerMobileNav = sellerNav;
 
   if (!isSeller) {

@@ -46,14 +46,14 @@ test("seller navigation keeps the localized product-create destination visible w
   const sellerLayout = readFileSync("components/SellerDashboardLayout.tsx", "utf8");
   const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
 
-  assert.match(sellerLayout, /const baseItems:[\s\S]*label: text\.addProduct/);
+  assert.match(sellerLayout, /function sellerDashboardNavItems[\s\S]*label: labels\.addProduct/);
   assert.match(sellerLayout, /href: `\/\$\{locale\}\/seller\/products\/new`/);
   assert.match(sellerLayout, /icon: Plus, active: active === "new-product"/);
   assert.match(ui, /premiumMobileDrawer[\s\S]*mobileMenuItems\.map/);
   assert.match(ui, /aria-current=\{active \? "page" : undefined\}/);
   assert.match(ui, /premiumDashboardMobileNav[\s\S]*items\.slice\(0, 5\)/);
   assert.match(dashboardPage, /sellerCanAddProduct = Boolean\(user\.store && canPublish\(user\.store\)\)/);
-  assert.match(dashboardPage, /const sellerNav = \[sellerNavBase\[0\], sellerNavBase\[1\],[\s\S]*nav\.addProduct/);
+  assert.match(dashboardPage, /const sellerNav = sellerDashboardNavItems/);
 });
 
 test("DashboardPremium translations keep Add Product parity and exact English and French labels", () => {
