@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useCart } from "@/components/CartProvider";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
-import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref } from "@/lib/desktop-category-taxonomy";
+import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId, subcategoryImagePath } from "@/lib/desktop-category-taxonomy";
 
 const categoryArtwork: Record<string, number> = {
   women: 0, men: 1, kids: 2, "bags-shoes": 3, beauty: 4,
@@ -93,7 +93,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
         </div>
         <div className="buyerMobileCategoryChildren" role="tabpanel">
           <a className="buyerMobileCategoryAll" href={categorySearchHref(locale, activeCategory.label)} onClick={closeDrawer}><strong>{activeCategory.label}</strong><span>{header("viewAll")} <ChevronRight size={15} aria-hidden="true"/></span></a>
-          {activeCategory.groups.map((group, groupIndex) => <section key={group.id} className="buyerMobileCategoryGroup"><h3>{group.label}</h3><div>{group.items.map((item, itemIndex) => <a key={item} href={categorySearchHref(locale, item)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={categoryImage(activeCategory.id, groupIndex + itemIndex)} alt="" width={84} height={84}/></span><span>{item}</span></a>)}</div></section>)}
+          {activeCategory.groups.map((group) => <section key={group.id} className="buyerMobileCategoryGroup"><h3>{group.label}</h3><div>{group.items.map((item) => <a key={subcategoryId(activeCategory.id, group.id, item)} href={categorySearchHref(locale, item)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={subcategoryImagePath(activeCategory.id, group.id, item)} alt="" width={84} height={84}/></span><span>{item}</span></a>)}</div></section>)}
         </div>
       </section> : <><nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>

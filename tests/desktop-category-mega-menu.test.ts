@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { DESKTOP_CATEGORY_TAXONOMY, assertValidDesktopTaxonomy, categoryFilterValues, categorySearchHref } from "../lib/desktop-category-taxonomy";
+import { existsSync, readFileSync } from "node:fs";
+import { DESKTOP_CATEGORY_TAXONOMY, assertValidDesktopTaxonomy, categoryFilterValues, categorySearchHref, subcategoryId, subcategoryImagePath } from "../lib/desktop-category-taxonomy";
 
 const labels=["Vêtements pour femmes","Fournitures pour animaux de compagnie","Maison et Jardin, Meubles","Santé et Beauté Cheveux","Bijoux & Montres","Vêtements pour hommes","Sac et Chaussures","Jouets, Enfants et Bébé","Sports et Plein air","Électronique grand public","Amélioration de l'habitat","Automobiles et Motos","Téléphones et Accessoires","Ordinateur et Bureau"];
 
@@ -14,3 +14,4 @@ test("men and bags-shoes contain the approved complete taxonomy",()=>{const men=
 test("all populated desktop categories render without manufactured fallback",()=>{assert.equal(DESKTOP_CATEGORY_TAXONOMY.every(category=>category.groups.length>0),true);const menu=readFileSync("components/MarketplaceCategoryNavigation.tsx","utf8");assert.match(menu,/marketQuickMegaContent/);assert.match(menu,/marketQuickMegaColumns/);const css=readFileSync("app/globals.css","utf8");assert.match(css,/\.marketQuickMegaMenu\{/);assert.match(css,/\.marketQuickMegaColumns\{/)});
 test("category scroller resets before paint when hover target changes",()=>{const menu=readFileSync("components/MarketplaceCategoryNavigation.tsx","utf8");assert.match(menu,/useLayoutEffect/);assert.match(menu,/contentRef\.current\?\.scrollTo/);assert.match(menu,/\[activeCategory\]/)});
 test("view-all remains locale-safe and includes every descendant category value",()=>{for(const category of DESKTOP_CATEGORY_TAXONOMY){assert.equal(categorySearchHref("fr",category.label),`/fr/search?category=${encodeURIComponent(category.label)}`);const values=categoryFilterValues(category.label);assert.ok(values.includes(category.label));for(const group of category.groups){assert.ok(values.includes(group.label));for(const item of group.items)assert.ok(values.includes(item))}}const page=readFileSync("app/page.tsx","utf8");assert.match(page,/category: \{ in: categoryFilterValues\(category\) \}/)});
+test("every leaf subcategory has a unique contextual thumbnail",()=>{const ids:string[]=[];const paths:string[]=[];for(const category of DESKTOP_CATEGORY_TAXONOMY)for(const group of category.groups)for(const item of group.items){ids.push(subcategoryId(category.id,group.id,item));const imagePath=subcategoryImagePath(category.id,group.id,item);paths.push(imagePath);assert.equal(existsSync(`public${imagePath}`),true,`Missing thumbnail for ${category.id}/${group.id}/${item}`)}assert.equal(ids.length,447);assert.equal(new Set(ids).size,447);assert.equal(new Set(paths).size,447)});
