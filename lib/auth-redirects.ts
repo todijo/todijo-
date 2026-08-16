@@ -9,8 +9,10 @@ export function adminEntryPath(locale: Locale) {
 }
 
 export function safeLoginDestination(next: string | null, locale: Locale) {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return localizedHome(locale);
+  if (!next || /[\u0000-\u001f\u007f]/.test(next)) return localizedHome(locale);
   try {
+    const decoded = decodeURIComponent(next);
+    if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\")) return localizedHome(locale);
     const url = new URL(next, "https://todijo.invalid");
     if (url.origin !== "https://todijo.invalid" || url.pathname.startsWith("/api/")) return localizedHome(locale);
     const segments = url.pathname.split("/").filter(Boolean);

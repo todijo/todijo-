@@ -4,6 +4,8 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AuthProvider } from "@prisma/client";
 import { publicAppUrl } from "./email/config";
 import { isSocialProvider, socialProviderStatus, type SocialProvider } from "./social-auth";
+import { safeLoginDestination } from "./auth-redirects";
+import type { Locale } from "../i18n/config";
 
 type RuntimeConfig = {
   provider: SocialProvider; prismaProvider: AuthProvider; clientId: string; clientSecret: string;
@@ -26,8 +28,8 @@ function stateSecret() {
   if(!value||value.length<32) throw new Error("SESSION_SECRET must contain at least 32 characters.");
   return value;
 }
-export function createOauthState(provider: SocialProvider, next: string | null) {
-  const payload=Buffer.from(JSON.stringify({provider,next:next?.startsWith("/")&&!next.startsWith("//")?next:null,nonce:randomBytes(24).toString("base64url"),createdAt:Date.now()})).toString("base64url");
+export function createOauthState(provider: SocialProvider, next: string | null, locale: Locale) {
+  const payload=Buffer.from(JSON.stringify({provider,next:safeLoginDestination(next,locale),locale,nonce:randomBytes(24).toString("base64url"),createdAt:Date.now()})).toString("base64url");
   const signature=createHmac("sha256",stateSecret()).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 }
@@ -37,7 +39,7 @@ export function readOauthState(value: string | undefined, provider: SocialProvid
   const expected=createHmac("sha256",stateSecret()).update(payload).digest();
   let actual:Buffer; try{actual=Buffer.from(signature,"base64url");}catch{return null}
   if(actual.length!==expected.length||!timingSafeEqual(actual,expected)) return null;
-  try{const parsed=JSON.parse(Buffer.from(payload,"base64url").toString("utf8")) as {provider?:unknown;next?:unknown;createdAt?:unknown};if(parsed.provider!==provider||typeof parsed.createdAt!=="number"||Date.now()-parsed.createdAt>10*60_000)return null;return{next:typeof parsed.next==="string"?parsed.next:null};}catch{return null}
+  try{const parsed=JSON.parse(Buffer.from(payload,"base64url").toString("utf8")) as {provider?:unknown;next?:unknown;locale?:unknown;createdAt?:unknown};if(parsed.provider!==provider||typeof parsed.createdAt!=="number"||Date.now()-parsed.createdAt>10*60_000)return null;if(typeof parsed.locale!=="string"||!(["en","fr","ar","ku","tr","de","es","it","nl","zh","fa","hi","pt","ru"] as string[]).includes(parsed.locale))return null;const locale=parsed.locale as Locale;return{locale,next:safeLoginDestination(typeof parsed.next==="string"?parsed.next:null,locale)};}catch{return null}
 }
 
 async function tokenResponse(config:RuntimeConfig,code:string){

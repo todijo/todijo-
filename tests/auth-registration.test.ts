@@ -44,6 +44,7 @@ test("buyer and seller login destinations are localized and reject open redirect
   assert.equal(safeLoginDestination("/messages?tab=all", "ku"), "/ku/messages?tab=all");
   assert.equal(safeLoginDestination("/fr/account/orders#latest", "de"), "/de/account/orders#latest");
   for (const destination of ["https://example.test", "//example.test", "\\\\example.test", "/api/auth/logout"]) assert.equal(safeLoginDestination(destination, "fr"), "/fr");
+  for (const destination of ["/%2F%2Fevil.test", "/%5C%5Cevil.test", "/bad%zz", "/messages\u0000evil"]) assert.equal(safeLoginDestination(destination, "fr"), "/fr");
   assert.equal(postLoginDestination("CUSTOMER", null, "fr"), "/fr");
   assert.equal(postLoginDestination("SELLER", null, "ku"), "/ku");
   assert.equal(adminEntryPath("fr"), "/fr/admin");

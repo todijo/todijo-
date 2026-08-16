@@ -5,6 +5,7 @@ import { createSession, readSession } from "@/lib/session";
 import { configuredSocialProvider, exchangeSocialCode, readOauthState } from "@/lib/social-auth-server";
 import { decideSocialIdentity } from "@/lib/social-auth";
 import { publicAppUrl } from "@/lib/email/config";
+import { safeLoginDestination } from "@/lib/auth-redirects";
 
 async function callback(request:Request,provider:string,values:URLSearchParams){
   const config=configuredSocialProvider(provider);if(!config)return NextResponse.json({error:"PROVIDER_NOT_CONFIGURED"},{status:503});
@@ -32,7 +33,7 @@ async function callback(request:Request,provider:string,values:URLSearchParams){
       return tx.user.findUniqueOrThrow({where:{id:userId},select:{id:true,role:true,authVersion:true}});
     });
     await createSession({userId:user.id,role:user.role,authVersion:user.authVersion});
-    return NextResponse.redirect(new URL(stateData.next??"/dashboard",publicAppUrl()),303);
+    return NextResponse.redirect(new URL(safeLoginDestination(stateData.next,stateData.locale),publicAppUrl()),303);
   }catch{return failure("PROVIDER_FAILED")}
 }
 export async function GET(request:Request,{params}:{params:Promise<{provider:string}>}){const {provider}=await params;return callback(request,provider,new URL(request.url).searchParams)}
