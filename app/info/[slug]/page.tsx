@@ -7,7 +7,9 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import PrivacyInformation from "@/components/PrivacyInformation";
 import MarketplaceLegalPolicy from "@/components/MarketplaceLegalPolicy";
 import MarketplaceInfoContent from "@/components/MarketplaceInfoContent";
-import { privacyPublicProfile } from "@/lib/privacy-legal";
+import HelpCenterContactForm from "@/components/HelpCenterContactForm";
+import { readSession } from "@/lib/session";
+import { supportCategories } from "@/lib/support-request";
 import { concise, localizedAlternates, localizedPath } from "@/lib/seo";
 import { type Locale } from "@/i18n/config";
 
@@ -46,22 +48,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-export default async function MarketplaceInfoPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function MarketplaceInfoPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ category?: string; product?: string }> }) {
   const { slug } = await params;
   const titleKey = pageTitleKeys[slug];
   if (!titleKey) notFound();
-  const [locale, t, legal, legalCleanup, sellerTransparency, infoPages, privacy] = await Promise.all([getLocale(), getTranslations("HomeFooter"), getTranslations("Legal"), getTranslations("LegalCleanup"), getTranslations("SellerTransparency"), getTranslations("InfoPages"), getTranslations("Privacy")]);
+  const [locale, t, legal, legalCleanup, sellerTransparency, infoPages, privacy, help, query, session] = await Promise.all([getLocale(), getTranslations("HomeFooter"), getTranslations("Legal"), getTranslations("LegalCleanup"), getTranslations("SellerTransparency"), getTranslations("InfoPages"), getTranslations("Privacy"), getTranslations("HelpCenter"), searchParams, readSession()]);
   const isLegal = legalPages.includes(slug as (typeof legalPages)[number]) || privacyTitleSlugs.includes(slug as (typeof privacyTitleSlugs)[number]);
-  const profile = privacyPublicProfile();
   const isPublicInfo = publicInfoSlugs.includes(slug as (typeof publicInfoSlugs)[number]);
   const relatedLabel = (target: string) => target === "dashboard" ? t("sellerDashboard") : target === "seller-terms" ? legal("seller.title") : t(pageTitleKeys[target]);
   return <main className={`marketInfoPage scopedPublicPage${isLegal ? " legalInfoPage" : ""}`}>
     <SiteHeader />
     <div className="marketInfoLayout">
-      {["privacy", "cookies", "privacy-data", "data-deletion"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data" | "data-deletion"} supportEmail={profile.supportEmail} />
-      : slug in policyKinds ? <MarketplaceLegalPolicy title={legal(`${policyKinds[slug as keyof typeof policyKinds]}.title`)} intro={legal(`${policyKinds[slug as keyof typeof policyKinds]}.intro`)} statusNote={legal("common.preIncorporation")} traderNote={slug === "seller-terms" || slug === "returns" ? sellerTransparency("legalStatusNote") : undefined} sections={legal.raw(`${policyKinds[slug as keyof typeof policyKinds]}.sections`) as Array<{ title: string; body: string }>} supportEmail={profile.supportEmail}/>
-      : slug in cleanupKinds ? <MarketplaceLegalPolicy title={legalCleanup(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.title`)} intro={legalCleanup(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.intro`)} statusNote={legal("common.preIncorporation")} sections={legalCleanup.raw(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.sections`) as Array<{title:string;body:string}>} supportEmail={profile.supportEmail} relatedLinks={slug === "marketplace-rules" ? [{label:legalCleanup("links.terms"),href:`/${locale}/info/terms`},{label:legalCleanup("links.sellerTerms"),href:`/${locale}/info/seller-terms`},{label:legalCleanup("links.returns"),href:`/${locale}/info/returns`}] : []}/>
-      : isPublicInfo ? <MarketplaceInfoContent content={infoPages.raw(`pages.${slug}`) as {eyebrow:string;title:string;intro:string;sections:Array<{title:string;body:string}>}} relatedTitle={infoPages("relatedTitle")} relatedLinks={related[slug as keyof typeof related].map((target) => ({label: relatedLabel(target), href: target === "dashboard" ? `/${locale}/dashboard` : `/${locale}/info/${target}`}))} supportEmail={["contact","support","report-problem"].includes(slug) ? profile.supportEmail : undefined}/> : null}
+      {slug === "contact" ? <HelpCenterContactForm authenticated={Boolean(session)} turnstileSiteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""} initialCategory={supportCategories.includes(query.category as never) ? query.category! : "GENERAL_QUESTION"} productReference={query.product}/>
+      : ["privacy", "cookies", "privacy-data", "data-deletion"].includes(slug) ? <PrivacyInformation kind={slug as "privacy" | "cookies" | "privacy-data" | "data-deletion"} />
+      : slug in policyKinds ? <MarketplaceLegalPolicy title={legal(`${policyKinds[slug as keyof typeof policyKinds]}.title`)} intro={legal(`${policyKinds[slug as keyof typeof policyKinds]}.intro`)} statusNote={legal("common.preIncorporation")} traderNote={slug === "seller-terms" || slug === "returns" ? sellerTransparency("legalStatusNote") : undefined} sections={legal.raw(`${policyKinds[slug as keyof typeof policyKinds]}.sections`) as Array<{ title: string; body: string }>} contactHref={`/${locale}/info/contact`} contactLabel={help("contactCta")}/>
+      : slug in cleanupKinds ? <MarketplaceLegalPolicy title={legalCleanup(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.title`)} intro={legalCleanup(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.intro`)} statusNote={legal("common.preIncorporation")} sections={legalCleanup.raw(`${cleanupKinds[slug as keyof typeof cleanupKinds]}.sections`) as Array<{title:string;body:string}>} contactHref={`/${locale}/info/contact`} contactLabel={help("contactCta")} relatedLinks={slug === "marketplace-rules" ? [{label:legalCleanup("links.terms"),href:`/${locale}/info/terms`},{label:legalCleanup("links.sellerTerms"),href:`/${locale}/info/seller-terms`},{label:legalCleanup("links.returns"),href:`/${locale}/info/returns`}] : []}/>
+      : isPublicInfo ? <MarketplaceInfoContent content={infoPages.raw(`pages.${slug}`) as {eyebrow:string;title:string;intro:string;sections:Array<{title:string;body:string}>}} relatedTitle={infoPages("relatedTitle")} relatedLinks={related[slug as keyof typeof related].map((target) => ({label: relatedLabel(target), href: target === "dashboard" ? `/${locale}/dashboard` : `/${locale}/info/${target}`}))} contactLink={["support","report-problem"].includes(slug) ? {label:help("contactCta"),href:`/${locale}/info/contact`} : undefined}/> : null}
       {isLegal && <aside className="marketInfoLegalNav"><h2>{t("legalTitle")}</h2><nav aria-label={t("legalTitle")}>{legalPages.map((legalSlug) => <Link className={legalSlug === slug ? "isActive" : ""} href={`/${locale}/info/${legalSlug}`} key={legalSlug}>{legalSlug === "seller-terms" ? legal("seller.title") : t(legalTitleKeys[legalSlug])}</Link>)}<Link className={slug === "privacy-data" ? "isActive" : ""} href={`/${locale}/info/privacy-data`}>{privacy("privacyData")}</Link><Link className={slug === "data-deletion" ? "isActive" : ""} href={`/${locale}/info/data-deletion`}>{privacy("dataDeletionTitle")}</Link></nav></aside>}
     </div>
     <MarketplaceFooter />

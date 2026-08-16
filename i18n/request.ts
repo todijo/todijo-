@@ -12,6 +12,7 @@ import {buyerAddressMessages} from "./buyer-address";
 import {genericModelMessages} from "./generic-model";
 import {supplierBulkMessages} from "./supplier-bulk";
 import {oauthReadinessMessages} from "./oauth-readiness";
+import {helpCenterMessages} from "./help-center";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -32,6 +33,7 @@ export default getRequestConfig(async () => {
   messages.HomeHeader = (await import(`../messages/home-header/${locale}.json`)).default;
   messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
   messages.Privacy = { ...(await import("../messages/privacy/en.json")).default, ...(await import(`../messages/privacy/${locale}.json`)).default, ...oauthReadinessMessages[locale] };
+  messages.HelpCenter = helpCenterMessages[locale];
   messages.Legal = (await import(`../messages/legal/${locale}.json`)).default;
   messages.LegalCleanup = (await import(`../messages/legal-cleanup/${locale}.json`)).default;
   messages.InfoPages = (await import(`../messages/info-pages/${locale}.json`)).default;

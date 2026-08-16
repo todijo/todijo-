@@ -221,6 +221,26 @@ enum ReviewReportStatus {
   DISMISSED
 }
 
+enum SupportRequestCategory {
+  TECHNICAL_ISSUE
+  PRODUCT_REPORT
+  ORDER_OR_PAYMENT
+  ACCOUNT_OR_SECURITY
+  PRIVACY_OR_DATA
+  SELLER_SUPPORT
+  RETURNS_OR_REFUNDS
+  GENERAL_QUESTION
+  OTHER
+}
+
+enum SupportRequestStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_USER
+  RESOLVED
+  CLOSED
+}
+
 model User {
   id                       String   @id @default(cuid())
   firstName                String
@@ -266,6 +286,34 @@ model User {
   emailChangeTokens   EmailChangeToken[]
   securityEvents      AccountSecurityEvent[]
   sellerOnboardingDraft SellerOnboardingDraft?
+  supportRequests SupportRequest[] @relation("SupportRequestOwner")
+  supportRequestsReviewed SupportRequest[] @relation("SupportRequestReviewer")
+}
+
+model SupportRequest {
+  id String @id @default(cuid())
+  userId String?
+  replyEmail String @db.VarChar(320)
+  category SupportRequestCategory
+  subject String @db.VarChar(160)
+  message String @db.VarChar(4000)
+  locale String @db.VarChar(8)
+  status SupportRequestStatus @default(OPEN)
+  orderId String?
+  productId String?
+  reviewedById String?
+  reviewedAt DateTime?
+  resolutionNote String? @db.VarChar(1500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation("SupportRequestOwner", fields: [userId], references: [id], onDelete: SetNull)
+  reviewedBy User? @relation("SupportRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@index([productId])
 }
 
 model SellerOnboardingDraft {
