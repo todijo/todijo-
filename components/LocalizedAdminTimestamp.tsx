@@ -1,0 +1,4 @@
+"use client";
+import{useEffect,useState}from"react";
+const options=(timeZone:string):Intl.DateTimeFormatOptions=>({year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone,timeZoneName:"short"});
+export default function LocalizedAdminTimestamp({value,locale}:{value:string;locale:string}){const[friendly,setFriendly]=useState<string|null>(null),[zone,setZone]=useState("");useEffect(()=>{const date=new Date(value),resolved=Intl.DateTimeFormat().resolvedOptions().timeZone;setZone(resolved);setFriendly(new Intl.DateTimeFormat(locale,options(resolved)).format(date))},[value,locale]);return <time dateTime={value} title={zone?`Timezone: ${zone}`:"UTC"} suppressHydrationWarning>{friendly??new Intl.DateTimeFormat(locale,options("UTC")).format(new Date(value))}</time>}

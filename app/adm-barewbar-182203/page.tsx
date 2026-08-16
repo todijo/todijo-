@@ -10,6 +10,7 @@ import { readSession } from "@/lib/session";
 import AdminDashboard from "./AdminDashboard";
 import { adminUserManagementMessages } from "@/i18n/admin-user-management";
 import { isLocale } from "@/i18n/config";
+import { siteContentMessages } from "@/i18n/site-content";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
 export default async function AdminPage() {
   const locale = await getLocale();
   const userManagementText = adminUserManagementMessages[isLocale(locale) ? locale : "en"];
+  const contentText = siteContentMessages[isLocale(locale) ? locale : "en"];
   const [t, ordersText, trustText, supplierText] = await Promise.all([getTranslations("Admin"), getTranslations("Orders"), getTranslations("TrustSafety"), getTranslations("Supplier")]);
   const session = await readSession();
   if (!session) redirect(`/${locale}/login`);
@@ -64,7 +66,7 @@ export default async function AdminPage() {
     <section className="adminShell">
       <header className="adminHero">
         <div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{t("intro")}</p></div>
-        <div><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link></div>
+        <div><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/content">{contentText.title}</Link><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link></div>
       </header>
       {pendingFinalRefundCount > 0 && <section className="subscriptionWarning adminRefundAlert" role="alert"><strong>{t(pendingFinalRefundCount === 1 ? "pendingFinalRefundSingular" : "pendingFinalRefundPlural", { count: pendingFinalRefundCount })}</strong><Link href="/adm-barewbar-182203/orders">{t("reviewRefundRequests")}</Link></section>}
       <AdminDashboard

@@ -249,6 +249,16 @@ enum SupportRequestStatus {
   CLOSED
 }
 
+enum SiteContentPageStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum SiteContentRevisionStatus {
+  DRAFT
+  PUBLISHED
+}
+
 model User {
   id                       String   @id @default(cuid())
   firstName                String
@@ -306,10 +316,71 @@ model User {
   supportRequestsReviewed SupportRequest[] @relation("SupportRequestReviewer")
   adminActionsReceived AdminUserAction[] @relation("AdminUserActionTarget")
   adminActionsPerformed AdminUserAction[] @relation("AdminUserActionActor")
+  siteContentRevisions SiteContentRevision[] @relation("SiteContentRevisionEditor")
 
   @@index([blockedAt, blockExpiresAt])
   @@index([sellerSuspendedAt])
   @@index([deactivatedAt])
+}
+
+model SiteContentPage {
+  id                  String                @id @default(cuid())
+  routeKey            String                @unique @db.VarChar(80)
+  groupKey            String                @db.VarChar(40)
+  legal               Boolean               @default(false)
+  status              SiteContentPageStatus @default(ACTIVE)
+  version             Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  revisions        SiteContentRevision[] @relation("SiteContentPageRevisions")
+  publications     SiteContentPublication[]
+
+  @@index([groupKey, status])
+}
+
+model SiteContentRevision {
+  id            String                    @id @default(cuid())
+  pageId        String
+  locale        String                    @db.VarChar(8)
+  revision      Int
+  status        SiteContentRevisionStatus @default(DRAFT)
+  title         String                    @db.VarChar(180)
+  content       String                    @db.Text
+  seoTitle      String?                   @db.VarChar(180)
+  seoDescription String?                  @db.VarChar(320)
+  editorAdminId String
+  sourceRevisionId String?
+  createdAt     DateTime                  @default(now())
+  publishedAt   DateTime?
+  effectiveAt   DateTime?
+
+  page          SiteContentPage       @relation("SiteContentPageRevisions", fields: [pageId], references: [id], onDelete: Restrict)
+  publications SiteContentPublication[]
+  editorAdmin   User                  @relation("SiteContentRevisionEditor", fields: [editorAdminId], references: [id], onDelete: Restrict)
+  sourceRevision SiteContentRevision? @relation("SiteContentRevisionRestore", fields: [sourceRevisionId], references: [id], onDelete: Restrict)
+  restoredAs    SiteContentRevision[] @relation("SiteContentRevisionRestore")
+
+  @@unique([pageId, locale, revision])
+  @@index([pageId, locale, createdAt])
+  @@index([status, publishedAt])
+  @@index([editorAdminId, createdAt])
+}
+
+model SiteContentPublication {
+  id         String                @id @default(cuid())
+  pageId     String
+  locale     String                @db.VarChar(8)
+  revisionId String
+  status     SiteContentPageStatus @default(ACTIVE)
+  updatedAt  DateTime              @updatedAt
+
+  page     SiteContentPage     @relation(fields: [pageId], references: [id], onDelete: Restrict)
+  revision SiteContentRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@unique([pageId, locale])
+  @@unique([revisionId])
+  @@index([locale, status])
 }
 
 model AdminUserAction {
