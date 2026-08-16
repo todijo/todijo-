@@ -21,6 +21,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   const [country, setCountry] = useState("");
   const locale = useLocale();
   const t = useTranslations("Auth");
+  const footer = useTranslations("HomeFooter");
 
   useEffect(() => {
     if (params.get("role") === "seller") setRole("seller");
@@ -104,7 +105,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
         <div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={10} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && password !== confirmPassword)} aria-describedby={confirmPassword && password !== confirmPassword ? "password-mismatch" : undefined} required /></div>
         {confirmPassword && password !== confirmPassword && <p className="authMessage" id="password-mismatch" role="alert">{t("passwordMismatch")}</p>}
         <div className="turnstileField" tabIndex={-1}><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
-        <label className="terms"><input type="checkbox" required /><span>{t("terms")}</span></label>
+        <label className="terms"><input type="checkbox" required /><span>{t("terms")} <a href={`/${locale}/info/terms`}>{footer("terms")}</a>{" / "}<a href={`/${locale}/info/privacy`}>{footer("privacy")}</a></span></label>
         {message && <p className="authMessage" role="alert">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading} aria-busy={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
       </form>

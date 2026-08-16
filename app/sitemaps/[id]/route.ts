@@ -5,7 +5,7 @@ import { parseSitemapPartition, SITEMAP_ENTITY_CHUNK_SIZE } from "@/lib/sitemap-
 import { sitemapUrlsetXml, type SitemapEntity } from "@/lib/sitemap-xml";
 
 export const dynamic = "force-dynamic";
-const infoSlugs = ["about","how-it-works","mission","help","how-to-buy","how-to-sell","delivery","returns","safety","seller-guide","contact","support","report-problem","terms","privacy","cookies","privacy-data","legal-notice","marketplace-rules","seller-terms"] as const;
+const infoSlugs = ["about","how-it-works","mission","help","how-to-buy","how-to-sell","delivery","returns","safety","seller-guide","contact","support","report-problem","terms","privacy","cookies","privacy-data","data-deletion","legal-notice","marketplace-rules","seller-terms"] as const;
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const rawId = (await context.params).id;

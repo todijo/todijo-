@@ -47,6 +47,7 @@ export default function MarketplaceFooter() {
       { label: t("privacy"), href: info("privacy") },
       { label: t("cookies"), href: info("cookies") },
       { label: privacy("privacyData"), href: info("privacy-data") },
+      { label: privacy("dataDeletionTitle"), href: info("data-deletion") },
       { label: t("legalNotice"), href: info("legal-notice") },
       { label: t("rules"), href: info("marketplace-rules") },
     ] },
