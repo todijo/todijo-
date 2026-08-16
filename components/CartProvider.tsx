@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cartLineKey, normalizeCartOption, removePurchasedCartLines, type CartLineQuantity } from "@/lib/cart-line";
 
@@ -64,6 +64,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const storageKeyRef = useRef<string | null>(null);
   const pathname = usePathname();
+  const clearCart = useCallback(() => setItems([]), []);
 
   useEffect(() => {
     let active = true;
@@ -173,11 +174,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const byLine=new Map(updates.map(update=>[update.lineKey,update]));
         setItems(current=>{let changed=false;const next=current.map(item=>{const update=byLine.get(item.lineKey??"");if(!update)return item;if(item.price===update.price&&item.currency===update.currency&&item.freeShipping===update.freeShipping&&item.deliveryMinDays===update.deliveryMinDays&&item.deliveryMaxDays===update.deliveryMaxDays&&item.authoritativePrice===true)return item;changed=true;return{...item,price:update.price,currency:update.currency,authoritativePrice:true,freeShipping:update.freeShipping,deliveryMinDays:update.deliveryMinDays,deliveryMaxDays:update.deliveryMaxDays};});return changed?next:current;});
       },
-      clearCart() {
-        setItems([]);
-      },
+      clearCart,
     };
-  }, [items]);
+  }, [clearCart, items]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

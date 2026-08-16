@@ -99,6 +99,10 @@ test("public product visibility requires Stripe, a live admin grant, or admin ex
         { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
       ],
     },
+    OR: [
+      { supplierLink: { is: null } },
+      { supplierLink: { is: { supplierAvailable: true, syncStatus: "HEALTHY" } } },
+    ],
   });
 });
 

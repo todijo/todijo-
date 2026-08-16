@@ -5,6 +5,6 @@ import { useCart } from "@/components/CartProvider";
 
 export default function ClearPaidCart() {
   const { clearCart } = useCart();
-  useEffect(() => { clearCart(); }, []); // Clear only after the server-rendered page confirms PAID.
+  useEffect(() => { clearCart(); }, [clearCart]); // Clear only after the server-rendered page confirms PAID.
   return null;
 }

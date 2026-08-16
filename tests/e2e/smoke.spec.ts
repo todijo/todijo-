@@ -1,11 +1,35 @@
 import { expect, test } from "@playwright/test";
 import { collectRuntimeErrors, dismissCookieConsent } from "./helpers";
 import { SignJWT } from "jose";
+import { execFileSync } from "node:child_process";
+import { join } from "node:path";
+import { DESKTOP_CATEGORY_TAXONOMY } from "../../lib/desktop-category-taxonomy";
 
 const e2eSecret = "e2e-only-placeholder-secret-at-least-32-characters";
+const databaseUsers = [
+  { id: "header-buyer", firstName: "Header", lastName: "Buyer", email: "header-buyer@e2e.todijo.test" },
+  { id: "buyer-a", firstName: "Buyer", lastName: "A", email: "buyer-a@e2e.todijo.test" },
+  { id: "buyer-b", firstName: "Buyer", lastName: "B", email: "buyer-b@e2e.todijo.test" },
+] as const;
+
+function executeFixtureSql(sql: string) {
+  execFileSync(process.execPath, [join(process.cwd(), "node_modules", "prisma", "build", "index.js"), "db", "execute", "--schema", join(process.cwd(), "prisma", "schema.prisma"), "--stdin"], { input: sql, env: process.env, stdio: ["pipe", "ignore", "pipe"] });
+}
+
+test.beforeAll(async () => {
+  executeFixtureSql(`INSERT INTO "User" ("id","firstName","lastName","email","role","authVersion","createdAt","updatedAt") VALUES
+    ('header-buyer','Header','Buyer','header-buyer@e2e.todijo.test','CUSTOMER',0,NOW(),NOW()),
+    ('buyer-a','Buyer','A','buyer-a@e2e.todijo.test','CUSTOMER',0,NOW(),NOW()),
+    ('buyer-b','Buyer','B','buyer-b@e2e.todijo.test','CUSTOMER',0,NOW(),NOW())
+    ON CONFLICT ("id") DO UPDATE SET "role"='CUSTOMER', "authVersion"=0, "updatedAt"=NOW();`);
+});
+
+test.afterAll(async () => {
+  executeFixtureSql(`DELETE FROM "User" WHERE "id" IN (${databaseUsers.map((user) => `'${user.id}'`).join(",")});`);
+});
 
 async function authenticate(page: import("@playwright/test").Page, userId: string) {
-  const token = await new SignJWT({ userId, role: "CUSTOMER" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
+  const token = await new SignJWT({ userId, role: "CUSTOMER", authVersion: 0 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
   await page.context().addCookies([{ name: "todijo_session", value: token, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
 }
 
@@ -80,43 +104,46 @@ test("unknown public routes render the localized not-found page", async ({ page 
   assertNoRuntimeErrors();
 });
 
-test("search filters are visibly triggered, preserve state, and update the URL", async ({ page }) => {
+test("canonical filter dock opens facets, preserves selection, and updates the URL", async ({ page }) => {
   await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux");
   await dismissCookieConsent(page);
-  const trigger = page.locator(".mobileFilterButton");
-  await expect(trigger).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Sort" })).toHaveCount(0);
-  await expect(trigger).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByRole("dialog", { name: "Filters" })).toHaveCount(0);
-  await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "Filters" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("heading", { name: "Filters" })).toHaveCount(1);
-  await expect(dialog.locator("legend").filter({ hasText: "Filters" })).toHaveCount(0);
-  await expect(dialog.locator(".filterChoice").first()).toHaveCSS("min-height", "40px");
-  await expect(dialog.locator(".filterActions")).toBeVisible();
-  const drawerColors = await dialog.evaluate((element) => { const style = getComputedStyle(element); return [style.backgroundColor, style.color]; });
-  expect(drawerColors[0]).not.toBe(drawerColors[1]);
+  let dock = page.getByRole("region", { name: "Filters" });
+  await expect(dock).toBeVisible();
+  const countryFacet = dock.locator("details:has(.countryFacetPopover)");
+  await countryFacet.locator("summary").click();
+  const [countryRequest] = await Promise.all([
+    page.waitForRequest((request) => new URL(request.url()).pathname === "/en/search"),
+    page.waitForURL(/\/en\/search\?country=FR/),
+    countryFacet.getByRole("button", { name: "France" }).click({ noWaitAfter: true }),
+  ]);
+  expect(new URL(countryRequest.url()).searchParams.get("country")).toBe("FR");
+
+  await page.goto("/en/e2e-ux");
+  dock = page.getByRole("region", { name: "Filters" });
+  const ratingFacet = dock.locator('details:has(input[name="rating-dock"])');
+  await ratingFacet.locator("summary").click();
+  await expect(ratingFacet.locator(".marketFacetPopover")).toBeVisible();
+  const [ratingRequest] = await Promise.all([
+    page.waitForRequest((request) => new URL(request.url()).pathname === "/en/search"),
+    page.waitForURL(/\/en\/search\?rating=4/),
+    ratingFacet.locator("label").nth(1).click({ noWaitAfter: true }),
+  ]);
+  expect(new URL(ratingRequest.url()).searchParams.get("rating")).toBe("4");
+
+  await page.goto("/en/e2e-ux");
+  dock = page.getByRole("region", { name: "Filters" });
   await page.getByLabel("Minimum price").fill("10");
-  await page.getByLabel("Country").fill("France");
-  await dialog.locator(".filterRatingSection .filterChoice").nth(1).click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await page.keyboard.press("Escape");
-  await expect(dialog).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-  await trigger.click();
+  await dock.getByRole("button", { name: "In stock" }).click();
+  await expect(dock.getByRole("button", { name: "In stock" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Minimum price")).toHaveValue("10");
-  await expect(page.getByLabel("Country")).toHaveValue("France");
-  await expect(page.getByRole("radio", { name: "4★+" })).toBeChecked();
   const [searchRequest] = await Promise.all([
     page.waitForRequest((request) => new URL(request.url()).pathname === "/en/search"),
-    dialog.getByRole("button", { name: "Apply" }).click({ noWaitAfter: true }),
+    dock.getByRole("button", { name: "Apply filters" }).click({ noWaitAfter: true }),
   ]);
   const searchUrl = new URL(searchRequest.url());
   expect(searchUrl.searchParams.get("minPrice")).toBe("10");
-  expect(searchUrl.searchParams.get("country")).toBe("France");
-  expect(searchUrl.searchParams.get("rating")).toBe("4");
+  expect(searchUrl.searchParams.get("availability")).toBe("in-stock");
 });
 
 test("homepage presents the localized stores CTA to the public directory", async ({ page }) => {
@@ -144,31 +171,49 @@ test("marketplace routes render one shared header with core navigation", async (
   await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
 });
 
-test("desktop Categories opens a stable mega-menu and preserves localized routing", async ({ page }) => {
+test("desktop category rail opens its canonical menu and preserves localized routing", async ({ page }) => {
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: false } }));
   await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
-  const trigger = page.locator("header[data-marketplace-header] .marketAllCategories");
-  await trigger.hover();
-  const menu = page.locator("#market-category-mega-menu");
+  const rail = page.getByRole("navigation", { name: "Categories" });
+  await expect(rail).toBeVisible();
+  await expect(rail.getByRole("link")).toHaveCount(DESKTOP_CATEGORY_TAXONOMY.length);
+  const category = rail.getByRole("link").first();
+  const categoryName = (await category.innerText()).trim();
+  await expect(category).toHaveAttribute("href", /^\/en\/search\?category=/);
+  await category.hover();
+  const menu = page.getByRole("region", { name: categoryName });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("link", { name: "Fashion", exact: true })).toBeVisible();
-  await menu.getByRole("link", { name: "Home", exact: true }).hover();
-  await expect(menu.getByRole("link", { name: "View all Home" })).toBeVisible();
-  await expect(menu).toBeVisible();
-  await Promise.all([page.waitForURL(/\/en\/search\?category=Maison/), menu.getByRole("link", { name: "Home", exact: true }).click()]);
+  await expect(category).toHaveAttribute("aria-expanded", "true");
+  const secondCategory = DESKTOP_CATEGORY_TAXONOMY[1];
+  await menu.getByRole("button", { name: secondCategory.label, exact: true }).hover();
+  const secondMenu = page.getByRole("region", { name: secondCategory.label });
+  await expect(secondMenu).toBeVisible();
+  await secondMenu.getByRole("button", { name: categoryName, exact: true }).hover();
+  await expect(menu.getByRole("link", { name: "View all" })).toBeVisible();
+  await Promise.all([page.waitForURL(/\/en\/search\?category=/), menu.getByRole("link", { name: "View all" }).click()]);
   await page.goto("/en/e2e-ux?view=home");
   await expect(page.locator(".categoryStripSection")).toBeHidden();
   await expect(page.locator(".categoryShowcase")).toBeHidden();
-  if (await menu.isVisible()) {
-    await page.keyboard.press("Escape");
-    await expect(menu).toHaveCount(0);
-  }
-  await trigger.focus();
-  await page.keyboard.press("Enter");
-  await expect(menu).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(menu).toHaveCount(0);
+  const more = page.getByRole("button", { name: "Categories", exact: true });
+  await more.focus();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+});
+
+test("favorites require a database-backed session and reject a JWT-only identity", async ({ page }) => {
+  await page.goto("/en/favorites");
+  await expect(page).toHaveURL(/\/en\/login\?next=\/en\/favorites$/);
+
+  await authenticate(page, "jwt-only-user-not-in-database");
+  await page.goto("/en/favorites");
+  await expect(page).toHaveURL(/\/en\/login\?next=\/en\/favorites$/);
+
+  await authenticate(page, "buyer-a");
+  await page.goto("/en/favorites");
+  await expect(page).toHaveURL(/\/en\/favorites$/);
+  await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
 });
 
 test("favorites remain isolated across logout and two authenticated buyers", async ({ page }) => {

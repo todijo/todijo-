@@ -92,40 +92,50 @@ test("mobile RTL information page preserves direction and layout", async ({ page
   assertNoRuntimeErrors();
 });
 
-test("mobile search filters open as a full-height sheet without squeezing results", async ({ page }) => {
+test("mobile canonical filter dock opens facets without squeezing results", async ({ page }) => {
   await page.goto("/en/e2e-ux");
   const results = page.locator(".resultsArea");
   const widthBefore = await results.evaluate((element) => element.getBoundingClientRect().width);
-  await page.getByRole("button", { name: "Filters" }).click();
-  const dialog = page.getByRole("dialog", { name: "Filters" });
-  await expect(dialog).toBeVisible();
-  const sheet = await dialog.boundingBox();
-  expect(sheet?.height).toBeGreaterThanOrEqual(800);
+  const dock = page.getByRole("region", { name: "Filters" });
+  await expect(dock).toBeVisible();
+  const sortFacet = dock.locator('details:has(input[name="sort-dock"])');
+  await sortFacet.locator("summary").click();
+  const sortPopover = sortFacet.locator(".marketFacetPopover");
+  await expect(sortPopover).toBeVisible();
+  await expect(sortFacet.getByRole("radio")).toHaveCount(4);
+  await expect(sortFacet.getByRole("radio").first()).toBeChecked();
   await page.keyboard.press("Escape");
-  await expect(dialog).toHaveCount(0);
+  await expect(sortPopover).toBeHidden();
+  await dock.getByRole("button", { name: "In stock" }).click();
+  await expect(dock.getByRole("button", { name: "In stock" })).toHaveAttribute("aria-pressed", "true");
+  await expect(sortPopover).toBeHidden();
   const widthAfter = await results.evaluate((element) => element.getBoundingClientRect().width);
   expect(widthAfter).toBe(widthBefore);
 });
 
-test("mobile Categories opens the compact category drawer and preserves locale", async ({ page }) => {
+test("mobile category rail opens its canonical menu and preserves locale", async ({ page }) => {
   await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
   await dismissCookieConsent(page);
-  await page.getByRole("button", { name: "Categories" }).last().click();
-  const drawer = page.getByRole("dialog", { name: "Mobile navigation" });
-  await expect(drawer).toBeVisible();
-  await drawer.getByRole("button", { name: "Categories" }).click();
-  await expect(drawer.getByRole("link", { name: "Electronics" })).toBeVisible();
-  await Promise.all([page.waitForURL(/\/en\/search\?category=/, { waitUntil: "commit" }), drawer.getByRole("link", { name: "Electronics" }).click()]);
+  const rail = page.getByRole("navigation", { name: "Categories" });
+  await expect(rail).toBeVisible();
+  const category = rail.getByRole("link").first();
+  await expect(category).toHaveAttribute("href", /^\/en\/search\?category=/);
+  await category.focus();
+  await expect(category).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(category).toHaveAttribute("aria-expanded", "false");
+  await Promise.all([page.waitForURL(/\/en\/search\?category=/, { waitUntil: "commit" }), category.click()]);
 });
 
 test("mobile compliance fields and contact seller remain readable", async ({ page }) => {
   await page.goto("/ar/e2e-ux?view=seller");
   await dismissCookieConsent(page);
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  const complianceInput = page.locator("#responsiblePartyName");
+  const complianceInput = page.locator('input[name="productIdentifier"]');
   await expect(complianceInput).toBeVisible();
-  await expect(complianceInput).toHaveCSS("color", "rgb(23, 59, 48)");
+  const complianceColors = await complianceInput.evaluate((element) => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
+  expect(complianceColors[0]).not.toBe(complianceColors[1]);
 
   await page.goto("/fr/e2e-ux?view=contact");
   await dismissCookieConsent(page);

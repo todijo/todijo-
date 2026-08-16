@@ -88,7 +88,7 @@ export default function MarketplaceFilterDock({
       const rankA = priority.get(a.code) ?? Number.POSITIVE_INFINITY;
       const rankB = priority.get(b.code) ?? Number.POSITIVE_INFINITY;
       if (rankA !== rankB) return rankA - rankB;
-      return a.name.localeCompare(b.name, locale, { sensitivity: "base" });
+      return a.code.localeCompare(b.code);
     });
   }, [locale]);
 
@@ -123,7 +123,7 @@ export default function MarketplaceFilterDock({
 
       <details className="marketFacetMenu" open={openFacet === "country"}><summary onClick={facetSummary("country").onClick}>{labels.country}{filters.country ? <b>{countries.find((item) => item.code === filters.country)?.name ?? filters.country}</b> : null}<ChevronDown size={14}/></summary><div className="marketFacetPopover countryFacetPopover">
         <button type="button" className={!filters.country ? "selected" : ""} onClick={() => select("country", "")}>{labels.all}</button>
-        {countries.map((country) => <button type="button" className={filters.country === country.code ? "selected" : ""} key={country.code} onClick={() => select("country", country.code)}>{country.name}</button>)}
+        {countries.map((country) => <button type="button" className={filters.country === country.code ? "selected" : ""} key={country.code} onClick={() => select("country", country.code)}><span suppressHydrationWarning>{country.name}</span></button>)}
       </div></details>
 
       <button type="button" className={`marketAvailabilityToggle${filters.availability === "in-stock" ? " selected" : ""}`} onClick={() => update("availability", filters.availability === "in-stock" ? "" : "in-stock")} aria-pressed={filters.availability === "in-stock"}>{labels.availability}</button>

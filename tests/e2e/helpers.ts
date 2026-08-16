@@ -12,7 +12,7 @@ export function collectRuntimeErrors(page: Page) {
 }
 
 export async function dismissCookieConsent(page: Page) {
-  const rejectAll = page.getByRole("button", { name: "Reject all" });
+  const rejectAll = page.locator(".cookieReject");
   try {
     await rejectAll.waitFor({ state: "visible", timeout: 5_000 });
     await rejectAll.click();

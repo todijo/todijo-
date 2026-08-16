@@ -23,7 +23,8 @@ test("variant purchase CTA distinguishes incomplete selection from unavailable s
 
 test("pre-purchase questions are meaningful and controlled by the seller", () => {
   assert.match(source("components/AskSellerButton.tsx"), /useState\(""\)/);
-  assert.match(source("components/AskSellerButton.tsx"), /trim\(\)\.length < 12/);
+  assert.match(source("components/AskSellerButton.tsx"), /trimmedLength < MIN_MESSAGE_LENGTH/);
+  assert.match(source("components/AskSellerButton.tsx"), /const MIN_MESSAGE_LENGTH = 12/);
   assert.match(source("app/api/conversations/route.ts"), /PREPURCHASE_QUESTIONS_DISABLED/);
   assert.match(source("prisma/schema.prisma"), /allowPrepurchaseQuestions Boolean\s+@default\(true\)/);
   assert.match(source("app/seller/products/new/NewProductForm.tsx"), /allowPrepurchaseQuestions/);
