@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, readSession } from "@/lib/session";
 import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
+import { isEffectiveBlock } from "@/lib/account-status";
 
 export async function POST(request: Request) {
   try {
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
     if (!user?.passwordHash || !(await compare(password, user.passwordHash))) {
       return NextResponse.json({ error: "Adresse e-mail ou mot de passe incorrect." }, { status: 401 });
     }
+    if(user.deactivatedAt||isEffectiveBlock(user))return NextResponse.json({error:"ACCOUNT_UNAVAILABLE",code:"ACCOUNT_UNAVAILABLE"},{status:403});
 
     await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
     return NextResponse.json({ ok: true, role: user.role });

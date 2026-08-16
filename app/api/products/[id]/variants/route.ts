@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { ProductVariantError, saveProductVariants, type ProductVariantsInput } from "@/lib/product-variants";
+import {assertSellerActivity}from"@/lib/account-status";
+import {AdminAccessError}from"@/lib/admin-access";
 
 const MAX_VARIANT_REQUEST_BYTES = 256 * 1024;
 
@@ -30,11 +32,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   try {
     const session = await readSession();
     if (!session) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+    await assertSellerActivity(prisma,session.userId);
     const { id } = await context.params;
     const body = await readVariantBody(request);
     return NextResponse.json({ ok: true, ...(await saveProductVariants(prisma, session.userId, id, body)) });
   } catch (error) {
     if (error instanceof ProductVariantError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if(error instanceof AdminAccessError)return NextResponse.json({error:error.code},{status:error.status});
     console.error("Update product variants error:", error);
     return NextResponse.json({ error: "Unable to update product variants." }, { status: 500 });
   }

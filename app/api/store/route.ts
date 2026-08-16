@@ -6,6 +6,8 @@ import { readSession } from "@/lib/session";
 import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { parseShippingSettings, ShippingError } from "@/lib/shipping";
+import { assertSellerActivity } from "@/lib/account-status";
+import { AdminAccessError } from "@/lib/admin-access";
 
 function makeSlug(value: string) {
   return value
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }
+    await assertSellerActivity(prisma,session.userId);
 
     const existingStore = await prisma.store.findUnique({
       where: { ownerId: session.userId },
@@ -121,6 +124,7 @@ export async function POST(request: Request) {
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
+    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
@@ -146,6 +150,7 @@ export async function PATCH(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }
+    await assertSellerActivity(prisma,session.userId);
 
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -227,6 +232,7 @@ export async function PATCH(request: Request) {
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store });
   } catch (error) {
+    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
         return NextResponse.json({ error: "Ce nom de boutique est déjà utilisé." }, { status: 409 });

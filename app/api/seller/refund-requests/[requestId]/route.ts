@@ -17,6 +17,7 @@ export async function GET(_request: Request, context: { params: Promise<{ reques
 export async function POST(request: Request, context: { params: Promise<{ requestId: string }> }) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if(session.sellerSuspended&&session.role!=="ADMIN")return NextResponse.json({error:"SELLER_SUSPENDED"},{status:403});
   const { requestId } = await context.params;
   let body: { decision?: unknown; decisionNote?: unknown };
   try {

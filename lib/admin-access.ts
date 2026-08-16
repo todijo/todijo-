@@ -64,6 +64,7 @@ export function activeAccessSource(store: {
 export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
   return {
     status: "ACTIVE",
+    owner: { sellerSuspendedAt: null, deactivatedAt: null },
     OR: [
       { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
       { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },

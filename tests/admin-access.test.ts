@@ -93,6 +93,7 @@ test("public product visibility requires Stripe, a live admin grant, or admin ex
   assert.deepEqual(publicProductAccessWhere(now), {
     store: {
       status: "ACTIVE",
+      owner: { sellerSuspendedAt: null, deactivatedAt: null },
       OR: [
         { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
         { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },

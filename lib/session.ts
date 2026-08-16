@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
+import { isEffectiveBlock } from "./account-status";
 
 export const SESSION_COOKIE_NAME = "todijo_session";
 
@@ -18,6 +19,7 @@ export type SessionPayload = {
   userId: string;
   role: "CUSTOMER" | "SELLER" | "ADMIN";
   authVersion?: number;
+  sellerSuspended?: boolean;
 };
 
 export async function createSession(payload: SessionPayload) {
@@ -51,9 +53,9 @@ export async function readSession(): Promise<SessionPayload | null> {
     if (typeof payload.userId !== "string") {
       return null;
     }
-    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { role: true, authVersion: true } });
-    if (!user || user.authVersion !== (typeof payload.authVersion === "number" ? payload.authVersion : 0)) return null;
-    return { userId: payload.userId, role: user.role, authVersion: user.authVersion };
+    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { role: true, authVersion: true, blockedAt:true, blockExpiresAt:true, deactivatedAt:true, sellerSuspendedAt:true } });
+    if (!user || user.deactivatedAt || isEffectiveBlock(user) || user.authVersion !== (typeof payload.authVersion === "number" ? payload.authVersion : 0)) return null;
+    return { userId: payload.userId, role: user.role, authVersion: user.authVersion, sellerSuspended:Boolean(user.sellerSuspendedAt) };
   } catch {
     return null;
   }

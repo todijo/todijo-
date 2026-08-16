@@ -6,6 +6,7 @@ import { configuredSocialProvider, exchangeSocialCode, readOauthState } from "@/
 import { decideSocialIdentity } from "@/lib/social-auth";
 import { publicAppUrl } from "@/lib/email/config";
 import { safeLoginDestination } from "@/lib/auth-redirects";
+import { anonymizedEmailHash, isEffectiveBlock } from "@/lib/account-status";
 
 async function callback(request:Request,provider:string,values:URLSearchParams){
   const config=configuredSocialProvider(provider);if(!config)return NextResponse.json({error:"PROVIDER_NOT_CONFIGURED"},{status:503});
@@ -23,6 +24,8 @@ async function callback(request:Request,provider:string,values:URLSearchParams){
     ]);
     const decision=decideSocialIdentity({linkedUserId:linked?.userId,currentUserId:current?.userId,email:profile.email,emailVerified:profile.emailVerified,emailUserId:emailUser?.id});
     if(decision.action==="reject")return failure(decision.code);
+    if(decision.action==="create"&&profile.email){const tombstone=await prisma.user.findUnique({where:{anonymizedEmailHash:anonymizedEmailHash(profile.email)},select:{id:true}});if(tombstone)return failure("ACCOUNT_UNAVAILABLE");}
+    if(decision.action!=="create"){const existing=await prisma.user.findUnique({where:{id:decision.userId},select:{blockedAt:true,blockExpiresAt:true,deactivatedAt:true}});if(!existing||existing.deactivatedAt||isEffectiveBlock(existing))return failure("ACCOUNT_UNAVAILABLE");}
     const user=await prisma.$transaction(async tx=>{
       let userId:string;
       if(decision.action==="create"){
@@ -30,8 +33,9 @@ async function callback(request:Request,provider:string,values:URLSearchParams){
       }else userId=decision.userId;
       if(!linked)await tx.oAuthAccount.create({data:{userId,provider:config.prismaProvider,providerAccountId:profile.accountId,providerEmail:profile.email,emailVerified:profile.emailVerified}});
       await tx.accountSecurityEvent.create({data:{userId,type:linked?"SOCIAL_LOGIN":"PROVIDER_LINKED"}});
-      return tx.user.findUniqueOrThrow({where:{id:userId},select:{id:true,role:true,authVersion:true}});
+      return tx.user.findUniqueOrThrow({where:{id:userId},select:{id:true,role:true,authVersion:true,blockedAt:true,blockExpiresAt:true,deactivatedAt:true}});
     });
+    if(user.deactivatedAt||isEffectiveBlock(user))return failure("ACCOUNT_UNAVAILABLE");
     await createSession({userId:user.id,role:user.role,authVersion:user.authVersion});
     return NextResponse.redirect(new URL(safeLoginDestination(stateData.next,stateData.locale),publicAppUrl()),303);
   }catch{return failure("PROVIDER_FAILED")}

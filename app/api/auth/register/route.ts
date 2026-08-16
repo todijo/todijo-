@@ -9,6 +9,7 @@ import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email/send";
 import { safeEmailError } from "@/lib/email/config";
 import { defaultLocale, isLocale } from "@/i18n/config";
 import { createBuyerAddress } from "@/lib/buyer-addresses";
+import { anonymizedEmailHash } from "@/lib/account-status";
 
 export async function POST(request: Request) {
   try {
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La vérification humaine a échoué.", code: turnstile === "missing" ? "TURNSTILE_REQUIRED" : "TURNSTILE_FAILED" }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: input.email } });
+    const existing = await prisma.user.findFirst({ where: { OR:[{email: input.email},{anonymizedEmailHash:anonymizedEmailHash(input.email)}] } });
     if (existing) return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail." }, { status: 409 });
 
     const passwordHash = await hash(input.password, 12);

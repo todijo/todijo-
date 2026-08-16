@@ -6,6 +6,7 @@ import { readSession } from "@/lib/session";
 export async function POST(request: Request, context: { params: Promise<{ orderId: string }> }) {
   const session = await readSession();
   if (!session || !["SELLER", "ADMIN"].includes(session.role)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if(session.sellerSuspended&&session.role!=="ADMIN")return NextResponse.json({error:"SELLER_SUSPENDED"},{status:403});
   try {
     const { orderId } = await context.params;
     const body = await request.json() as { action?: SellerFulfillmentAction; trackingCarrier?: unknown; trackingNumber?: unknown; trackingUrl?: unknown };

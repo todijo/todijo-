@@ -1,5 +1,6 @@
 import type { PrismaClient, SellerStatus, SellerType, SellerVatStatus, SubscriptionStatus } from "@prisma/client";
 import { activeAccessSource } from "./admin-access";
+import { assertSellerActivity } from "./account-status";
 
 export const publishableSubscriptionStatuses: SubscriptionStatus[] = ["ACTIVE", "TRIALING"];
 
@@ -19,6 +20,7 @@ export class SellerSubscriptionError extends Error {
 }
 
 export async function requirePublishingAccess(db: PrismaClient, userId: string) {
+  await assertSellerActivity(db,userId);
   const store = await db.store.findUnique({
     where: { ownerId: userId },
     select: {

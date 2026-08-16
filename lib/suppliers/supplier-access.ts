@@ -24,7 +24,7 @@ export async function setSellerDropshippingPermission(db: Database, session: { u
 
 export async function requireSellerSupplierAccess(db: Database, session: { userId: string; role?: string } | null) {
   if (!session) throw new SupplierAccessError("AUTH_REQUIRED", 401);
-  const store = await db.store.findUnique({ where: { ownerId: session.userId }, select: { id: true, dropshippingEnabled: true } });
+  const store = await db.store.findFirst({ where: { ownerId: session.userId, owner:{sellerSuspendedAt:null,deactivatedAt:null} }, select: { id: true, dropshippingEnabled: true } });
   if (!store || !store.dropshippingEnabled) throw new SupplierAccessError("DROPSHIPPING_PERMISSION_DENIED");
   return store;
 }

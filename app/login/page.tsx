@@ -26,8 +26,8 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: form.get("email"), password: form.get("password") }),
       });
-      const data: { error?: string; role?: "CUSTOMER" | "SELLER" | "ADMIN" } = await response.json().catch(() => ({}));
-      if (!response.ok) return setMessage(data.error ?? t("error"));
+      const data: { error?: string; code?: string; role?: "CUSTOMER" | "SELLER" | "ADMIN" } = await response.json().catch(() => ({}));
+      if (!response.ok) return setMessage(data.code === "ACCOUNT_UNAVAILABLE" ? t("accountUnavailable") : data.error ?? t("error"));
       window.location.assign(postLoginDestination(data.role, params.get("next"), locale as Locale));
     } catch {
       setMessage(t("error"));

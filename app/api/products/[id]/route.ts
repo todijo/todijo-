@@ -10,6 +10,8 @@ import { ProductComplianceError, readProductCompliance } from "@/lib/product-com
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
 import { assertProductPublicationEligible } from "@/lib/suppliers/safety";
+import { AdminAccessError } from "@/lib/admin-access";
+import { assertSellerActivity } from "@/lib/account-status";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -20,6 +22,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   try {
     const session = await readSession();
     if (!session) return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
+    await assertSellerActivity(prisma, session.userId);
 
     const { id } = await context.params;
     const product = await prisma.product.findFirst({
@@ -78,6 +81,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -92,6 +96,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   try {
     const session = await readSession();
     if (!session) return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
+    await assertSellerActivity(prisma, session.userId);
     const { id } = await context.params;
     const product = await prisma.product.findFirst({ where: { id, store: { ownerId: session.userId } }, select: { id: true } });
     if (!product) return NextResponse.json({ error: "Produit introuvable ou accès refusé." }, { status: 404 });
@@ -99,6 +104,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     console.error("Delete product error:", error);
     return NextResponse.json({ error: "Impossible de supprimer le produit." }, { status: 500 });
   }

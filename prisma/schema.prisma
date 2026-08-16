@@ -131,6 +131,14 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum AdminUserActionType {
+  BLOCK
+  UNBLOCK
+  SELLER_SUSPEND
+  SELLER_RESTORE
+  ANONYMIZE
+}
+
 enum AuthProvider {
   GOOGLE
   APPLE
@@ -263,6 +271,14 @@ model User {
   profileCity              String?  @db.VarChar(120)
   profileCountry           String?  @db.VarChar(2)
   authVersion              Int      @default(0)
+  blockedAt                DateTime?
+  blockExpiresAt           DateTime?
+  blockReason              String?  @db.VarChar(1000)
+  sellerSuspendedAt        DateTime?
+  sellerSuspensionReason   String?  @db.VarChar(1000)
+  deactivatedAt            DateTime?
+  anonymizedAt             DateTime?
+  anonymizedEmailHash      String?  @unique @db.Char(64)
 
   store               Store?
   buyerConversations  Conversation[] @relation("ConversationBuyer")
@@ -288,6 +304,32 @@ model User {
   sellerOnboardingDraft SellerOnboardingDraft?
   supportRequests SupportRequest[] @relation("SupportRequestOwner")
   supportRequestsReviewed SupportRequest[] @relation("SupportRequestReviewer")
+  adminActionsReceived AdminUserAction[] @relation("AdminUserActionTarget")
+  adminActionsPerformed AdminUserAction[] @relation("AdminUserActionActor")
+
+  @@index([blockedAt, blockExpiresAt])
+  @@index([sellerSuspendedAt])
+  @@index([deactivatedAt])
+}
+
+model AdminUserAction {
+  id              String              @id @default(cuid())
+  actorAdminId    String
+  targetUserId    String
+  action          AdminUserActionType
+  reason          String              @db.VarChar(1000)
+  previousStatus  Json
+  newStatus       Json
+  blockExpiresAt  DateTime?
+  correlationId   String?             @db.VarChar(120)
+  createdAt       DateTime            @default(now())
+
+  actorAdmin User @relation("AdminUserActionActor", fields: [actorAdminId], references: [id], onDelete: Restrict)
+  targetUser User @relation("AdminUserActionTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+
+  @@index([targetUserId, createdAt])
+  @@index([actorAdminId, createdAt])
+  @@index([action, createdAt])
 }
 
 model SupportRequest {

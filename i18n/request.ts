@@ -13,6 +13,7 @@ import {genericModelMessages} from "./generic-model";
 import {supplierBulkMessages} from "./supplier-bulk";
 import {oauthReadinessMessages} from "./oauth-readiness";
 import {helpCenterMessages} from "./help-center";
+import {accountStatusMessages} from "./account-status";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -20,7 +21,7 @@ export default getRequestConfig(async () => {
   const fallback = (await import("../messages/en.json")).default;
   const localized = (await import(`../messages/${locale}.json`)).default;
   const messages: Record<string, unknown> = Object.fromEntries(Object.entries(fallback).map(([namespace, values]) => [namespace, { ...values, ...(localized as Record<string, Record<string, string>>)[namespace] }]));
-  messages.Auth = {...(await import(`../messages/auth/${locale}.json`)).default,...buyerAddressMessages[locale]};
+  messages.Auth = {...(await import(`../messages/auth/${locale}.json`)).default,...buyerAddressMessages[locale],...accountStatusMessages[locale]};
   messages.Connect = (await import(`../messages/connect/${locale}.json`)).default;
   messages.Categories = (await import(`../messages/categories/${locale}.json`)).default;
   messages.CartRecommendations = (await import(`../messages/cart-recommendations/${locale}.json`)).default;
