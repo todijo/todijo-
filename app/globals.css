@@ -1170,8 +1170,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 
 /* Mobile storefront: product-first, uncropped media and incremental discovery. */
 .categoryShowcaseImage{position:relative;width:48px;height:48px;overflow:hidden;border-radius:14px;background:#f5f2f8;display:block}.categoryShowcaseImage img{object-fit:contain}
+.marketplaceFooterCompact{display:none}
 .mobileInfiniteSentinel{display:none}
 @media(max-width:860px){
+  .marketCategoryNavigation{display:none!important}
   .buyerHomePage .discoveryHero,
   .buyerHomePage .marketplaceDiscoverySections,
   .buyerHomePage .todijoTrust,
@@ -1194,22 +1196,51 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
   .buyerHomePage .resultsToolbar{margin:0 4px 8px}
   .buyerHomePage .resultsToolbar h2{font-size:16px}
   .buyerHomePage .resultsToolbar span{font-size:10px}
-  .buyerHomePage .discoveryProductGrid{gap:4px}
+  .buyerHomePage .discoveryProductGrid{column-gap:3px;row-gap:5px}
   .buyerHomePage .discoveryCard{border:0;border-radius:10px;overflow:hidden;box-shadow:none}
   .buyerHomePage .discoveryImageWrap{aspect-ratio:1/1;border-radius:10px;background:#f7f5f9}
   .buyerHomePage .discoveryImageWrap>img{padding:3px;object-fit:contain!important;object-position:center}
   .buyerHomePage .discoveryCardBody{padding:5px 4px 7px}
   .buyerHomePage .discoveryCardBody h3{min-height:27px;margin:1px 0 3px;font-size:11px;line-height:1.22;-webkit-line-clamp:2}
   .buyerHomePage .cardBottom strong{font-size:14px}
-  .buyerHomePage .cardCartButton.cardCartIconOnly{width:34px;height:34px;min-width:34px;min-height:34px}
+  .buyerHomePage .cardBottom{display:grid!important;grid-template-columns:minmax(0,1fr) 34px;align-items:end!important;gap:4px;padding-top:2px}
+  .buyerHomePage .cardBottom>div{min-width:0}
+  .buyerHomePage .cardCartButton.cardCartIconOnly{width:34px!important;height:34px;min-width:34px;min-height:34px;margin:0!important;padding:0!important;border:1px solid #dac9f3;border-radius:50%;background:#fff;color:#6d28d9}
+  .buyerHomePage .cardCartButton.cardCartIconOnly:disabled{background:#f2eef6;color:#938a9e}
   .buyerHomePage .pagination{display:none}
   .mobileInfiniteSentinel{min-height:42px;display:grid;place-items:center;color:#6d28d9;font-weight:900}
   .productMobileImageTrack{background:#fff!important}
   .productMobileImageSlide{background:#fff!important}
   .productMobileImageSlide img{padding:4px;object-fit:contain!important;object-position:center!important}
-  .buyerMobileCategoryList{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px!important}
-  .buyerMobileCategoryList a{min-width:0;min-height:76px!important;padding:8px!important;display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column;gap:5px!important;text-align:center!important;font-size:11px!important}
-  .buyerMobileCategoryList a>span{width:34px;height:34px;border-radius:50%;background:#f0e8ff;color:#6d28d9;display:grid;place-items:center}
+  .buyerMobileDrawer.showingCategoryBrowser{width:min(100vw,620px);padding-inline:0;overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr)}
+  .buyerMobileDrawer.showingCategoryBrowser .buyerMobileDrawerHeader{padding-inline:12px}
+  .buyerMobileCategoryBack{width:40px!important;height:40px!important;flex:0 0 40px!important;border:0!important;background:#f3ecff!important;color:#6d28d9!important}
+  .buyerMobileCategoryBrowser{min-height:0;display:grid;grid-template-columns:112px minmax(0,1fr);overflow:hidden;background:#fff}
+  .buyerMobileCategoryParents{overflow-y:auto;padding:8px 5px calc(76px + env(safe-area-inset-bottom));background:#f7f5f8;scrollbar-width:none}
+  .buyerMobileCategoryParents::-webkit-scrollbar,.buyerMobileCategoryChildren::-webkit-scrollbar{display:none}
+  .buyerMobileCategoryParents button{width:100%;min-height:82px;padding:7px 4px;border:0;border-inline-start:3px solid transparent;border-radius:10px;background:transparent;color:#3b3443;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;font:700 10px/1.16 inherit;text-align:center;cursor:pointer}
+  .buyerMobileCategoryParents button.active{border-inline-start-color:#6d28d9;background:#eee5ff;color:#5420a4}
+  .buyerMobileCategoryParentImage{width:42px;height:42px;overflow:hidden;border-radius:50%;background:#fff;display:block;box-shadow:0 2px 8px rgba(45,21,78,.1)}
+  .buyerMobileCategoryParentImage img{width:100%;height:100%;object-fit:cover}
+  .buyerMobileCategoryChildren{min-width:0;overflow-y:auto;padding:10px 9px calc(82px + env(safe-area-inset-bottom));scrollbar-width:none}
+  .buyerMobileCategoryAll{min-height:64px!important;padding:10px 12px!important;border-radius:13px!important;background:linear-gradient(135deg,#efe6ff,#f8f4ff)!important;color:#4f198f!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}
+  .buyerMobileCategoryAll strong{font-size:15px;line-height:1.2}.buyerMobileCategoryAll>span{display:flex;align-items:center;font-size:10px;white-space:nowrap}
+  .buyerMobileCategoryGroup{padding:15px 0 4px;border-bottom:1px solid #eee9f2}
+  .buyerMobileCategoryGroup:last-child{border-bottom:0}
+  .buyerMobileCategoryGroup h3{margin:0 2px 10px;color:#29163f;font-size:13px;line-height:1.25}
+  .buyerMobileCategoryGroup>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px 6px}
+  .buyerMobileCategoryGroup a{min-width:0!important;min-height:0!important;padding:0!important;border-radius:0!important;display:flex!important;align-items:center!important;flex-direction:column;gap:5px!important;text-align:center!important;background:transparent!important;color:#3e3548!important;font-size:9px!important;font-weight:700!important;line-height:1.18}
+  .buyerMobileCategoryGroup a>span:last-child{display:-webkit-box;max-width:100%;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+  .buyerMobileCategoryTileImage{width:min(19vw,84px);height:min(19vw,84px);overflow:hidden;border-radius:50%;background:#f5f1f8;display:block;box-shadow:inset 0 0 0 1px rgba(92,52,126,.06)}
+  .buyerMobileCategoryTileImage img{width:100%;height:100%;object-fit:cover}
+  .buyerMobileCategoriesButton svg:last-child{margin-inline-start:auto}
   .buyerMobileInformationLinks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:8px 11px;padding-top:10px;border-top:1px solid #eee7f5}
   .buyerMobileInformationLinks a{min-height:38px!important;padding:5px!important;justify-content:center!important;border:1px solid #eee7f5;border-radius:9px;font-size:10px!important}
+  .productDetailPage>.marketplaceFooter{margin-top:0;padding-bottom:calc(76px + env(safe-area-inset-bottom));background:#241136}
+  .productDetailPage>.marketplaceFooter>.marketplaceFooterTrust,.productDetailPage>.marketplaceFooter>.marketplaceFooterMain,.productDetailPage>.marketplaceFooter>.marketplaceFooterBottom{display:none!important}
+  .productDetailPage>.marketplaceFooter>.marketplaceFooterCompact{min-height:104px;padding:18px 16px;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px 16px}
+  .marketplaceFooterCompact .todijoLogo{font-size:20px}
+  .marketplaceFooterCompact nav{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px 12px}
+  .marketplaceFooterCompact nav a{color:#e7dcf4;font-size:10px;font-weight:750}
+  .marketplaceFooterCompact small{grid-column:1/-1;color:#ad9dbc;font-size:9px}
 }

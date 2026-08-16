@@ -160,7 +160,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>
-        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}>{categoryImages.get(category) ? <span className="categoryShowcaseImage"><Image src={categoryImages.get(category)!} alt="" fill sizes="92px" unoptimized/></span> : <span className={`categoryShowcaseIcon tone-${index % 4}`}><Package size={24} aria-hidden="true"/></span>}<strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
+        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}><span className="categoryShowcaseImage"><Image src={categoryImages.get(category) ?? `/images/mobile-categories/category-${index % 16}.webp`} alt="" fill sizes="92px" unoptimized={Boolean(categoryImages.get(category))}/></span><strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
       </section>}
 
       <div className="marketplaceDiscoverySections">

@@ -35,7 +35,8 @@ test("shared drawer and live bottom navigation remain accessible across routes",
   assert.match(navigation, /totalItems > 0/);
   assert.match(navigation, /showBottomNavigation = !currentPath\.startsWith\("\/checkout"\)/);
   assert.match(navigation, /className="buyerMobileCategoriesButton"/);
-  assert.match(navigation, /PRODUCT_CATEGORIES\.map/);
+  assert.match(navigation, /DESKTOP_CATEGORY_TAXONOMY\.map/);
+  assert.match(navigation, /buyerMobileCategoryBrowser/);
 });
 
 test("shared mobile header shows locale-safe Back navigation only away from Home", () => {

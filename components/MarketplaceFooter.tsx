@@ -54,6 +54,11 @@ export default function MarketplaceFooter() {
   ];
 
   return <footer className="marketplaceFooter">
+    <div className="marketplaceFooterCompact">
+      <TodijoLogo href={`/${locale}`} inverse/>
+      <nav aria-label={t("helpTitle")}><a href={info("help")}>{t("helpCenter")}</a><a href={info("returns")}>{t("returns")}</a><a href={info("privacy")}>{t("privacy")}</a></nav>
+      <small>© {new Date().getFullYear()} Todijo</small>
+    </div>
     <div className="marketplaceFooterTrust">
       <div className="marketplaceNewsletter"><div><Mail size={25} aria-hidden="true"/><span><strong>{t("newsletterTitle")}</strong><small>{t("newsletterText")}</small></span></div></div>
       <div className="marketplacePaymentTrust"><div><LockKeyhole size={20} aria-hidden="true"/><span><strong>{t("securePayment")}</strong><small>{t("securePaymentText")}</small></span></div><div className="paymentBadges" aria-label={t("paymentMethods")}><span>Visa</span><span>Mastercard</span><span>Apple Pay</span><span>Google Pay</span><span>Stripe</span></div></div>
