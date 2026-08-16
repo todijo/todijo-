@@ -39,9 +39,9 @@ test("all 14 Help and OAuth locale payloads are Unicode-safe with deliberate fal
   }
 });
 
-test("informational pages use the clean shell while marketplace routes retain browse controls",()=>{
+test("informational pages retain category navigation without the filter dock while marketplace routes retain browse controls",()=>{
   const header=source("components/SiteHeader.tsx"),marketplace=source("components/MarketplaceHeader.tsx");
-  assert.match(header,/path\.startsWith\("\/info\/"\)[\s\S]*showCategoryNav=\{false\}[\s\S]*showFilterDock=\{false\}/);
+  assert.match(header,/path\.startsWith\("\/info\/"\)[\s\S]*<MarketplaceHeader showCategoryNav showFilterDock=\{false\}/);
   assert.match(header,/return <MarketplaceHeader showFilterDock\/>/);
   assert.match(marketplace,/showFilterDock \? <MarketplaceBrowseFilterBar\/>/);
   assert.match(marketplace,/showCategoryNav \? <MarketplaceCategoryNavigation/);

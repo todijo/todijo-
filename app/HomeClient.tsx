@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, Languages, LockKeyhole, MapPin, MessageCircle, Package, SearchX, ShoppingBag, Store } from "lucide-react";
 import { rtlLocales, type Locale } from "@/i18n/config";
@@ -23,6 +23,7 @@ type MarketplaceProduct = MarketplaceCardProduct & {
 };
 
 type MarketplaceStore = { id: string; name: string; slug: string; description: string | null; logo: string | null; city: string; country: string; products: Array<{ id: string; name: string; image: string | null }> };
+const MOBILE_BATCH_SIZE = 24;
 
 
 function ProductRail({ id, title, titleHref, products, soldOut }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string }) {
@@ -45,6 +46,11 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   resultsOnly?: boolean;
 }) {
   const [filters, setFilters] = useState(initialFilters);
+  const [visibleProducts, setVisibleProducts] = useState(products);
+  const [nextOffset, setNextOffset] = useState(MOBILE_BATCH_SIZE);
+  const [hasMore, setHasMore] = useState(page * pageSize < total);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const activeLocale = useLocale();
   const m = useTranslations("Marketplace");
   const c = useTranslations("Common");
@@ -61,6 +67,49 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length, [filters]);
   const featuredProducts = heroProducts.filter((product) => product.image).slice(0, 5);
   const featuredCategories = categories.slice(0, 4);
+  const categoryImages = useMemo(() => {
+    const images = new Map<string, string>();
+    [...products, ...newArrivals, ...bestSellers, ...heroProducts].forEach((product) => {
+      if (product.image && !images.has(product.category)) images.set(product.category, product.image);
+    });
+    return images;
+  }, [bestSellers, heroProducts, newArrivals, products]);
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 860px)").matches;
+    setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
+    setNextOffset(page === 1 ? Math.min(MOBILE_BATCH_SIZE, products.length) : page * pageSize);
+    setHasMore(page === 1 && mobile ? Math.min(MOBILE_BATCH_SIZE, products.length) < total : page * pageSize < total);
+  }, [page, pageSize, products, total]);
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel || !hasMore || loadingMore || !window.matchMedia("(max-width: 860px)").matches) return;
+    const observer = new IntersectionObserver(async ([entry]) => {
+      if (!entry.isIntersecting || loadingMore) return;
+      setLoadingMore(true);
+      try {
+        const query = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
+        query.set("offset", String(nextOffset));
+        const response = await fetch(`/api/marketplace/products?${query.toString()}`, { credentials: "same-origin" });
+        if (!response.ok) throw new Error("Unable to load products");
+        const payload = await response.json() as { products: MarketplaceProduct[]; hasMore: boolean; nextOffset: number };
+        setVisibleProducts((current) => {
+          const seen = new Set(current.map((product) => product.id));
+          return [...current, ...payload.products.filter((product) => !seen.has(product.id))];
+        });
+        setHasMore(payload.hasMore);
+        setNextOffset(payload.nextOffset);
+      } catch {
+        setHasMore(false);
+      } finally {
+        setLoadingMore(false);
+      }
+    }, { rootMargin: "700px 0px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filters, hasMore, loadingMore, nextOffset]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -111,7 +160,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>
-        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}><span className={`categoryShowcaseIcon tone-${index % 4}`}><Package size={24} aria-hidden="true"/></span><strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
+        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}>{categoryImages.get(category) ? <span className="categoryShowcaseImage"><Image src={categoryImages.get(category)!} alt="" fill sizes="92px" unoptimized/></span> : <span className={`categoryShowcaseIcon tone-${index % 4}`}><Package size={24} aria-hidden="true"/></span>}<strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
       </section>}
 
       <div className="marketplaceDiscoverySections">
@@ -128,9 +177,11 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
             <div><h2 tabIndex={-1}>{filters.q ? `${t.products}: “${filters.q}”` : filters.category ? `${t.products}: ${displayCategory(filters.category)}` : t.products}</h2><span aria-live="polite">{total} {t.results}</span></div>
           </div>
 
-          {products.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">
-            {products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
+          {visibleProducts.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">
+            {visibleProducts.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
           </div>}
+
+          <div ref={loadMoreRef} className="mobileInfiniteSentinel" aria-live="polite">{loadingMore ? <span>…</span> : null}</div>
 
           {totalPages > 1 && <nav className={`pagination${page === 1 ? " firstPagePagination" : ""}`} aria-label={t.products}>
             {page > 1 ? <a href={buildUrl(filters, page - 1)}>← {t.previous}</a> : <span />}

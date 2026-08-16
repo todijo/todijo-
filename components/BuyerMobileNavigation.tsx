@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Grid2X2, Heart, Home, Menu, MessageCircle, Package, Search, ShoppingCart, Store, UserRound, X } from "lucide-react";
+import { Baby, BookOpen, Car, Dumbbell, Grid2X2, Hammer, Heart, Home, House, Menu, MessageCircle, Package, Search, Shirt, ShoppingCart, Smartphone, Sparkles, Store, UserRound, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -18,6 +18,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const header = useTranslations("HomeHeader");
   const product = useTranslations("Product");
   const ux = useTranslations("Ux");
+  const footer = useTranslations("HomeFooter");
   const categoryText = useTranslations("Categories");
   const { totalItems } = useCart();
   const [open, setOpen] = useState(false);
@@ -68,6 +69,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const cartHref = localizedPath(locale, "/cart");
   const favoritesHref = localizedPath(locale, "/favorites");
   const sellerHref = `${localizedPath(locale, "/register")}?role=seller`;
+  const categoryIcons = { fashion: Shirt, electronics: Smartphone, home: House, beauty: Sparkles, sports: Dumbbell, books: BookOpen, children: Baby, auto: Car, crafts: Hammer, other: Package } as const;
 
   const drawer = open && typeof document !== "undefined" ? createPortal(<div className="buyerMobileDrawerLayer">
     <button className="buyerMobileDrawerBackdrop" type="button" onClick={closeDrawer} aria-label={product("close")} />
@@ -76,7 +78,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
       <nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>
         <button className="buyerMobileCategoriesButton" type="button" onClick={() => setCategoriesOpen((open) => !open)} aria-expanded={categoriesOpen}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}</button>
-        {categoriesOpen ? <div className="buyerMobileCategoryList">{PRODUCT_CATEGORIES.map((category) => <a key={category.key} href={`${homeHref}/search?category=${encodeURIComponent(category.value)}`} onClick={closeDrawer}>{categoryText(category.key)}</a>)}</div> : null}
+        {categoriesOpen ? <div className="buyerMobileCategoryList">{PRODUCT_CATEGORIES.map((category) => { const Icon = categoryIcons[category.key]; return <a key={category.key} href={`${homeHref}/search?category=${encodeURIComponent(category.value)}`} onClick={closeDrawer}><span><Icon size={20} aria-hidden="true"/></span>{categoryText(category.key)}</a>; })}</div> : null}
         <a href={`${homeHref}?sort=newest#products`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("newArrivals")}</a>
         <a href={`${homeHref}#best-sellers`} onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
         <a href={ordersHref} onClick={closeDrawer} className={isNavigationActive(pathname, ordersHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, ordersHref, true) ? "page" : undefined}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
@@ -84,6 +86,11 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
         {accountName ? <a href={favoritesHref} onClick={closeDrawer} className={isNavigationActive(pathname, favoritesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, favoritesHref, true) ? "page" : undefined}><Heart size={20} aria-hidden="true"/>{ux("favoritesNav")}</a> : null}
         <a href={accountHref} onClick={closeDrawer} className={isNavigationActive(pathname, accountHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, accountHref, true) ? "page" : undefined}><UserRound size={20} aria-hidden="true"/>{common("account")}</a>
         <a href={sellerHref} onClick={closeDrawer}><Store size={20} aria-hidden="true"/>{common("sell")}</a>
+        <div className="buyerMobileInformationLinks">
+          <a href={localizedPath(locale, "/info/about")} onClick={closeDrawer}>{footer("about")}</a>
+          <a href={localizedPath(locale, "/info/help")} onClick={closeDrawer}>{footer("helpCenter")}</a>
+          <a href={localizedPath(locale, "/info/privacy")} onClick={closeDrawer}>{footer("privacy")}</a>
+        </div>
       </nav>
       <LanguageSwitcher className="buyerMobileDrawerLanguage"/>
       {accountName ? <form action="/api/auth/logout" method="post"><button type="submit">{common("logout")}</button></form> : null}

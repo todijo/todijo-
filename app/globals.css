@@ -1167,3 +1167,49 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 @media(max-width:560px){.adminUsersPage .adminShell{width:min(100% - 20px,1480px)}.adminUserFilters{grid-template-columns:1fr}.adminUserFilters label:first-child{grid-column:auto}.adminUsersTable tr{grid-template-columns:1fr;padding:15px}.adminUsersTable td,.adminUsersTable td:first-child,.adminUsersTable td:last-child{grid-column:auto;grid-template-columns:1fr;gap:6px}.adminUsersTable td:first-child,.adminUsersTable td:last-child{grid-column:1}.adminUserEmail{white-space:normal;overflow-wrap:anywhere}.adminUserRecordCounts{grid-template-columns:1fr}.adminUserActions{display:grid;grid-template-columns:1fr}.adminUserActions button{width:100%}.adminUserDialog form>div{align-items:stretch;flex-direction:column-reverse}.adminUserDialog form>div button{width:100%;min-height:44px}}
 .adminUsersPage .adminUserActions button{font-family:inherit;font-size:12px;font-weight:800;line-height:1.25}
 .cmsAdminPage .adminShell,.cmsEditorPage .adminShell{max-width:1480px}.cmsAdminPage .adminTablePanel{margin-bottom:24px}.cmsAdminPage .adminTablePanel h2{margin:0 0 16px}.cmsAdminPage .adminTablePanel td:last-child{display:flex;flex-wrap:wrap;gap:8px}.cmsAdminPage .adminTablePanel td:last-child a,.cmsEditorActions a{display:inline-flex;min-height:42px;align-items:center;padding:8px 12px;border:1px solid #b9d8cb;border-radius:10px;color:#075b43;font-weight:700}.cmsEditorGrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:20px}.cmsEditor textarea{resize:vertical}.cmsEditorActions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.cmsHistory{align-self:start}.cmsHistory article{display:grid;gap:8px;padding:14px 0;border-bottom:1px solid #dce9e4}.cmsHistory small{overflow-wrap:anywhere}.cmsPreviewBanner{position:sticky;top:0;z-index:30;padding:10px;text-align:center;background:#fff3cd;color:#654d03;font-weight:800}.cmsPublicContent{max-width:920px}.cmsPublicContent>div{display:grid;gap:16px}.cmsPublicContent h2,.cmsPublicContent h3,.cmsPublicContent p,.cmsPublicContent ul{margin:0}.cmsPublicContent p,.cmsPublicContent li{font-size:1rem;line-height:1.75}.cmsPublicContent a{color:#087653;text-decoration:underline}.cmsPublicContent ul{padding-inline-start:24px}@media(max-width:900px){.cmsEditorGrid{grid-template-columns:1fr}.cmsAdminPage .adminTablePanel table,.cmsAdminPage .adminTablePanel tbody,.cmsAdminPage .adminTablePanel tr,.cmsAdminPage .adminTablePanel td{display:block;width:100%}.cmsAdminPage .adminTablePanel thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.cmsAdminPage .adminTablePanel tr{padding:14px;border:1px solid #dce9e4;border-radius:14px;margin-bottom:12px}.cmsAdminPage .adminTablePanel td{padding:7px 0;border:0}.cmsAdminPage .adminTablePanel td:last-child{display:flex}.cmsEditorActions>*{flex:1 1 180px;justify-content:center}}
+
+/* Mobile storefront: product-first, uncropped media and incremental discovery. */
+.categoryShowcaseImage{position:relative;width:48px;height:48px;overflow:hidden;border-radius:14px;background:#f5f2f8;display:block}.categoryShowcaseImage img{object-fit:contain}
+.mobileInfiniteSentinel{display:none}
+@media(max-width:860px){
+  .buyerHomePage .discoveryHero,
+  .buyerHomePage .marketplaceDiscoverySections,
+  .buyerHomePage .todijoTrust,
+  .buyerHomePage .sellerGrowthCta,
+  .buyerHomePage .mobileAppPromotion,
+  .buyerHomePage>.marketplaceFooter{display:none!important}
+  .buyerHomePage .categoryShowcase{width:100%;padding:10px 8px 8px;background:#fff}
+  .buyerHomePage .categoryShowcase .marketplaceRailHeading{margin:0 4px 8px}
+  .buyerHomePage .categoryShowcase .marketplaceRailHeading>div>span,
+  .buyerHomePage .categoryShowcase .marketplaceRailHeading>a{display:none}
+  .buyerHomePage .categoryShowcase .marketplaceRailHeading h2{font-size:16px;letter-spacing:0}
+  .buyerHomePage .categoryShowcaseGrid{display:flex;gap:8px;padding:1px 2px 7px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}
+  .buyerHomePage .categoryShowcaseGrid::-webkit-scrollbar{display:none}
+  .buyerHomePage .categoryShowcaseGrid>a{flex:0 0 82px;min-height:104px;padding:7px 4px;border:0;border-radius:12px;box-shadow:none;display:flex;align-items:center;justify-content:flex-start;flex-direction:column;gap:6px;text-align:center;scroll-snap-align:start}
+  .buyerHomePage .categoryShowcaseGrid>a>svg{display:none}
+  .buyerHomePage .categoryShowcaseGrid strong{display:-webkit-box;max-width:100%;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:10px;line-height:1.2}
+  .buyerHomePage .categoryShowcaseImage,.buyerHomePage .categoryShowcaseIcon{width:72px;height:72px;flex:0 0 72px;border-radius:50%;background:#f7f4fa}
+  .buyerHomePage .categoryShowcaseImage img{padding:2px;object-fit:contain}
+  .buyerHomePage .discoveryLayout{width:100%;padding:6px 6px calc(84px + env(safe-area-inset-bottom))}
+  .buyerHomePage .resultsToolbar{margin:0 4px 8px}
+  .buyerHomePage .resultsToolbar h2{font-size:16px}
+  .buyerHomePage .resultsToolbar span{font-size:10px}
+  .buyerHomePage .discoveryProductGrid{gap:4px}
+  .buyerHomePage .discoveryCard{border:0;border-radius:10px;overflow:hidden;box-shadow:none}
+  .buyerHomePage .discoveryImageWrap{aspect-ratio:1/1;border-radius:10px;background:#f7f5f9}
+  .buyerHomePage .discoveryImageWrap>img{padding:3px;object-fit:contain!important;object-position:center}
+  .buyerHomePage .discoveryCardBody{padding:5px 4px 7px}
+  .buyerHomePage .discoveryCardBody h3{min-height:27px;margin:1px 0 3px;font-size:11px;line-height:1.22;-webkit-line-clamp:2}
+  .buyerHomePage .cardBottom strong{font-size:14px}
+  .buyerHomePage .cardCartButton.cardCartIconOnly{width:34px;height:34px;min-width:34px;min-height:34px}
+  .buyerHomePage .pagination{display:none}
+  .mobileInfiniteSentinel{min-height:42px;display:grid;place-items:center;color:#6d28d9;font-weight:900}
+  .productMobileImageTrack{background:#fff!important}
+  .productMobileImageSlide{background:#fff!important}
+  .productMobileImageSlide img{padding:4px;object-fit:contain!important;object-position:center!important}
+  .buyerMobileCategoryList{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px!important}
+  .buyerMobileCategoryList a{min-width:0;min-height:76px!important;padding:8px!important;display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column;gap:5px!important;text-align:center!important;font-size:11px!important}
+  .buyerMobileCategoryList a>span{width:34px;height:34px;border-radius:50%;background:#f0e8ff;color:#6d28d9;display:grid;place-items:center}
+  .buyerMobileInformationLinks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:8px 11px;padding-top:10px;border-top:1px solid #eee7f5}
+  .buyerMobileInformationLinks a{min-height:38px!important;padding:5px!important;justify-content:center!important;border:1px solid #eee7f5;border-radius:9px;font-size:10px!important}
+}
