@@ -28,9 +28,10 @@ import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-pric
 import {readCjProductCache} from "@/lib/suppliers/cj-client";
 import type {SupplierVariantSnapshot} from "@/lib/suppliers/types";
 import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
+import { requireAdmin } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams?:Promise<{adminPreview?:string}> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
@@ -51,16 +52,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ProductPage({ params }: Props) {
+export default async function ProductPage({ params, searchParams }: Props) {
   const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, resolvedParams, session, locale] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
     getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"), getTranslations("SellerControl"),
     params, readSession(), getLocale(),
   ]);
   const { id } = resolvedParams;
-  const publicAccess = publicProductAccessWhere();
+  const previewRequested=(await searchParams)?.adminPreview==="1";
+  if(previewRequested){try{await requireAdmin(prisma,session);}catch{notFound();}}
+  const publicAccess = previewRequested?{}:publicProductAccessWhere();
   const product = await prisma.product.findFirst({
-    where: { id, status: "PUBLISHED", ...publicAccess },
+    where: { id, ...(previewRequested?{}:{status:"PUBLISHED" as const}), ...publicAccess },
     select: {
       id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true,
       condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,

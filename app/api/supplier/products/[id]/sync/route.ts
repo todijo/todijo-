@@ -4,8 +4,10 @@ import { readSession } from "@/lib/session";
 import { CjCatalogProvider } from "@/lib/suppliers/cj-client";
 import { syncSupplierProduct } from "@/lib/suppliers/supplier-products";
 import { requirePlatformSupplierAdmin, requirePlatformSupplierProduct } from "@/lib/suppliers/supplier-access";
+import { MutationOriginError, assertAdminMutationRequest } from "@/lib/request-security";
 
-export async function POST(_request:Request,context:{params:Promise<{id:string}>}) {
+export async function POST(request:Request,context:{params:Promise<{id:string}>}) {
+  try{assertAdminMutationRequest(request);}catch(error){if(error instanceof MutationOriginError)return NextResponse.json({error:error.message},{status:403});throw error;}
   const session=await readSession(); try { await requirePlatformSupplierAdmin(prisma,session); } catch { return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:403}); }
   const {id}=await context.params;
   try { await requirePlatformSupplierProduct(prisma,id); } catch { return NextResponse.json({error:"PRODUCT_NOT_FOUND"},{status:404}); }

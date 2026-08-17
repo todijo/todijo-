@@ -1,4 +1,4 @@
-import type { SupplierCatalogProvider, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
+import type { SupplierCatalogProvider, SupplierCatalogSearchPage, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
 import { mapCjSemanticVariants } from "./cj-variant-mapping";
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
@@ -162,6 +162,16 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
     return normalizeCjProduct(product, variants.data, inventory.data);
+  }
+  async searchProducts(query:string,page=1,pageSize=20):Promise<SupplierCatalogSearchPage>{
+    const keyWord=query.trim();
+    if(keyWord.length>120||!Number.isSafeInteger(page)||page<1||page>500||!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>20)throw new Error("CJ_CATALOG_SEARCH_INPUT_INVALID");
+    const path=`/product/listV2?page=${page}&size=${pageSize}${keyWord?`&keyWord=${encodeURIComponent(keyWord)}`:""}`;
+    const result=await this.get("search-products",path,{page:String(page),pageSize:String(pageSize),queryLength:String(keyWord.length)});
+    const root=object(result.data),content=list(root.content),rows=content.length?content.flatMap((entry)=>list(object(entry).productList)):list(root.productList);
+    const items=rows.flatMap((entry)=>{const row=object(entry),supplierProductId=text(row.id??row.pid),title=text(row.nameEn??row.productNameEn??row.name),imageUrl=text(row.bigImage??row.image);if(!supplierProductId||!title)return[];return[{supplierProductId,sku:text(row.sku??row.spu)||null,title:title.slice(0,160),imageUrl:isValidProductImageUrl(imageUrl)?imageUrl:null,categoryReference:text(row.categoryId)||null,cost:number(row.sellPrice??row.productPrice),currency:"USD"}];});
+    const total=number(root.total??root.totalCount),hasMore=total!=null?page*pageSize<total:rows.length===pageSize;
+    return{items,page,pageSize,hasMore};
   }
   async getProductReviews(supplierProductId:string,page=1,pageSize=20):Promise<SupplierProductReviewsPage>{
     const pid=supplierProductId.trim();

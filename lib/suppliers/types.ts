@@ -59,9 +59,28 @@ export type SupplierProductSnapshot = {
   rawMetadata: Record<string, unknown>;
 };
 
+export type SupplierCatalogSearchItem = {
+  supplierProductId: string;
+  sku: string | null;
+  title: string;
+  imageUrl: string | null;
+  categoryReference: string | null;
+  cost: number | null;
+  currency: string;
+};
+
+export type SupplierCatalogSearchPage = {
+  items: SupplierCatalogSearchItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
 export interface SupplierCatalogProvider {
   readonly id: SupplierProviderId;
   isConfigured(): boolean;
   getProduct(supplierProductId: string): Promise<SupplierProductSnapshot>;
+  searchProducts?(query: string, page?: number, pageSize?: number): Promise<SupplierCatalogSearchPage>;
+  calculateFreight?(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<{selected:{name:string;amount:string;currency:string;estimatedDelivery:string}}>;
   getProductReviews?(supplierProductId: string, page?: number, pageSize?: number): Promise<SupplierProductReviewsPage>;
 }

@@ -14,8 +14,8 @@ test("normal sellers cannot see platform CJ tools and supplier costs remain admi
   const admin = readFileSync(resolve(root, "app/adm-barewbar-182203/suppliers/page.tsx"), "utf8");
   assert.doesNotMatch(seller, /SupplierProductManager|supplierCost|supplierStock|CJ product ID/);
   assert.match(seller, /dropshippingEnabled/);
-  assert.match(admin, /SupplierProductManager/);
-  assert.match(admin, /ownerType:\s*"PLATFORM"/);
+  assert.match(admin, /SupplierCatalogWorkspace/);
+  assert.match(admin, /requirePlatformSupplierAdmin/);
 });
 
 test("supplier mutation routes require database-verified platform admin access", () => {

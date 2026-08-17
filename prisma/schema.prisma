@@ -99,6 +99,22 @@ enum SupplierSyncStatus {
   ERROR
 }
 
+enum SupplierCatalogJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+}
+
+enum SupplierCatalogItemStatus {
+  PENDING
+  IMPORTING
+  IMPORTED
+  SKIPPED
+  QUARANTINED
+  FAILED
+}
+
 enum SupplierFulfillmentStatus {
   PENDING
   SUBMITTING
@@ -317,6 +333,7 @@ model User {
   adminActionsReceived AdminUserAction[] @relation("AdminUserActionTarget")
   adminActionsPerformed AdminUserAction[] @relation("AdminUserActionActor")
   siteContentRevisions SiteContentRevision[] @relation("SiteContentRevisionEditor")
+  supplierCatalogJobs SupplierCatalogImportJob[] @relation("SupplierCatalogJobAdmin")
 
   @@index([blockedAt, blockExpiresAt])
   @@index([sellerSuspendedAt])
@@ -593,6 +610,7 @@ model Store {
   subscription  SellerSubscription?
   accessGrants  StoreAccessGrant[]
   supplierConnections SupplierConnection[]
+  supplierCatalogJobs SupplierCatalogImportJob[]
   orderGroups OrderGroup[]
 
   createdAt DateTime @default(now())
@@ -752,6 +770,68 @@ model SupplierProductLink {
   @@unique([connectionId, supplierProductId])
   @@index([provider, syncStatus, lastSyncedAt])
   @@index([connectionId, syncStatus, lastSyncedAt])
+}
+
+model SupplierCatalogImportJob {
+  id             String                   @id @default(cuid())
+  provider       SupplierProvider         @default(CJ)
+  status         SupplierCatalogJobStatus @default(PENDING)
+  createdById    String
+  storeId        String
+  destinationCountry String                  @db.Char(2)
+  requestedCount Int
+  processedCount Int                      @default(0)
+  importedCount  Int                      @default(0)
+  skippedCount   Int                      @default(0)
+  quarantinedCount Int                    @default(0)
+  failedCount    Int                      @default(0)
+  batchLimit     Int
+  lastErrorCode  String?                  @db.VarChar(100)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  createdBy User @relation("SupplierCatalogJobAdmin", fields: [createdById], references: [id], onDelete: Restrict)
+  store     Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  items     SupplierCatalogImportItem[]
+
+  @@index([createdById, createdAt])
+  @@index([status, updatedAt])
+}
+
+model SupplierCatalogImportItem {
+  id                    String                    @id @default(cuid())
+  jobId                 String
+  position              Int
+  requestedIdentifier   String                    @db.VarChar(200)
+  canonicalSupplierId   String?                   @db.VarChar(200)
+  supplierSku           String?                   @db.VarChar(200)
+  status                SupplierCatalogItemStatus @default(PENDING)
+  canonicalCategoryId   String?                   @db.VarChar(160)
+  categoryMappingSource String?                   @db.VarChar(40)
+  categoryMappingReason String?                   @db.VarChar(500)
+  pricingStatus         String?                   @db.VarChar(40)
+  pricingEvidence       Json?
+  stockStatus           String?                   @db.VarChar(40)
+  complianceStatus      String?                   @db.VarChar(40)
+  complianceReason      String?                   @db.VarChar(500)
+  errorCode             String?                   @db.VarChar(100)
+  errorMessage          String?                   @db.VarChar(500)
+  productId             String?
+  attemptCount          Int                       @default(0)
+  claimedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  job SupplierCatalogImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, requestedIdentifier])
+  @@unique([jobId, position])
+  @@index([jobId, status, position])
+  @@index([canonicalSupplierId])
+  @@index([productId])
 }
 
 model SupplierConnection {
