@@ -40,6 +40,7 @@ test("visible category surfaces use the shared resolver while values and queries
   const productCard = fs.readFileSync(path.join(root, "components/MarketplaceProductCard.tsx"), "utf8");
   const create = fs.readFileSync(path.join(root, "app/seller/products/new/NewProductForm.tsx"), "utf8");
   const edit = fs.readFileSync(path.join(root, "app/seller/products/[id]/edit/EditProductForm.tsx"), "utf8");
+  const selector = fs.readFileSync(path.join(root, "components/SellerCategorySelector.tsx"), "utf8");
   assert.match(home, /const displayCategory = .*categoryLabel/);
   assert.match(home, /categoryShowcaseGrid[^\n]+categories\.slice\(0,8\)\.map/);
   assert.match(home, /<strong>\{displayCategory\(category\)\}<\/strong>/);
@@ -48,10 +49,11 @@ test("visible category surfaces use the shared resolver while values and queries
   assert.match(store, /<MarketplaceProductCard[^>]+showCategory/);
   assert.match(productCard, /categoryLabel\(product\.category/);
   for (const source of [create, edit]) {
-    assert.match(source, /PRODUCT_CATEGORIES\.map/);
-    assert.match(source, /value=\{value\}/);
-    assert.match(source, /categoryLabel\(value/);
+    assert.match(source, /SellerCategorySelector/);
+    assert.doesNotMatch(source, /PRODUCT_CATEGORIES/);
   }
+  assert.match(selector, /DESKTOP_CATEGORY_TAXONOMY\.map/);
+  assert.match(selector, /name="category"/);
   assert.match(fs.readFileSync(path.join(root, "app/page.tsx"), "utf8"), /category: \{ contains: q/);
   assert.match(fs.readFileSync(path.join(root, "lib/marketplace-search.ts"), "utf8"), /\["category", normalizedFilters\.category\]/);
 });

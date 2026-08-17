@@ -13,13 +13,12 @@ import ProductVideoManager from "@/components/ProductVideoManager";
 import type { ProductVideoInput } from "@/lib/product-media";
 import { productStockForForm } from "@/lib/product-variant-form";
 import { useToast } from "@/components/ToastProvider";
-import { categoryLabel, PRODUCT_CATEGORIES } from "@/lib/categories";
 import ProductComplianceFields from "@/components/ProductComplianceFields";
+import SellerCategorySelector from "@/components/SellerCategorySelector";
 import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type ShippingDraft} from "@/components/ShippingRuleFields";
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
-  const categoryText = useTranslations("Categories");
   const ux = useTranslations("Ux");
   const compliance = useTranslations("Compliance");
   const shipping = useTranslations("Shipping");
@@ -105,7 +104,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
 
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
           <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("category")} htmlFor="category" required><select id="category" name="category" required defaultValue=""><option value="" disabled>{t("chooseCategory")}</option>{PRODUCT_CATEGORIES.map(({ value }) => <option key={value} value={value}>{categoryLabel(value, (key) => categoryText(key))}</option>)}</select></SellerFormField>
+            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
             <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
           </div>
           <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>

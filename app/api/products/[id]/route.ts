@@ -12,6 +12,7 @@ import { replaceProductVideo } from "@/lib/product-media";
 import { assertProductPublicationEligible } from "@/lib/suppliers/safety";
 import { AdminAccessError } from "@/lib/admin-access";
 import { assertSellerActivity } from "@/lib/account-status";
+import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -59,7 +60,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     if (name.length < 2 || name.length > 120) return NextResponse.json({ error: "Le nom doit contenir entre 2 et 120 caractères." }, { status: 400 });
     if (description.length < 10 || description.length > 5000) return NextResponse.json({ error: "La description doit contenir entre 10 et 5000 caractères." }, { status: 400 });
-    if (!category || category.length > 80) return NextResponse.json({ error: "Choisissez une catégorie valide." }, { status: 400 });
+    if (!category || category.length > 160 || !isCanonicalLeafCategoryId(category)) return NextResponse.json({ error: "Choisissez une catégorie valide." }, { status: 400 });
     if (!Number.isFinite(price) || price <= 0 || price > 1000000) return NextResponse.json({ error: "Le prix est invalide." }, { status: 400 });
     if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) return NextResponse.json({ error: "Le stock est invalide." }, { status: 400 });
 

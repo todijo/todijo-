@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { localizedHome, postLoginDestination } from "@/lib/auth-redirects";
 import type { Locale } from "@/i18n/config";
 import SocialLoginButtons from "@/components/SocialLoginButtons";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -37,7 +38,7 @@ export default function LoginPage() {
   }
 
   return <main className="authPage">
-    <section className="authBrand">
+    <section className="authBrand authBrandWithArtwork is-login"><Image className="authArtwork" src="/images/auth/secure-login.webp" alt="" fill sizes="(max-width: 850px) 100vw, 50vw" priority/>
       <a className="authLogo" href={localizedHome(locale)} aria-label="Todijo">Todijo<span>.</span></a>
       <div className="authPitch"><h1>{t("welcome")}</h1><p>{t("pitch")}</p>
         <div className="authBenefits"><div className="authBenefit"><i>✓</i> {t("buyerHelp")}</div><div className="authBenefit"><i>✓</i> {t("sellerHelp")}</div><div className="authBenefit"><i>✓</i> Stripe</div></div>

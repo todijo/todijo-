@@ -7,6 +7,7 @@ import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { localizedHome } from "@/lib/auth-redirects";
 import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 import SocialLoginButtons from "@/components/SocialLoginButtons";
+import Image from "next/image";
 
 export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const params = useSearchParams();
@@ -76,7 +77,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   }
 
   return <main className="authPage">
-    <section className="authBrand"><a className="authLogo" href={localizedHome(locale)} aria-label="Todijo">Todijo<span>.</span></a>
+    <section className={`authBrand authBrandWithArtwork is-${role}`}><Image className="authArtwork" src={role==="seller"?"/images/auth/seller-registration.webp":"/images/auth/buyer-registration.webp"} alt="" fill sizes="(max-width: 850px) 100vw, 50vw" priority/><a className="authLogo" href={localizedHome(locale)} aria-label="Todijo">Todijo<span>.</span></a>
       <div className="authPitch"><h1>{t("createTitle")}</h1><p>{t("createPitch")}</p>
         <div className="authBenefits"><div className="authBenefit"><i>✓</i> {t("buyerHelp")}</div><div className="authBenefit"><i>✓</i> {t("sellerHelp")}</div><div className="authBenefit"><i>✓</i> Todijo Marketplace</div></div>
       </div><small>© 2026 Todijo</small>

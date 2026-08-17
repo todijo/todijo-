@@ -36,5 +36,6 @@ export function categoryKey(value: string): CategoryKey | null {
 
 export function categoryLabel(value: string, translate: (key: CategoryKey) => string) {
   const key = categoryKey(value);
-  return key ? translate(key) : value.trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+  return key ? translate(key) : canonicalCategoryLabel(value).trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 }
+import { canonicalCategoryLabel } from "./desktop-category-taxonomy";

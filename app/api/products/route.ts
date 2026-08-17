@@ -13,6 +13,7 @@ import { ProductComplianceError, readProductCompliance } from "@/lib/product-com
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
+import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     if (description.length < 10 || description.length > 5000) {
       return NextResponse.json({ error: "La description doit contenir entre 10 et 5000 caractères." }, { status: 400 });
     }
-    if (!category || category.length > 80) {
+    if (!category || category.length > 160 || !isCanonicalLeafCategoryId(category)) {
       return NextResponse.json({ error: "Choisissez une catégorie valide." }, { status: 400 });
     }
     if (!Number.isFinite(price) || price <= 0 || price > 1000000) {
