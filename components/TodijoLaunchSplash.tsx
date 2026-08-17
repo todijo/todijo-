@@ -4,20 +4,19 @@ import { useEffect, useState } from "react";
 import TodijoUmbrellaMark from "@/components/TodijoUmbrellaMark";
 
 const SESSION_KEY = "todijo-mobile-splash-seen-v1";
-const FALLBACK_MS = 1900;
+const FALLBACK_MS = 2950;
 
 export default function TodijoLaunchSplash() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 860px)").matches;
-    if (!mobile || window.sessionStorage.getItem(SESSION_KEY) === "1") return;
+    if (!mobile || window.sessionStorage.getItem(SESSION_KEY) === "1") { setVisible(false); return; }
     window.sessionStorage.setItem(SESSION_KEY, "1");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setReducedMotion(reduced);
-    setVisible(true);
-    const done = window.setTimeout(() => setVisible(false), reduced ? 280 : 1450);
+    const done = window.setTimeout(() => setVisible(false), reduced ? 280 : 2750);
     const fallback = window.setTimeout(() => setVisible(false), FALLBACK_MS);
     return () => { window.clearTimeout(done); window.clearTimeout(fallback); };
   }, []);

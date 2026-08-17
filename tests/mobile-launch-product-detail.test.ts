@@ -24,8 +24,12 @@ test("cold mobile splash is session-scoped, reduced-motion aware and bounded",()
   assert.match(splash,/matchMedia\("\(max-width: 860px\)"\)/);
   assert.match(splash,/sessionStorage\.getItem/);assert.match(splash,/sessionStorage\.setItem/);
   assert.match(splash,/prefers-reduced-motion: reduce/);
-  assert.match(splash,/reduced \? 280 : 1450/);assert.match(splash,/FALLBACK_MS = 1900/);
+  assert.match(splash,/useState\(true\)/);assert.match(splash,/reduced \? 280 : 2750/);assert.match(splash,/FALLBACK_MS = 2950/);
   assert.match(splash,/aria-hidden="true"/);assert.match(css,/\.todijoLaunchSplash\{[^}]*pointer-events:none/);
+  const splashCss=css.slice(css.indexOf("/* Cold mobile launch branding"));
+  assert.match(css,/html \{[^}]*background:#16074c/);assert.match(splashCss,/background:radial-gradient\([^}]*#32108a[^}]*#16074c[^}]*#090529/);
+  assert.doesNotMatch(splashCss,/#0d1714|#063a2c|#07553e/);
+  assert.match(css,/\.todijoLaunchMark\{width:min\(82vw,380px\)/);assert.match(css,/todijo-canopy-open 1\.8s/);assert.match(css,/animation:todijo-splash-exit 2\.75s/);
 });
 
 test("umbrella identity, exact default title and install icons are wired",()=>{
@@ -44,14 +48,24 @@ test("pricing failures terminate with a retry while the last safe minimum remain
   assert.match(quote,/state\.status==="error"/);assert.match(quote,/productPriceUi\[locale\]\.retry/);assert.match(quote,/setRetry\(value=>value\+1\)/);
 });
 
-test("mobile purchase companion follows the selected image and retains an accessible one-shot cart action",()=>{
+test("mobile sticky purchase bar contains only the accessible one-shot cart action",()=>{
   const panel=source("components/ProductPurchasePanel.tsx"),button=source("components/AddToCartButton.tsx"),css=source("app/globals.css");
-  assert.match(panel,/setSelectedImage\(images\[0\]\?\?product\.image\)/);assert.match(panel,/IntersectionObserver/);
-  assert.match(panel,/mobilePurchaseThumb/);assert.match(panel,/<AddToCartButton compact/);
+  const bar=panel.match(/<div className="mobilePurchaseBar">([\s\S]*?)<\/div>\s*<\/aside>/)?.[1]??"";
+  assert.match(bar,/<AddToCartButton compact/);assert.doesNotMatch(bar,/mobilePurchaseThumb|mobilePurchaseSummary|<span|<strong|<Image/);
   assert.match(button,/compactCartIcon/);assert.match(button,/className="srOnly"/);assert.match(button,/aria-label=/);assert.match(button,/\|\| added/);
-  assert.match(css,/\.mobilePurchaseThumb img\{[^}]*object-fit:contain/);assert.match(css,/\.addCartButton\.isCompact\{[^}]*min-height:52px/);
+  assert.doesNotMatch(css,/\.mobilePurchaseThumb|\.mobilePurchaseSummary/);assert.match(css,/\.addCartButton\.isCompact\{[^}]*min-height:52px/);
   assert.match(css,/\.addCartButton\.isCompact:disabled/);assert.match(css,/@media\(max-width:760px\)/);
   assert.match(button,/compact \? /);assert.match(button,/ : disabled \|\| product\.stock === 0 \?/);
+});
+
+test("the selected large gallery image remains sticky, visible and uncropped on mobile only",()=>{
+  const gallery=source("app/product/[id]/ProductGallery.tsx"),panel=source("components/ProductPurchasePanel.tsx"),css=source("app/globals.css");
+  assert.match(panel,/new CustomEvent\("todijo:variant-images"/);assert.match(gallery,/addEventListener\("todijo:variant-images"/);
+  assert.match(css,/@media\(max-width:860px\)[\s\S]*\.productGallerySticky\{position:sticky!important/);
+  assert.match(css,/\.productGallerySticky \.productGalleryInteractive\{height:clamp\(240px,42dvh,420px\)/);
+  assert.match(css,/\.productGallerySticky \.productMobileImageSlide img\{[^}]*object-fit:contain!important/);
+  assert.match(css,/@media\(max-width:860px\) and \(max-height:500px\)/);
+  assert.match(css,/@media\(min-width:1201px\)[\s\S]*\.productGallerySticky,\.productPurchaseColumn\{position:sticky/);
 });
 
 test("old dark-green public skeleton is replaced without changing its dimensions",()=>{

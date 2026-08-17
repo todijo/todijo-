@@ -11,7 +11,7 @@ import CookieConsent from "@/components/CookieConsent";
 import TodijoLaunchSplash from "@/components/TodijoLaunchSplash";
 
 export const viewport: Viewport = {
-  themeColor: "#5b21b6",
+  themeColor: "#16074c",
 };
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,7 +43,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
-      <body><NextIntlClientProvider messages={messages}><ToastProvider><WishlistProvider><CartProvider><TodijoLaunchSplash/>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></NextIntlClientProvider></body>
+      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><ToastProvider><WishlistProvider><CartProvider><TodijoLaunchSplash/>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></NextIntlClientProvider></body>
     </html>
   );
 }
