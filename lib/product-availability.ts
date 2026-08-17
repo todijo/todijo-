@@ -19,6 +19,14 @@ export function isSelectedVariantAvailable(variant: VariantAvailability | null |
   return Boolean(variant?.active && variant.stock > 0);
 }
 
+export function minimumPurchasableVariantPrice(input: { basePrice: number; activeOptionCount: number; variants: readonly (VariantAvailability & { priceOverride?: number | null })[] }) {
+  const prices = input.variants
+    .filter((variant) => variant.active && variant.stock > 0 && (variant.valueCount == null || variant.valueCount === input.activeOptionCount))
+    .map((variant) => variant.priceOverride ?? input.basePrice)
+    .filter((price) => Number.isFinite(price) && price > 0);
+  return prices.length ? Math.min(...prices) : null;
+}
+
 export function buyerVisibleVariantWhere(): Prisma.ProductVariantWhereInput {
   return { active: true, values: { every: { optionValue: { active: true, option: { active: true } } } } };
 }

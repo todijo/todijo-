@@ -89,11 +89,11 @@ test("mobile product gallery has no floating actions and keeps a live counter", 
 
 test("mobile purchase bar keeps one visible primary action and safe content clearance", async () => {
   const [purchase, css] = await Promise.all([readFile("components/ProductPurchasePanel.tsx", "utf8"), readFile("app/globals.css", "utf8")]);
-  assert.match(purchase, /className="mobilePurchaseBar"/);
+  assert.match(purchase, /className=\{`mobilePurchaseBar/);
   assert.match(purchase, /selectedOptions \|\| detail\("chooseCombination"\)/);
   assert.match(css, /\.variantPurchasePanel>\.addCartButton\{display:none\}/);
   assert.match(css, /\.mobilePurchaseBar\{position:fixed;[^}]*bottom:0;[^}]*safe-area-inset-bottom/);
-  assert.match(css, /\.productDetailPage\{[^}]*padding-bottom:calc\(86px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.productDetailPage\{padding-bottom:calc\(142px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /\.mobilePurchaseBar \.addCartButton\{min-height:52px/);
   assert.match(css, /\.mobilePurchaseBar\{bottom:calc\(64px \+ env\(safe-area-inset-bottom\)\);padding-bottom:9px\}/);
 });

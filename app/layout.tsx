@@ -8,6 +8,7 @@ import { locales, rtlLocales, type Locale } from "@/i18n/config";
 import { ToastProvider } from "@/components/ToastProvider";
 import { WishlistProvider } from "@/components/WishlistProvider";
 import CookieConsent from "@/components/CookieConsent";
+import TodijoLaunchSplash from "@/components/TodijoLaunchSplash";
 
 export const viewport: Viewport = {
   themeColor: "#5b21b6",
@@ -22,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const privateRoute = /^\/(dashboard|account(?:\/|$)|seller(?:\/|$)|checkout(?:\/|$)|cart(?:\/|$)|messages(?:\/|$)|favorites(?:\/|$)|connect(?:\/|$)|login(?:\/|$)|register(?:\/|$)|forgot-password(?:\/|$)|reset-password(?:\/|$)|verify-email(?:\/|$)|e2e-ux(?:\/|$)|adm-barewbar-182203(?:\/|$))/.test(suffix);
   const searchRoute = suffix === "/search";
   return {
-    title: { default: t("title"), template: `%s · ${t("brand")}` },
+    title: { default: "Todijo Marketplace", template: `%s · ${t("brand")}` },
     description: t("description"),
     metadataBase: new URL(base),
     icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png" },
@@ -42,7 +43,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
-      <body><NextIntlClientProvider messages={messages}><ToastProvider><WishlistProvider><CartProvider>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></NextIntlClientProvider></body>
+      <body><NextIntlClientProvider messages={messages}><ToastProvider><WishlistProvider><CartProvider><TodijoLaunchSplash/>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></NextIntlClientProvider></body>
     </html>
   );
 }

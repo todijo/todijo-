@@ -14,7 +14,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { readSession } from "@/lib/session";
 import { getLocale, getTranslations } from "next-intl/server";
 import { publicProductAccessWhere } from "@/lib/admin-access";
-import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
+import { buyerVisibleVariantWhere, minimumPurchasableVariantPrice, resolveProductAvailability } from "@/lib/product-availability";
 import { categoryLabel } from "@/lib/categories";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 import ProductReportButton from "@/components/ProductReportButton";
@@ -79,7 +79,9 @@ export default async function ProductPage({ params }: Props) {
   });
   if (!product) notFound();
   const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true,supplierLink:{select:{sourceMetadata:true}}} });
-  const price=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
+  const persistedPrice=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
+  const minimumVariantPrice=minimumPurchasableVariantPrice({basePrice:persistedPrice,activeOptionCount:product.options.length,variants:product.variants.map((variant)=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
+  const price=minimumVariantPrice??persistedPrice;
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   const productJsonLd = productStructuredData({ ...product, available: availability.isGenerallyAvailable }, locale);
   const publicProductInfo = [
@@ -100,7 +102,7 @@ export default async function ProductPage({ params }: Props) {
       <div className="productGallery productGallerySticky"><ProductGallery images={product.images} productName={product.name} media={product.media}/></div>
       <article className="productDetailInfo">
         <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/></div></div>
-        <h1>{product.name}</h1><ProductDetailPrice requiresVerifiedPricing={requiresAuthoritativePrice} price={price} compareAtPrice={compare} currency={product.currency}/>
+        <h1>{product.name}</h1><ProductDetailPrice initialMinimum={Boolean(minimumVariantPrice!=null||requiresAuthoritativePrice)} price={price} compareAtPrice={compare} currency={product.currency}/>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
         <dl className="productFacts productFactsDesktop" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div></dl>
       </article>
@@ -122,6 +124,6 @@ export default async function ProductPage({ params }: Props) {
       <div className="productLowerActions">{product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}<ProductReportButton productId={product.id} loggedIn={Boolean(session)}/></div>
     </section>
   </section>
-  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?<AuthoritativeProductCardPrice productId={item.id}/>:`${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
+  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong>{requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)?<AuthoritativeProductCardPrice productId={item.id} fallbackPrice={Number(item.price)} currency={item.currency}/>: `${Number(item.price).toFixed(2)} ${item.currency}`}</strong></Link>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }

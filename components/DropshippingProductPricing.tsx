@@ -3,6 +3,8 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {useLocale,useTranslations} from "next-intl";
 import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 import {dropshippingPricingRequestKey,persistShoppingCountry,readShoppingCountry,type BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
+import {productPriceUi} from "@/i18n/product-price-ui";
+import type {Locale} from "@/i18n/config";
 
 type PricingState={status:"idle"|"loading"|"error";data:null}|{status:"ready";data:BuyerDropshippingPricingResponse};
 const authoritativeQuoteCache=new Map<string,BuyerDropshippingPricingResponse>();
@@ -22,7 +24,7 @@ async function requestQuote(input:{productId:string;variantId:string;quantity:nu
 }
 
 export default function DropshippingProductPricing({productId,variantId,availableVariantIds,quantity,enabled,prefetchEnabled,onChange}:{productId:string;variantId:string|null;availableVariantIds:string[];quantity:number;enabled:boolean;prefetchEnabled:boolean;onChange:(pricing:BuyerDropshippingPricingResponse|null,pending:boolean)=>void}){
- const t=useTranslations("ProductDetail"),shipping=useTranslations("Shipping"),locale=useLocale(),[country,setCountry]=useState(""),[preferenceLoaded,setPreferenceLoaded]=useState(false),[state,setState]=useState<PricingState>({status:"idle",data:null}),requestKey=useRef("");
+ const t=useTranslations("ProductDetail"),shipping=useTranslations("Shipping"),locale=useLocale() as Locale,[country,setCountry]=useState(""),[preferenceLoaded,setPreferenceLoaded]=useState(false),[state,setState]=useState<PricingState>({status:"idle",data:null}),[retry,setRetry]=useState(0),requestKey=useRef("");
  const prefetchIds=useMemo(()=>[...new Set(availableVariantIds)],[availableVariantIds]);
  const prefetchIdentity=`${productId}:${country}:${quantity}:${prefetchIds.join(",")}`;
  useEffect(()=>{setCountry(readShoppingCountry(window.localStorage)??"");setPreferenceLoaded(true)},[]);
@@ -35,7 +37,7 @@ export default function DropshippingProductPricing({productId,variantId,availabl
   const controller=new AbortController();setState({status:"loading",data:null});onChange(null,true);
   const timer=window.setTimeout(async()=>{try{const data=await requestQuote(input,controller.signal);if(requestKey.current!==key)return;setState({status:"ready",data});onChange(data,false)}catch{if(!controller.signal.aborted&&requestKey.current===key){setState({status:"error",data:null});onChange(null,false)}}},180);
   return()=>{window.clearTimeout(timer);controller.abort()};
- },[country,enabled,onChange,preferenceLoaded,productId,quantity,variantId]);
+ },[country,enabled,onChange,preferenceLoaded,productId,quantity,retry,variantId]);
 
  useEffect(()=>{
   if(!prefetchEnabled||state.status!=="ready"||!country||completedPrefetches.has(prefetchIdentity)||activePrefetches.has(prefetchIdentity))return;
@@ -46,5 +48,5 @@ export default function DropshippingProductPricing({productId,variantId,availabl
 
  if(!enabled)return null;
  const selectCountry=(value:string)=>{onChange(null,false);setState({status:"idle",data:null});requestKey.current="";const next=persistShoppingCountry(window.localStorage,value);setCountry(next??"");};
- return <section className="dropshippingBuyerPricing" aria-live="polite">{preferenceLoaded&&!country&&<><LocalizedCountrySelect id={`product-destination-${productId}`} value={country} onChange={selectCountry} label={t("deliveryCountry")} placeholder={t("selectDeliveryCountry")}/><p>{t("destinationRequired")}</p></>}{country&&!variantId&&<p>{t("chooseCombination")}</p>}{state.status==="loading"&&<p className="isLoading">{t("pricingLoading")}</p>}{state.status==="error"&&<LocalizedCountrySelect id={`product-destination-retry-${productId}`} value={country} onChange={selectCountry} label={t("deliveryCountry")} placeholder={t("selectDeliveryCountry")}/>} {state.status==="ready"&&<div className="dropshippingVerifiedPrice"><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:state.data.buyerCurrency}).format(Number(state.data.buyerUnitPrice))}</strong>{state.data.freeShipping&&<b>{shipping("freeLabel")}</b>}{state.data.deliveryMinDays!=null&&state.data.deliveryMaxDays!=null&&<span>{shipping("estimate",{min:state.data.deliveryMinDays,max:state.data.deliveryMaxDays})}</span>}</div>}</section>;
+ return <section className="dropshippingBuyerPricing" aria-live="polite">{preferenceLoaded&&!country&&<><LocalizedCountrySelect id={`product-destination-${productId}`} value={country} onChange={selectCountry} label={t("deliveryCountry")} placeholder={t("selectDeliveryCountry")}/><p>{t("destinationRequired")}</p></>}{country&&!variantId&&<p>{t("chooseCombination")}</p>}{state.status==="loading"&&<p className="isLoading">{productPriceUi[locale].updating}</p>}{state.status==="error"&&<div className="pricingRetry"><button type="button" onClick={()=>setRetry(value=>value+1)}>{productPriceUi[locale].retry}</button></div>} {state.status==="ready"&&<div className="dropshippingVerifiedPrice"><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:state.data.buyerCurrency}).format(Number(state.data.buyerUnitPrice))}</strong>{state.data.freeShipping&&<b>{shipping("freeLabel")}</b>}{state.data.deliveryMinDays!=null&&state.data.deliveryMaxDays!=null&&<span>{shipping("estimate",{min:state.data.deliveryMinDays,max:state.data.deliveryMaxDays})}</span>}</div>}</section>;
 }

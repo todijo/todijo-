@@ -160,10 +160,10 @@ test("the main product heading area never substitutes a country prompt for price
   assert.doesNotMatch(price, /selectDeliveryCountry/);
 });
 
-test("CJ deferred price display is non-numeric until the exact canonical quote is verified",()=>{
+test("CJ deferred price display starts from a safe minimum until the exact canonical quote is verified",()=>{
   const price=readFileSync("app/product/[id]/ProductDetailPrice.tsx","utf8"),panel=readFileSync("components/ProductPurchasePanel.tsx","utf8"),live=readFileSync("components/DropshippingProductPricing.tsx","utf8");
   assert.match(price,/selectedPrice, setSelectedPrice\] = useState\(price\)/);assert.doesNotMatch(price,/return null/);
   assert.match(panel,/selectedVariant\?\.priceOverride \?\? product\.price/);assert.match(panel,/activePricing\?Number\(activePricing\.buyerUnitPrice\)/);assert.match(panel,/detail: activePricing\|\|!requiresAuthoritativePrice\?\{price:selectedPrice,currency:selectedCurrency,verified:true\}:\{verified:false\}/);
-  assert.match(price,/requiresVerifiedPricing&&!verified\?t\("pricingLoading"\)/);assert.doesNotMatch(price,/verified:false[\s\S]{0,100}price:/);
+  assert.match(price,/initialMinimum/);assert.match(price,/exact\?formatted:text\.from\(formatted\)/);assert.doesNotMatch(price,/verified:false[\s\S]{0,100}price:/);
   assert.match(live,/state\.status==="loading"/);assert.match(live,/state\.status==="error"/);assert.doesNotMatch(live,/status==="loading"[\s\S]{0,120}buyerUnitPrice/);
 });

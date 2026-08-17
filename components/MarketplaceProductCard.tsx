@@ -33,7 +33,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
     <div className="discoveryCardBody">
       {showCategory && <span className="cartRecommendationCategory">{categoryLabel(product.category, (key) => categories(key))}</span>}
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
-      <div className="cardBottom"><div>{product.requiresAuthoritativePrice?<strong><AuthoritativeProductCardPrice productId={product.id}/></strong>:<><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</>}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div>
+      <div className="cardBottom"><div>{product.requiresAuthoritativePrice?<strong><AuthoritativeProductCardPrice productId={product.id} fallbackPrice={price} currency={product.currency}/></strong>:<><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</>}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div>
     </div>
   </article>;
 }

@@ -4,11 +4,13 @@ import { useCallback,useEffect,useLayoutEffect,useMemo,useState } from "react";
 import Image from "next/image";
 import AddToCartButton from "@/components/AddToCartButton";
 import type { CartProduct } from "@/components/CartProvider";
-import { useTranslations } from "next-intl";
+import { useLocale,useTranslations } from "next-intl";
 import { isSelectedVariantAvailable } from "@/lib/product-availability";
 import DropshippingProductPricing from "@/components/DropshippingProductPricing";
 import ShareButton from "@/components/ShareButton";
 import type {BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
+import {productPriceUi} from "@/i18n/product-price-ui";
+import type {Locale} from "@/i18n/config";
 
 type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null;supplierVariantId?:string|null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
@@ -16,11 +18,14 @@ type Option = { id: string; name: string; position: number; values: Array<{ id: 
 export default function ProductPurchasePanel({ product, colors, sizes, options = [], variants = [], availabilityLabel, dropshippingEligible = false, requiresAuthoritativePrice=false }: { product: CartProduct; colors: string[]; sizes: string[]; options?: Option[]; variants?: Variant[]; availabilityLabel: string; dropshippingEligible?: boolean;requiresAuthoritativePrice?:boolean }) {
   const t = useTranslations("Product");
   const detail = useTranslations("ProductDetail");
+  const locale=useLocale() as Locale;
   const genericOptions = useMemo(()=>options.filter((option) => option.values.length > 0).sort((a, b) => a.position - b.position),[options]);
   const initialVariant=variants.find((variant)=>variant.active&&variant.stock>0&&(!requiresAuthoritativePrice||Boolean(variant.supplierVariantId)));
   const [selection, setSelection] = useState<Record<string, string>>(()=>initialVariant?Object.fromEntries(initialVariant.values.map(({optionValue})=>[optionValue.option.id,optionValue.id])):{});
   const [quantity, setQuantity] = useState(1);
   const [verifiedPricing,setVerifiedPricing]=useState<BuyerDropshippingPricingResponse|null>(null);
+  const [selectedImage,setSelectedImage]=useState(product.image);
+  const [galleryVisible,setGalleryVisible]=useState(true);
   const colorChoices = colors.length ? colors : [t("standard")], sizeChoices = sizes.length ? sizes : [t("unique")];
   const [color, setColor] = useState(colorChoices[0]), [size, setSize] = useState(sizeChoices[0]);
   const isVariantProduct = genericOptions.length > 0;
@@ -40,8 +45,12 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   useEffect(()=>{
     const selectedValues=genericOptions.flatMap((option)=>option.values.filter((value)=>selection[option.id]===value.id));
     const imageValue=selectedValues.find((value)=>value.imageUrls?.length);
-    window.dispatchEvent(new CustomEvent("todijo:variant-images",{detail:{images:imageValue?.imageUrls??[]}}));
-  },[genericOptions,selection]);
+    const images=imageValue?.imageUrls??[];
+    setSelectedImage(images[0]??product.image);
+    window.dispatchEvent(new CustomEvent("todijo:variant-images",{detail:{images}}));
+  },[genericOptions,product.image,selection]);
+
+  useEffect(()=>{const gallery=document.querySelector(".productGalleryInteractive");if(!gallery)return;const observer=new IntersectionObserver(([entry])=>setGalleryVisible(entry.isIntersecting),{threshold:.08});observer.observe(gallery);return()=>observer.disconnect()},[]);
 
   function selectOption(optionId: string, valueId: string) {
     const position=genericOptions.find((option)=>option.id===optionId)?.position??0;
@@ -86,6 +95,6 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
       <AddToCartButton disabled={!available||!pricingReady} disabledLabel={!pricingReady?detail("pricingLoading"):disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
       </div>
     </div>
-    <div className="mobilePurchaseBar"><span aria-live="polite">{selectedOptions || detail("chooseCombination")}</span><AddToCartButton disabled={!available||!pricingReady} disabledLabel={!pricingReady?detail("pricingLoading"):disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
+    <div className={`mobilePurchaseBar${galleryVisible ? " isGalleryVisible" : ""}`}><span className="mobilePurchaseThumb" aria-hidden="true">{selectedImage?<Image src={selectedImage} alt="" width={48} height={48} unoptimized/>:null}</span><span className="mobilePurchaseSummary" aria-live="polite"><span>{selectedOptions || detail("chooseCombination")}</span><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:selectedCurrency}).format(selectedPrice)}</strong></span><AddToCartButton compact disabled={!available||!pricingReady} disabledLabel={!pricingReady?productPriceUi[locale].updating:disabledLabel} quantity={quantity} product={{ ...product, image:selectedImage,price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
   </aside>;
 }

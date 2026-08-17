@@ -1,8 +1,10 @@
 "use client";
 
 import {useEffect,useRef,useState} from "react";
-import {useLocale,useTranslations} from "next-intl";
+import {useLocale} from "next-intl";
 import {dropshippingPricingRequestKey,readShoppingCountry,type BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
+import {productPriceUi} from "@/i18n/product-price-ui";
+import type {Locale} from "@/i18n/config";
 
 type State={status:"idle"|"loading"|"error";price:null}|{status:"ready";price:number;currency:string};
 const quoteCache=new Map<string,BuyerDropshippingPricingResponse>();
@@ -19,8 +21,8 @@ function loadQuote(productId:string,destinationCountry:string){
   pendingQuotes.set(cardKey,request);return request;
 }
 
-export default function AuthoritativeProductCardPrice({productId,className=""}:{productId:string;className?:string}){
-  const locale=useLocale(),common=useTranslations("Common"),root=useRef<HTMLSpanElement>(null),[state,setState]=useState<State>({status:"idle",price:null});
+export default function AuthoritativeProductCardPrice({productId,fallbackPrice,currency,className=""}:{productId:string;fallbackPrice:number;currency:string;className?:string}){
+  const locale=useLocale() as Locale,root=useRef<HTMLSpanElement>(null),[state,setState]=useState<State>({status:"idle",price:null});
   useEffect(()=>{
     const element=root.current;if(!element)return;
     let active=true;
@@ -35,5 +37,6 @@ export default function AuthoritativeProductCardPrice({productId,className=""}:{
     observer.observe(element);
     return()=>{active=false;observer.disconnect()};
   },[productId]);
-  return <span ref={root} className={className} aria-live="polite">{state.status==="ready"?new Intl.NumberFormat(locale,{style:"currency",currency:state.currency}).format(state.price):common("loading")}</span>;
+  const minimum=new Intl.NumberFormat(locale,{style:"currency",currency}).format(fallbackPrice);
+  return <span ref={root} className={className} aria-live="polite">{state.status==="ready"?new Intl.NumberFormat(locale,{style:"currency",currency:state.currency}).format(state.price):productPriceUi[locale].from(minimum)}</span>;
 }
