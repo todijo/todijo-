@@ -31,6 +31,8 @@ test("canonical mapping is stable, deterministic and fails to review instead of 
   const workspace=read("components/SupplierCatalogWorkspace.tsx");assert.match(workspace,/SellerCategorySelector/);assert.match(workspace,/canonicalCategoryId/);assert.doesNotMatch(workspace,/PRODUCT_CATEGORIES/);
 });
 
+test("durable execution persists explainable CJ classification and quarantines uncertainty",()=>{const jobs=read("lib/suppliers/supplier-catalog-jobs.ts"),schema=read("prisma/schema.prisma"),workspace=read("components/SupplierCatalogWorkspace.tsx");assert.match(jobs,/classifyCjProduct\(snapshot\)/);assert.match(jobs,/classificationConfidence/);assert.match(jobs,/classificationEvidence/);assert.match(jobs,/CJ_CLASSIFICATION_REVIEW_REQUIRED/);assert.match(schema,/classificationConfidence\s+Float\?/);assert.match(workspace,/classificationStatus/);assert.match(workspace,/classificationConfidence/);});
+
 test("compliance and unavailable pricing quarantine only the affected catalog item",()=>{
   const safe={title:"Plain cotton shirt",description:"Everyday garment",media:[{type:"IMAGE" as const,url:"https://example.com/a.jpg"}],variants:[{supplierVariantId:"v1",sku:"S1",title:"M",cost:5,currency:"USD",stock:2,available:true,originCountryCodes:["CN"]}]};
   assert.equal(catalogComplianceDecision(safe).status,"REVIEW_REQUIRED");

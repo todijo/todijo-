@@ -760,6 +760,7 @@ model SupplierProductLink {
   reviewLastSyncedAt    DateTime?
   reviewSyncError       String?            @db.VarChar(500)
   sourceMetadata        Json?
+  classificationStatus  String             @default("REVIEWED") @db.VarChar(20)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -811,6 +812,9 @@ model SupplierCatalogImportItem {
   canonicalCategoryId   String?                   @db.VarChar(160)
   categoryMappingSource String?                   @db.VarChar(40)
   categoryMappingReason String?                   @db.VarChar(500)
+  classificationStatus String?                   @db.VarChar(40)
+  classificationConfidence Float?
+  classificationEvidence Json?
   pricingStatus         String?                   @db.VarChar(40)
   pricingEvidence       Json?
   stockStatus           String?                   @db.VarChar(40)

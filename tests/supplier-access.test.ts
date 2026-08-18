@@ -157,9 +157,9 @@ test("import blocks duplicates within one connection but permits platform and tw
   const provider: any = { id: "CJ", isConfigured: () => true, getProduct: async () => ({ provider: "CJ", supplierProductId: "CANONICAL-PID", sku: "CJ-SKU", title: "Product", description: "Description", categoryReference: null, sourceUrl: null, cost: 5, currency: "USD", stock: 2, available: true, weightGrams: null, media: [], rawMetadata: {}, variants: [{ supplierVariantId: "V1", sku: null, title: "Variant", cost: 5, currency: "USD", stock: 2, available: true }] }) };
   const media: any = { copyRemote: async () => { throw new Error("unexpected media copy"); } };
   for (const [connectionId, ownerType, storeId] of [[PLATFORM_CJ_CONNECTION_ID, "PLATFORM", "platform-store"], ["seller-a-cj", "SELLER", "store-a"], ["seller-b-cj", "SELLER", "store-b"]] as const) {
-    await importSupplierProduct(db, provider, media, { connectionId, ownerType, storeId, supplierProductId: "ABC", sellingPrice: 20, category: "Other" });
+    await importSupplierProduct(db, provider, media, { connectionId, ownerType, storeId, supplierProductId: "ABC", sellingPrice: 20, category: "women--outerwear--blazers" });
   }
-  await assert.rejects(() => importSupplierProduct(db, provider, media, { connectionId: "seller-a-cj", ownerType: "SELLER", storeId: "store-a", supplierProductId: "ABC", sellingPrice: 20, category: "Other" }), /SUPPLIER_PRODUCT_ALREADY_IMPORTED/);
+  await assert.rejects(() => importSupplierProduct(db, provider, media, { connectionId: "seller-a-cj", ownerType: "SELLER", storeId: "store-a", supplierProductId: "ABC", sellingPrice: 20, category: "women--outerwear--blazers" }), /SUPPLIER_PRODUCT_ALREADY_IMPORTED/);
   assert.deepEqual(createdLinks.map((link) => link.connectionId), [PLATFORM_CJ_CONNECTION_ID, "seller-a-cj", "seller-b-cj"]);
   assert.deepEqual(createdLinks.map((link) => link.supplierProductId), ["CANONICAL-PID", "CANONICAL-PID", "CANONICAL-PID"]);
   assert.deepEqual(createdVariants.map((variant) => variant.supplierConnectionId), [PLATFORM_CJ_CONNECTION_ID, "seller-a-cj", "seller-b-cj"]);
@@ -169,7 +169,7 @@ test("import rejects a connection whose tenant ownership does not match", async 
   let where: any;
   const db: any = { supplierConnection: { findFirst: async (args: any) => { where = args.where; return null; } } };
   const provider: any = { id: "CJ", isConfigured: () => true };
-  await assert.rejects(() => importSupplierProduct(db, provider, { copyRemote: async () => { throw new Error("unexpected media copy"); } }, { connectionId: "seller-b-cj", ownerType: "SELLER", storeId: "store-a", supplierProductId: "ABC", sellingPrice: 20, category: "Other" }), /SUPPLIER_CONNECTION_NOT_AUTHORIZED/);
+  await assert.rejects(() => importSupplierProduct(db, provider, { copyRemote: async () => { throw new Error("unexpected media copy"); } }, { connectionId: "seller-b-cj", ownerType: "SELLER", storeId: "store-a", supplierProductId: "ABC", sellingPrice: 20, category: "women--outerwear--blazers" }), /SUPPLIER_CONNECTION_NOT_AUTHORIZED/);
   assert.equal(where.id, "seller-b-cj"); assert.equal(where.storeId, "store-a"); assert.equal(where.ownerType, "SELLER");
 });
 
@@ -185,7 +185,7 @@ test("supplier import copies and persists at most 30 ordered images", async () =
   };
   const provider:any={id:"CJ",isConfigured:()=>true,getProduct:async()=>({provider:"CJ",supplierProductId:"PID",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:1,currency:"USD",stock:1,available:true,weightGrams:null,variants:[],media:sourceImages,rawMetadata:{}})};
   const media:any={copyRemote:async(source:any)=>{copied.push(source.url);return{...source,provider:"CLOUDINARY",publicId:`media-${copied.length}`,width:null,height:null,durationMs:null};}};
-  await importSupplierProduct(db,provider,media,{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID",sellingPrice:10,category:"Other"});
+  await importSupplierProduct(db,provider,media,{storeId:"store",connectionId:"platform-cj",ownerType:"PLATFORM",supplierProductId:"PID",sellingPrice:10,category:"women--outerwear--blazers"});
   assert.deepEqual(copied,sourceImages.slice(0,30).map((item)=>item.url));
   assert.deepEqual(created.images,copied);
   assert.equal(created.images[0],sourceImages[0].url);

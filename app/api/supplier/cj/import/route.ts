@@ -13,12 +13,12 @@ export async function POST(request: Request) {
     assertAdminMutationRequest(request);
     const session = await readSession();
     const admin = await requirePlatformSupplierAdmin(prisma, session);
-    const body = await request.json() as {supplierProductId?:unknown;sellingPrice?:unknown;pricingMode?:unknown;category?:unknown};
+    const body = await request.json() as {supplierProductId?:unknown;sellingPrice?:unknown;pricingMode?:unknown;category?:unknown;quarantine?:unknown};
     const store = await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true,currency:true}});
     if (!store) return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
     const manual = body.pricingMode === "MANUAL";
     const category=String(body.category??"");if(!isCanonicalLeafCategoryId(category))return NextResponse.json({error:"CANONICAL_CATEGORY_INVALID"},{status:400});
-    const product = await importSupplierProduct(prisma,new CjCatalogProvider(),defaultSupplierMediaProvider(),{storeId:store.id,connectionId:PLATFORM_CJ_CONNECTION_ID,ownerType:"PLATFORM",supplierProductId:String(body.supplierProductId??""),sellingPrice:manual?Number(body.sellingPrice):null,sellingCurrency:store.currency,category});
+    const product = await importSupplierProduct(prisma,new CjCatalogProvider(),defaultSupplierMediaProvider(),{storeId:store.id,connectionId:PLATFORM_CJ_CONNECTION_ID,ownerType:"PLATFORM",supplierProductId:String(body.supplierProductId??""),sellingPrice:manual?Number(body.sellingPrice):null,sellingCurrency:store.currency,category,quarantine:body.quarantine===true});
     return NextResponse.json({ok:true,productId:product.id,status:"DRAFT"},{status:201});
   } catch (error) {
     if (error instanceof MutationOriginError) return NextResponse.json({error:error.message},{status:403});

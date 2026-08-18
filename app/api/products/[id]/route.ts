@@ -30,7 +30,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       where: { id, store: { ownerId: session.userId } },
       select: {
         id: true, complianceDeclaredAt: true, deactivationReason: true,
-        supplierLink: { select: { provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
+        supplierLink: { select: { provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
         variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierAvailable: true } },
       },
     });
@@ -45,6 +45,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const compliance = readProductCompliance(body);
     const productShipping = parseProductShipping(body);
     if (status === "PUBLISHED" && !product.complianceDeclaredAt && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
+    if(status==="PUBLISHED"&&product.supplierLink?.classificationStatus==="QUARANTINED")return NextResponse.json({error:"SUPPLIER_CLASSIFICATION_REVIEW_REQUIRED"},{status:400});
     if (status === "PUBLISHED") {
       await requirePublishingAccess(prisma, session.userId);
       assertProductPublicationEligible(product);

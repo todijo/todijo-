@@ -7,6 +7,8 @@ import { calculateSupplierSnapshotPrices } from "./pricing";
 import { replaceProductVariantImages } from "../product-variant-images";
 import { syncSupplierReviews } from "./supplier-reviews";
 import { verifiedFxRate } from "../fx";
+import { classifyCjProduct, type CjClassification, validateTodijoClassification } from "./cj-classification";
+import type { SupplierProductSnapshot } from "./types";
 
 type Database = PrismaClient;
 
@@ -41,14 +43,15 @@ async function uniqueSlug(db: Database, storeId: string, title: string) {
   return slug;
 }
 
-export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string}) {
+export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification}) {
   if (!provider.isConfigured()) throw new Error("SUPPLIER_NOT_CONFIGURED");
   const manualPrice = input.sellingPrice == null ? null : Number(input.sellingPrice);
   if (manualPrice != null && (!Number.isFinite(manualPrice) || manualPrice <= 0)) throw new Error("SELLING_PRICE_INVALID");
   const connection = await db.supplierConnection.findFirst({where:{id:input.connectionId,provider:provider.id,ownerType:input.ownerType,status:"CONNECTED",...(input.ownerType==="SELLER"?{storeId:input.storeId,store:{dropshippingEnabled:true}}:{storeId:null})},select:{id:true}});
   if (!connection) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
-  const snapshot = await provider.getProduct(input.supplierProductId);
+  const snapshot = input.snapshot??await provider.getProduct(input.supplierProductId);
   if (!snapshot.supplierProductId) throw new Error("SUPPLIER_PRODUCT_INVALID");
+  const classification=input.classification??classifyCjProduct(snapshot),selected=validateTodijoClassification(input.category),category=selected.id;
   const sellingCurrency=(input.sellingCurrency??"EUR").trim().toUpperCase();
   const exchangeRates:Record<string,string>={};
   if(manualPrice==null){
@@ -71,9 +74,9 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   const slug = await uniqueSlug(db,input.storeId,snapshot.title);
   const product=await db.$transaction(async (tx) => {
     const product = await tx.product.create({data:{
-      storeId:input.storeId,name:snapshot.title.slice(0,120),slug,description:snapshot.description.slice(0,5000),category:input.category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
+      storeId:input.storeId,name:snapshot.title.slice(0,120),slug,description:snapshot.description.slice(0,5000),category:category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
       price:sellingPrice,currency:sellingCurrency,stock:snapshot.stock,images,
-      supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),sourceMetadata:{...snapshot.rawMetadata,pricing:automaticPricing??{mode:"MANUAL_OVERRIDE",shippingStatus:"DEFERRED",marginGuaranteed:false}} as Prisma.InputJsonValue}},
+      supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),classificationStatus:input.quarantine===true?"QUARANTINED":"REVIEWED",sourceMetadata:{...snapshot.rawMetadata,classification:{...classification,selectedCanonicalCategoryId:selected.id,reviewStatus:input.quarantine===true?"QUARANTINED":"REVIEWED"},pricing:automaticPricing??{mode:"MANUAL_OVERRIDE",shippingStatus:"DEFERRED",marginGuaranteed:false}} as Prisma.InputJsonValue}},
       media:{create:copied.map((item,index)=>({type:item.type,provider:item.provider,publicId:item.publicId,url:item.url,posterUrl:item.posterUrl,position:index,width:item.width,height:item.height,durationMs:item.durationMs,sourceUrl:copiedSources[index]?.url??null}))},
     }});
     let variantImageAssignments:Array<{optionValueId:string;imageUrls:string[];primaryUrl:string}> = [];
