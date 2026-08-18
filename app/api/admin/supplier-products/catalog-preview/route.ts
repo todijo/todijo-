@@ -8,6 +8,7 @@ import { CjCatalogProvider } from "@/lib/suppliers/cj-client";
 import { catalogIdentifiers } from "@/lib/suppliers/supplier-catalog-jobs";
 import { classifyCjProduct } from "@/lib/suppliers/cj-classification";
 import { resolveCatalogCategory, catalogComplianceDecision } from "@/lib/suppliers/supplier-catalog-policy";
+import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
 
 const PREVIEW_ITEM_LIMIT=100;
 
@@ -25,9 +26,11 @@ export async function POST(request:Request){
         const snapshot=await provider.getProduct(identifier);
         const classification=classifyCjProduct(snapshot),compliance=catalogComplianceDecision(snapshot);
         const suggested = classification.canonicalCategoryId;
+        const suggestedCanonicalCategoryLabel = suggested ? classification.subcategoryLabel ?? canonicalLeafCategory(suggested)?.label ?? null : null;
+        const requiresReview = classification.status!=="SUGGESTED"||!suggestedCanonicalCategoryLabel||compliance.status==="QUARANTINED";
         const override = typeof body.canonicalCategoryByIdentifier==="object"&&body.canonicalCategoryByIdentifier&&typeof (body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]==="string"?String((body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]).trim():null;
         const category = resolveCatalogCategory(snapshot, override||null);
-        return {supplierProductId:identifier,title:snapshot.title,classificationStatus:classification.status,classificationConfidence:classification.confidence,classificationEvidence:classification.evidence,suggestedCanonicalCategoryId:suggested,suggestedCanonicalCategoryLabel:suggested?classification.subcategoryLabel:null,requiresReview:classification.status!=="SUGGESTED"||compliance.status==="QUARANTINED",errorCode:null,canonicalCategoryId:category.categoryId||null};
+        return {supplierProductId:identifier,title:snapshot.title,classificationStatus:requiresReview ? "NEEDS_REVIEW":"SUGGESTED",classificationConfidence:classification.confidence,classificationEvidence:classification.evidence,suggestedCanonicalCategoryId:suggested,suggestedCanonicalCategoryLabel:requiresReview?null:suggestedCanonicalCategoryLabel,errorCode:null,canonicalCategoryId:category.categoryId||null};
       }catch(error){return {supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:[],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,errorCode:error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",canonicalCategoryId:null};}
     }));
     return NextResponse.json({ok:true,previews});

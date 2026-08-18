@@ -57,6 +57,13 @@ test("preview quarantine hints and manual override remain visible in supplier UI
   assert.match(messages,/override/);
 });
 
+test("preview classification status is consistent with missing canonical suggestion",()=>{
+  const previewRoute=read("app/api/admin/supplier-products/catalog-preview/route.ts");
+  assert.match(previewRoute,/suggestedCanonicalCategoryLabel/);
+  assert.match(previewRoute,/requiresReview.*classificationStatus:requiresReview \? "NEEDS_REVIEW" : "SUGGESTED"/);
+  assert.match(previewRoute,/canonicalLeafCategory/);
+});
+
 test("compliance and unavailable pricing quarantine only the affected catalog item",()=>{
   const safe={title:"Plain cotton shirt",description:"Everyday garment",media:[{type:"IMAGE" as const,url:"https://example.com/a.jpg"}],variants:[{supplierVariantId:"v1",sku:"S1",title:"M",cost:5,currency:"USD",stock:2,available:true,originCountryCodes:["CN"]}]};
   assert.equal(catalogComplianceDecision(safe).status,"REVIEW_REQUIRED");
