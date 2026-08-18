@@ -13,7 +13,8 @@ export async function POST(request:Request){
     assertAdminMutationRequest(request);
     const session=await readSession(),admin=await requirePlatformSupplierAdmin(prisma,session),body=await request.json().catch(()=>({})) as Record<string,unknown>;
     const store=await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true}});if(!store)return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
-    const job=await createCatalogImportJob(prisma,{adminId:admin.id,storeId:store.id,identifiers:body.identifiers,destinationCountry:body.destinationCountry,canonicalCategoryId:typeof body.canonicalCategoryId==="string"?body.canonicalCategoryId:null,batchLimit:body.batchLimit});
+    const canonicalCategoryByIdentifier=typeof body.canonicalCategoryByIdentifier==="object"&&body.canonicalCategoryByIdentifier!==null&&!Array.isArray(body.canonicalCategoryByIdentifier)?body.canonicalCategoryByIdentifier as Record<string,string>:undefined;
+    const job=await createCatalogImportJob(prisma,{adminId:admin.id,storeId:store.id,identifiers:body.identifiers,destinationCountry:body.destinationCountry,canonicalCategoryId:typeof body.canonicalCategoryId==="string"?body.canonicalCategoryId:null,canonicalCategoryByIdentifier,batchLimit:body.batchLimit});
     return NextResponse.json({ok:true,maximum:MAX_CATALOG_JOB_ITEMS,job},{status:201});
   }catch(error){
     if(error instanceof MutationOriginError)return NextResponse.json({error:error.message},{status:403});

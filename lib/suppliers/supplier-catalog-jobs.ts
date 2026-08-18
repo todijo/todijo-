@@ -14,15 +14,42 @@ export const DEFAULT_CATALOG_PROCESS_LIMIT=3;
 export const MAX_CATALOG_PROCESS_LIMIT=10;
 const STALE_CLAIM_MS=15*60_000;
 
+type JobCategoryInput = {adminId:string;storeId:string;identifiers:unknown;destinationCountry:unknown;canonicalCategoryId?:string|null;batchLimit?:unknown;canonicalCategoryByIdentifier?:Record<string,string>};
+
 function boundedInteger(value:unknown,fallback:number,maximum:number){const parsed=Number(value);return Number.isSafeInteger(parsed)&&parsed>0?Math.min(parsed,maximum):fallback;}
 export function catalogIdentifiers(value:unknown){const values=(Array.isArray(value)?value:typeof value==="string"?value.split(/[\s,;]+/):[]).map((item)=>String(item).trim()).filter(Boolean);if(values.some((item)=>!/^[A-Za-z0-9-]{4,200}$/.test(item)))throw new Error("SUPPLIER_BULK_INPUT_INVALID");return[...new Set(values)];}
 
-export async function createCatalogImportJob(db:PrismaClient,input:{adminId:string;storeId:string;identifiers:unknown;destinationCountry:unknown;canonicalCategoryId?:string|null;batchLimit?:unknown}){
+function parseCanonicalCategoryByIdentifier(input:unknown,identifiers:string[]){
+  if(input==null||typeof input!=="object"||Array.isArray(input))return new Map<string,string>();
+  const requested=new Set(identifiers),map=new Map<string,string>();
+  for(const [identifier,rawCategory] of Object.entries(input)){
+    const normalized=String(identifier).trim();
+    if(!requested.has(normalized)||typeof rawCategory!=="string")continue;
+    const category=rawCategory.trim();
+    if(!category)continue;
+    map.set(normalized,category);
+  }
+  return map;
+}
+
+export async function createCatalogImportJob(db:PrismaClient,input:JobCategoryInput){
   const identifiers=catalogIdentifiers(input.identifiers),destinationCountry=normalizeCountryCode(input.destinationCountry),batchLimit=boundedInteger(input.batchLimit,DEFAULT_CATALOG_PROCESS_LIMIT,MAX_CATALOG_PROCESS_LIMIT);
   if(!identifiers.length||identifiers.length>MAX_CATALOG_JOB_ITEMS)throw new Error(identifiers.length>MAX_CATALOG_JOB_ITEMS?"SUPPLIER_BULK_LIMIT_EXCEEDED":"SUPPLIER_BULK_INPUT_INVALID");
-  const category=resolveCatalogCategory({categoryReference:null,title:""},input.canonicalCategoryId);
-  if(input.canonicalCategoryId&&!category.categoryId)throw new Error("CANONICAL_CATEGORY_INVALID");
-  return db.supplierCatalogImportJob.create({data:{createdById:input.adminId,storeId:input.storeId,destinationCountry,requestedCount:identifiers.length,batchLimit,items:{create:identifiers.map((requestedIdentifier,position)=>({requestedIdentifier,position,canonicalCategoryId:category.categoryId,categoryMappingSource:category.categoryId?category.source:null,categoryMappingReason:category.categoryId?category.reason:null}))}},select:{id:true,status:true,requestedCount:true,batchLimit:true,destinationCountry:true,createdAt:true}});
+  const globalCategory=resolveCatalogCategory({categoryReference:null,title:""},input.canonicalCategoryId);
+  if(input.canonicalCategoryId&&!globalCategory.categoryId)throw new Error("CANONICAL_CATEGORY_INVALID");
+  const overrides=parseCanonicalCategoryByIdentifier(input.canonicalCategoryByIdentifier,identifiers);
+  for(const categoryId of overrides.values()){
+    if(!resolveCatalogCategory({categoryReference:null,title:""},categoryId).categoryId)throw new Error("CANONICAL_CATEGORY_INVALID");
+  }
+  return db.supplierCatalogImportJob.create({data:{createdById:input.adminId,storeId:input.storeId,destinationCountry,requestedCount:identifiers.length,batchLimit,items:{create:identifiers.map((requestedIdentifier,position)=>{
+    const hasOverride=overrides.has(requestedIdentifier);
+    const category=resolveCatalogCategory({categoryReference:null,title:""},hasOverride?overrides.get(requestedIdentifier):input.canonicalCategoryId);
+    return{
+      requestedIdentifier,position,canonicalCategoryId:category.categoryId,
+      categoryMappingSource:category.categoryId?category.source:null,
+      categoryMappingReason:category.categoryId?category.reason:null,
+    };
+  })}},select:{id:true,status:true,requestedCount:true,batchLimit:true,destinationCountry:true,createdAt:true}});
 }
 
 async function verifiedCatalogPricing(provider:SupplierCatalogProvider,snapshot:SupplierProductSnapshot,destinationCountry:string,sellingCurrency:string){

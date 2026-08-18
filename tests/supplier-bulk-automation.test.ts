@@ -31,7 +31,31 @@ test("canonical mapping is stable, deterministic and fails to review instead of 
   const workspace=read("components/SupplierCatalogWorkspace.tsx");assert.match(workspace,/SellerCategorySelector/);assert.match(workspace,/canonicalCategoryId/);assert.doesNotMatch(workspace,/PRODUCT_CATEGORIES/);
 });
 
+test("admin can request classification preview before creating a catalog job",()=>{
+  const workspace=read("components/SupplierCatalogWorkspace.tsx"),previewRoute=read("app/api/admin/supplier-products/catalog-preview/route.ts"),jobs=read("lib/suppliers/supplier-catalog-jobs.ts"),bulkRoute=read("app/api/admin/supplier-products/bulk-import/route.ts");
+  assert.match(workspace,/catalog-preview/);
+  assert.match(workspace,/preview-category-/);
+  assert.match(workspace,/override/);
+  assert.match(previewRoute,/catalogIdentifiers/);
+  assert.match(previewRoute,/classifyCjProduct/);
+  assert.match(previewRoute,/catalogComplianceDecision/);
+  assert.match(jobs,/canonicalCategoryByIdentifier/);
+  assert.match(jobs,/CANONICAL_CATEGORY_INVALID/);
+  assert.match(bulkRoute,/canonicalCategoryByIdentifier/);
+});
+
 test("durable execution persists explainable CJ classification and quarantines uncertainty",()=>{const jobs=read("lib/suppliers/supplier-catalog-jobs.ts"),schema=read("prisma/schema.prisma"),workspace=read("components/SupplierCatalogWorkspace.tsx");assert.match(jobs,/classifyCjProduct\(snapshot\)/);assert.match(jobs,/classificationConfidence/);assert.match(jobs,/classificationEvidence/);assert.match(jobs,/CJ_CLASSIFICATION_REVIEW_REQUIRED/);assert.match(schema,/classificationConfidence\s+Float\?/);assert.match(workspace,/classificationStatus/);assert.match(workspace,/classificationConfidence/);});
+
+test("preview quarantine hints and manual override remain visible in supplier UI",()=>{
+  const workspace=read("components/SupplierCatalogWorkspace.tsx"),messages=read("i18n/supplier-bulk.ts");
+  assert.match(workspace,/needsReview/);
+  assert.match(workspace,/bulkStatusGood/);
+  assert.match(workspace,/quarantine/);
+  assert.match(messages,/needsReview/);
+  assert.match(messages,/bulkStatusGood/);
+  assert.match(messages,/quarantine/);
+  assert.match(messages,/override/);
+});
 
 test("compliance and unavailable pricing quarantine only the affected catalog item",()=>{
   const safe={title:"Plain cotton shirt",description:"Everyday garment",media:[{type:"IMAGE" as const,url:"https://example.com/a.jpg"}],variants:[{supplierVariantId:"v1",sku:"S1",title:"M",cost:5,currency:"USD",stock:2,available:true,originCountryCodes:["CN"]}]};
