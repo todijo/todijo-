@@ -2,9 +2,10 @@ import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100";
+const databaseURL = process.env.PLAYWRIGHT_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public";
 const serverEnvironment = {
   ...process.env,
-  DATABASE_URL: process.env.DATABASE_URL ?? "postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public",
+  DATABASE_URL: databaseURL,
   APP_URL: baseURL,
   SESSION_SECRET: "e2e-only-placeholder-secret-at-least-32-characters",
   STRIPE_SECRET_KEY: "",
@@ -56,7 +57,7 @@ try {
   await waitForServer();
   exitCode = await new Promise((resolve, reject) => {
     const tests = spawn(process.execPath, [playwrightCli, "test", ...process.argv.slice(2)], {
-      env: { ...process.env, PLAYWRIGHT_BASE_URL: baseURL },
+      env: { ...serverEnvironment, PLAYWRIGHT_BASE_URL: baseURL },
       stdio: "inherit",
     });
     tests.once("error", reject);

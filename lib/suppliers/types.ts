@@ -41,6 +41,17 @@ export type SupplierMediaSource = {
   posterUrl?: string | null;
 };
 
+export type SupplierCategoryHierarchy = {
+  categoryId: string | null;
+  categoryName: string | null;
+  firstCategoryId: string | null;
+  firstCategoryName: string | null;
+  secondCategoryId: string | null;
+  secondCategoryName: string | null;
+  thirdCategoryId: string | null;
+  thirdCategoryName: string | null;
+};
+
 export type SupplierProductSnapshot = {
   provider: SupplierProviderId;
   supplierProductId: string;
@@ -48,6 +59,7 @@ export type SupplierProductSnapshot = {
   title: string;
   description: string;
   categoryReference: string | null;
+  categoryHierarchy?: SupplierCategoryHierarchy;
   sourceUrl: string | null;
   cost: number | null;
   currency: string;

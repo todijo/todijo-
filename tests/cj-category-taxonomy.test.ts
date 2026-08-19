@@ -24,6 +24,39 @@ test("CJ dash cameras map to the existing Todijo automotive electronics leaf",()
   assert.equal(result?.subcategoryLabel,"DVR & Dash Camera");
 });
 
-test("unknown CJ paths never invent a canonical category",()=>{
+test("CJ men sports watches map from supplier taxonomy, not title guessing",()=>{
+  const result=mapCjCategoryPathToTodijo(path("Jewelry & Watches","Men Watches","Men Sports Watches"));
+  assert.equal(result?.categoryId,"jewelry");
+  assert.equal(result?.subcategoryLabel,"Montres de sport pour homme");
+  assert.equal(result?.confidence,.99);
+});
+
+test("CJ men boots map authoritatively to the existing men boots leaf",()=>{
+  const result=mapCjCategoryPathToTodijo(path("Bags & Shoes","Men Shoes","Men Boots"));
+  assert.equal(result?.categoryId,"bags-shoes");
+  assert.equal(result?.subcategoryLabel,"Bottes pour Homme");
+  assert.ok(result?.evidence.includes("CJ_TAXONOMY_MAPPING:MEN_BOOTS"));
+});
+
+test("CJ men formal shoes map authoritatively without fabricating vulcanized shoes",()=>{
+  const result=mapCjCategoryPathToTodijo(path("Bags & Shoes","Men Shoes","Men Formal Shoes"));
+  assert.equal(result?.subcategoryLabel,"Chaussures formelles");
+  assert.notEqual(result?.subcategoryLabel,"Chaussure de vulcanisation");
+});
+
+test("CJ women handbags map to the canonical handbag leaf",()=>{
+  const result=mapCjCategoryPathToTodijo(path("Bags & Shoes","Women Bags","Women Handbags"));
+  assert.equal(result?.subcategoryLabel,"Sac à main");
+});
+
+test("CJ baby rompers map to baby rompers when supplier taxonomy is specific",()=>{
+  const result=mapCjCategoryPathToTodijo(path("Kids & Baby","Baby Clothing","Baby Rompers"));
+  assert.equal(result?.categoryId,"kids");
+  assert.equal(result?.subcategoryLabel,"Barboteuses de bébé");
+});
+
+test("unknown or generic CJ paths never invent a canonical category",()=>{
   assert.equal(mapCjCategoryPathToTodijo(path("Unknown","Unknown","Unmapped Novelty")),null);
+  assert.equal(mapCjCategoryPathToTodijo(path("Bags & Shoes","Men Shoes","Men Shoes")),null);
+  assert.equal(mapCjCategoryPathToTodijo(path("Kids & Baby","Baby Clothing","Baby Clothing")),null);
 });

@@ -7,7 +7,7 @@ import type { SupplierProductSnapshot } from "./types";
 const CJ_BASE_URL="https://developers.cjdropshipping.com/api2.0/v1";
 const CATEGORY_CACHE_TTL_MS=6*60*60*1000;
 
-type CjCategoryPath={categoryId:string;first:string;second:string;third:string};
+export type CjCategoryPath={categoryId:string;first:string;second:string;third:string};
 type CategoryCache={expiresAt:number;byId:Map<string,CjCategoryPath>};
 const globalCache=globalThis as typeof globalThis&{__todijoCjCategoryTaxonomy?:CategoryCache;__todijoCjCategoryTaxonomyPending?:Promise<CategoryCache>};
 
@@ -64,12 +64,38 @@ export async function resolveCjCategoryPath(categoryId:unknown):Promise<CjCatego
   try{return (await categoryCache()).byId.get(id.toUpperCase())??null;}catch{return null;}
 }
 
+function embeddedCategoryPath(snapshot:SupplierProductSnapshot):CjCategoryPath|null{
+  const hierarchy=snapshot.categoryHierarchy;
+  if(!hierarchy)return null;
+  const categoryId=text(hierarchy.thirdCategoryId??hierarchy.categoryId??snapshot.categoryReference);
+  const first=text(hierarchy.firstCategoryName),second=text(hierarchy.secondCategoryName),third=text(hierarchy.thirdCategoryName??hierarchy.categoryName);
+  return categoryId&&third?{categoryId,first,second,third}:null;
+}
+
 function mapped(categoryId:string,groupId:string,label:string,path:CjCategoryPath,reason:string):CjClassification{
   return{canonicalCategoryId:subcategoryId(categoryId,groupId,label),categoryId,categoryLabel:null,subcategoryLabel:label,confidence:.99,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};
 }
 
 export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|null{
   const first=normalized(path.first),second=normalized(path.second),third=normalized(path.third),all=`${first} ${second} ${third}`;
+
+  if(/\b(sports? watch|sports? watches)\b/.test(all)&&/\b(men|mens|male|man)\b/.test(all))return mapped("jewelry","men-watches","Montres de sport pour homme",path,"MEN_SPORTS_WATCH");
+  if(/\b(sports? watch|sports? watches)\b/.test(all)&&/\b(women|womens|female|woman)\b/.test(all))return mapped("jewelry","women-watches","Montres de sport pour femmes",path,"WOMEN_SPORTS_WATCH");
+  if(/\bdigital watch(es)?\b/.test(all))return mapped("jewelry","men-watches","Montres numériques",path,"DIGITAL_WATCH");
+  if(/\bquartz watch(es)?\b/.test(all))return mapped("jewelry","men-watches","Montres à quartz",path,"QUARTZ_WATCH");
+  if(/\bmechanical watch(es)?\b/.test(all))return mapped("jewelry","men-watches","Montres mécaniques",path,"MECHANICAL_WATCH");
+
+  if(/\b(men|mens|male|man)\b/.test(all)&&/\b(boot|boots|high top boots?)\b/.test(all))return mapped("bags-shoes","men-shoes","Bottes pour Homme",path,"MEN_BOOTS");
+  if(/\b(men|mens|male|man)\b/.test(all)&&/\b(formal shoes?|dress shoes?|business shoes?|oxford shoes?)\b/.test(all))return mapped("bags-shoes","men-shoes","Chaussures formelles",path,"MEN_FORMAL_SHOES");
+  if(/\b(men|mens|male|man)\b/.test(all)&&/\b(sandal|sandals)\b/.test(all))return mapped("bags-shoes","men-shoes","Sandales Pour Homme",path,"MEN_SANDALS");
+  if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(boot|boots)\b/.test(all))return mapped("bags-shoes","women-shoes","Bottes pour femme",path,"WOMEN_BOOTS");
+  if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(sandal|sandals)\b/.test(all))return mapped("bags-shoes","women-shoes","Sandales pour femme",path,"WOMEN_SANDALS");
+  if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(handbag|handbags|hand bag|purse)\b/.test(all))return mapped("bags-shoes","women-bags","Sac à main",path,"WOMEN_HANDBAG");
+  if(/\b(men|mens|male|man)\b/.test(all)&&/\b(backpack|backpacks|rucksack)\b/.test(all))return mapped("bags-shoes","men-bags","Sacs à dos pour hommes",path,"MEN_BACKPACK");
+
+  if(/\b(baby|infant|newborn)\b/.test(all)&&/\b(romper|rompers|onesie|onesies|overall|overalls)\b/.test(all))return mapped("kids","baby","Barboteuses de bébé",path,"BABY_ROMPER");
+  if(/\b(baby|infant|newborn)\b/.test(all)&&/\b(clothing set|clothing sets|clothes set|outfit set|outfit sets)\b/.test(all))return mapped("kids","baby","Ensembles de vêtements pour bébé",path,"BABY_CLOTHING_SET");
+
   if(/\b(car|automobile|vehicle|automotive)\b/.test(all)&&/\b(sticker|stickers|decal|decals|exterior decoration|exterior accessories?)\b/.test(all))return mapped("auto","parts","Pièces extérieures",path,"AUTO_EXTERIOR_DECORATION");
   if(/\b(car|automobile|vehicle|automotive)\b/.test(all)&&/\b(car light|car lights|lighting|headlight|headlights|taillight|taillights)\b/.test(all))return mapped("auto","parts","Lumières de voiture",path,"AUTO_LIGHTING");
   if(/\b(dash camera|dash cam|dvr)\b/.test(all))return mapped("auto","electronics","DVR & Dash Camera",path,"AUTO_DASH_CAMERA");
@@ -83,7 +109,8 @@ export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|
 }
 
 export async function classifyCjProductAuthoritatively(snapshot:SupplierProductSnapshot):Promise<CjClassification>{
-  const path=await resolveCjCategoryPath(snapshot.categoryReference??snapshot.rawMetadata.categoryId);
+  const embedded=embeddedCategoryPath(snapshot);
+  const path=embedded??await resolveCjCategoryPath(snapshot.categoryReference??snapshot.rawMetadata.categoryId);
   if(path){
     const direct=mapCjCategoryPathToTodijo(path);if(direct)return direct;
     const enriched:SupplierProductSnapshot={...snapshot,categoryReference:`${path.first} > ${path.second} > ${path.third}`,rawMetadata:{...snapshot.rawMetadata,cjCategoryPath:path}};
