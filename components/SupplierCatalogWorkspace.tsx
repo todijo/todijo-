@@ -14,26 +14,41 @@ type JobDetail=JobSummary&{items:JobItem[];nextCursor:string|null};
 type PreviewItem={supplierProductId:string;title:string;errorCode:string|null;classificationStatus:string;classificationConfidence:number;suggestedCanonicalCategoryId:string|null;suggestedCanonicalCategoryLabel:string|null;requiresReview:boolean;canonicalCategoryId:string|null};
 type LeafOption={id:string;label:string};
 const mutationHeaders={"Content-Type":"application/json","X-Todijo-Admin-Action":"1"};
+const PREVIEW_DEBOUNCE_MS=650;
 
 export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobSummary[]}){
   const t=useTranslations("Supplier"),categoryText=useTranslations("SellerControl"),formRef=useRef<HTMLFormElement>(null);
   const [jobs,setJobs]=useState(initialJobs),[active,setActive]=useState<JobDetail|null>(null),[query,setQuery]=useState(""),[page,setPage]=useState(1),[hasMore,setHasMore]=useState(false),[results,setResults]=useState<SearchItem[]>([]),[selected,setSelected]=useState<Set<string>>(new Set()),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
-  const [previews,setPreviews]=useState<Record<string,PreviewItem>>({}),[previewBusy,setPreviewBusy]=useState(false),previewRequest=useRef(0);
+  const [previews,setPreviews]=useState<Record<string,PreviewItem>>({}),[previewBusy,setPreviewBusy]=useState(false),previewRequest=useRef(0),previewAbort=useRef<AbortController|null>(null);
   const leaves:LeafOption[]=CANONICAL_LEAF_CATEGORIES.map((leaf)=>({id:leaf.id,label:leaf.label})),previewItems=Array.from(selected).map((id)=>previews[id]).filter(Boolean);
   const selectedResults=results.filter((item)=>selected.has(item.supplierProductId));
 
-  useEffect(()=>{void updatePreviews(Array.from(selected));},[selected]);
+  useEffect(()=>{
+    const identifiers=Array.from(selected);
+    if(!identifiers.length){previewAbort.current?.abort();previewAbort.current=null;setPreviews({});setPreviewBusy(false);setMessage("");return;}
+    setPreviewBusy(true);
+    const timer=window.setTimeout(()=>{void updatePreviews(identifiers);},PREVIEW_DEBOUNCE_MS);
+    return()=>window.clearTimeout(timer);
+  },[selected]);
 
   async function updatePreviews(identifiers:string[]){
     if(!identifiers.length){setPreviews({});setMessage("");return;}
-    const requestId=++previewRequest.current;setPreviewBusy(true);setMessage("");
+    const requestId=++previewRequest.current;
+    previewAbort.current?.abort();
+    const controller=new AbortController();
+    previewAbort.current=controller;
+    setPreviewBusy(true);setMessage("");
     try{
-      const response=await fetch("/api/admin/supplier-products/catalog-preview",{method:"POST",headers:mutationHeaders,body:JSON.stringify({identifiers})}),data=await response.json() as {error?:string;previews?:PreviewItem[]};
+      const response=await fetch("/api/admin/supplier-products/catalog-preview",{method:"POST",headers:mutationHeaders,body:JSON.stringify({identifiers}),signal:controller.signal}),data=await response.json() as {error?:string;previews?:PreviewItem[]};
       if(requestId!==previewRequest.current)return;
       if(!response.ok)throw new Error(data.error??"CJ_CLASSIFICATION_FAILED");
       const next:Record<string,PreviewItem>={};for(const item of data.previews??[])next[item.supplierProductId]=item;setPreviews(next);
-    }catch(error){if(requestId===previewRequest.current)setPreviews({});setMessage(error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED");}
-    finally{if(requestId===previewRequest.current)setPreviewBusy(false);}
+    }catch(error){
+      if(error instanceof DOMException&&error.name==="AbortError")return;
+      if(requestId===previewRequest.current){setPreviews({});setMessage(error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED");}
+    }finally{
+      if(requestId===previewRequest.current){setPreviewBusy(false);if(previewAbort.current===controller)previewAbort.current=null;}
+    }
   }
 
   async function search(nextPage=1){
@@ -83,11 +98,20 @@ export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobS
       <SellerCategorySelector required={false} labels={{main:categoryText("mainCategory"),group:categoryText("categoryGroup"),leaf:categoryText("leafCategory"),chooseMain:categoryText("chooseMainCategory"),chooseGroup:categoryText("chooseCategoryGroup"),chooseLeaf:categoryText("chooseLeafCategory"),legacyInvalid:categoryText("legacyCategoryInvalid")}}/>
       <div className="supplierCatalogItems" aria-live="polite">
         <header><h3>{t("classification")}</h3>{previewBusy&&<p>{t("pending")}</p>}</header>
-        {previewItems.length===0&&<p>{t("reviewRequired")}</p>}
-        {selectedResults.map((item)=>{const preview=previews[item.supplierProductId];const isReviewRequired=Boolean(preview?.requiresReview)||preview?.classificationStatus==="NEEDS_REVIEW"||preview?.classificationStatus==="UNRESOLVED"||preview?.classificationStatus==="QUARANTINED"||!preview?.suggestedCanonicalCategoryId||!preview?.suggestedCanonicalCategoryLabel;const isLowConfidence=isReviewRequired||Boolean(preview&&preview.classificationConfidence<0.62);return <article key={item.supplierProductId}><div><strong>{item.supplierProductId}</strong><span>{item.title}</span></div><dl><div><dt>{t("classification")}</dt><dd>{isReviewRequired?t("needsReview"):t("bulkStatusGood")} {preview?.classificationConfidence!=null?`(${Math.round(preview.classificationConfidence*100)}%)`:""}</dd></div><div><dt>{t("categoryStatus")}</dt><dd>{isReviewRequired?t("reviewRequired"):preview?.suggestedCanonicalCategoryLabel??t("reviewRequired")}</dd></div><div><dt>{t("needsReview")}</dt><dd>{isReviewRequired?t("needsReview"):t("bulkStatusGood")}</dd></div><div><dt> {t("override")}</dt><dd><select name={`preview-category-${item.supplierProductId}`} defaultValue={preview?.suggestedCanonicalCategoryId??""}><option value="">{t("reviewRequired")}</option>{leaves.map((leaf)=><option key={leaf.id} value={leaf.id}>{leaf.label}</option>)}</select></dd></div><div>{isLowConfidence&&preview&&<strong>{t("quarantine")}</strong>}</div></dl></article>})}
+        {selected.size===0&&<p>{t("reviewRequired")}</p>}
+        {selectedResults.map((item)=>{
+          const preview=previews[item.supplierProductId];
+          const pending=!preview;
+          const isReviewRequired=Boolean(preview&&(preview.requiresReview||preview.classificationStatus==="NEEDS_REVIEW"||preview.classificationStatus==="UNRESOLVED"||preview.classificationStatus==="QUARANTINED"||!preview.suggestedCanonicalCategoryId||!preview.suggestedCanonicalCategoryLabel));
+          const isLowConfidence=Boolean(preview&&(isReviewRequired||preview.classificationConfidence<0.62));
+          const classificationText=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("needsReview"):t("bulkStatusGood");
+          const categoryStatus=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("reviewRequired"):preview.suggestedCanonicalCategoryLabel??t("reviewRequired");
+          const reviewText=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("needsReview"):t("bulkStatusGood");
+          return <article key={item.supplierProductId}><div><strong>{item.supplierProductId}</strong><span>{item.title}</span></div><dl><div><dt>{t("classification")}</dt><dd>{classificationText} {!pending&&preview?.classificationConfidence!=null?`(${Math.round(preview.classificationConfidence*100)}%)`:""}</dd></div><div><dt>{t("categoryStatus")}</dt><dd>{categoryStatus}</dd></div><div><dt>{t("needsReview")}</dt><dd>{reviewText}</dd></div><div><dt>{t("override")}</dt><dd><select name={`preview-category-${item.supplierProductId}`} defaultValue={preview?.suggestedCanonicalCategoryId??""} disabled={pending}><option value="">{pending?t("pending"):t("reviewRequired")}</option>{leaves.map((leaf)=><option key={leaf.id} value={leaf.id}>{leaf.label}</option>)}</select></dd></div><div>{isLowConfidence&&preview&&!preview.errorCode&&<strong>{t("quarantine")}</strong>}</div></dl></article>;
+        })}
       </div>
       <div className="supplierCatalogSettings"><label>{t("destinationCountry")}<input name="destinationCountry" required minLength={2} maxLength={2} pattern="[A-Za-z]{2}" placeholder="FR"/></label><label>{t("batchLimit")}<input name="batchLimit" type="number" min="1" max="10" defaultValue="3"/></label></div>
-      <button className="sellerControlButton primary" disabled={busy}>{t("bulkImportAction")}</button>
+      <button className="sellerControlButton primary" disabled={busy||previewBusy}>{t("bulkImportAction")}</button>
       <p className="supplierBulkSafety">{t("bulkSafety")}</p>
     </form>
     {message&&<p className="supplierBulkSafety" role="status">{message}</p>}
