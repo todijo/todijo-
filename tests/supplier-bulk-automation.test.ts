@@ -39,6 +39,7 @@ test("admin can request classification preview before creating a catalog job",()
   assert.match(previewRoute,/catalogIdentifiers/);
   assert.match(previewRoute,/classifyCjProduct/);
   assert.match(previewRoute,/catalogComplianceDecision/);
+  assert.match(previewRoute,/return \{supplierProductId:identifier,title:snapshot.title,classificationStatus:requiresReview \? "NEEDS_REVIEW":"SUGGESTED",classificationConfidence:classification.confidence,classificationEvidence:classification.evidence,requiresReview/);
   assert.match(jobs,/canonicalCategoryByIdentifier/);
   assert.match(jobs,/CANONICAL_CATEGORY_INVALID/);
   assert.match(bulkRoute,/canonicalCategoryByIdentifier/);
