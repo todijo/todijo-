@@ -22,16 +22,16 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Colliers pour animaux de compagnie":["pet collar","dog collar","cat collar"],
   "Jouets à mâcher":["chew toy","dog chew"],
   "Robes pour femmes":["womens dress","women dress","female dress","dress","robe"],
-  "Montres":["watch","watches","sports watch","smart watch","sportswatch","smartwatch","watch accessory","wrist watch","wristwatch"],
+  "Montres":["watch","watches","watch accessory","wrist watch","wristwatch"],
   "Montres de sport pour femmes":["sports watch","sportswatch","sport watch","women's sports watch","women sports watch","femme sport watch","sportive watch","sportive bracelet"],
   "Montres de sport pour homme":["sports watch","sportswatch","sport watch","men's sports watch","mens sports watch","homme sport watch","sport watch homme"],
-  "Montres à quartz":["watch","quartz watch","wristwatch"],
-  "Montres mécaniques":["watch","mechanical watch","wristwatch"],
-  "Montres numériques":["digital watch","smart watch","smartwatch","watch"],
-  "Montres-bracelets pour femmes":["watch bracelet","wristwatch","watch band"],
+  "Montres à quartz":["quartz watch"],
+  "Montres mécaniques":["mechanical watch"],
+  "Montres numériques":["digital watch","smart watch","smartwatch"],
+  "Montres-bracelets pour femmes":["watch bracelet","watch band"],
   "Montres d'amoureux":["couple watch","his and hers watch"],
   "Étuis en silicone":["silicone phone case","phone case silicone"],
-  "Montres à double affichage":["watch","dual display watch","hybrid watch"],
+  "Montres à double affichage":["dual display watch","hybrid watch"],
   "Chaussures décontractées":["sneakers","sneaker","casual shoes","athletic shoes","sports shoes","running shoes"],
   "Chaussure de vulcanisation":["sneakers","running shoes","sports shoes","casual shoes"],
   "Les chaussures Vulcanises":["sneakers","sneaker","running shoes","sports shoes","casual shoes"],
@@ -41,7 +41,7 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Chaussures plates":["flat shoes","flats","shoe"],
   "Bottes pour femme":["women boots","lady boots","boot"],
   "Bottes pour Homme":["men boots","men's boots","boots for men"],
-  "T-shirts à manches longues pour hommes":["t shirt","t-shirt","tshirts","tshirts","tees","tee","tshirt"],
+  "T-shirts à manches longues pour hommes":["t shirt","t-shirt","tshirts","tees","tee","tshirt"],
   "Hauts et T-shirts":["t shirt","t-shirts","tee","tee shirt","tshirt"],
   "Géométrique":["t-shirts","t shirt","tees","tshirt"],
   "Impression":["printed t-shirt","t-shirts","graphic tshirt","custom t-shirt"],
@@ -96,7 +96,11 @@ export function classifyCjProduct(snapshot:SupplierProductSnapshot):CjClassifica
  candidates.sort((a,b)=>b.score-a.score||Number(b.decisiveAlias)-Number(a.decisiveAlias)||a.label.localeCompare(b.label));
  const best=candidates[0],second=candidates[1];
  if(!best||best.score<0.2)return{canonicalCategoryId:null,categoryId:null,categoryLabel:null,subcategoryLabel:null,confidence:0,status:"UNRESOLVED",evidence:["INSUFFICIENT_TAXONOMY_SIGNAL"]};
- const conflict=Boolean(second&&second.category.id!==best.category.id&&second.score>=best.score-0.08&&second.score>=CJ_CLASSIFICATION_THRESHOLDS.accepted);
+ // A specific multi-word product signal (for example "digital watch") is allowed to
+ // resolve a nearby generic cross-category candidate (for example Electronics > Montres).
+ // Two competing specific signals still remain on the manual-review path.
+ const competingSpecific=Boolean(second?.decisiveAlias);
+ const conflict=Boolean(second&&second.category.id!==best.category.id&&second.score>=best.score-0.08&&second.score>=CJ_CLASSIFICATION_THRESHOLDS.accepted&&(!best.decisiveAlias||competingSpecific));
  const confidence=Number(Math.max(0,Math.min(1,best.score-(conflict?0.2:0))).toFixed(2));
  const evidenceAliases=best.evidence.length>0?best.evidence.map((entry)=>`ALIAS:${entry}`):[];
  return{canonicalCategoryId:subcategoryId(best.category.id,best.group.id,best.label),categoryId:best.category.id,categoryLabel:best.category.label,subcategoryLabel:best.label,confidence,status:conflict?"CONFLICT":confidence>=CJ_CLASSIFICATION_THRESHOLDS.accepted?"SUGGESTED":"NEEDS_REVIEW",evidence:[`TITLE_CATEGORY_SCORE:${best.score.toFixed(2)}`,`TARGET:${best.category.id}/${best.group.id}`,...evidenceAliases,...(best.decisiveAlias?["DECISIVE_MULTIWORD_ALIAS"]:[]),...(hierarchy?["CJ_CATEGORY_PRESENT"]:[]),...(conflict?[`CONFLICT:${second.category.id}`]:[])]};
