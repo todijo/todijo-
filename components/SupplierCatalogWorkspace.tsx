@@ -15,12 +15,13 @@ type PreviewItem={supplierProductId:string;title:string;errorCode:string|null;cl
 type LeafOption={id:string;label:string};
 const mutationHeaders={"Content-Type":"application/json","X-Todijo-Admin-Action":"1"};
 const PREVIEW_DEBOUNCE_MS=650;
+const PRICING_REFERENCE_COUNTRY="FR";
 
 export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobSummary[]}){
   const t=useTranslations("Supplier"),categoryText=useTranslations("SellerControl"),formRef=useRef<HTMLFormElement>(null);
   const [jobs,setJobs]=useState(initialJobs),[active,setActive]=useState<JobDetail|null>(null),[query,setQuery]=useState(""),[page,setPage]=useState(1),[hasMore,setHasMore]=useState(false),[results,setResults]=useState<SearchItem[]>([]),[selected,setSelected]=useState<Set<string>>(new Set()),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
   const [previews,setPreviews]=useState<Record<string,PreviewItem>>({}),[previewBusy,setPreviewBusy]=useState(false),previewRequest=useRef(0),previewAbort=useRef<AbortController|null>(null);
-  const leaves:LeafOption[]=CANONICAL_LEAF_CATEGORIES.map((leaf)=>({id:leaf.id,label:leaf.label})),previewItems=Array.from(selected).map((id)=>previews[id]).filter(Boolean);
+  const leaves:LeafOption[]=CANONICAL_LEAF_CATEGORIES.map((leaf)=>({id:leaf.id,label:leaf.label}));
   const selectedResults=results.filter((item)=>selected.has(item.supplierProductId));
 
   useEffect(()=>{
@@ -69,7 +70,7 @@ export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobS
     const canonicalCategoryByIdentifier:Record<string,string>|undefined=Object.fromEntries(
       identifiers.map((identifier)=>{const override=form.get(`preview-category-${identifier}`);if(typeof override==="string"){const value=override.trim();if(value)return [identifier,value] as const;}return null;}).filter((entry):entry is [string,string]=>Boolean(entry)),
     );
-    const payload={identifiers,destinationCountry:form.get("destinationCountry"),canonicalCategoryId:form.get("category"),batchLimit:form.get("batchLimit"),canonicalCategoryByIdentifier:Object.keys(canonicalCategoryByIdentifier).length?canonicalCategoryByIdentifier:undefined};
+    const payload={identifiers,destinationCountry:PRICING_REFERENCE_COUNTRY,canonicalCategoryId:form.get("category"),canonicalCategoryByIdentifier:Object.keys(canonicalCategoryByIdentifier).length?canonicalCategoryByIdentifier:undefined};
     setBusy(true);setMessage("");
     try{
       const response=await fetch("/api/admin/supplier-products/bulk-import",{method:"POST",headers:mutationHeaders,body:JSON.stringify(payload)}),data=await response.json() as {error?:string;job?:JobSummary};
@@ -110,7 +111,6 @@ export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobS
           return <article key={item.supplierProductId}><div><strong>{item.supplierProductId}</strong><span>{item.title}</span></div><dl><div><dt>{t("classification")}</dt><dd>{classificationText} {!pending&&preview?.classificationConfidence!=null?`(${Math.round(preview.classificationConfidence*100)}%)`:""}</dd></div><div><dt>{t("categoryStatus")}</dt><dd>{categoryStatus}</dd></div><div><dt>{t("needsReview")}</dt><dd>{reviewText}</dd></div><div><dt>{t("override")}</dt><dd><select name={`preview-category-${item.supplierProductId}`} defaultValue={preview?.suggestedCanonicalCategoryId??""} disabled={pending}><option value="">{pending?t("pending"):t("reviewRequired")}</option>{leaves.map((leaf)=><option key={leaf.id} value={leaf.id}>{leaf.label}</option>)}</select></dd></div><div>{isLowConfidence&&preview&&!preview.errorCode&&<strong>{t("quarantine")}</strong>}</div></dl></article>;
         })}
       </div>
-      <div className="supplierCatalogSettings"><label>{t("destinationCountry")}<input name="destinationCountry" required minLength={2} maxLength={2} pattern="[A-Za-z]{2}" placeholder="FR"/></label><label>{t("batchLimit")}<input name="batchLimit" type="number" min="1" max="10" defaultValue="3"/></label></div>
       <button className="sellerControlButton primary" disabled={busy||previewBusy}>{t("bulkImportAction")}</button>
       <p className="supplierBulkSafety">{t("bulkSafety")}</p>
     </form>
