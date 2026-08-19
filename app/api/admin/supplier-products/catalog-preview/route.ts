@@ -25,13 +25,28 @@ export async function POST(request:Request){
       try{
         const snapshot=await provider.getProduct(identifier);
         const classification=classifyCjProduct(snapshot),compliance=catalogComplianceDecision(snapshot);
-        const suggested = classification.canonicalCategoryId;
-        const suggestedCanonicalCategoryLabel = suggested ? classification.subcategoryLabel ?? canonicalLeafCategory(suggested)?.label ?? null : null;
-        const requiresReview = classification.status!=="SUGGESTED"||!suggestedCanonicalCategoryLabel||compliance.status==="QUARANTINED";
-        const override = typeof body.canonicalCategoryByIdentifier==="object"&&body.canonicalCategoryByIdentifier&&typeof (body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]==="string"?String((body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]).trim():null;
-        const category = resolveCatalogCategory(snapshot, override||null);
-        return {supplierProductId:identifier,title:snapshot.title,classificationStatus:requiresReview ? "NEEDS_REVIEW":"SUGGESTED",classificationConfidence:classification.confidence,classificationEvidence:classification.evidence,requiresReview,suggestedCanonicalCategoryId:suggested,suggestedCanonicalCategoryLabel:requiresReview?null:suggestedCanonicalCategoryLabel,errorCode:null,canonicalCategoryId:category.categoryId||null};
-      }catch(error){return {supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:[],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,errorCode:error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",canonicalCategoryId:null};}
+        const suggested=classification.canonicalCategoryId;
+        const suggestedCanonicalCategoryLabel=suggested?classification.subcategoryLabel??canonicalLeafCategory(suggested)?.label??null:null;
+        const classificationRequiresReview=classification.status!=="SUGGESTED"||!suggested||!suggestedCanonicalCategoryLabel;
+        const complianceRequiresReview=compliance.status==="QUARANTINED";
+        const override=typeof body.canonicalCategoryByIdentifier==="object"&&body.canonicalCategoryByIdentifier&&typeof (body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]==="string"?String((body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]).trim():null;
+        const category=resolveCatalogCategory(snapshot,override||null);
+        return {
+          supplierProductId:identifier,
+          title:snapshot.title,
+          classificationStatus:classification.status,
+          classificationConfidence:classification.confidence,
+          classificationEvidence:classification.evidence,
+          requiresReview:classificationRequiresReview,
+          classificationRequiresReview,
+          complianceRequiresReview,
+          complianceStatus:compliance.status,
+          suggestedCanonicalCategoryId:suggested,
+          suggestedCanonicalCategoryLabel,
+          errorCode:null,
+          canonicalCategoryId:category.categoryId||null,
+        };
+      }catch(error){return {supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:[],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:null,errorCode:error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",canonicalCategoryId:null};}
     }));
     return NextResponse.json({ok:true,previews});
   }catch(error){
