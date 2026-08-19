@@ -113,18 +113,23 @@ test("mobile canonical filter dock opens facets without squeezing results", asyn
   expect(widthAfter).toBe(widthBefore);
 });
 
-test("mobile category rail opens its canonical menu and preserves locale", async ({ page }) => {
+test("mobile category browser opens from bottom navigation and preserves locale", async ({ page }) => {
   await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
   await dismissCookieConsent(page);
-  const rail = page.getByRole("navigation", { name: "Categories" });
-  await expect(rail).toBeVisible();
-  const category = rail.getByRole("link").first();
+
+  const bottomNavigation = page.locator("nav.buyerMobileBottomNav");
+  await expect(bottomNavigation).toBeVisible();
+  await bottomNavigation.getByRole("button", { name: "Categories" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Mobile navigation" });
+  await expect(drawer).toBeVisible();
+  const browser = drawer.locator(".buyerMobileCategoryBrowser");
+  await expect(browser).toBeVisible();
+  await expect(browser.getByRole("tab")).toHaveCount(14);
+
+  const category = browser.locator(".buyerMobileCategoryAll");
   await expect(category).toHaveAttribute("href", /^\/en\/search\?category=/);
-  await category.focus();
-  await expect(category).toHaveAttribute("aria-expanded", "true");
-  await page.keyboard.press("Escape");
-  await expect(category).toHaveAttribute("aria-expanded", "false");
   await Promise.all([page.waitForURL(/\/en\/search\?category=/, { waitUntil: "commit" }), category.click()]);
 });
 
