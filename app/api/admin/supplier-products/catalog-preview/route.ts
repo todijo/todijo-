@@ -8,7 +8,7 @@ import { normalizeCjProduct } from "@/lib/suppliers/cj-client";
 import { cjAuth } from "@/lib/suppliers/cj-auth";
 import { scheduleCjRequest } from "@/lib/suppliers/cj-rate-limiter";
 import { catalogIdentifiers } from "@/lib/suppliers/supplier-catalog-jobs";
-import { classifyCjProduct } from "@/lib/suppliers/cj-classification";
+import { classifyCjProductAuthoritatively } from "@/lib/suppliers/cj-category-taxonomy";
 import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
 
 const PREVIEW_ITEM_LIMIT=100;
@@ -67,7 +67,7 @@ export async function POST(request:Request){
     for(const identifier of identifiers){
       try{
         const product=await resolvePreviewProduct(identifier),snapshot=normalizeCjProduct(product,[],[]);if(!snapshot.supplierProductId)throw new Error("CJ_PRODUCT_NOT_FOUND");
-        const classification=classifyCjProduct(snapshot),suggested=classification.canonicalCategoryId,suggestedCanonicalCategoryLabel=suggested?classification.subcategoryLabel??canonicalLeafCategory(suggested)?.label??null:null,requiresReview=classification.status!=="SUGGESTED"||!suggested||!suggestedCanonicalCategoryLabel;
+        const classification=await classifyCjProductAuthoritatively(snapshot),suggested=classification.canonicalCategoryId,suggestedCanonicalCategoryLabel=suggested?classification.subcategoryLabel??canonicalLeafCategory(suggested)?.label??null:null,requiresReview=classification.status!=="SUGGESTED"||!suggested||!suggestedCanonicalCategoryLabel;
         previews.push({supplierProductId:identifier,title:snapshot.title,classificationStatus:classification.status,classificationConfidence:classification.confidence,classificationEvidence:[...classification.evidence,"PREVIEW_SOURCE:CJ_PRODUCT_QUERY","AUTHORITATIVE_IMPORT_RECHECK_REQUIRED"],requiresReview,classificationRequiresReview:requiresReview,complianceRequiresReview:false,complianceStatus:"IMPORT_RECHECK_REQUIRED",suggestedCanonicalCategoryId:suggested,suggestedCanonicalCategoryLabel,errorCode:null,canonicalCategoryId:suggested});
       }catch(error){const code=error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED";previews.push({supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:["PREVIEW_LOOKUP_FAILED",`ERROR:${code}`],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:"IMPORT_RECHECK_REQUIRED",errorCode:code,canonicalCategoryId:null});}
     }
