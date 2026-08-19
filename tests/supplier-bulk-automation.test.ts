@@ -65,6 +65,13 @@ test("preview classification status is consistent with missing canonical suggest
   assert.match(previewRoute,/canonicalLeafCategory/);
 });
 
+test("preview UI treats missing suggestion or review flags as review required",()=>{
+  const workspace=read("components/SupplierCatalogWorkspace.tsx");
+  assert.match(workspace,/const isReviewRequired=/);
+  assert.match(workspace,/classificationStatus==="NEEDS_REVIEW"\|\|preview\?\.classificationStatus==="UNRESOLVED"/);
+  assert.match(workspace,/isReviewRequired\?t\("needsReview"\):t\("bulkStatusGood"\)/);
+});
+
 test("compliance and unavailable pricing quarantine only the affected catalog item",()=>{
   const safe={title:"Plain cotton shirt",description:"Everyday garment",media:[{type:"IMAGE" as const,url:"https://example.com/a.jpg"}],variants:[{supplierVariantId:"v1",sku:"S1",title:"M",cost:5,currency:"USD",stock:2,available:true,originCountryCodes:["CN"]}]};
   assert.equal(catalogComplianceDecision(safe).status,"REVIEW_REQUIRED");
