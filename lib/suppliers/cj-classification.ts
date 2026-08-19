@@ -48,7 +48,6 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Jeans pour femmes":["women jeans","women's jeans","ladies jeans","womens denim","female jeans","jean"],
   "Jeans pour hommes":["men jeans","men's jeans","male jeans","jean"],
   "Robes de demoiselle d'honneur":["wedding dress","evening dress","cocktail dress"],
-  "Robes pour femmes":["women dress","womens dress","robe","dress","female dress"],
   "Semelles pour femmes":["women shoes","women sandals","heels","women casual shoes","flat shoes"],
   "Semelles pour hommes":["men shoes","men sandals","men boots","men casual shoes"],
   "Sac à dos pour hommes":["backpack","mens backpack","men backpack","unisex backpack","rucksack"],
@@ -96,4 +95,3 @@ export function classifyCjProduct(snapshot:SupplierProductSnapshot):CjClassifica
 
 export function todijoTaxonomyOptions(){return CANONICAL_LEAF_CATEGORIES.map(leaf=>({id:leaf.id,label:leaf.label,categoryId:leaf.categoryId,categoryLabel:leaf.categoryLabel,groupId:leaf.groupId,groupLabel:leaf.groupLabel}));}
 export function validateTodijoClassification(canonicalCategoryId:unknown){const leaf=typeof canonicalCategoryId==="string"?canonicalLeafCategory(canonicalCategoryId):null;if(!leaf)throw new Error("CANONICAL_CATEGORY_INVALID");return leaf;}
-
