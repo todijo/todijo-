@@ -12,27 +12,27 @@ function metadataText(snapshot:SupplierProductSnapshot){const values:unknown[]=[
 const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Talons hauts":["high heels","heel shoes","womens heels","women heels"],
   "Chargeurs":["charger","charging adapter"],
-  "C‚bles":["usb cable","phone cable","charging cable","usb"],
-  "…couteurs":["earbuds","headphones","earphones"],
-  "Sacs ‡ dos pour hommes":["mens backpack","men backpack","men shoulder bag","men shoulderbags","sac ‡ dos homme","unisex backpack","backpack"],
-  "Sacs ‡ dos ‡ la mode":["crossbody bag","backpack"],
-  "Sacs ‡ bandouliËre":["crossbody","shoulder bag","bandouliere","strap bag","shoulderbag","men shoulder bag"],
-  "Sacs ‡ bandouliËre pour femme":["crossbody","shoulder bag","shoulderbag","strap bag","women shoulder bag","french shoulder bag","bandouliere"],
-  "Sac ‡ main":["handbag","hand bag","purse","women's handbag","womens handbag","poche ‡ main","crossbody bag"],
+  "C√¢bles":["usb cable","phone cable","charging cable","usb"],
+  "√âcouteurs":["earbuds","headphones","earphones"],
+  "Sacs √† dos pour hommes":["mens backpack","men backpack","men shoulder bag","men shoulderbags","sac √† dos homme","unisex backpack","backpack"],
+  "Sacs √† dos √† la mode":["crossbody bag","backpack"],
+  "Sacs √† bandouli√®re":["crossbody","shoulder bag","bandouliere","strap bag","shoulderbag","men shoulder bag"],
+  "Sacs √† bandouli√®re pour femme":["crossbody","shoulder bag","shoulderbag","strap bag","women shoulder bag","french shoulder bag","bandouliere"],
+  "Sac √† main":["handbag","hand bag","purse","women's handbag","womens handbag","poche √† main","crossbody bag"],
   "Colliers pour animaux de compagnie":["pet collar","dog collar","cat collar"],
-  "Jouets ‡ m‚cher":["chew toy","dog chew"],
+  "Jouets √† m√¢cher":["chew toy","dog chew"],
   "Robes pour femmes":["womens dress","women dress","female dress","dress","robe"],
   "Montres":["watch","watches","sports watch","smart watch","sportswatch","smartwatch","watch accessory","wrist watch","wristwatch"],
   "Montres de sport pour femmes":["sports watch","sportswatch","sport watch","women's sports watch","women sports watch","femme sport watch","sportive watch","sportive bracelet"],
   "Montres de sport pour homme":["sports watch","sportswatch","sport watch","men's sports watch","mens sports watch","homme sport watch","sport watch homme"],
-  "Montres ‡ quartz":["watch","quartz watch","wristwatch"],
-  "Montres mÈcaniques":["watch","mechanical watch","wristwatch"],
-  "Montres numÈriques":["digital watch","smart watch","smartwatch","watch"],
+  "Montres √† quartz":["watch","quartz watch","wristwatch"],
+  "Montres m√©caniques":["watch","mechanical watch","wristwatch"],
+  "Montres num√©riques":["digital watch","smart watch","smartwatch","watch"],
   "Montres-bracelets pour femmes":["watch bracelet","wristwatch","watch band"],
   "Montres d'amoureux":["couple watch","his and hers watch"],
-  "…tuis en silicone":["silicone phone case","phone case silicone"],
-  "Montres ‡ double affichage":["watch","digital watch","dual display watch","hybrid watch"],
-  "Chaussures dÈcontractÈes":["sneakers","sneaker","casual shoes","athletic shoes","sports shoes","running shoes"],
+  "√âtuis en silicone":["silicone phone case","phone case silicone"],
+  "Montres √† double affichage":["watch","digital watch","dual display watch","hybrid watch"],
+  "Chaussures d√©contract√©es":["sneakers","sneaker","casual shoes","athletic shoes","sports shoes","running shoes"],
   "Chaussure de vulcanisation":["sneakers","running shoes","sports shoes","casual shoes"],
   "Les chaussures Vulcanises":["sneakers","sneaker","running shoes","sports shoes","casual shoes"],
   "Chaussures de course":["running shoes","sneakers","sport shoes","athletic shoes","trekking shoes","course shoes"],
@@ -41,9 +41,9 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Chaussures plates":["flat shoes","flats","shoe"],
   "Bottes pour femme":["women boots","lady boots","boot"],
   "Bottes pour Homme":["men boots","men's boots","boots for men"],
-  "T-shirts ‡ manches longues pour hommes":["t shirt","t-shirt","tshirts","tshirts","tees","tee","tshirt"],
+  "T-shirts √† manches longues pour hommes":["t shirt","t-shirt","tshirts","tshirts","tees","tee","tshirt"],
   "Hauts et T-shirts":["t shirt","t-shirts","tee","tee shirt","tshirt"],
-  "GÈomÈtrique":["t-shirts","t shirt","tees","tshirt"],
+  "G√©om√©trique":["t-shirts","t shirt","tees","tshirt"],
   "Impression":["printed t-shirt","t-shirts","graphic tshirt","custom t-shirt"],
   "Jeans pour femmes":["women jeans","women's jeans","ladies jeans","womens denim","female jeans","jean"],
   "Jeans pour hommes":["men jeans","men's jeans","male jeans","jean"],
@@ -51,7 +51,7 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Robes pour femmes":["women dress","womens dress","robe","dress","female dress"],
   "Semelles pour femmes":["women shoes","women sandals","heels","women casual shoes","flat shoes"],
   "Semelles pour hommes":["men shoes","men sandals","men boots","men casual shoes"],
-  "Sac ‡ dos pour hommes":["backpack","mens backpack","men backpack","unisex backpack","rucksack"],
+  "Sac √† dos pour hommes":["backpack","mens backpack","men backpack","unisex backpack","rucksack"],
   "Sacs pour fille":["girl bag","girls bag","women bag"],
   "Porte-documents":["wallet","leather wallet","document bag"],
 };
@@ -62,7 +62,7 @@ function boostSignals(source:Set<string>){
   const has=(...values:string[])=>values.some((value)=>source.has(value));
   if(has("watch","smartwatch","smart","watches","sportswatch","sportwatch","timepiece")){boosted.add("montre");boosted.add("montres");}
   if(has("purse","handbag","hand","bag","sac","bags","crossbody","satchel","tote","backpack")){boosted.add("sac");boosted.add("sacs");}
-  if(has("shoulder")){boosted.add("bandouliere");boosted.add("bandouliËre");}
+  if(has("shoulder")){boosted.add("bandouliere");boosted.add("bandouli√®re");}
   if(has("sneaker","sneakers","athletic","tennis","running")){boosted.add("chaussure");boosted.add("chaussures");}
   if(has("shoe","shoes","boot","boots","sandal","sandals")){boosted.add("chaussure");boosted.add("chaussures");}
   if(has("shirt","tshirt","tee","t-shirts","teeshirt")){boosted.add("chemise");boosted.add("t-shirt");}
