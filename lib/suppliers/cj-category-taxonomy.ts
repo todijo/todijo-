@@ -1,4 +1,3 @@
-import "server-only";
 import { subcategoryId } from "../desktop-category-taxonomy";
 import { cjAuth } from "./cj-auth";
 import { classifyCjProduct, type CjClassification } from "./cj-classification";
