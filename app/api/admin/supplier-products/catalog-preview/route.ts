@@ -15,6 +15,27 @@ const CJ_INTER_PRODUCT_DELAY_MS=1100;
 
 function wait(ms:number){return new Promise((resolve)=>setTimeout(resolve,ms));}
 
+let previewQueue:Promise<void>=Promise.resolve();
+let lastCjPreviewRequestAt=0;
+
+async function queuedGetProduct(provider:CjCatalogProvider,identifier:string){
+  let release!:()=>void;
+  const previous=previewQueue;
+  previewQueue=new Promise<void>((resolve)=>{release=resolve;});
+  await previous;
+  try{
+    const elapsed=Date.now()-lastCjPreviewRequestAt;
+    const remaining=CJ_INTER_PRODUCT_DELAY_MS-elapsed;
+    if(remaining>0)await wait(remaining);
+    const snapshot=await provider.getProduct(identifier);
+    lastCjPreviewRequestAt=Date.now();
+    return snapshot;
+  }finally{
+    if(lastCjPreviewRequestAt===0)lastCjPreviewRequestAt=Date.now();
+    release();
+  }
+}
+
 export async function POST(request:Request){
   try{
     assertAdminMutationRequest(request);
@@ -26,9 +47,9 @@ export async function POST(request:Request){
     if(!provider.isConfigured())return NextResponse.json({error:"SUPPLIER_NOT_CONFIGURED"},{status:503});
 
     const previews=[];
-    for(const [index,identifier] of identifiers.entries()){
+    for(const identifier of identifiers){
       try{
-        const snapshot=await provider.getProduct(identifier);
+        const snapshot=await queuedGetProduct(provider,identifier);
         const classification=classifyCjProduct(snapshot),compliance=catalogComplianceDecision(snapshot);
         const suggested=classification.canonicalCategoryId;
         const suggestedCanonicalCategoryLabel=suggested?classification.subcategoryLabel??canonicalLeafCategory(suggested)?.label??null:null;
@@ -54,7 +75,6 @@ export async function POST(request:Request){
       }catch(error){
         previews.push({supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:[],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:null,errorCode:error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",canonicalCategoryId:null});
       }
-      if(index<identifiers.length-1)await wait(CJ_INTER_PRODUCT_DELAY_MS);
     }
     return NextResponse.json({ok:true,previews});
   }catch(error){
