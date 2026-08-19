@@ -31,7 +31,7 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Montres-bracelets pour femmes":["watch bracelet","wristwatch","watch band"],
   "Montres d'amoureux":["couple watch","his and hers watch"],
   "Étuis en silicone":["silicone phone case","phone case silicone"],
-  "Montres à double affichage":["watch","digital watch","dual display watch","hybrid watch"],
+  "Montres à double affichage":["watch","dual display watch","hybrid watch"],
   "Chaussures décontractées":["sneakers","sneaker","casual shoes","athletic shoes","sports shoes","running shoes"],
   "Chaussure de vulcanisation":["sneakers","running shoes","sports shoes","casual shoes"],
   "Les chaussures Vulcanises":["sneakers","sneaker","running shoes","sports shoes","casual shoes"],
@@ -55,7 +55,14 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Porte-documents":["wallet","leather wallet","document bag"],
 };
 function aliasSpecificity(alias:string){const size=tokens(alias).size;return Math.min(1,0.75+Math.min(size,2)*0.125);}
-function aliasScore(source:Set<string>,label:string){const aliases=ENGLISH_ALIASES[label];if(!aliases)return{score:0,hits:[] as string[]};const matching=aliases.filter((alias)=>overlap(source,alias)>0);if(!matching.length)return{score:0,hits:[] as string[]};return{score:Math.max(...matching.map((alias)=>overlap(source,alias)*aliasSpecificity(alias)),0),hits:matching};}
+function aliasScore(source:Set<string>,label:string){
+  const aliases=ENGLISH_ALIASES[label];
+  if(!aliases)return{score:0,hits:[] as string[],decisive:false};
+  const matching=aliases.filter((alias)=>overlap(source,alias)>0);
+  if(!matching.length)return{score:0,hits:[] as string[],decisive:false};
+  const decisive=matching.some((alias)=>tokens(alias).size>=2&&overlap(source,alias)===1);
+  return{score:Math.max(...matching.map((alias)=>overlap(source,alias)*aliasSpecificity(alias)),0),hits:matching,decisive};
+}
 
 function boostSignals(source:Set<string>){
   const boosted=new Set(source);
@@ -69,7 +76,7 @@ function boostSignals(source:Set<string>){
   if(has("trousers","pant","pants","jean","jeans")){boosted.add("pantalon");boosted.add("pantalon");boosted.add("jeans");}
   if(has("dress","dresses","robe")){boosted.add("robe");}
   if(has("men","man","mens","male","boy","boys")){boosted.add("homme");boosted.add("hommes");}
-  if(has("women","woman","womens","female","females" ,"girls","girl")){boosted.add("femme");boosted.add("femmes");}
+  if(has("women","woman","womens","female","females","girls","girl")){boosted.add("femme");boosted.add("femmes");}
   if(has("jacket","blazer","coat","trench")){boosted.add("veste");}
   return boosted;
 }
@@ -82,16 +89,17 @@ export function classifyCjProduct(snapshot:SupplierProductSnapshot):CjClassifica
    const strongAlias=aliasScore(strong,label),broadAlias=aliasScore(broad,label);
    const subStrong=Math.max(overlap(strong,label),strongAlias.score),subBroad=Math.max(overlap(broad,label),broadAlias.score);
    const categoryScore=Math.max(overlap(strong,category.label),...category.legacyValues.map(value=>overlap(strong,value)),overlap(strong,group.label));
-   const score=Math.min(1,subStrong*0.55+subBroad*0.2+categoryScore*0.25+(subStrong===1?0.15:0));
-   return {category,group,label,score,evidence:[...new Set([...strongAlias.hits,...broadAlias.hits])]};
+   const decisiveAlias=strongAlias.decisive||broadAlias.decisive;
+   const score=Math.min(1,subStrong*0.55+subBroad*0.2+categoryScore*0.25+(subStrong===1?0.15:0)+(decisiveAlias?0.12:0));
+   return {category,group,label,score,decisiveAlias,evidence:[...new Set([...strongAlias.hits,...broadAlias.hits])]};
  })));
- candidates.sort((a,b)=>b.score-a.score||a.label.localeCompare(b.label));
+ candidates.sort((a,b)=>b.score-a.score||Number(b.decisiveAlias)-Number(a.decisiveAlias)||a.label.localeCompare(b.label));
  const best=candidates[0],second=candidates[1];
  if(!best||best.score<0.2)return{canonicalCategoryId:null,categoryId:null,categoryLabel:null,subcategoryLabel:null,confidence:0,status:"UNRESOLVED",evidence:["INSUFFICIENT_TAXONOMY_SIGNAL"]};
  const conflict=Boolean(second&&second.category.id!==best.category.id&&second.score>=best.score-0.08&&second.score>=CJ_CLASSIFICATION_THRESHOLDS.accepted);
  const confidence=Number(Math.max(0,Math.min(1,best.score-(conflict?0.2:0))).toFixed(2));
  const evidenceAliases=best.evidence.length>0?best.evidence.map((entry)=>`ALIAS:${entry}`):[];
- return{canonicalCategoryId:subcategoryId(best.category.id,best.group.id,best.label),categoryId:best.category.id,categoryLabel:best.category.label,subcategoryLabel:best.label,confidence,status:conflict?"CONFLICT":confidence>=CJ_CLASSIFICATION_THRESHOLDS.accepted?"SUGGESTED":"NEEDS_REVIEW",evidence:[`TITLE_CATEGORY_SCORE:${best.score.toFixed(2)}`,`TARGET:${best.category.id}/${best.group.id}`,...evidenceAliases,...(hierarchy? ["CJ_CATEGORY_PRESENT"]:[]),...(conflict?[`CONFLICT:${second.category.id}`]:[])]};
+ return{canonicalCategoryId:subcategoryId(best.category.id,best.group.id,best.label),categoryId:best.category.id,categoryLabel:best.category.label,subcategoryLabel:best.label,confidence,status:conflict?"CONFLICT":confidence>=CJ_CLASSIFICATION_THRESHOLDS.accepted?"SUGGESTED":"NEEDS_REVIEW",evidence:[`TITLE_CATEGORY_SCORE:${best.score.toFixed(2)}`,`TARGET:${best.category.id}/${best.group.id}`,...evidenceAliases,...(best.decisiveAlias?["DECISIVE_MULTIWORD_ALIAS"]:[]),...(hierarchy?["CJ_CATEGORY_PRESENT"]:[]),...(conflict?[`CONFLICT:${second.category.id}`]:[])]};
 }
 
 export function todijoTaxonomyOptions(){return CANONICAL_LEAF_CATEGORIES.map(leaf=>({id:leaf.id,label:leaf.label,categoryId:leaf.categoryId,categoryLabel:leaf.categoryLabel,groupId:leaf.groupId,groupLabel:leaf.groupLabel}));}
