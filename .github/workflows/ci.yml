@@ -72,11 +72,9 @@ jobs:
     name: Browser smoke tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    container:
-      image: mcr.microsoft.com/playwright:v1.55.0-noble
     env:
       CI: true
-      DATABASE_URL: postgresql://e2e:e2e@postgres:5432/todijo_e2e?schema=public
+      DATABASE_URL: postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public
     services:
       postgres:
         image: postgres:16
@@ -84,6 +82,8 @@ jobs:
           POSTGRES_USER: e2e
           POSTGRES_PASSWORD: e2e
           POSTGRES_DB: todijo_e2e
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U e2e -d todijo_e2e"
           --health-interval 10s
@@ -102,6 +102,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Install Chromium browser only
+        run: npx playwright install chromium
 
       - name: Prepare ephemeral browser-test database
         run: npx prisma migrate deploy
