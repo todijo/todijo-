@@ -6,7 +6,8 @@ export type CjClassificationStatus="SUGGESTED"|"NEEDS_REVIEW"|"UNRESOLVED"|"CONF
 export type CjClassification={canonicalCategoryId:string|null;categoryId:string|null;categoryLabel:string|null;subcategoryLabel:string|null;confidence:number;status:CjClassificationStatus;evidence:string[]};
 
 function normalized(value:string){return value.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();}
-function tokens(value:string){return new Set(normalized(value).split(/\s+/).filter((item)=>item.length>2));}
+function classificationText(value:string){return value.replace(/\bshort[-\s]?sleeved?\b/gi,"sleeved").replace(/\bshort[-\s]?sleeves?\b/gi,"sleeves").replace(/\blong[-\s]?sleeved?\b/gi,"longsleeved");}
+function tokens(value:string){return new Set(normalized(classificationText(value)).split(/\s+/).filter((item)=>item.length>2));}
 function overlap(source:Set<string>,label:string){const target=tokens(label);if(!target.size)return 0;let matches=0;for(const item of target)if(source.has(item))matches++;return matches/target.size;}
 function metadataText(snapshot:SupplierProductSnapshot){const values:unknown[]=[snapshot.categoryReference,snapshot.rawMetadata.categoryId,snapshot.rawMetadata.productType];return values.filter((value):value is string=>typeof value==="string").join(" ");}
 const ENGLISH_ALIASES:Record<string,readonly string[]>={
@@ -28,7 +29,6 @@ function boostSignals(source:Set<string>){
   if(has("shoulder")){boosted.add("bandouliere");boosted.add("bandoulière");}
   if(has("sneaker","sneakers","athletic","tennis","running","shoe","shoes","boot","boots","sandal","sandals")){boosted.add("chaussure");boosted.add("chaussures");}
   if(has("shirt","tshirt","tee","t-shirts","teeshirt")){boosted.add("chemise");boosted.add("t-shirt");}
-  // Generic trousers/pants/shorts are NOT jeans. Only explicit jean/jeans/denim signals may create a jeans token.
   if(has("trousers","trouser","pant","pants","short","shorts")){boosted.add("pantalon");boosted.add("pantalons");}
   if(has("jean","jeans","denim")){boosted.add("jean");boosted.add("jeans");}
   if(has("dress","dresses","robe")){boosted.add("robe");}
