@@ -11,6 +11,9 @@ import { resolveCatalogCategory, catalogComplianceDecision } from "@/lib/supplie
 import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
 
 const PREVIEW_ITEM_LIMIT=100;
+const CJ_INTER_PRODUCT_DELAY_MS=1100;
+
+function wait(ms:number){return new Promise((resolve)=>setTimeout(resolve,ms));}
 
 export async function POST(request:Request){
   try{
@@ -21,7 +24,9 @@ export async function POST(request:Request){
     if(identifiers.length===0||identifiers.length>PREVIEW_ITEM_LIMIT)throw new Error("SUPPLIER_BULK_INPUT_INVALID");
     const provider=new CjCatalogProvider();
     if(!provider.isConfigured())return NextResponse.json({error:"SUPPLIER_NOT_CONFIGURED"},{status:503});
-    const previews=await Promise.all(identifiers.map(async (identifier)=>{
+
+    const previews=[];
+    for(const [index,identifier] of identifiers.entries()){
       try{
         const snapshot=await provider.getProduct(identifier);
         const classification=classifyCjProduct(snapshot),compliance=catalogComplianceDecision(snapshot);
@@ -31,7 +36,7 @@ export async function POST(request:Request){
         const complianceRequiresReview=compliance.status==="QUARANTINED";
         const override=typeof body.canonicalCategoryByIdentifier==="object"&&body.canonicalCategoryByIdentifier&&typeof (body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]==="string"?String((body.canonicalCategoryByIdentifier as Record<string,unknown>)[identifier]).trim():null;
         const category=resolveCatalogCategory(snapshot,override||null);
-        return {
+        previews.push({
           supplierProductId:identifier,
           title:snapshot.title,
           classificationStatus:classification.status,
@@ -45,9 +50,12 @@ export async function POST(request:Request){
           suggestedCanonicalCategoryLabel,
           errorCode:null,
           canonicalCategoryId:category.categoryId||null,
-        };
-      }catch(error){return {supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:[],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:null,errorCode:error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",canonicalCategoryId:null};}
-    }));
+        });
+      }catch(error){
+        previews.push({supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:[],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:null,errorCode:error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",canonicalCategoryId:null});
+      }
+      if(index<identifiers.length-1)await wait(CJ_INTER_PRODUCT_DELAY_MS);
+    }
     return NextResponse.json({ok:true,previews});
   }catch(error){
     if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});
