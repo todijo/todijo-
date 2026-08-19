@@ -54,7 +54,8 @@ const ENGLISH_ALIASES:Record<string,readonly string[]>={
   "Sacs pour fille":["girl bag","girls bag","women bag"],
   "Porte-documents":["wallet","leather wallet","document bag"],
 };
-function aliasScore(source:Set<string>,label:string){const aliases=ENGLISH_ALIASES[label];if(!aliases)return{score:0,hits:[] as string[]};const matching=aliases.filter((alias)=>overlap(source,alias)>0);if(!matching.length)return{score:0,hits:[] as string[]};return{score:Math.max(...matching.map((alias)=>overlap(source,alias)),0),hits:matching};}
+function aliasSpecificity(alias:string){const size=tokens(alias).size;return Math.min(1,0.75+Math.min(size,2)*0.125);}
+function aliasScore(source:Set<string>,label:string){const aliases=ENGLISH_ALIASES[label];if(!aliases)return{score:0,hits:[] as string[]};const matching=aliases.filter((alias)=>overlap(source,alias)>0);if(!matching.length)return{score:0,hits:[] as string[]};return{score:Math.max(...matching.map((alias)=>overlap(source,alias)*aliasSpecificity(alias)),0),hits:matching};}
 
 function boostSignals(source:Set<string>){
   const boosted=new Set(source);
