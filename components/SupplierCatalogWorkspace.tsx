@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { CANONICAL_LEAF_CATEGORIES } from "@/lib/desktop-category-taxonomy";
+import { DESKTOP_CATEGORY_TAXONOMY, resolveCanonicalLeafSelection, subcategoryId } from "@/lib/desktop-category-taxonomy";
 import SellerCategorySelector from "./SellerCategorySelector";
 
 type SearchItem={supplierProductId:string;sku:string|null;title:string;imageUrl:string|null;categoryReference:string|null;cost:number|null;currency:string};
@@ -12,82 +12,52 @@ type JobSummary={id:string;status:string;requestedCount:number;processedCount:nu
 type JobItem={id:string;requestedIdentifier:string;canonicalSupplierId:string|null;status:string;canonicalCategoryId:string|null;classificationStatus:string|null;classificationConfidence:number|null;classificationEvidence:unknown;pricingStatus:string|null;stockStatus:string|null;complianceStatus:string|null;errorCode:string|null;productId:string|null;attemptCount:number};
 type JobDetail=JobSummary&{items:JobItem[];nextCursor:string|null};
 type PreviewItem={supplierProductId:string;title:string;errorCode:string|null;classificationStatus:string;classificationConfidence:number;suggestedCanonicalCategoryId:string|null;suggestedCanonicalCategoryLabel:string|null;requiresReview:boolean;canonicalCategoryId:string|null};
-type LeafOption={id:string;label:string};
+type CategoryLabels={main:string;group:string;leaf:string;chooseMain:string;chooseGroup:string;chooseLeaf:string};
 const mutationHeaders={"Content-Type":"application/json","X-Todijo-Admin-Action":"1"};
 const PREVIEW_DEBOUNCE_MS=650;
 const PRICING_REFERENCE_COUNTRY="FR";
+
+function PreviewCategoryOverride({identifier,initialValue,disabled,labels}:{identifier:string;initialValue:string;disabled:boolean;labels:CategoryLabels}){
+  const initial=resolveCanonicalLeafSelection(initialValue);
+  const [categoryId,setCategoryId]=useState(initial?.categoryId??"");
+  const [groupId,setGroupId]=useState(initial?.groupId??"");
+  const [leafId,setLeafId]=useState(initial?.id??"");
+  useEffect(()=>{const next=resolveCanonicalLeafSelection(initialValue);setCategoryId(next?.categoryId??"");setGroupId(next?.groupId??"");setLeafId(next?.id??"");},[initialValue]);
+  const category=DESKTOP_CATEGORY_TAXONOMY.find(item=>item.id===categoryId),group=category?.groups.find(item=>item.id===groupId);
+  return <div className="sellerCategorySelector supplierPreviewCategorySelector">
+    <div className="sellerCategoryLevel"><label>{labels.main}</label><select value={categoryId} disabled={disabled} onChange={event=>{setCategoryId(event.target.value);setGroupId("");setLeafId("")}}><option value="">{labels.chooseMain}</option>{DESKTOP_CATEGORY_TAXONOMY.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+    <div className="sellerCategoryLevel"><label>{labels.group}</label><select value={groupId} disabled={disabled||!category} onChange={event=>{setGroupId(event.target.value);setLeafId("")}}><option value="">{labels.chooseGroup}</option>{category?.groups.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+    <div className="sellerCategoryLevel"><label>{labels.leaf}</label><select name={`preview-category-${identifier}`} value={leafId} disabled={disabled||!group} onChange={event=>setLeafId(event.target.value)}><option value="">{labels.chooseLeaf}</option>{group?.items.map(label=>{const id=subcategoryId(categoryId,groupId,label);return <option key={id} value={id}>{label}</option>})}</select></div>
+  </div>;
+}
 
 export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobSummary[]}){
   const t=useTranslations("Supplier"),categoryText=useTranslations("SellerControl"),formRef=useRef<HTMLFormElement>(null);
   const [jobs,setJobs]=useState(initialJobs),[active,setActive]=useState<JobDetail|null>(null),[query,setQuery]=useState(""),[page,setPage]=useState(1),[hasMore,setHasMore]=useState(false),[results,setResults]=useState<SearchItem[]>([]),[selected,setSelected]=useState<Set<string>>(new Set()),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
   const [previews,setPreviews]=useState<Record<string,PreviewItem>>({}),[previewBusy,setPreviewBusy]=useState(false),previewRequest=useRef(0),previewAbort=useRef<AbortController|null>(null);
-  const leaves:LeafOption[]=CANONICAL_LEAF_CATEGORIES.map((leaf)=>({id:leaf.id,label:leaf.label}));
   const selectedResults=results.filter((item)=>selected.has(item.supplierProductId));
+  const overrideLabels:CategoryLabels={main:categoryText("mainCategory"),group:categoryText("categoryGroup"),leaf:categoryText("leafCategory"),chooseMain:categoryText("chooseMainCategory"),chooseGroup:categoryText("chooseCategoryGroup"),chooseLeaf:categoryText("chooseLeafCategory")};
 
-  useEffect(()=>{
-    const identifiers=Array.from(selected);
-    if(!identifiers.length){previewAbort.current?.abort();previewAbort.current=null;setPreviews({});setPreviewBusy(false);setMessage("");return;}
-    setPreviewBusy(true);
-    const timer=window.setTimeout(()=>{void updatePreviews(identifiers);},PREVIEW_DEBOUNCE_MS);
-    return()=>window.clearTimeout(timer);
-  },[selected]);
+  useEffect(()=>{const identifiers=Array.from(selected);if(!identifiers.length){previewAbort.current?.abort();previewAbort.current=null;setPreviews({});setPreviewBusy(false);setMessage("");return;}setPreviewBusy(true);const timer=window.setTimeout(()=>{void updatePreviews(identifiers);},PREVIEW_DEBOUNCE_MS);return()=>window.clearTimeout(timer);},[selected]);
 
   async function updatePreviews(identifiers:string[]){
-    if(!identifiers.length){setPreviews({});setMessage("");return;}
-    const requestId=++previewRequest.current;
-    previewAbort.current?.abort();
-    const controller=new AbortController();
-    previewAbort.current=controller;
-    setPreviewBusy(true);setMessage("");
-    try{
-      const response=await fetch("/api/admin/supplier-products/catalog-preview",{method:"POST",headers:mutationHeaders,body:JSON.stringify({identifiers}),signal:controller.signal}),data=await response.json() as {error?:string;previews?:PreviewItem[]};
-      if(requestId!==previewRequest.current)return;
-      if(!response.ok)throw new Error(data.error??"CJ_CLASSIFICATION_FAILED");
-      const next:Record<string,PreviewItem>={};for(const item of data.previews??[])next[item.supplierProductId]=item;setPreviews(next);
-    }catch(error){
-      if(error instanceof DOMException&&error.name==="AbortError")return;
-      if(requestId===previewRequest.current){setPreviews({});setMessage(error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED");}
-    }finally{
-      if(requestId===previewRequest.current){setPreviewBusy(false);if(previewAbort.current===controller)previewAbort.current=null;}
-    }
+    if(!identifiers.length){setPreviews({});setMessage("");return;}const requestId=++previewRequest.current;previewAbort.current?.abort();const controller=new AbortController();previewAbort.current=controller;setPreviewBusy(true);setMessage("");
+    try{const response=await fetch("/api/admin/supplier-products/catalog-preview",{method:"POST",headers:mutationHeaders,body:JSON.stringify({identifiers}),signal:controller.signal}),data=await response.json() as {error?:string;previews?:PreviewItem[]};if(requestId!==previewRequest.current)return;if(!response.ok)throw new Error(data.error??"CJ_CLASSIFICATION_FAILED");const next:Record<string,PreviewItem>={};for(const item of data.previews??[])next[item.supplierProductId]=item;setPreviews(next);}catch(error){if(error instanceof DOMException&&error.name==="AbortError")return;if(requestId===previewRequest.current){setPreviews({});setMessage(error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED");}}finally{if(requestId===previewRequest.current){setPreviewBusy(false);if(previewAbort.current===controller)previewAbort.current=null;}}
   }
 
-  async function search(nextPage=1){
-    setBusy(true);setMessage("");try{const response=await fetch(`/api/admin/supplier-products/catalog-search?q=${encodeURIComponent(query)}&page=${nextPage}&pageSize=20`,{cache:"no-store"}),data=await response.json() as {error?:string;items?:SearchItem[];hasMore?:boolean};if(!response.ok)throw new Error(data.error);setResults(current=>nextPage===1?(data.items??[]):[...current,...(data.items??[]).filter(item=>!current.some(existing=>existing.supplierProductId===item.supplierProductId))]);setPage(nextPage);setHasMore(Boolean(data.hasMore));}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_SEARCH_FAILED");}finally{setBusy(false);}}
+  async function search(nextPage=1){setBusy(true);setMessage("");try{const response=await fetch(`/api/admin/supplier-products/catalog-search?q=${encodeURIComponent(query)}&page=${nextPage}&pageSize=20`,{cache:"no-store"}),data=await response.json() as {error?:string;items?:SearchItem[];hasMore?:boolean};if(!response.ok)throw new Error(data.error);setResults(current=>nextPage===1?(data.items??[]):[...current,...(data.items??[]).filter(item=>!current.some(existing=>existing.supplierProductId===item.supplierProductId))]);setPage(nextPage);setHasMore(Boolean(data.hasMore));}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_SEARCH_FAILED");}finally{setBusy(false);}}
   function toggle(identifier:string){setSelected(current=>{const next=new Set(current);if(next.has(identifier))next.delete(identifier);else next.add(identifier);return next;});}
-
-  async function loadJob(jobId:string){
-    const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}?take=100`,{cache:"no-store"}),data=await response.json() as {error?:string;job?:JobDetail};
-    if(!response.ok||!data.job)throw new Error(data.error??"SUPPLIER_CATALOG_JOB_FAILED");setActive(data.job);setJobs(current=>[data.job!,...current.filter(job=>job.id!==jobId)]);return data.job;
-  }
-
+  async function loadJob(jobId:string){const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}?take=100`,{cache:"no-store"}),data=await response.json() as {error?:string;job?:JobDetail};if(!response.ok||!data.job)throw new Error(data.error??"SUPPLIER_CATALOG_JOB_FAILED");setActive(data.job);setJobs(current=>[data.job!,...current.filter(job=>job.id!==jobId)]);return data.job;}
   async function resume(jobId:string){setBusy(true);setMessage("");try{const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}/resume`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({})}),data=await response.json() as {error?:string};if(!response.ok)throw new Error(data.error);const job=await loadJob(jobId);setMessage(`${t("bulkComplete")}: ${job.processedCount}/${job.requestedCount}`);}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_JOB_FAILED");}finally{setBusy(false);}}
 
   async function create(event:FormEvent<HTMLFormElement>){
-    event.preventDefault();
-    const form=new FormData(event.currentTarget),pasted=String(form.get("identifiers")??"").split(/[\s,;]+/).filter(Boolean),identifiers=[...new Set([...selected,...pasted])];
-    if(!identifiers.length)return;
-    const canonicalCategoryByIdentifier:Record<string,string>|undefined=Object.fromEntries(
-      identifiers.map((identifier)=>{const override=form.get(`preview-category-${identifier}`);if(typeof override==="string"){const value=override.trim();if(value)return [identifier,value] as const;}return null;}).filter((entry):entry is [string,string]=>Boolean(entry)),
-    );
-    const payload={identifiers,destinationCountry:PRICING_REFERENCE_COUNTRY,canonicalCategoryId:form.get("category"),canonicalCategoryByIdentifier:Object.keys(canonicalCategoryByIdentifier).length?canonicalCategoryByIdentifier:undefined};
-    setBusy(true);setMessage("");
-    try{
-      const response=await fetch("/api/admin/supplier-products/bulk-import",{method:"POST",headers:mutationHeaders,body:JSON.stringify(payload)}),data=await response.json() as {error?:string;job?:JobSummary};
-      if(!response.ok||!data.job)throw new Error(data.error);
-      setJobs(current=>[data.job!,...current]);setSelected(new Set());setPreviews({});await resume(data.job.id);
-    }catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_BULK_IMPORT_FAILED");setBusy(false);}
+    event.preventDefault();const form=new FormData(event.currentTarget),pasted=String(form.get("identifiers")??"").split(/[\s,;]+/).filter(Boolean),identifiers=[...new Set([...selected,...pasted])];if(!identifiers.length)return;
+    const canonicalCategoryByIdentifier:Record<string,string>|undefined=Object.fromEntries(identifiers.map((identifier)=>{const override=form.get(`preview-category-${identifier}`);if(typeof override==="string"){const value=override.trim();if(value)return [identifier,value] as const;}return null;}).filter((entry):entry is [string,string]=>Boolean(entry)));
+    const payload={identifiers,destinationCountry:PRICING_REFERENCE_COUNTRY,canonicalCategoryId:form.get("category"),canonicalCategoryByIdentifier:Object.keys(canonicalCategoryByIdentifier).length?canonicalCategoryByIdentifier:undefined};setBusy(true);setMessage("");
+    try{const response=await fetch("/api/admin/supplier-products/bulk-import",{method:"POST",headers:mutationHeaders,body:JSON.stringify(payload)}),data=await response.json() as {error?:string;job?:JobSummary};if(!response.ok||!data.job)throw new Error(data.error);setJobs(current=>[data.job!,...current]);setSelected(new Set());setPreviews({});await resume(data.job.id);}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_BULK_IMPORT_FAILED");setBusy(false);}
   }
 
-  async function retry(){
-    if(!active)return;
-    const category=new FormData(formRef.current!).get("category");
-    setBusy(true);setMessage("");
-    try{const response=await fetch(`/api/admin/supplier-products/bulk-import/${active.id}/retry`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({canonicalCategoryId:category})}),data=await response.json() as {error?:string;updated?:number};
-      if(!response.ok)throw new Error(data.error);
-      setMessage(`${data.updated??0} ${t("pending")}`);await loadJob(active.id);
-    }catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_RETRY_FAILED");}finally{setBusy(false);}
-  }
+  async function retry(){if(!active)return;const category=new FormData(formRef.current!).get("category");setBusy(true);setMessage("");try{const response=await fetch(`/api/admin/supplier-products/bulk-import/${active.id}/retry`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({canonicalCategoryId:category})}),data=await response.json() as {error?:string;updated?:number};if(!response.ok)throw new Error(data.error);setMessage(`${data.updated??0} ${t("pending")}`);await loadJob(active.id);}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_RETRY_FAILED");}finally{setBusy(false);}}
   async function syncAll(){setBusy(true);setMessage("");try{const response=await fetch("/api/admin/supplier-products/sync-stale",{method:"POST",headers:mutationHeaders,body:JSON.stringify({limit:20,staleMinutes:1})}),data=await response.json() as {error?:string;synced?:number;failed?:number};if(!response.ok)throw new Error(data.error);setMessage(`${t("syncComplete")}: ${data.synced??0} ${t("synced")}, ${data.failed??0} ${t("bulkFailed")}`);}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_SYNC_FAILED");}finally{setBusy(false);}}
 
   return <section className="supplierCatalogWorkspace" aria-labelledby="supplier-catalog-title">
@@ -96,23 +66,13 @@ export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobS
     {results.length>0&&<div className="supplierCatalogResults">{results.map(item=><label key={item.supplierProductId} className="supplierCatalogResult"><input type="checkbox" checked={selected.has(item.supplierProductId)} onChange={()=>toggle(item.supplierProductId)}/>{item.imageUrl&&<Image unoptimized src={item.imageUrl} alt="" width={72} height={72}/>}<span><strong>{item.title}</strong><small>{item.supplierProductId}{item.sku?` · ${item.sku}`:""}</small></span></label>)}{hasMore&&<button type="button" className="sellerControlButton secondary" disabled={busy} onClick={()=>void search(page+1)}>{t("loadMore")}</button>}</div>}
     <form ref={formRef} className="supplierCatalogCreate" onSubmit={create}><p><strong>{t("selectedCount")}: {selected.size}</strong></p>
       <label>{t("bulkProductIds")}<textarea name="identifiers" rows={5} maxLength={50000} placeholder={t("bulkPlaceholder")}/></label>
-      <SellerCategorySelector required={false} labels={{main:categoryText("mainCategory"),group:categoryText("categoryGroup"),leaf:categoryText("leafCategory"),chooseMain:categoryText("chooseMainCategory"),chooseGroup:categoryText("chooseCategoryGroup"),chooseLeaf:categoryText("chooseLeafCategory"),legacyInvalid:categoryText("legacyCategoryInvalid")}}/>
+      <SellerCategorySelector required={false} labels={{...overrideLabels,legacyInvalid:categoryText("legacyCategoryInvalid")}}/>
       <div className="supplierCatalogItems" aria-live="polite">
         <header><h3>{t("classification")}</h3>{previewBusy&&<p>{t("pending")}</p>}</header>
         {selected.size===0&&<p>{t("reviewRequired")}</p>}
-        {selectedResults.map((item)=>{
-          const preview=previews[item.supplierProductId];
-          const pending=!preview;
-          const isReviewRequired=Boolean(preview&&(preview.requiresReview||preview.classificationStatus==="NEEDS_REVIEW"||preview.classificationStatus==="UNRESOLVED"||preview.classificationStatus==="QUARANTINED"||!preview.suggestedCanonicalCategoryId||!preview.suggestedCanonicalCategoryLabel));
-          const isLowConfidence=Boolean(preview&&(isReviewRequired||preview.classificationConfidence<0.62));
-          const classificationText=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("needsReview"):t("bulkStatusGood");
-          const categoryStatus=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("reviewRequired"):preview.suggestedCanonicalCategoryLabel??t("reviewRequired");
-          const reviewText=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("needsReview"):t("bulkStatusGood");
-          return <article key={item.supplierProductId}><div><strong>{item.supplierProductId}</strong><span>{item.title}</span></div><dl><div><dt>{t("classification")}</dt><dd>{classificationText} {!pending&&preview?.classificationConfidence!=null?`(${Math.round(preview.classificationConfidence*100)}%)`:""}</dd></div><div><dt>{t("categoryStatus")}</dt><dd>{categoryStatus}</dd></div><div><dt>{t("needsReview")}</dt><dd>{reviewText}</dd></div><div><dt>{t("override")}</dt><dd><select name={`preview-category-${item.supplierProductId}`} defaultValue={preview?.suggestedCanonicalCategoryId??""} disabled={pending}><option value="">{pending?t("pending"):t("reviewRequired")}</option>{leaves.map((leaf)=><option key={leaf.id} value={leaf.id}>{leaf.label}</option>)}</select></dd></div><div>{isLowConfidence&&preview&&!preview.errorCode&&<strong>{t("quarantine")}</strong>}</div></dl></article>;
-        })}
+        {selectedResults.map((item)=>{const preview=previews[item.supplierProductId],pending=!preview,isReviewRequired=Boolean(preview&&(preview.requiresReview||preview.classificationStatus==="NEEDS_REVIEW"||preview.classificationStatus==="UNRESOLVED"||preview.classificationStatus==="QUARANTINED"||!preview.suggestedCanonicalCategoryId||!preview.suggestedCanonicalCategoryLabel)),isLowConfidence=Boolean(preview&&(isReviewRequired||preview.classificationConfidence<0.62)),classificationText=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("needsReview"):t("bulkStatusGood"),categoryStatus=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("reviewRequired"):preview.suggestedCanonicalCategoryLabel??t("reviewRequired"),reviewText=pending?t("pending"):preview.errorCode?preview.errorCode:isReviewRequired?t("needsReview"):t("bulkStatusGood");return <article key={item.supplierProductId}><div><strong>{item.supplierProductId}</strong><span>{item.title}</span></div><dl><div><dt>{t("classification")}</dt><dd>{classificationText} {!pending&&preview?.classificationConfidence!=null?`(${Math.round(preview.classificationConfidence*100)}%)`:""}</dd></div><div><dt>{t("categoryStatus")}</dt><dd>{categoryStatus}</dd></div><div><dt>{t("needsReview")}</dt><dd>{reviewText}</dd></div><div className="supplierCatalogOverride"><dt>{t("override")}</dt><dd><PreviewCategoryOverride identifier={item.supplierProductId} initialValue={preview?.suggestedCanonicalCategoryId??""} disabled={pending} labels={overrideLabels}/></dd></div><div>{isLowConfidence&&preview&&!preview.errorCode&&<strong>{t("quarantine")}</strong>}</div></dl></article>;})}
       </div>
-      <button className="sellerControlButton primary" disabled={busy||previewBusy}>{t("bulkImportAction")}</button>
-      <p className="supplierBulkSafety">{t("bulkSafety")}</p>
+      <button className="sellerControlButton primary" disabled={busy||previewBusy}>{t("bulkImportAction")}</button><p className="supplierBulkSafety">{t("bulkSafety")}</p>
     </form>
     {message&&<p className="supplierBulkSafety" role="status">{message}</p>}
     {jobs.length>0&&<div className="supplierCatalogJobs">{jobs.map(job=><article key={job.id}><div><strong>{t("jobStatus")}: {job.status}</strong><small>{job.processedCount}/{job.requestedCount} · {job.importedCount} {t("bulkImported")} · {job.skippedCount} {t("bulkSkipped")} · {job.quarantinedCount} {t("quarantined")} · {job.failedCount} {t("bulkFailed")}</small></div><div><button type="button" className="sellerControlButton secondary" disabled={busy} onClick={()=>void loadJob(job.id)}>{t("reviewRequired")}</button>{job.processedCount<job.requestedCount&&<button type="button" className="sellerControlButton primary" disabled={busy} onClick={()=>void resume(job.id)}>{t("resume")}</button>}</div></article>)}</div>}
