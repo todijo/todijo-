@@ -10,14 +10,16 @@ function overlap(source:Set<string>,label:string){const target=tokens(label);if(
 function metadataText(snapshot:SupplierProductSnapshot){return [snapshot.categoryReference,snapshot.rawMetadata.categoryId,snapshot.rawMetadata.productType].filter((v):v is string=>typeof v==="string").join(" ");}
 function leafResult(categoryId:string,groupId:string,label:string,confidence:number,evidence:string[]):CjClassification{const category=DESKTOP_CATEGORY_TAXONOMY.find(c=>c.id===categoryId),group=category?.groups.find(g=>g.id===groupId);if(!category||!group||!group.items.includes(label))return{canonicalCategoryId:null,categoryId:null,categoryLabel:null,subcategoryLabel:null,confidence:0,status:"UNRESOLVED",evidence:["EXPLICIT_RULE_TARGET_MISSING"]};return{canonicalCategoryId:subcategoryId(categoryId,groupId,label),categoryId,categoryLabel:category.label,subcategoryLabel:label,confidence,status:"SUGGESTED",evidence};}
 function explicitClassification(snapshot:SupplierProductSnapshot):CjClassification|null{
- const title=normalized(snapshot.title),description=normalized(snapshot.description.slice(0,1200)),combined=`${title} ${description}`,has=(pattern:RegExp)=>pattern.test(title),hasCombined=(pattern:RegExp)=>pattern.test(combined);
+ const title=normalized(snapshot.title),description=normalized(snapshot.description.slice(0,1200)),combined=`${title} ${description}`,has=(pattern:RegExp)=>pattern.test(title),hasCombined=(pattern:RegExp)=>pattern.test(combined),words=tokens(combined);
  if(has(/\b(t shirt|tshirt|tee shirt|graphic tee)\b/)){
    const women=has(/\b(women|womens|woman|female|girl|girls)\b/),men=has(/\b(men|mens|man|male|boy|boys)\b/);
    if(women&&!men)return leafResult("women","tops","Ladies Short Sleeve",0.96,["EXPLICIT_PRODUCT_TYPE:T_SHIRT","AUDIENCE:WOMEN"]);
    if(men&&!women)return leafResult("men","tshirts",has(/\b(print|printed|graphic|dragon|cartoon|pattern)\b/)?"Impression":"Solide",0.96,["EXPLICIT_PRODUCT_TYPE:T_SHIRT","AUDIENCE:MEN"]);
    return null;
  }
- if(hasCombined(/\b(digital watch|digital wristwatch|digital electronic watch|smart watch|smartwatch)\b/))return leafResult("jewelry","men-watches","Montres numériques",0.98,["EXPLICIT_PRODUCT_TYPE:DIGITAL_WATCH","ALIAS:digital watch"]);
+ // CJ titles frequently reorder modifiers (e.g. "Digital waterproof electronic watch").
+ // Explicit co-occurrence of digital + watch is authoritative enough to outrank generic Electronics metadata.
+ if((words.has("digital")&&(words.has("watch")||words.has("wristwatch")))||hasCombined(/\b(smart watch|smartwatch)\b/))return leafResult("jewelry","men-watches","Montres numériques",0.98,["EXPLICIT_PRODUCT_TYPE:DIGITAL_WATCH","ALIAS:digital watch"]);
  if(hasCombined(/\b(quartz watch)\b/))return leafResult("jewelry","men-watches","Montres à quartz",0.98,["EXPLICIT_PRODUCT_TYPE:QUARTZ_WATCH","ALIAS:quartz watch"]);
  if(hasCombined(/\b(mechanical watch)\b/))return leafResult("jewelry","men-watches","Montres mécaniques",0.98,["EXPLICIT_PRODUCT_TYPE:MECHANICAL_WATCH","ALIAS:mechanical watch"]);
  if(hasCombined(/\b(sports watch|sport watch)\b/)&&hasCombined(/\b(men|mens|man|male)\b/))return leafResult("jewelry","men-watches","Montres de sport pour homme",0.96,["EXPLICIT_PRODUCT_TYPE:SPORTS_WATCH","AUDIENCE:MEN","ALIAS:sports watch"]);
