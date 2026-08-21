@@ -1,6 +1,7 @@
-import { subcategoryId } from "../desktop-category-taxonomy";
+import { canonicalLeafCategory, subcategoryId } from "../desktop-category-taxonomy";
 import { cjAuth } from "./cj-auth";
 import { classifyCjProduct, type CjClassification } from "./cj-classification";
+import { resolveCjLivePathAlias } from "./cj-live-path-aliases";
 import { scheduleCjRequest } from "./cj-rate-limiter";
 import type { SupplierProductSnapshot } from "./types";
 
@@ -102,7 +103,16 @@ function mapped(categoryId:string,groupId:string,label:string,path:CjCategoryPat
   return{canonicalCategoryId:subcategoryId(categoryId,groupId,label),categoryId,categoryLabel:null,subcategoryLabel:label,confidence:.99,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};
 }
 
+function mappedCanonical(canonicalCategoryId:string,path:CjCategoryPath,reason:string):CjClassification|null{
+  const leaf=canonicalLeafCategory(canonicalCategoryId);if(!leaf)return null;
+  return{canonicalCategoryId:leaf.id,categoryId:leaf.categoryId,categoryLabel:leaf.categoryLabel,subcategoryLabel:leaf.label,confidence:.995,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};
+}
+
 export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|null{
+  const exactPath=[path.first,path.second,path.third].filter(Boolean).join(" > ");
+  const liveAlias=resolveCjLivePathAlias(exactPath);
+  if(liveAlias){const result=mappedCanonical(liveAlias,path,"REVIEWED_LIVE_PATH_ALIAS");if(result)return result;}
+
   const first=normalized(path.first),second=normalized(path.second),third=normalized(path.third),all=`${first} ${second} ${third}`;
 
   if(/\b(sports? watch|sports? watches)\b/.test(all)&&/\b(men|mens|male|man)\b/.test(all))return mapped("jewelry","men-watches","Montres de sport pour homme",path,"MEN_SPORTS_WATCH");
