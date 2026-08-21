@@ -1,4 +1,4 @@
-import { canonicalLeafCategory, isCanonicalLeafCategoryId } from "../desktop-category-taxonomy";
+import { marketplaceCanonicalLeafCategory, isMarketplaceCanonicalLeafCategoryId } from "../marketplace-category-taxonomy";
 import { mapCjCategoryPathToTodijo, type CjCategoryPath } from "./cj-category-taxonomy";
 import type { CjTaxonomyMirrorNode } from "./cj-taxonomy-sync";
 
@@ -18,8 +18,6 @@ export type CjTaxonomyCoverageRow={
 
 function id(value:unknown){return typeof value==="string"||typeof value==="number"?String(value).trim().toUpperCase():"";}
 
-// Deliberately empty until an ID has been observed from CJ's authoritative tree and reviewed.
-// Once reviewed, a rule belongs here by stable CJ category ID — never by product title.
 export const CURATED_CJ_CATEGORY_ID_MAPPINGS:readonly CjCategoryIdMapping[]=[];
 
 export function validateCjCategoryIdMappings(rows:readonly CjCategoryIdMapping[]){
@@ -28,7 +26,7 @@ export function validateCjCategoryIdMappings(rows:readonly CjCategoryIdMapping[]
     const key=id(row.cjCategoryId);
     if(!key)throw new Error("CJ_CATEGORY_MAPPING_ID_REQUIRED");
     if(seen.has(key))throw new Error("CJ_CATEGORY_MAPPING_DUPLICATE_ID");
-    if(!isCanonicalLeafCategoryId(row.canonicalCategoryId))throw new Error("CJ_CATEGORY_MAPPING_TARGET_INVALID");
+    if(!isMarketplaceCanonicalLeafCategoryId(row.canonicalCategoryId))throw new Error("CJ_CATEGORY_MAPPING_TARGET_INVALID");
     seen.add(key);
   }
   return true;
@@ -41,7 +39,7 @@ export function deriveExactPathMappings(paths:readonly CjCategoryPath[]):CjCateg
     if(!path.third)continue;
     const key=id(path.categoryId);if(!key||seen.has(key))continue;
     const mapped=mapCjCategoryPathToTodijo(path);
-    if(!mapped?.canonicalCategoryId||!isCanonicalLeafCategoryId(mapped.canonicalCategoryId))continue;
+    if(!mapped?.canonicalCategoryId||!isMarketplaceCanonicalLeafCategoryId(mapped.canonicalCategoryId))continue;
     rows.push({cjCategoryId:path.categoryId,canonicalCategoryId:mapped.canonicalCategoryId,source:"DERIVED_EXACT_PATH"});
     seen.add(key);
   }
@@ -60,7 +58,7 @@ export function resolveCjCategoryIdMapping(categoryId:unknown,mappings:readonly 
   const key=id(categoryId);if(!key)return null;
   const row=mappings.find(item=>id(item.cjCategoryId)===key)??null;
   if(!row)return null;
-  const leaf=canonicalLeafCategory(row.canonicalCategoryId);
+  const leaf=marketplaceCanonicalLeafCategory(row.canonicalCategoryId);
   if(!leaf)return null;
   return{...row,canonicalLabel:leaf.label};
 }
@@ -74,12 +72,5 @@ export function buildCjTaxonomyCoverageReport(nodes:readonly CjTaxonomyMirrorNod
   });
   const mapped=rows.filter(row=>row.canonicalCategoryId!==null).length;
   const unmapped=rows.length-mapped;
-  return{
-    totalThirdLevel:rows.length,
-    mapped,
-    unmapped,
-    coverage:rows.length?mapped/rows.length:1,
-    rows,
-    unmappedRows:rows.filter(row=>row.canonicalCategoryId===null),
-  };
+  return{totalThirdLevel:rows.length,mapped,unmapped,coverage:rows.length?mapped/rows.length:1,rows,unmappedRows:rows.filter(row=>row.canonicalCategoryId===null)};
 }
