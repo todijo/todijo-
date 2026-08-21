@@ -8,7 +8,8 @@ const CJ_BASE_URL="https://developers.cjdropshipping.com/api2.0/v1";
 const CATEGORY_CACHE_TTL_MS=6*60*60*1000;
 
 export type CjCategoryPath={categoryId:string;first:string;second:string;third:string};
-type CategoryCache={expiresAt:number;byId:Map<string,CjCategoryPath>};
+export type CjCategoryTaxonomySnapshot={fetchedAt:number;expiresAt:number;paths:CjCategoryPath[]};
+type CategoryCache={fetchedAt:number;expiresAt:number;byId:Map<string,CjCategoryPath>};
 const globalCache=globalThis as typeof globalThis&{__todijoCjCategoryTaxonomy?:CategoryCache;__todijoCjCategoryTaxonomyPending?:Promise<CategoryCache>};
 
 function text(value:unknown){return typeof value==="string"||typeof value==="number"?String(value).trim():"";}
@@ -54,7 +55,8 @@ async function fetchCategoryTree():Promise<CategoryCache>{
     if(!response.ok||payload.result===false||payload.success===false)throw new Error("CJ_CATEGORY_TAXONOMY_UNAVAILABLE");
     const byId=parseCjCategoryTree(payload.data);
     if(!byId.size)throw new Error("CJ_CATEGORY_TAXONOMY_UNAVAILABLE");
-    return{expiresAt:Date.now()+CATEGORY_CACHE_TTL_MS,byId};
+    const fetchedAt=Date.now();
+    return{fetchedAt,expiresAt:fetchedAt+CATEGORY_CACHE_TTL_MS,byId};
   }
   throw new Error("CJ_AUTHENTICATION_FAILED");
 }
@@ -66,6 +68,11 @@ async function categoryCache(){
   const pending=fetchCategoryTree().then(cache=>{globalCache.__todijoCjCategoryTaxonomy=cache;return cache;}).finally(()=>{delete globalCache.__todijoCjCategoryTaxonomyPending;});
   globalCache.__todijoCjCategoryTaxonomyPending=pending;
   return pending;
+}
+
+export async function getCjCategoryTaxonomySnapshot():Promise<CjCategoryTaxonomySnapshot>{
+  const cache=await categoryCache();
+  return{fetchedAt:cache.fetchedAt,expiresAt:cache.expiresAt,paths:[...cache.byId.values()].sort((a,b)=>a.categoryId.localeCompare(b.categoryId))};
 }
 
 export async function resolveCjCategoryPath(categoryId:unknown):Promise<CjCategoryPath|null>{
