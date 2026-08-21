@@ -1,4 +1,4 @@
-import type { SupplierCatalogProvider, SupplierCatalogSearchPage, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot } from "./types";
+import type { SupplierCatalogProvider, SupplierCatalogSearchPage, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot, SupplierCategoryHierarchy } from "./types";
 import { mapCjSemanticVariants } from "./cj-variant-mapping";
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
@@ -24,6 +24,22 @@ function object(value: unknown): Record<string, unknown> { return value && typeo
 function normalizedIdentifier(value: unknown) { return text(value).toUpperCase(); }
 function reviewText(value:unknown){return text(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,"").slice(0,2000);}
 
+function firstText(row:Record<string,unknown>,keys:string[]){for(const key of keys){const value=text(row[key]);if(value)return value;}return "";}
+
+export function normalizeCjCategoryHierarchy(productValue:unknown):SupplierCategoryHierarchy{
+  const product=object(productValue);
+  const rawCategoryName=firstText(product,["categoryName","categoryPath","categoryFullName"]);
+  const parts=rawCategoryName.split(/\s*(?:>|\/)\s*/).map(part=>part.trim()).filter(Boolean);
+  const categoryId=firstText(product,["categoryId","categoryThirdId","thirdCategoryId"])||null;
+  const firstCategoryId=firstText(product,["categoryFirstId","firstCategoryId"])||null;
+  const firstCategoryName=firstText(product,["categoryFirstName","firstCategoryName"])||(parts.length>=3?parts[0]:null);
+  const secondCategoryId=firstText(product,["categorySecondId","secondCategoryId"])||null;
+  const secondCategoryName=firstText(product,["categorySecondName","secondCategoryName"])||(parts.length>=3?parts[parts.length-2]:null);
+  const thirdCategoryId=firstText(product,["categoryThirdId","thirdCategoryId","categoryId"])||null;
+  const thirdCategoryName=firstText(product,["categoryThirdName","thirdCategoryName"])||(parts.length>=2?parts[parts.length-1]:rawCategoryName)||null;
+  return{categoryId,categoryName:rawCategoryName||thirdCategoryName,firstCategoryId,firstCategoryName,secondCategoryId,secondCategoryName,thirdCategoryId,thirdCategoryName};
+}
+
 export function normalizeCjProductImages(productValue: unknown) {
   const product = object(productValue);
   const ordered = [product.bigImage, ...list(product.productImageSet)];
@@ -39,6 +55,7 @@ export function normalizeCjProductImages(productValue: unknown) {
 
 export function normalizeCjProduct(productValue: unknown, variantValue: unknown, inventoryValue: unknown): SupplierProductSnapshot {
   const product = object(productValue);
+  const categoryHierarchy=normalizeCjCategoryHierarchy(product);
   const variantsRaw = list(object(variantValue).list ?? variantValue);
   const inventoryRoot = object(inventoryValue);
   const variantInventories = list(object(inventoryRoot.data ?? inventoryRoot).variantInventories);
@@ -61,17 +78,19 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
   const productCost = number(product.sellPrice ?? product.productPrice);
   const variantCosts = variants.map((variant) => variant.cost).filter((cost): cost is number => cost != null);
   const summaryCost = productCost ?? (variantCosts.length ? Math.min(...variantCosts) : null);
+  const categoryReference=categoryHierarchy.thirdCategoryId??categoryHierarchy.categoryId;
   return {
     provider:"CJ", supplierProductId:productId, sku:text(product.productSku) || null,
     title:text(product.productNameEn ?? product.productName) || "Imported CJ product",
     description:text(product.description) || "Supplier product pending seller review.",
-    categoryReference:text(product.categoryId) || null,
+    categoryReference,
+    categoryHierarchy,
     sourceUrl:productId ? `https://cjdropshipping.com/product-${encodeURIComponent(productId)}.html` : null,
     cost:summaryCost, currency:"USD", stock,
     available:text(product.saleStatus) !== "0" && (variants.length ? variants.some((variant) => variant.available) : stock > 0),
     weightGrams:number(product.productWeight), variants,
     media:[...imageUrls.map((url) => ({type:"IMAGE" as const,url})), ...(videoUrl ? [{type:"VIDEO" as const,url:videoUrl}] : [])],
-    rawMetadata:{categoryId:product.categoryId??null,productType:product.productType??null,deliveryCycle:product.deliveryCycle??null,cjOptionNormalization:{version:1,status:semantic?"SEMANTIC":"AMBIGUOUS",reason:semantic?null:"AUTHORITATIVE_DIMENSIONS_OR_VARIANT_KEYS_INSUFFICIENT",source:semantic?.source??null,dimensions:semantic?.dimensions??null,productKeyEn:typeof product.productKeyEn==="string"?product.productKeyEn.slice(0,500):null,productKeySet:list(product.productKeySet).slice(0,20).map((value)=>{if(typeof value==="string")return value.slice(0,100);const row=object(value);return{keyEn:text(row.keyEn).slice(0,100)||null,nameEn:text(row.nameEn).slice(0,100)||null,key:text(row.key).slice(0,100)||null,name:text(row.name).slice(0,100)||null};}),variants:parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,variantKey:variant.variantKey,variantName:variant.variantName,optionValues:semantic?.variants.find((item)=>item.supplierVariantId===variant.supplierVariantId)?.optionValues??null,imageUrl:variant.imageUrl})).slice(0,200)}},
+    rawMetadata:{...categoryHierarchy,productType:product.productType??null,deliveryCycle:product.deliveryCycle??null,cjOptionNormalization:{version:1,status:semantic?"SEMANTIC":"AMBIGUOUS",reason:semantic?null:"AUTHORITATIVE_DIMENSIONS_OR_VARIANT_KEYS_INSUFFICIENT",source:semantic?.source??null,dimensions:semantic?.dimensions??null,productKeyEn:typeof product.productKeyEn==="string"?product.productKeyEn.slice(0,500):null,productKeySet:list(product.productKeySet).slice(0,20).map((value)=>{if(typeof value==="string")return value.slice(0,100);const row=object(value);return{keyEn:text(row.keyEn).slice(0,100)||null,nameEn:text(row.nameEn).slice(0,100)||null,key:text(row.key).slice(0,100)||null,name:text(row.name).slice(0,100)||null};}),variants:parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,variantKey:variant.variantKey,variantName:variant.variantName,optionValues:semantic?.variants.find((item)=>item.supplierVariantId===variant.supplierVariantId)?.optionValues??null,imageUrl:variant.imageUrl})).slice(0,200)}},
   };
 }
 

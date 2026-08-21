@@ -15,15 +15,24 @@ function text(value:unknown){return typeof value==="string"||typeof value==="num
 function object(value:unknown):Record<string,unknown>{return value&&typeof value==="object"?value as Record<string,unknown>:{};}
 function list(value:unknown){return Array.isArray(value)?value:[];}
 function normalized(value:string){return value.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();}
+function firstText(row:Record<string,unknown>,keys:string[]){for(const key of keys){const value=text(row[key]);if(value)return value;}return "";}
 
-function parseCategoryTree(value:unknown){
+export function parseCjCategoryTree(value:unknown){
   const byId=new Map<string,CjCategoryPath>();
   for(const firstRaw of list(value)){
-    const firstRow=object(firstRaw),first=text(firstRow.categoryFirstName);
-    for(const secondRaw of list(firstRow.categoryFirstList)){
-      const secondRow=object(secondRaw),second=text(secondRow.categorySecondName);
-      for(const thirdRaw of list(secondRow.categorySecondList)){
-        const thirdRow=object(thirdRaw),categoryId=text(thirdRow.categoryId),third=text(thirdRow.categoryName);
+    const firstRow=object(firstRaw);
+    const first=firstText(firstRow,["categoryFirstName","firstCategoryName","categoryName"]);
+    const firstId=firstText(firstRow,["categoryFirstId","firstCategoryId","categoryId"]);
+    if(firstId&&first)byId.set(firstId.toUpperCase(),{categoryId:firstId,first,second:"",third:""});
+    for(const secondRaw of list(firstRow.categoryFirstList??firstRow.children)){
+      const secondRow=object(secondRaw);
+      const second=firstText(secondRow,["categorySecondName","secondCategoryName","categoryName"]);
+      const secondId=firstText(secondRow,["categorySecondId","secondCategoryId","categoryId"]);
+      if(secondId&&second)byId.set(secondId.toUpperCase(),{categoryId:secondId,first,second,third:""});
+      for(const thirdRaw of list(secondRow.categorySecondList??secondRow.children)){
+        const thirdRow=object(thirdRaw);
+        const categoryId=firstText(thirdRow,["categoryId","categoryThirdId","thirdCategoryId"]);
+        const third=firstText(thirdRow,["categoryName","categoryThirdName","thirdCategoryName"]);
         if(categoryId&&third)byId.set(categoryId.toUpperCase(),{categoryId,first,second,third});
       }
     }
@@ -43,7 +52,7 @@ async function fetchCategoryTree():Promise<CategoryCache>{
     if(authFailed&&authAttempt===0){cjAuth.invalidateAccessToken();continue;}
     if(authFailed)throw new Error("CJ_AUTHENTICATION_FAILED");
     if(!response.ok||payload.result===false||payload.success===false)throw new Error("CJ_CATEGORY_TAXONOMY_UNAVAILABLE");
-    const byId=parseCategoryTree(payload.data);
+    const byId=parseCjCategoryTree(payload.data);
     if(!byId.size)throw new Error("CJ_CATEGORY_TAXONOMY_UNAVAILABLE");
     return{expiresAt:Date.now()+CATEGORY_CACHE_TTL_MS,byId};
   }
@@ -124,9 +133,10 @@ export async function classifyCjProductAuthoritatively(snapshot:SupplierProductS
   const path=embedded??await resolveCjCategoryPath(snapshot.categoryReference??snapshot.rawMetadata.categoryId);
   if(path){
     const direct=mapCjCategoryPathToTodijo(path);if(direct)return direct;
-    const enriched:SupplierProductSnapshot={...snapshot,categoryReference:`${path.first} > ${path.second} > ${path.third}`,rawMetadata:{...snapshot.rawMetadata,cjCategoryPath:path}};
+    const pathText=[path.first,path.second,path.third].filter(Boolean).join(" > ");
+    const enriched:SupplierProductSnapshot={...snapshot,categoryReference:pathText||snapshot.categoryReference,rawMetadata:{...snapshot.rawMetadata,cjCategoryPath:path}};
     const fallback=classifyCjProduct(enriched);
-    return{...fallback,evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,...fallback.evidence]};
+    return{...fallback,evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${pathText}`,...fallback.evidence]};
   }
   const fallback=classifyCjProduct(snapshot);
   return{...fallback,evidence:["CJ_CATEGORY_PATH_UNAVAILABLE",...fallback.evidence]};
