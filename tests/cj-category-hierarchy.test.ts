@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeCjCategoryHierarchy, normalizeCjProduct } from "../lib/suppliers/cj-client";
-import { classifyCjProductAuthoritatively } from "../lib/suppliers/cj-category-taxonomy";
+import { classifyCjProductAuthoritatively, parseCjCategoryTree } from "../lib/suppliers/cj-category-taxonomy";
 
 test("CJ product normalization preserves explicit supplier hierarchy fields",()=>{
   const hierarchy=normalizeCjCategoryHierarchy({
@@ -54,4 +54,19 @@ test("authoritative embedded CJ tote hierarchy resolves before text fallback",as
   assert.equal(result.subcategoryLabel,"Sac à main");
   assert.equal(result.confidence,.99);
   assert.ok(result.evidence.includes("CJ_TAXONOMY_MAPPING:WOMEN_HANDBAG_OR_TOTE"));
+});
+
+test("CJ category tree indexes first, second, and third level ids",()=>{
+  const byId=parseCjCategoryTree([{
+    categoryFirstId:"first-bags",
+    categoryFirstName:"Bags & Shoes",
+    categoryFirstList:[{
+      categorySecondId:"second-women-bags",
+      categorySecondName:"Women Bags",
+      categorySecondList:[{categoryId:"third-tote",categoryName:"Tote Bags"}],
+    }],
+  }]);
+  assert.deepEqual(byId.get("FIRST-BAGS"),{categoryId:"first-bags",first:"Bags & Shoes",second:"",third:""});
+  assert.deepEqual(byId.get("SECOND-WOMEN-BAGS"),{categoryId:"second-women-bags",first:"Bags & Shoes",second:"Women Bags",third:""});
+  assert.deepEqual(byId.get("THIRD-TOTE"),{categoryId:"third-tote",first:"Bags & Shoes",second:"Women Bags",third:"Tote Bags"});
 });
