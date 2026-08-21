@@ -64,12 +64,22 @@ export async function resolveCjCategoryPath(categoryId:unknown):Promise<CjCatego
   try{return (await categoryCache()).byId.get(id.toUpperCase())??null;}catch{return null;}
 }
 
+function pathFromCategoryName(categoryId:unknown,categoryName:unknown):CjCategoryPath|null{
+  const id=text(categoryId),name=text(categoryName);
+  if(!id||!name)return null;
+  const parts=name.split(/\s*(?:>|\/)\s*/).map(part=>part.trim()).filter(Boolean);
+  if(parts.length<2)return null;
+  return{categoryId:id,first:parts[0]??"",second:parts.length>2?parts[parts.length-2]??"":"",third:parts[parts.length-1]??""};
+}
+
 function embeddedCategoryPath(snapshot:SupplierProductSnapshot):CjCategoryPath|null{
   const hierarchy=snapshot.categoryHierarchy;
-  if(!hierarchy)return null;
-  const categoryId=text(hierarchy.thirdCategoryId??hierarchy.categoryId??snapshot.categoryReference);
-  const first=text(hierarchy.firstCategoryName),second=text(hierarchy.secondCategoryName),third=text(hierarchy.thirdCategoryName??hierarchy.categoryName);
-  return categoryId&&third?{categoryId,first,second,third}:null;
+  if(hierarchy){
+    const categoryId=text(hierarchy.thirdCategoryId??hierarchy.categoryId??snapshot.categoryReference);
+    const first=text(hierarchy.firstCategoryName),second=text(hierarchy.secondCategoryName),third=text(hierarchy.thirdCategoryName??hierarchy.categoryName);
+    if(categoryId&&third)return{categoryId,first,second,third};
+  }
+  return pathFromCategoryName(snapshot.categoryReference??snapshot.rawMetadata.categoryId,snapshot.rawMetadata.categoryName);
 }
 
 function mapped(categoryId:string,groupId:string,label:string,path:CjCategoryPath,reason:string):CjClassification{
@@ -90,14 +100,15 @@ export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|
   if(/\b(men|mens|male|man)\b/.test(all)&&/\b(sandal|sandals)\b/.test(all))return mapped("bags-shoes","men-shoes","Sandales Pour Homme",path,"MEN_SANDALS");
   if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(boot|boots)\b/.test(all))return mapped("bags-shoes","women-shoes","Bottes pour femme",path,"WOMEN_BOOTS");
   if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(sandal|sandals)\b/.test(all))return mapped("bags-shoes","women-shoes","Sandales pour femme",path,"WOMEN_SANDALS");
-  if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(handbag|handbags|hand bag|purse)\b/.test(all))return mapped("bags-shoes","women-bags","Sac à main",path,"WOMEN_HANDBAG");
+  if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(handbag|handbags|hand bag|purse|tote bag|tote bags|totes)\b/.test(all))return mapped("bags-shoes","women-bags","Sac à main",path,"WOMEN_HANDBAG_OR_TOTE");
   if(/\b(men|mens|male|man)\b/.test(all)&&/\b(backpack|backpacks|rucksack)\b/.test(all))return mapped("bags-shoes","men-bags","Sacs à dos pour hommes",path,"MEN_BACKPACK");
 
   if(/\b(baby|infant|newborn)\b/.test(all)&&/\b(romper|rompers|onesie|onesies|overall|overalls)\b/.test(all))return mapped("kids","baby","Barboteuses de bébé",path,"BABY_ROMPER");
   if(/\b(baby|infant|newborn)\b/.test(all)&&/\b(clothing set|clothing sets|clothes set|outfit set|outfit sets)\b/.test(all))return mapped("kids","baby","Ensembles de vêtements pour bébé",path,"BABY_CLOTHING_SET");
 
-  if(/\b(car|automobile|vehicle|automotive)\b/.test(all)&&/\b(sticker|stickers|decal|decals|exterior decoration|exterior accessories?)\b/.test(all))return mapped("auto","parts","Pièces extérieures",path,"AUTO_EXTERIOR_DECORATION");
-  if(/\b(car|automobile|vehicle|automotive)\b/.test(all)&&/\b(car light|car lights|lighting|headlight|headlights|taillight|taillights)\b/.test(all))return mapped("auto","parts","Lumières de voiture",path,"AUTO_LIGHTING");
+  const automotiveFamily=/\b(car|cars|automobile|automobiles|vehicle|vehicles|automotive|motorcycle|motorcycles)\b/.test(first)||/\b(car|cars|automobile|automobiles|vehicle|vehicles|automotive)\b/.test(`${second} ${third}`);
+  if(automotiveFamily&&/\b(sticker|stickers|decal|decals|decoration|decorations|exterior decoration|exterior accessories?)\b/.test(`${second} ${third}`))return mapped("auto","parts","Pièces extérieures",path,"AUTO_EXTERIOR_DECORATION");
+  if(automotiveFamily&&/\b(car light|car lights|lighting|headlight|headlights|taillight|taillights)\b/.test(all))return mapped("auto","parts","Lumières de voiture",path,"AUTO_LIGHTING");
   if(/\b(dash camera|dash cam|dvr)\b/.test(all))return mapped("auto","electronics","DVR & Dash Camera",path,"AUTO_DASH_CAMERA");
   if(/\b(vehicle camera|car camera|reversing camera|backup camera)\b/.test(all))return mapped("auto","electronics","Caméra de véhicule",path,"AUTO_CAMERA");
   if(/\b(car gps|vehicle gps|navigation)\b/.test(all))return mapped("auto","electronics","GPS de véhicule",path,"AUTO_GPS");
