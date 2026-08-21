@@ -7,7 +7,7 @@ import { calculateSupplierVariantPriceWithFreight, convertSupplierPriceForBuyer 
 import { defaultSupplierMediaProvider, importSupplierProduct } from "./supplier-products";
 import { catalogComplianceDecision, publicCatalogError, resolveCatalogCategory } from "./supplier-catalog-policy";
 import type { SupplierCatalogProvider, SupplierProductSnapshot } from "./types";
-import { classifyCjProductAuthoritatively } from "./cj-category-taxonomy";
+import { classifyCjProductByTaxonomyId } from "./cj-taxonomy-classifier";
 
 export const MAX_CATALOG_JOB_ITEMS=500;
 export const DEFAULT_CATALOG_PROCESS_LIMIT=3;
@@ -80,8 +80,8 @@ export async function processCatalogImportJob(db:PrismaClient,provider:SupplierC
     const candidate=await db.supplierCatalogImportItem.findFirst({where:{jobId,status:"PENDING"},orderBy:{position:"asc"},select:{id:true,requestedIdentifier:true,canonicalCategoryId:true}});if(!candidate)break;
     const claim=await db.supplierCatalogImportItem.updateMany({where:{id:candidate.id,status:"PENDING"},data:{status:"IMPORTING",claimedAt:new Date(),attemptCount:{increment:1},errorCode:null,errorMessage:null}});if(claim.count!==1){processed-=1;continue;}
     try{
-      const snapshot=await provider.getProduct(candidate.requestedIdentifier),classification=await classifyCjProductAuthoritatively(snapshot),automaticCategory=classification.status==="SUGGESTED"?classification.canonicalCategoryId:null,category=resolveCatalogCategory(snapshot,candidate.canonicalCategoryId??automaticCategory),compliance=catalogComplianceDecision(snapshot);
-      const taxonomyMapped=classification.evidence.some((entry)=>entry.startsWith("CJ_TAXONOMY_MAPPING:"));
+      const snapshot=await provider.getProduct(candidate.requestedIdentifier),classification=await classifyCjProductByTaxonomyId(snapshot),automaticCategory=classification.status==="SUGGESTED"?classification.canonicalCategoryId:null,category=resolveCatalogCategory(snapshot,candidate.canonicalCategoryId??automaticCategory),compliance=catalogComplianceDecision(snapshot);
+      const taxonomyMapped=classification.evidence.some((entry)=>entry.startsWith("CJ_TAXONOMY_ID_MAPPING:")||entry.startsWith("CJ_TAXONOMY_MAPPING:"));
       const common={canonicalSupplierId:snapshot.supplierProductId,supplierSku:snapshot.sku,canonicalCategoryId:category.categoryId,categoryMappingSource:candidate.canonicalCategoryId?"ADMIN":automaticCategory?(taxonomyMapped?"CJ_TAXONOMY":"CLASSIFIER"):category.source,categoryMappingReason:candidate.canonicalCategoryId?"ADMIN_SELECTED_CANONICAL_LEAF":automaticCategory?(taxonomyMapped?"CJ_CATEGORY_ID_AUTHORITATIVE_MAPPING":"CLASSIFIER_ACCEPTED_THRESHOLD"):category.reason,classificationStatus:candidate.canonicalCategoryId?"ADMIN_REVIEWED":classification.status,classificationConfidence:classification.confidence,classificationEvidence:classification.evidence as Prisma.InputJsonValue,stockStatus:snapshot.available&&snapshot.stock>0?"AVAILABLE":"UNAVAILABLE",complianceStatus:compliance.status,complianceReason:compliance.reason};
       if(!category.categoryId||compliance.status==="QUARANTINED"){await db.supplierCatalogImportItem.update({where:{id:candidate.id},data:{...common,status:"QUARANTINED",errorCode:!category.categoryId?"CJ_CLASSIFICATION_REVIEW_REQUIRED":compliance.reason,completedAt:new Date()}});continue;}
       let pricing:Awaited<ReturnType<typeof verifiedCatalogPricing>>;try{pricing=await verifiedCatalogPricing(provider,snapshot,job.destinationCountry,job.store.currency);}catch(error){const code=publicCatalogError(error);await db.supplierCatalogImportItem.update({where:{id:candidate.id},data:{...common,status:"QUARANTINED",pricingStatus:"UNAVAILABLE",errorCode:code,errorMessage:code,completedAt:new Date()}});continue;}
