@@ -1,5 +1,5 @@
 import "server-only";
-import { MARKETPLACE_CANONICAL_LEAF_CATEGORIES, marketplaceCanonicalLeafCategory, isMarketplaceCanonicalLeafCategoryId } from "../marketplace-category-taxonomy";
+import { MARKETPLACE_CANONICAL_LEAF_CATEGORIES, marketplaceCanonicalLeafCategory, isMarketplaceCanonicalLeafCategoryId } from "../marketplace-category-registry";
 import type { SupplierProductSnapshot } from "./types";
 
 export type CatalogCategoryDecision = { categoryId:string|null; source:"ADMIN"|"EXACT_SOURCE"|"UNMAPPED"; reason:string };
