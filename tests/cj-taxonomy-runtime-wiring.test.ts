@@ -14,3 +14,12 @@ test("CJ preview classifies by stable taxonomy ID before legacy fallback",()=>{
   assert.match(preview,/classifyCjProductByTaxonomyId/);
   assert.doesNotMatch(preview,/classifyCjProductAuthoritatively/);
 });
+
+test("CJ preview resolves the full live taxonomy path by category ID before embedded fallback",()=>{
+  assert.match(classifier,/resolveCjCategoryPath\(categoryId\)/);
+  assert.match(classifier,/mapCjCategoryPathToTodijo\(resolvedPath\)/);
+  assert.match(classifier,/CJ_PREVIEW_RESOLVED_FULL_PATH_BY_ID/);
+  const resolvedPathIndex=classifier.indexOf("resolveCjCategoryPath(categoryId)");
+  const fallbackIndex=classifier.indexOf("return classifyCjProductAuthoritatively(snapshot)");
+  assert.ok(resolvedPathIndex>=0&&fallbackIndex>resolvedPathIndex);
+});
