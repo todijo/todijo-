@@ -16,7 +16,8 @@ function validQuote(data:BuyerDropshippingPricingResponse,input:{productId:strin
  return data.eligible===true&&data.productId===input.productId&&data.variantId===input.variantId&&data.quantity===input.quantity;
 }
 async function requestQuote(input:{productId:string;variantId:string;quantity:number;destinationCountry:string},signal?:AbortSignal){
- const response=await fetch(`/api/products/${encodeURIComponent(input.productId)}/dropshipping-pricing`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variantId:input.variantId,quantity:input.quantity,destinationCountry:input.destinationCountry}),signal,cache:"no-store"});
+ const adminPreview=typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("adminPreview")==="1";
+ const response=await fetch(`/api/products/${encodeURIComponent(input.productId)}/dropshipping-pricing${adminPreview?"?adminPreview=1":""}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variantId:input.variantId,quantity:input.quantity,destinationCountry:input.destinationCountry}),signal,cache:"no-store"});
  const data=await response.json() as BuyerDropshippingPricingResponse;
  if(!response.ok||!validQuote(data,input))throw new Error("DROPSHIPPING_PRICING_UNAVAILABLE");
  authoritativeQuoteCache.set(dropshippingPricingRequestKey(input),data);

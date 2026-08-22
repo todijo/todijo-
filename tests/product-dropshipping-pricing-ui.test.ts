@@ -28,8 +28,9 @@ test("shopping-country values are normalized, restricted to ISO destinations and
  assert.equal(persistShoppingCountry(storage," de "),"DE");assert.equal(readShoppingCountry(storage),"DE");assert.equal(values.get(SHOPPING_COUNTRY_STORAGE_KEY),"DE");
 });
 
-test("public estimate route validates destination and accepts no client financial override",()=>{
- const route=source("app/api/products/[id]/dropshipping-pricing/route.ts");assert.match(route,/normalizeShoppingCountry\(body\.destinationCountry\)/);assert.match(route,/INVALID_DESTINATION/);assert.doesNotMatch(route,/readSession|defaultBuyerAddress|body\.buyerCurrency/);assert.match(route,/buyerCurrency:undefined/);
+test("public estimate route validates destination, accepts no client financial override, and guards admin preview",()=>{
+ const route=source("app/api/products/[id]/dropshipping-pricing/route.ts");assert.match(route,/normalizeShoppingCountry\(body\.destinationCountry\)/);assert.match(route,/INVALID_DESTINATION/);assert.doesNotMatch(route,/defaultBuyerAddress|body\.buyerCurrency/);assert.match(route,/buyerCurrency:undefined/);
+ assert.match(route,/previewRequested=new URL\(request\.url\)\.searchParams\.get\("adminPreview"\)==="1"/);assert.match(route,/if\(previewRequested\)await requireAdmin\(prisma,await readSession\(\)\)/);assert.match(route,/allowUnpublished:previewRequested/);
  assert.match(route,/productVariant\.findFirst/);assert.match(route,/active:true,stock:\{gt:0\},supplierVariantId:\{not:null\}/);assert.match(route,/orderBy:\[\{createdAt:"asc"\},\{id:"asc"\}\]/);
  const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/JSON\.stringify\(\{variantId:input\.variantId,quantity:input\.quantity,destinationCountry:input\.destinationCountry\}\)/);assert.doesNotMatch(ui,/supplierCost|freightTotal|includedCost|targetMargin|fxRate|buyerCurrency:/);
 });
