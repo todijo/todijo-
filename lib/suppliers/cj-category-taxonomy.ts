@@ -3,6 +3,7 @@ import { marketplaceCanonicalLeafCategory, resolveCjGapLeaf } from "../marketpla
 import { cjAuth } from "./cj-auth";
 import { classifyCjProduct, type CjClassification } from "./cj-classification";
 import { resolveCjLivePathAlias } from "./cj-live-path-aliases";
+import { resolveCjPostMergePathAlias } from "./cj-post-merge-path-aliases";
 import { scheduleCjRequest } from "./cj-rate-limiter";
 import type { SupplierProductSnapshot } from "./types";
 
@@ -83,6 +84,8 @@ function mappedCanonical(canonicalCategoryId:string,path:CjCategoryPath,reason:s
 
 export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|null{
   const exactPath=[path.first,path.second,path.third].filter(Boolean).join(" > ");
+  const postMergeAlias=resolveCjPostMergePathAlias(exactPath);
+  if(postMergeAlias){const result=mappedCanonical(postMergeAlias,path,"REVIEWED_POST_MERGE_PATH_ALIAS");if(result)return result;}
   const liveAlias=resolveCjLivePathAlias(exactPath);
   if(liveAlias){const result=mappedCanonical(liveAlias,path,"REVIEWED_LIVE_PATH_ALIAS");if(result)return result;}
   const gapLeaf=resolveCjGapLeaf(exactPath);
