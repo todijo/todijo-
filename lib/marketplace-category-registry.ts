@@ -1,5 +1,6 @@
 import { subcategoryId, type CanonicalLeafCategory } from "./desktop-category-taxonomy";
 import {
+  MARKETPLACE_CANONICAL_LEAF_CATEGORIES as BASE_MARKETPLACE_CANONICAL_LEAF_CATEGORIES,
   marketplaceCanonicalLeafCategory as baseMarketplaceCanonicalLeafCategory,
   isMarketplaceCanonicalLeafCategoryId as baseIsMarketplaceCanonicalLeafCategoryId,
 } from "./marketplace-category-taxonomy";
@@ -31,6 +32,7 @@ export const CJ_FINAL_SAFE_CANONICAL_LEAVES:readonly CanonicalLeafCategory[]=CJ_
   groupLabel:spec.groupLabel,
 }));
 
+export const MARKETPLACE_CANONICAL_LEAF_CATEGORIES:readonly CanonicalLeafCategory[]=[...BASE_MARKETPLACE_CANONICAL_LEAF_CATEGORIES,...CJ_FINAL_SAFE_CANONICAL_LEAVES];
 const FINAL_SAFE_BY_ID=new Map(CJ_FINAL_SAFE_CANONICAL_LEAVES.map(leaf=>[leaf.id,leaf]));
 
 export function marketplaceCanonicalLeafCategory(value:string){
