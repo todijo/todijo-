@@ -1,4 +1,5 @@
-import { canonicalLeafCategory, subcategoryId } from "../desktop-category-taxonomy";
+import { subcategoryId } from "../desktop-category-taxonomy";
+import { marketplaceCanonicalLeafCategory, resolveCjGapLeaf } from "../marketplace-category-taxonomy";
 import { cjAuth } from "./cj-auth";
 import { classifyCjProduct, type CjClassification } from "./cj-classification";
 import { resolveCjLivePathAlias } from "./cj-live-path-aliases";
@@ -71,56 +72,28 @@ async function categoryCache(){
   return pending;
 }
 
-export async function getCjCategoryTaxonomySnapshot():Promise<CjCategoryTaxonomySnapshot>{
-  const cache=await categoryCache();
-  return{fetchedAt:cache.fetchedAt,expiresAt:cache.expiresAt,paths:[...cache.byId.values()].sort((a,b)=>a.categoryId.localeCompare(b.categoryId))};
-}
+export async function getCjCategoryTaxonomySnapshot():Promise<CjCategoryTaxonomySnapshot>{const cache=await categoryCache();return{fetchedAt:cache.fetchedAt,expiresAt:cache.expiresAt,paths:[...cache.byId.values()].sort((a,b)=>a.categoryId.localeCompare(b.categoryId))};}
+export async function resolveCjCategoryPath(categoryId:unknown):Promise<CjCategoryPath|null>{const id=text(categoryId);if(!id)return null;try{return (await categoryCache()).byId.get(id.toUpperCase())??null;}catch{return null;}}
 
-export async function resolveCjCategoryPath(categoryId:unknown):Promise<CjCategoryPath|null>{
-  const id=text(categoryId);if(!id)return null;
-  try{return (await categoryCache()).byId.get(id.toUpperCase())??null;}catch{return null;}
-}
+function pathFromCategoryName(categoryId:unknown,categoryName:unknown):CjCategoryPath|null{const id=text(categoryId),name=text(categoryName);if(!id||!name)return null;const parts=name.split(/\s*(?:>|\/)\s*/).map(part=>part.trim()).filter(Boolean);if(parts.length<2)return null;return{categoryId:id,first:parts[0]??"",second:parts.length>2?parts[parts.length-2]??"":"",third:parts[parts.length-1]??""};}
+function embeddedCategoryPath(snapshot:SupplierProductSnapshot):CjCategoryPath|null{const hierarchy=snapshot.categoryHierarchy;if(hierarchy){const categoryId=text(hierarchy.thirdCategoryId??hierarchy.categoryId??snapshot.categoryReference);const first=text(hierarchy.firstCategoryName),second=text(hierarchy.secondCategoryName),third=text(hierarchy.thirdCategoryName??hierarchy.categoryName);if(categoryId&&third)return{categoryId,first,second,third};}return pathFromCategoryName(snapshot.categoryReference??snapshot.rawMetadata.categoryId,snapshot.rawMetadata.categoryName);}
 
-function pathFromCategoryName(categoryId:unknown,categoryName:unknown):CjCategoryPath|null{
-  const id=text(categoryId),name=text(categoryName);
-  if(!id||!name)return null;
-  const parts=name.split(/\s*(?:>|\/)\s*/).map(part=>part.trim()).filter(Boolean);
-  if(parts.length<2)return null;
-  return{categoryId:id,first:parts[0]??"",second:parts.length>2?parts[parts.length-2]??"":"",third:parts[parts.length-1]??""};
-}
-
-function embeddedCategoryPath(snapshot:SupplierProductSnapshot):CjCategoryPath|null{
-  const hierarchy=snapshot.categoryHierarchy;
-  if(hierarchy){
-    const categoryId=text(hierarchy.thirdCategoryId??hierarchy.categoryId??snapshot.categoryReference);
-    const first=text(hierarchy.firstCategoryName),second=text(hierarchy.secondCategoryName),third=text(hierarchy.thirdCategoryName??hierarchy.categoryName);
-    if(categoryId&&third)return{categoryId,first,second,third};
-  }
-  return pathFromCategoryName(snapshot.categoryReference??snapshot.rawMetadata.categoryId,snapshot.rawMetadata.categoryName);
-}
-
-function mapped(categoryId:string,groupId:string,label:string,path:CjCategoryPath,reason:string):CjClassification{
-  return{canonicalCategoryId:subcategoryId(categoryId,groupId,label),categoryId,categoryLabel:null,subcategoryLabel:label,confidence:.99,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};
-}
-
-function mappedCanonical(canonicalCategoryId:string,path:CjCategoryPath,reason:string):CjClassification|null{
-  const leaf=canonicalLeafCategory(canonicalCategoryId);if(!leaf)return null;
-  return{canonicalCategoryId:leaf.id,categoryId:leaf.categoryId,categoryLabel:leaf.categoryLabel,subcategoryLabel:leaf.label,confidence:.995,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};
-}
+function mapped(categoryId:string,groupId:string,label:string,path:CjCategoryPath,reason:string):CjClassification{return{canonicalCategoryId:subcategoryId(categoryId,groupId,label),categoryId,categoryLabel:null,subcategoryLabel:label,confidence:.99,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};}
+function mappedCanonical(canonicalCategoryId:string,path:CjCategoryPath,reason:string):CjClassification|null{const leaf=marketplaceCanonicalLeafCategory(canonicalCategoryId);if(!leaf)return null;return{canonicalCategoryId:leaf.id,categoryId:leaf.categoryId,categoryLabel:leaf.categoryLabel,subcategoryLabel:leaf.label,confidence:.995,status:"SUGGESTED",evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${path.first} > ${path.second} > ${path.third}`,`CJ_TAXONOMY_MAPPING:${reason}`]};}
 
 export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|null{
   const exactPath=[path.first,path.second,path.third].filter(Boolean).join(" > ");
   const liveAlias=resolveCjLivePathAlias(exactPath);
   if(liveAlias){const result=mappedCanonical(liveAlias,path,"REVIEWED_LIVE_PATH_ALIAS");if(result)return result;}
+  const gapLeaf=resolveCjGapLeaf(exactPath);
+  if(gapLeaf){const result=mappedCanonical(gapLeaf,path,"REVIEWED_TAXONOMY_GAP_EXTENSION");if(result)return result;}
 
   const first=normalized(path.first),second=normalized(path.second),third=normalized(path.third),all=`${first} ${second} ${third}`;
-
   if(/\b(sports? watch|sports? watches)\b/.test(all)&&/\b(men|mens|male|man)\b/.test(all))return mapped("jewelry","men-watches","Montres de sport pour homme",path,"MEN_SPORTS_WATCH");
   if(/\b(sports? watch|sports? watches)\b/.test(all)&&/\b(women|womens|female|woman)\b/.test(all))return mapped("jewelry","women-watches","Montres de sport pour femmes",path,"WOMEN_SPORTS_WATCH");
   if(/\bdigital watch(es)?\b/.test(all))return mapped("jewelry","men-watches","Montres numériques",path,"DIGITAL_WATCH");
   if(/\bquartz watch(es)?\b/.test(all))return mapped("jewelry","men-watches","Montres à quartz",path,"QUARTZ_WATCH");
   if(/\bmechanical watch(es)?\b/.test(all))return mapped("jewelry","men-watches","Montres mécaniques",path,"MECHANICAL_WATCH");
-
   if(/\b(men|mens|male|man)\b/.test(all)&&/\b(boot|boots|high top boots?)\b/.test(all))return mapped("bags-shoes","men-shoes","Bottes pour Homme",path,"MEN_BOOTS");
   if(/\b(men|mens|male|man)\b/.test(all)&&/\b(formal shoes?|dress shoes?|business shoes?|oxford shoes?)\b/.test(all))return mapped("bags-shoes","men-shoes","Chaussures formelles",path,"MEN_FORMAL_SHOES");
   if(/\b(men|mens|male|man)\b/.test(all)&&/\b(sandal|sandals)\b/.test(all))return mapped("bags-shoes","men-shoes","Sandales Pour Homme",path,"MEN_SANDALS");
@@ -128,7 +101,6 @@ export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|
   if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(sandal|sandals)\b/.test(all))return mapped("bags-shoes","women-shoes","Sandales pour femme",path,"WOMEN_SANDALS");
   if(/\b(women|womens|female|woman)\b/.test(all)&&/\b(handbag|handbags|hand bag|purse|tote bag|tote bags|totes)\b/.test(all))return mapped("bags-shoes","women-bags","Sac à main",path,"WOMEN_HANDBAG_OR_TOTE");
   if(/\b(men|mens|male|man)\b/.test(all)&&/\b(backpack|backpacks|rucksack)\b/.test(all))return mapped("bags-shoes","men-bags","Sacs à dos pour hommes",path,"MEN_BACKPACK");
-
   if(/\b(baby|infant|newborn)\b/.test(all)&&/\b(romper|rompers|onesie|onesies|overall|overalls)\b/.test(all))return mapped("kids","baby","Barboteuses de bébé",path,"BABY_ROMPER");
   if(/\b(baby|infant|newborn)\b/.test(all)&&/\b(clothing set|clothing sets|clothes set|outfit set|outfit sets)\b/.test(all))return mapped("kids","baby","Ensembles de vêtements pour bébé",path,"BABY_CLOTHING_SET");
 
@@ -148,13 +120,6 @@ export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|
 export async function classifyCjProductAuthoritatively(snapshot:SupplierProductSnapshot):Promise<CjClassification>{
   const embedded=embeddedCategoryPath(snapshot);
   const path=embedded??await resolveCjCategoryPath(snapshot.categoryReference??snapshot.rawMetadata.categoryId);
-  if(path){
-    const direct=mapCjCategoryPathToTodijo(path);if(direct)return direct;
-    const pathText=[path.first,path.second,path.third].filter(Boolean).join(" > ");
-    const enriched:SupplierProductSnapshot={...snapshot,categoryReference:pathText||snapshot.categoryReference,rawMetadata:{...snapshot.rawMetadata,cjCategoryPath:path}};
-    const fallback=classifyCjProduct(enriched);
-    return{...fallback,evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${pathText}`,...fallback.evidence]};
-  }
-  const fallback=classifyCjProduct(snapshot);
-  return{...fallback,evidence:["CJ_CATEGORY_PATH_UNAVAILABLE",...fallback.evidence]};
+  if(path){const direct=mapCjCategoryPathToTodijo(path);if(direct)return direct;const pathText=[path.first,path.second,path.third].filter(Boolean).join(" > ");const enriched:SupplierProductSnapshot={...snapshot,categoryReference:pathText||snapshot.categoryReference,rawMetadata:{...snapshot.rawMetadata,cjCategoryPath:path}};const fallback=classifyCjProduct(enriched);return{...fallback,evidence:[`CJ_CATEGORY_ID:${path.categoryId}`,`CJ_CATEGORY_PATH:${pathText}`,...fallback.evidence]};}
+  const fallback=classifyCjProduct(snapshot);return{...fallback,evidence:["CJ_CATEGORY_PATH_UNAVAILABLE",...fallback.evidence]};
 }
