@@ -1,4 +1,4 @@
-import { marketplaceCanonicalLeafCategory } from "../marketplace-category-taxonomy";
+import { marketplaceCanonicalLeafCategory } from "../marketplace-category-registry";
 import { classifyCjProductAuthoritatively, getCjCategoryTaxonomySnapshot } from "./cj-category-taxonomy";
 import { CURATED_CJ_CATEGORY_ID_MAPPINGS, deriveExactPathMappings, mergeCjCategoryIdMappings, resolveCjCategoryIdMapping } from "./cj-taxonomy-mapping";
 import type { CjClassification } from "./cj-classification";

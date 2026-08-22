@@ -1,7 +1,9 @@
 import { subcategoryId } from "../desktop-category-taxonomy";
-import { marketplaceCanonicalLeafCategory, resolveCjGapLeaf } from "../marketplace-category-taxonomy";
+import { marketplaceCanonicalLeafCategory } from "../marketplace-category-registry";
+import { resolveCjGapLeaf } from "../marketplace-category-taxonomy";
 import { cjAuth } from "./cj-auth";
 import { classifyCjProduct, type CjClassification } from "./cj-classification";
+import { resolveCjFinalSafePathAlias } from "./cj-final-safe-path-aliases";
 import { resolveCjLivePathAlias } from "./cj-live-path-aliases";
 import { resolveCjPostMergePathAlias } from "./cj-post-merge-path-aliases";
 import { scheduleCjRequest } from "./cj-rate-limiter";
@@ -84,6 +86,8 @@ function mappedCanonical(canonicalCategoryId:string,path:CjCategoryPath,reason:s
 
 export function mapCjCategoryPathToTodijo(path:CjCategoryPath):CjClassification|null{
   const exactPath=[path.first,path.second,path.third].filter(Boolean).join(" > ");
+  const finalSafeAlias=resolveCjFinalSafePathAlias(exactPath);
+  if(finalSafeAlias){const result=mappedCanonical(finalSafeAlias,path,"REVIEWED_FINAL_SAFE_PATH_ALIAS");if(result)return result;}
   const postMergeAlias=resolveCjPostMergePathAlias(exactPath);
   if(postMergeAlias){const result=mappedCanonical(postMergeAlias,path,"REVIEWED_POST_MERGE_PATH_ALIAS");if(result)return result;}
   const liveAlias=resolveCjLivePathAlias(exactPath);

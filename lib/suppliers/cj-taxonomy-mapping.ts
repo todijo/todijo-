@@ -1,4 +1,4 @@
-import { marketplaceCanonicalLeafCategory, isMarketplaceCanonicalLeafCategoryId } from "../marketplace-category-taxonomy";
+import { marketplaceCanonicalLeafCategory, isMarketplaceCanonicalLeafCategoryId } from "../marketplace-category-registry";
 import { mapCjCategoryPathToTodijo, type CjCategoryPath } from "./cj-category-taxonomy";
 import type { CjTaxonomyMirrorNode } from "./cj-taxonomy-sync";
 
