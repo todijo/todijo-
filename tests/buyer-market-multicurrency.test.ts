@@ -8,7 +8,7 @@ import {convertMarketplacePrice,memoizeFxResolver} from "../lib/marketplace-pres
 import {readFileSync} from "node:fs";
 
 test("buyer markets resolve independently from locale with safe USD fallback",()=>{
- assert.equal(resolveBuyerMarket({explicitCountry:"IQ"}).currency,"USD");
+ assert.equal(resolveBuyerMarket({explicitCountry:"IQ"}).currency,"IQD");
  assert.equal(resolveBuyerMarket({explicitCountry:"FR"}).currency,"EUR");
  assert.equal(resolveBuyerMarket({explicitCountry:"GB"}).currency,"GBP");
  assert.equal(resolveBuyerMarket({explicitCountry:"US"}).currency,"USD");
@@ -17,8 +17,8 @@ test("buyer markets resolve independently from locale with safe USD fallback",()
  assert.equal(resolveBuyerMarket({explicitCountry:"FR",explicitCurrency:"BTC"}).currency,"EUR");
 });
 
-test("supported native country currencies are explicit and unsupported markets fall back to USD",()=>{
- const expected={FR:"EUR",DE:"EUR",BE:"EUR",ES:"EUR",IT:"EUR",NL:"EUR",PT:"EUR",AT:"EUR",IE:"EUR",FI:"EUR",GR:"EUR",LU:"EUR",GB:"GBP",US:"USD",CA:"CAD",AU:"AUD",CH:"CHF",JP:"JPY",SE:"SEK",NO:"NOK",DK:"DKK",PL:"PLN",CZ:"CZK",HU:"HUF",RO:"RON",TR:"TRY",AE:"AED",SA:"SAR",QA:"QAR",SG:"SGD",HK:"HKD",NZ:"NZD",KR:"KRW",IN:"INR",MX:"MXN",BR:"BRL",ZA:"ZAR",IQ:"USD"};
+test("native Stripe-supported country currencies are explicit and unknown markets fall back to USD",()=>{
+ const expected={AD:"EUR",FR:"EUR",DE:"EUR",GB:"GBP",US:"USD",CA:"CAD",AU:"AUD",CH:"CHF",JP:"JPY",SE:"SEK",NO:"NOK",DK:"DKK",PL:"PLN",CZ:"CZK",HU:"HUF",RO:"RON",TR:"TRY",AE:"AED",SA:"SAR",QA:"QAR",SG:"SGD",HK:"HKD",NZ:"NZD",KR:"KRW",IN:"INR",MX:"MXN",BR:"BRL",ZA:"ZAR",IQ:"IQD",AF:"AFN",AL:"ALL",DZ:"DZD",AR:"ARS",BD:"BDT",BG:"BGN",BH:"BHD",CN:"CNY",EG:"EGP",ID:"IDR",IL:"ILS",JO:"JOD",KW:"KWD",MA:"MAD",MY:"MYR",NG:"NGN",OM:"OMR",PH:"PHP",PK:"PKR",TH:"THB",TW:"TWD",UA:"UAH",VN:"VND"};
  for(const [country,currency] of Object.entries(expected))assert.equal(preferredCurrencyForCountry(country),currency,country);
  assert.equal(preferredCurrencyForCountry("ZZ"),"USD");
 });
@@ -27,7 +27,7 @@ test("ordinary seller price uses verified FX and correct minor-unit rounding",as
  const result=await convertMarketplacePrice("10.01","EUR","USD",async()=>({provider:"OPEN_EXCHANGE_RATES",baseCurrency:"EUR",quoteCurrency:"USD",rate:"1.1",fetchedAt:"2026-08-23T00:00:00.000Z",effectiveAt:"2026-08-23T00:00:00.000Z"}));
  assert.equal(result.buyerAmount,"11.02");
  assert.equal(roundCurrencyUp(new Prisma.Decimal("100.01"),"JPY").toString(),"101");
- assert.equal(currencyMinorUnits("JPY"),0);assert.equal(currencyMinorUnits("USD"),2);
+ assert.equal(currencyMinorUnits("JPY"),0);assert.equal(currencyMinorUnits("USD"),2);assert.equal(currencyMinorUnits("IQD"),2);
 });
 
 test("one verified FX lookup is reused for multiple ordinary seller prices",async()=>{

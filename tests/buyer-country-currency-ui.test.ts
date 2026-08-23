@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {DEFAULT_BUYER_CURRENCY,preferredCurrencyForCountry} from "../lib/currency";
 
-test("Iraq uses USD and unknown global markets fail to the USD presentment fallback",()=>{
-  assert.equal(preferredCurrencyForCountry("IQ"),"USD");
+test("Iraq uses IQD and unknown global markets fail to the USD presentment fallback",()=>{
+  assert.equal(preferredCurrencyForCountry("IQ"),"IQD");
   assert.equal(DEFAULT_BUYER_CURRENCY,"USD");
   assert.equal(preferredCurrencyForCountry("ZZ"),"USD");
 });

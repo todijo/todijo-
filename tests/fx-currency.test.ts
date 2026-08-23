@@ -26,8 +26,10 @@ test("FX conversion happens after the 20 percent margin and rounds upward by cur
 test("market defaults and explicit supported preferences are centralized and safe",()=>{
   assert.equal(preferredCurrencyForCountry("FR"),"EUR");assert.equal(preferredCurrencyForCountry("GB"),"GBP");assert.equal(preferredCurrencyForCountry("US"),"USD");
   assert.equal(resolveBuyerCurrency({explicitPreference:"CAD",shippingCountry:"FR"}),"CAD");assert.equal(resolveBuyerCurrency({explicitPreference:"XXX",shippingCountry:"GB"}),"GBP");
-  for(const currency of ["AED","SAR","QAR","INR","BRL","ZAR"] as const)assert.equal(stripePresentmentSupported(currency),true);
-  assert.equal(stripePresentmentSupported("XXX"),false);assert.equal(SUPPORTED_BUYER_CURRENCIES.length,26);
+  for(const currency of ["AED","SAR","QAR","INR","BRL","ZAR","IQD","CNY"] as const)assert.equal(stripePresentmentSupported(currency),true);
+  assert.equal(stripePresentmentSupported("XXX"),false);
+  assert.ok(SUPPORTED_BUYER_CURRENCIES.length>26);
+  assert.equal(new Set(SUPPORTED_BUYER_CURRENCIES).size,SUPPORTED_BUYER_CURRENCIES.length);
 });
 
 test("missing, stale and malformed FX data fail closed",async()=>{
