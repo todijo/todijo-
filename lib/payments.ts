@@ -1,20 +1,21 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 import { cartLineKey, normalizeCartOption } from "./cart-line";
-import { cartShippingQuote, normalizeCountryCode, ShippingError } from "./shipping";
+import {cartShippingQuote,effectiveShippingRule,normalizeCountryCode,quoteShippingRule,ShippingError} from "./shipping";
 import { assertSupplierPurchasable } from "./suppliers/safety";
 import { resolveBuyerCurrency, stripeMinorAmount, supportedBuyerCurrency, type SupportedBuyerCurrency } from "./currency";
 import { resolveDropshippingEligibility, resolveDropshippingPricing, type DropshippingPriceSnapshot, type ResolvedDropshippingPricing } from "./suppliers/commerce-pricing";
 import { prepareSupplierFulfillments } from "./suppliers/supplier-fulfillment";
 import { defaultBuyerAddress } from "./buyer-addresses";
 import { resolveSellerMaturity } from "./seller-maturity";
+import {convertMarketplacePrice} from "./marketplace-presentment";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
 }
 
 type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?: string | number | null; displayedCurrency?: string | null };
-type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing };
+type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3] };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
 
 export function embeddedShippingQuote(lines:Array<{pricingSnapshot:DropshippingPriceSnapshot|null}>,currency:SupportedBuyerCurrency,destinationCountry:unknown){
@@ -91,9 +92,7 @@ export async function createCheckout(
   // Legacy top-level snapshots remain populated for single-group orders while
   // OrderGroup becomes authoritative for mixed carts.
   const seller=products[0].store.owner;
-  const normalCurrencies = new Set(classifiedLines.filter(line=>!line.eligibility.eligible).map(line=>products.find(product=>product.id===line.productId)!.currency.toUpperCase()));
-  if(normalCurrencies.size>1)throw new CheckoutError("All products must use the same currency.");
-  const paymentCurrency=supportedBuyerCurrency(normalCurrencies.size===1?[...normalCurrencies][0]:resolveBuyerCurrency({shippingCountry:destinationCountry}));
+  const paymentCurrency=supportedBuyerCurrency(resolveBuyerCurrency({explicitPreference:pricingDependencies.buyerCurrency,shippingCountry:destinationCountry}));
   if(!paymentCurrency)throw new CheckoutError("CURRENCY_UNSUPPORTED",409);
   const baseLines = classifiedLines.map((line) => {
     const product = products.find((candidate) => candidate.id === line.productId)!;
@@ -102,10 +101,10 @@ export async function createCheckout(
       const variant = line.variantId ? variants.find((candidate) => candidate.id === line.variantId && candidate.active) : null;
       if (!variant) throw new CheckoutError("Selected product variant is unavailable.", 409);
       const selectedOptions = variant.values.sort((a, b) => a.optionValue.option.position - b.optionValue.option.position).map(({ optionValue }) => ({ name: optionValue.option.name, value: optionValue.value }));
-      return { ...line, product, variant, unitPrice: variant.priceOverride ?? product.price, selectedOptions, pricingSnapshot:null as DropshippingPriceSnapshot|null };
+      const sourceUnitPrice=variant.priceOverride??product.price;return { ...line, product, variant, unitPrice:sourceUnitPrice,sourceUnitPrice, selectedOptions, pricingSnapshot:null as DropshippingPriceSnapshot|null };
     }
     if (line.variantId || ((product.colors ?? []).length && (!line.selectedColor || !(product.colors ?? []).includes(line.selectedColor))) || ((product.sizes ?? []).length && (!line.selectedSize || !(product.sizes ?? []).includes(line.selectedSize)))) throw new CheckoutError("Selected product options are unavailable.", 409);
-    return { ...line, product, variant: null, unitPrice: product.price, selectedOptions: { color: line.selectedColor, size: line.selectedSize }, pricingSnapshot:null as DropshippingPriceSnapshot|null };
+    return { ...line, product, variant: null, unitPrice: product.price,sourceUnitPrice:product.price, selectedOptions: { color: line.selectedColor, size: line.selectedSize }, pricingSnapshot:null as DropshippingPriceSnapshot|null };
   });
   for (const line of baseLines) {
     const available = line.variant?.stock ?? line.product.stock;
@@ -116,7 +115,7 @@ export async function createCheckout(
   // authority and is reused unchanged by OrderItem evidence and Stripe.
   const resolvedLines=[] as typeof baseLines;
   for(const line of baseLines){
-    if(!line.eligibility.eligible){resolvedLines.push(line);continue;}
+    if(!line.eligibility.eligible){try{quoteShippingRule(effectiveShippingRule(line.product.store,line.product),destinationCountry,destinationPostalCode,line.sourceUnitPrice.mul(line.quantity));}catch(error){if(error instanceof ShippingError)throw new CheckoutError(error.message,409);throw error;}let presentment;try{presentment=await convertMarketplacePrice(line.sourceUnitPrice,line.product.currency,paymentCurrency,pricingDependencies.marketplaceFx);}catch{throw new CheckoutError("FX_UNAVAILABLE",409);}resolvedLines.push({...line,unitPrice:new Prisma.Decimal(presentment.buyerAmount)});continue;}
     if(!line.variant)throw new CheckoutError("DROPSHIPPING_VARIANT_INVALID",409);
     let resolution:ResolvedDropshippingPricing;
     try{resolution=await (pricingDependencies.resolveDropshipping??resolveDropshippingPricing)(db,{productId:line.product.id,variantId:line.variant.id,quantity:line.quantity,destinationCountry,buyerCurrency:paymentCurrency});}
@@ -124,12 +123,12 @@ export async function createCheckout(
     if(!resolution.buyer||!resolution.snapshot)throw new CheckoutError("DROPSHIPPING_PRICING_UNAVAILABLE",409);
     resolvedLines.push({...line,unitPrice:new Prisma.Decimal(resolution.buyer.buyerUnitPrice),pricingSnapshot:resolution.snapshot});
   }
-  const changedLines=resolvedLines.filter(line=>line.pricingSnapshot&&(!line.displayedCurrency||line.displayedCurrency.toUpperCase()!==paymentCurrency||!displayedPriceMatches(line.displayedUnitPrice,line.unitPrice))).map(line=>({lineKey:line.lineKey,productId:line.product.id,variantId:line.variant?.id??null,unitPrice:line.unitPrice.toString(),currency:paymentCurrency,lineTotal:line.unitPrice.mul(line.quantity).toString(),freeShipping:line.pricingSnapshot!.freeShipping,deliveryMinDays:line.pricingSnapshot!.deliveryMinDays,deliveryMaxDays:line.pricingSnapshot!.deliveryMaxDays}));
+  const changedLines=resolvedLines.filter(line=>Boolean(line.pricingSnapshot)||line.displayedCurrency!=null||line.displayedUnitPrice!=null).filter(line=>!line.displayedCurrency||line.displayedCurrency.toUpperCase()!==paymentCurrency||!displayedPriceMatches(line.displayedUnitPrice,line.unitPrice)).map(line=>({lineKey:line.lineKey,productId:line.product.id,variantId:line.variant?.id??null,unitPrice:line.unitPrice.toString(),currency:paymentCurrency,lineTotal:line.unitPrice.mul(line.quantity).toString(),freeShipping:line.pricingSnapshot?.freeShipping??false,deliveryMinDays:line.pricingSnapshot?.deliveryMinDays??null,deliveryMaxDays:line.pricingSnapshot?.deliveryMaxDays??null}));
   if(changedLines.length)throw new CheckoutError("CHECKOUT_PRICE_CHANGED",409,{lines:changedLines,currency:paymentCurrency});
   const subtotal = resolvedLines.reduce((sum, line) => sum.add(line.unitPrice.mul(line.quantity)), new Prisma.Decimal(0));
   const checkoutGroups=new Map<string,typeof resolvedLines>();for(const line of resolvedLines){const key=line.pricingSnapshot?.shippingIncluded?"cj:platform":`store:${line.product.storeId}`;checkoutGroups.set(key,[...(checkoutGroups.get(key)??[]),line])}
   const groupQuotes=new Map<string,ReturnType<typeof cartShippingQuote>|ReturnType<typeof embeddedShippingQuote>>();
-  try { for(const [key,groupLines] of checkoutGroups)groupQuotes.set(key,key==="cj:platform"?embeddedShippingQuote(groupLines,paymentCurrency,destinationCountry):cartShippingQuote(groupLines[0].product.store,groupLines.map(line=>({product:line.product,subtotal:line.unitPrice.mul(line.quantity)})),destinationCountry,destinationPostalCode)); }
+  try { for(const [key,groupLines] of checkoutGroups){if(key==="cj:platform"){groupQuotes.set(key,embeddedShippingQuote(groupLines,paymentCurrency,destinationCountry));continue;}const source=cartShippingQuote(groupLines[0].product.store,groupLines.map(line=>({product:line.product,subtotal:line.sourceUnitPrice.mul(line.quantity)})),destinationCountry,destinationPostalCode),presentment=await convertMarketplacePrice(source.amount,groupLines[0].product.currency,paymentCurrency,pricingDependencies.marketplaceFx);groupQuotes.set(key,{...source,amount:new Prisma.Decimal(presentment.buyerAmount),currency:paymentCurrency});} }
   catch (error) { if (error instanceof ShippingError) throw new CheckoutError(error.message, 409); throw error; }
   const quoteList=[...groupQuotes.values()],shippingPolicies=quoteList.reduce<unknown[]>((all,quote)=>[...all,...quote.policies],[]),shipping={method:quoteList.length===1?quoteList[0].method:"Grouped delivery",amount:quoteList.reduce((sum,quote)=>sum.add(quote.amount),new Prisma.Decimal(0)),currency:paymentCurrency,destinationCountry:normalizeCountryCode(destinationCountry),free:quoteList.every(quote=>quote.free),estimatedMinDays:Math.min(...quoteList.map(quote=>quote.estimatedMinDays)),estimatedMaxDays:Math.max(...quoteList.map(quote=>quote.estimatedMaxDays)),carrier:null,provider:"GROUPED",externalServiceId:null,policies:shippingPolicies as Prisma.InputJsonValue};
   const total = subtotal.add(shipping.amount);

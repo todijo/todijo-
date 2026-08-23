@@ -41,10 +41,10 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
   for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png","apple-icon.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
 });
 
-test("pricing failures terminate with a retry while the last safe minimum remains visible",()=>{
+test("pricing failures terminate with a retry without exposing stale source-currency prices",()=>{
   const card=source("components/AuthoritativeProductCardPrice.tsx"),detail=source("app/product/[id]/ProductDetailPrice.tsx"),quote=source("components/DropshippingProductPricing.tsx");
-  assert.match(card,/productPriceUi\[locale\]\.from\(minimum\)/);assert.doesNotMatch(card,/Common.*loading|common\("loading"\)/);
-  assert.match(detail,/useLayoutEffect/);assert.match(detail,/initialMinimum/);assert.match(detail,/detail\.verified===true/);
+  assert.match(card,/status:"error",price:null/);assert.match(card,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*:"…"/);assert.doesNotMatch(card,/from\(minimum\)/);
+  assert.match(detail,/useLayoutEffect/);assert.match(detail,/pendingPresentment\?"…"/);assert.match(detail,/detail\.verified===true/);
   assert.match(quote,/state\.status==="error"/);assert.match(quote,/productPriceUi\[locale\]\.retry/);assert.match(quote,/setRetry\(value=>value\+1\)/);
 });
 

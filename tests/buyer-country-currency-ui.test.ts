@@ -12,11 +12,14 @@ test("Iraq uses USD and unknown global markets fail to the USD presentment fallb
 test("marketplace exposes a persisted country selector and safe proxy country detection",()=>{
   const header=readFileSync("components/MarketplaceHeader.tsx","utf8");
   const selector=readFileSync("components/ShoppingCountrySwitcher.tsx","utf8");
+  const provider=readFileSync("components/BuyerMarketProvider.tsx","utf8");
   const geo=readFileSync("app/api/geo/country/route.ts","utf8");
   assert.match(header,/ShoppingCountrySwitcher/);
-  assert.match(selector,/readShoppingCountry/);
-  assert.match(selector,/persistShoppingCountry/);
-  assert.match(selector,/\/api\/geo\/country/);
+  assert.match(selector,/useBuyerMarket/);
+  assert.match(selector,/selectCountry/);
+  assert.match(provider,/readShoppingCountry/);
+  assert.match(provider,/persistShoppingCountry/);
+  assert.match(provider,/\/api\/geo\/country/);
   assert.match(geo,/cf-ipcountry/);
   assert.match(geo,/x-vercel-ip-country/);
   assert.match(geo,/normalizeShoppingCountry/);

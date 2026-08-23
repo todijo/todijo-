@@ -13,7 +13,7 @@ import MarketplaceCategoryNavigation from "@/components/MarketplaceCategoryNavig
 import { EmptyState } from "@/components/FeedbackState";
 import { clearMarketplaceFilters, marketplaceUrl, normalizeMarketplacePriceRange, type MarketplaceFilters } from "@/lib/marketplace-search";
 import { categoryLabel } from "@/lib/categories";
-import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
+import BuyerProductPrice from "@/components/BuyerProductPrice";
 import MarketplaceFilterDock, { type MarketplaceFacets } from "@/components/MarketplaceFilterDock";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
@@ -147,7 +147,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
             {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
               {featuredProducts.map((product, index) => <a href={`/${activeLocale}/product/${product.id}`} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
                 <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
-                <span><strong>{product.name}</strong><b>{product.requiresAuthoritativePrice?<AuthoritativeProductCardPrice productId={product.id} fallbackPrice={Number(product.price)} currency={product.currency}/>: `${product.price} ${product.currency}`}</b></span>
+                <span><strong>{product.name}</strong><b><BuyerProductPrice productId={product.id} sourcePrice={Number(product.price)} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice}/></b></span>
               </a>)}
             </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
               <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>

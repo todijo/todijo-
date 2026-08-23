@@ -51,9 +51,10 @@ test("shipping presentation authority is product-specific and manual override is
 
 test("normal and CJ lines retain existing line-aware checkout and embedded-shipping contracts", () => {
   const payments = source("lib/payments.ts"), pricing = source("lib/suppliers/commerce-pricing.ts");
-  assert.match(payments, /resolvedLines\.filter\(line=>line\.pricingSnapshot/);
-  assert.match(payments, /key==="cj:platform"\?embeddedShippingQuote\(groupLines/);
-  assert.match(payments, /:cartShippingQuote\(groupLines\[0\]\.product\.store/);
+  assert.match(payments, /resolvedLines\.filter\(line=>Boolean\(line\.pricingSnapshot\)\|\|line\.displayedCurrency!=null\|\|line\.displayedUnitPrice!=null\)/);
+  assert.match(payments, /if\(key==="cj:platform"\)\{groupQuotes\.set\(key,embeddedShippingQuote\(groupLines/);
+  assert.match(payments, /cartShippingQuote\(groupLines\[0\]\.product\.store/);
+  assert.match(payments, /convertMarketplacePrice\(source\.amount,groupLines\[0\]\.product\.currency,paymentCurrency,pricingDependencies\.marketplaceFx\)/);
   assert.match(pricing, /shippingIncluded=mode==="AUTOMATIC"/);
   assert.match(pricing, /DEFAULT_SUPPLIER_TARGET_MARGIN/);
   assert.match(pricing, /verifiedFxRate/);
