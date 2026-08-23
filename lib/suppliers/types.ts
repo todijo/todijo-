@@ -1,3 +1,5 @@
+import type { CjFreightQuote } from "./cj-freight";
+
 export type SupplierProviderId = "CJ";
 
 export type SupplierOptionValueSnapshot = {
@@ -93,6 +95,6 @@ export interface SupplierCatalogProvider {
   isConfigured(): boolean;
   getProduct(supplierProductId: string): Promise<SupplierProductSnapshot>;
   searchProducts?(query: string, page?: number, pageSize?: number): Promise<SupplierCatalogSearchPage>;
-  calculateFreight?(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<{selected:{name:string;amount:string;currency:string;estimatedDelivery:string}}>;
+  calculateFreight?(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<CjFreightQuote>;
   getProductReviews?(supplierProductId: string, page?: number, pageSize?: number): Promise<SupplierProductReviewsPage>;
 }

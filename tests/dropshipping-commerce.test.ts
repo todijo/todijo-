@@ -44,7 +44,7 @@ test("invalid or cross-product variants fail before any supplier call",async()=>
 
 test("freight and FX failures fail closed without substituting browser money",async()=>{
  const freight=dependencies();freight.provider.calculateFreight=async()=>{throw new Error("CJ_FREIGHT_FAILED");};
- await assert.rejects(()=>resolveDropshippingPricing(db(),{productId:"product-1",variantId:"variant-1",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},freight),/CJ_FREIGHT_FAILED/);
+ await assert.rejects(()=>resolveDropshippingPricing(db(),{productId:"product-1",variantId:"variant-1",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},freight),/CJ_FREIGHT_ALL_ORIGINS_UNAVAILABLE/);
  const fx=dependencies();fx.fx=async()=>{throw new Error("FX_UNAVAILABLE");};
  await assert.rejects(()=>resolveDropshippingPricing(db(),{productId:"product-1",variantId:"variant-1",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},fx),/FX_UNAVAILABLE/);
 });

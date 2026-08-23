@@ -113,7 +113,9 @@ export function calculateSupplierPrice(input: PricingInput): SupplierPriceCalcul
 
 export function calculateSupplierSnapshotPrices(snapshot: SupplierProductSnapshot, sellingCurrency: string, exchangeRates: Readonly<Record<string, Prisma.Decimal.Value>> = {}) {
   const deferredShipping = { status:"DEFERRED", required:true } as const;
-  const variants = snapshot.variants.map((variant) => ({
+  const variants = snapshot.variants.filter((variant)=>{
+    try{return variant.cost!=null&&new Prisma.Decimal(variant.cost).isFinite()&&new Prisma.Decimal(variant.cost).greaterThan(0);}catch{return false;}
+  }).map((variant) => ({
     supplierVariantId:variant.supplierVariantId,
     calculation:calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[variant.currency.trim().toUpperCase()]}),
   }));
