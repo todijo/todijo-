@@ -10,10 +10,10 @@ const Context=createContext<MarketContext|null>(null);
 
 export default function BuyerMarketProvider({children}:{children:React.ReactNode}){
  const [market,setMarket]=useState<BuyerMarket>(()=>resolveBuyerMarket({})),[ready,setReady]=useState(false);
- useEffect(()=>{let active=true;const explicitCountry=readShoppingCountry(localStorage);try{localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}
-  if(explicitCountry){setMarket(resolveBuyerMarket({explicitCountry}));setReady(true);return()=>{active=false};}
-  fetch("/api/geo/country",{cache:"no-store"}).then(response=>response.ok?response.json():null).then((data:{country?:unknown}|null)=>{if(active){setMarket(resolveBuyerMarket({detectedCountry:data?.country}));setReady(true);}}).catch(()=>{if(active){setMarket(resolveBuyerMarket({}));setReady(true);}});return()=>{active=false};},[]);
  const publish=useCallback((next:BuyerMarket)=>{setMarket(next);document.cookie=marketCookie(BUYER_MARKET_COOKIE,next.country);document.cookie=marketCookie(BUYER_CURRENCY_COOKIE,next.currency);window.dispatchEvent(new CustomEvent(BUYER_MARKET_EVENT,{detail:next}));},[]);
+ useEffect(()=>{let active=true;const explicitCountry=readShoppingCountry(localStorage);try{localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}
+  if(explicitCountry){publish(resolveBuyerMarket({explicitCountry}));setReady(true);return()=>{active=false};}
+  fetch("/api/geo/country",{cache:"no-store"}).then(response=>response.ok?response.json():null).then((data:{country?:unknown}|null)=>{if(active){publish(resolveBuyerMarket({detectedCountry:data?.country}));setReady(true);}}).catch(()=>{if(active){publish(resolveBuyerMarket({}));setReady(true);}});return()=>{active=false};},[publish]);
  const selectCountry=useCallback((country:string)=>{const explicitCountry=persistShoppingCountry(localStorage,country);if(!explicitCountry)return;try{localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}publish(resolveBuyerMarket({explicitCountry}));},[publish]);
  const selectCurrency=useCallback((currency:SupportedBuyerCurrency|null)=>{try{if(currency)localStorage.setItem(BUYER_CURRENCY_STORAGE_KEY,currency);else localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}publish(resolveBuyerMarket({explicitCountry:readShoppingCountry(localStorage),explicitCurrency:currency}));},[publish]);
  const value=useMemo(()=>({...market,ready,selectCountry,selectCurrency}),[market,ready,selectCountry,selectCurrency]);
