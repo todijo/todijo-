@@ -4,7 +4,7 @@ export const SUPPORTED_BUYER_CURRENCIES=["EUR","USD","GBP","CAD","AUD","CHF","JP
 export type SupportedBuyerCurrency=typeof SUPPORTED_BUYER_CURRENCIES[number];
 const supported=new Set<string>(SUPPORTED_BUYER_CURRENCIES);
 const zeroDecimal=new Set<SupportedBuyerCurrency>(["JPY","KRW"]);
-export const DEFAULT_BUYER_CURRENCY:SupportedBuyerCurrency="EUR";
+export const DEFAULT_BUYER_CURRENCY:SupportedBuyerCurrency="USD";
 
 export class CurrencyError extends Error{constructor(public readonly code:"CURRENCY_UNSUPPORTED"|"CURRENCY_AMOUNT_INVALID"){super(code);}}
 export function supportedBuyerCurrency(value:unknown):SupportedBuyerCurrency|null{const code=typeof value==="string"?value.trim().toUpperCase():"";return supported.has(code)?code as SupportedBuyerCurrency:null;}
@@ -14,6 +14,6 @@ export function roundCurrencyUp(value:Prisma.Decimal.Value,currency:SupportedBuy
 export function stripeMinorAmount(value:Prisma.Decimal.Value,currency:SupportedBuyerCurrency){const rounded=roundCurrencyUp(value,currency),factor=new Prisma.Decimal(10).pow(currencyMinorUnits(currency)),minor=rounded.mul(factor);if(!minor.isInteger()||minor.isNegative()||minor.greaterThan(Number.MAX_SAFE_INTEGER))throw new CurrencyError("CURRENCY_AMOUNT_INVALID");return minor.toNumber();}
 export function stripePresentmentSupported(value:unknown){return supportedBuyerCurrency(value)!=null;}
 
-const countryCurrency:Record<string,SupportedBuyerCurrency>={FR:"EUR",DE:"EUR",ES:"EUR",IT:"EUR",NL:"EUR",BE:"EUR",AT:"EUR",PT:"EUR",IE:"EUR",FI:"EUR",GR:"EUR",LU:"EUR",GB:"GBP",US:"USD",CA:"CAD",AU:"AUD",CH:"CHF",JP:"JPY",SE:"SEK",NO:"NOK",DK:"DKK",PL:"PLN",CZ:"CZK",HU:"HUF",RO:"RON",TR:"TRY",AE:"AED",SA:"SAR",QA:"QAR",SG:"SGD",HK:"HKD",NZ:"NZD",KR:"KRW",IN:"INR",MX:"MXN",BR:"BRL",ZA:"ZAR"};
+const countryCurrency:Record<string,SupportedBuyerCurrency>={FR:"EUR",DE:"EUR",ES:"EUR",IT:"EUR",NL:"EUR",BE:"EUR",AT:"EUR",PT:"EUR",IE:"EUR",FI:"EUR",GR:"EUR",LU:"EUR",GB:"GBP",US:"USD",IQ:"USD",CA:"CAD",AU:"AUD",CH:"CHF",JP:"JPY",SE:"SEK",NO:"NOK",DK:"DKK",PL:"PLN",CZ:"CZK",HU:"HUF",RO:"RON",TR:"TRY",AE:"AED",SA:"SAR",QA:"QAR",SG:"SGD",HK:"HKD",NZ:"NZD",KR:"KRW",IN:"INR",MX:"MXN",BR:"BRL",ZA:"ZAR"};
 export function preferredCurrencyForCountry(country:unknown){const code=typeof country==="string"?country.trim().toUpperCase():"";return countryCurrency[code]??DEFAULT_BUYER_CURRENCY;}
 export function resolveBuyerCurrency(input:{explicitPreference?:unknown;shippingCountry?:unknown;accountCountry?:unknown}){return supportedBuyerCurrency(input.explicitPreference)??preferredCurrencyForCountry(input.shippingCountry??input.accountCountry);}
