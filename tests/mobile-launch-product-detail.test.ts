@@ -43,7 +43,7 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
 
 test("pricing failures terminate with a retry without exposing stale source-currency prices",()=>{
   const card=source("components/AuthoritativeProductCardPrice.tsx"),detail=source("app/product/[id]/ProductDetailPrice.tsx"),quote=source("components/DropshippingProductPricing.tsx");
-  assert.match(card,/status:"error",price:null/);assert.match(card,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*:"…"/);assert.doesNotMatch(card,/from\(minimum\)/);
+  assert.match(card,/status:"error",price:null/);assert.match(card,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*priceSkeleton/);assert.match(card,/productPriceUi\[locale\]\.retry/);assert.match(card,/setRetry\(value=>value\+1\)/);assert.doesNotMatch(card,/from\(minimum\)/);
   assert.match(detail,/useLayoutEffect/);assert.match(detail,/pendingPresentment\?"…"/);assert.match(detail,/detail\.verified===true/);
   assert.match(quote,/state\.status==="error"/);assert.match(quote,/productPriceUi\[locale\]\.retry/);assert.match(quote,/setRetry\(value=>value\+1\)/);
 });

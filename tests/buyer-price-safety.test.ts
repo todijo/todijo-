@@ -25,7 +25,9 @@ test("all public product-card sources propagate the deferred-price safety marker
  assert.match(cardPrice,/pendingQuotes/);
  assert.match(cardPrice,/dropshippingPricingRequestKey\(\{productId,variantId:data\.variantId,quantity:1,destinationCountry\}\)\}:\$\{buyerCurrency\}/);
  assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat/);
- assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*:"…"/);assert.doesNotMatch(cardPrice,/common\("loading"\)|from\(minimum\)/);
+ assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*priceSkeleton[\s\S]*productPriceUi\[locale\]\.updating/);
+ assert.match(cardPrice,/state\.status==="error"[\s\S]*productPriceUi\[locale\]\.retry/);
+ assert.match(cardPrice,/setRetry\(value=>value\+1\)/);assert.doesNotMatch(cardPrice,/common\("loading"\)|from\(minimum\)/);
  assert.match(action,/CHOOSE_OPTIONS"\|\|product\.requiresAuthoritativePrice/);
  assert.match(home,/<BuyerProductPrice/);
  assert.doesNotMatch(card+home,/pricingUnavailable/);
