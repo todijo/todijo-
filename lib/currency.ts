@@ -1,9 +1,15 @@
 import {Prisma} from "@prisma/client";
 
-export const SUPPORTED_BUYER_CURRENCIES=["EUR","USD","GBP","CAD","AUD","CHF","JPY","SEK","NOK","DKK","PLN","CZK","HUF","RON","TRY","AED","SAR","QAR","SGD","HKD","NZD","KRW","INR","MXN","BRL","ZAR"] as const;
+// Card-presentment currencies supported by Stripe and used by Todijo's buyer market layer.
+// Keep this list aligned with Stripe's supported-currencies documentation and our minor-unit rules below.
+export const SUPPORTED_BUYER_CURRENCIES=[
+  "USD","AED","AFN","ALL","AMD","ANG","AOA","ARS","AUD","AWG","AZN","BAM","BBD","BDT","BGN","BHD","BIF","BMD","BND","BOB","BRL","BSD","BTN","BWP","BYN","BZD","CAD","CDF","CHF","CLP","CNY","COP","CRC","CVE","CZK","DJF","DKK","DOP","DZD","EGP","ETB","EUR","FJD","FKP","GBP","GEL","GHS","GIP","GMD","GNF","GTQ","GYD","HKD","HNL","HTG","HUF","IDR","ILS","INR","IQD","ISK","JMD","JOD","JPY","KES","KGS","KHR","KMF","KRW","KWD","KYD","KZT","LAK","LBP","LKR","LRD","LSL","MAD","MDL","MGA","MKD","MMK","MNT","MOP","MUR","MVR","MWK","MXN","MYR","MZN","NAD","NGN","NIO","NOK","NPR","NZD","OMR","PAB","PEN","PGK","PHP","PKR","PLN","PYG","QAR","RON","RSD","RWF","SAR","SBD","SCR","SEK","SGD","SHP","SLE","SOS","SRD","SZL","THB","TJS","TND","TOP","TRY","TTD","TWD","TZS","UAH","UGX","UYU","UZS","VND","VUV","WST","XAF","XCD","XOF","XPF","YER","ZAR","ZMW"
+] as const;
 export type SupportedBuyerCurrency=typeof SUPPORTED_BUYER_CURRENCIES[number];
 const supported=new Set<string>(SUPPORTED_BUYER_CURRENCIES);
-const zeroDecimal=new Set<SupportedBuyerCurrency>(["JPY","KRW"]);
+// Stripe API charge amounts for these currencies use zero decimal places. UGX/ISK are special
+// backwards-compatible cases and intentionally remain two-decimal in stripeMinorAmount.
+const zeroDecimal=new Set<SupportedBuyerCurrency>(["BIF","CLP","DJF","GNF","JPY","KMF","KRW","MGA","PYG","RWF","VND","VUV","XAF","XOF","XPF"]);
 export const DEFAULT_BUYER_CURRENCY:SupportedBuyerCurrency="USD";
 
 export class CurrencyError extends Error{constructor(public readonly code:"CURRENCY_UNSUPPORTED"|"CURRENCY_AMOUNT_INVALID"){super(code);}}
@@ -15,32 +21,32 @@ export function stripeMinorAmount(value:Prisma.Decimal.Value,currency:SupportedB
 export function stripePresentmentSupported(value:unknown){return supportedBuyerCurrency(value)!=null;}
 
 const countryCurrency:Record<string,SupportedBuyerCurrency>={
-  AD:"EUR",AT:"EUR",BE:"EUR",HR:"EUR",CY:"EUR",EE:"EUR",FI:"EUR",FR:"EUR",DE:"EUR",GR:"EUR",IE:"EUR",IT:"EUR",LV:"EUR",LT:"EUR",LU:"EUR",MT:"EUR",MC:"EUR",ME:"EUR",NL:"EUR",PT:"EUR",SM:"EUR",SK:"EUR",SI:"EUR",ES:"EUR",VA:"EUR",XK:"EUR",
-  GB:"GBP",GG:"GBP",IM:"GBP",JE:"GBP",
-  US:"USD",IQ:"USD",AS:"USD",BQ:"USD",EC:"USD",FM:"USD",GU:"USD",MH:"USD",MP:"USD",PA:"USD",PW:"USD",PR:"USD",SV:"USD",TC:"USD",TL:"USD",UM:"USD",VG:"USD",VI:"USD",
-  CA:"CAD",
-  AU:"AUD",CC:"AUD",CX:"AUD",HM:"AUD",KI:"AUD",NR:"AUD",NF:"AUD",TV:"AUD",
-  CH:"CHF",LI:"CHF",
-  JP:"JPY",
-  SE:"SEK",
-  NO:"NOK",BV:"NOK",SJ:"NOK",
-  DK:"DKK",FO:"DKK",GL:"DKK",
-  PL:"PLN",
-  CZ:"CZK",
-  HU:"HUF",
-  RO:"RON",
-  TR:"TRY",
-  AE:"AED",
-  SA:"SAR",
+  AD:"EUR",AE:"AED",AF:"AFN",AG:"XCD",AI:"XCD",AL:"ALL",AM:"AMD",AO:"AOA",AR:"ARS",AT:"EUR",AU:"AUD",AW:"AWG",AZ:"AZN",
+  BA:"BAM",BB:"BBD",BD:"BDT",BE:"EUR",BF:"XOF",BG:"BGN",BH:"BHD",BI:"BIF",BJ:"XOF",BM:"BMD",BN:"BND",BO:"BOB",BR:"BRL",BS:"BSD",BT:"BTN",BW:"BWP",BY:"BYN",BZ:"BZD",
+  CA:"CAD",CD:"CDF",CF:"XAF",CG:"XAF",CH:"CHF",CI:"XOF",CK:"NZD",CL:"CLP",CM:"XAF",CN:"CNY",CO:"COP",CR:"CRC",CV:"CVE",CY:"EUR",CZ:"CZK",
+  DE:"EUR",DJ:"DJF",DK:"DKK",DM:"XCD",DO:"DOP",DZ:"DZD",
+  EC:"USD",EE:"EUR",EG:"EGP",ES:"EUR",ET:"ETB",
+  FJ:"FJD",FK:"FKP",FI:"EUR",FO:"DKK",FR:"EUR",
+  GA:"XAF",GB:"GBP",GD:"XCD",GE:"GEL",GG:"GBP",GH:"GHS",GI:"GIP",GM:"GMD",GN:"GNF",GQ:"XAF",GR:"EUR",GT:"GTQ",GY:"GYD",
+  HK:"HKD",HN:"HNL",HR:"EUR",HT:"HTG",HU:"HUF",
+  ID:"IDR",IE:"EUR",IL:"ILS",IM:"GBP",IN:"INR",IQ:"IQD",IS:"ISK",IT:"EUR",
+  JE:"GBP",JM:"JMD",JO:"JOD",JP:"JPY",
+  KE:"KES",KG:"KGS",KH:"KHR",KI:"AUD",KM:"KMF",KN:"XCD",KR:"KRW",KW:"KWD",KY:"KYD",KZ:"KZT",
+  LA:"LAK",LB:"LBP",LC:"XCD",LI:"CHF",LK:"LKR",LR:"LRD",LS:"LSL",LT:"EUR",LU:"EUR",LV:"EUR",
+  MA:"MAD",MC:"EUR",MD:"MDL",ME:"EUR",MG:"MGA",MK:"MKD",MM:"MMK",MN:"MNT",MO:"MOP",MR:"USD",MT:"EUR",MU:"MUR",MV:"MVR",MW:"MWK",MX:"MXN",MY:"MYR",MZ:"MZN",
+  NA:"NAD",NE:"XOF",NF:"AUD",NG:"NGN",NI:"NIO",NL:"EUR",NO:"NOK",NP:"NPR",NR:"AUD",NU:"NZD",NZ:"NZD",
+  OM:"OMR",
+  PA:"USD",PE:"PEN",PG:"PGK",PH:"PHP",PK:"PKR",PL:"PLN",PN:"NZD",PR:"USD",PS:"ILS",PT:"EUR",PW:"USD",PY:"PYG",
   QA:"QAR",
-  SG:"SGD",
-  HK:"HKD",
-  NZ:"NZD",CK:"NZD",NU:"NZD",PN:"NZD",TK:"NZD",
-  KR:"KRW",
-  IN:"INR",
-  MX:"MXN",
-  BR:"BRL",
-  ZA:"ZAR"
+  RO:"RON",RS:"RSD",RW:"RWF",
+  SA:"SAR",SB:"SBD",SC:"SCR",SE:"SEK",SG:"SGD",SH:"SHP",SI:"EUR",SJ:"NOK",SK:"EUR",SL:"SLE",SM:"EUR",SN:"XOF",SO:"SOS",SR:"SRD",SV:"USD",SZ:"SZL",
+  TC:"USD",TD:"XAF",TH:"THB",TJ:"TJS",TK:"NZD",TL:"USD",TN:"TND",TO:"TOP",TR:"TRY",TT:"TTD",TV:"AUD",TW:"TWD",TZ:"TZS",
+  UA:"UAH",UG:"UGX",UM:"USD",US:"USD",UY:"UYU",UZ:"UZS",
+  VA:"EUR",VC:"XCD",VG:"USD",VI:"USD",VN:"VND",VU:"VUV",
+  WF:"XPF",WS:"WST",
+  XK:"EUR",
+  YE:"YER",YT:"EUR",
+  ZA:"ZAR",ZM:"ZMW"
 };
 export function preferredCurrencyForCountry(country:unknown){const code=typeof country==="string"?country.trim().toUpperCase():"";return countryCurrency[code]??DEFAULT_BUYER_CURRENCY;}
 export function resolveBuyerCurrency(input:{explicitPreference?:unknown;shippingCountry?:unknown;accountCountry?:unknown}){return supportedBuyerCurrency(input.explicitPreference)??preferredCurrencyForCountry(input.shippingCountry??input.accountCountry);}
