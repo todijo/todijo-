@@ -19,6 +19,9 @@ test("marketplace exposes a persisted country selector and safe proxy country de
   assert.match(selector,/selectCountry/);
   assert.match(provider,/readShoppingCountry/);
   assert.match(provider,/persistShoppingCountry/);
+  assert.match(provider,/localStorage\.removeItem\(BUYER_CURRENCY_STORAGE_KEY\)/);
+  assert.match(provider,/resolveBuyerMarket\(\{explicitCountry\}\)/);
+  assert.doesNotMatch(provider,/resolveBuyerMarket\(\{explicitCountry,explicitCurrency:readBuyerCurrency/);
   assert.match(provider,/\/api\/geo\/country/);
   assert.match(geo,/cf-ipcountry/);
   assert.match(geo,/x-vercel-ip-country/);
