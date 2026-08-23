@@ -4,6 +4,7 @@ import {resolveBuyerCurrency,type SupportedBuyerCurrency} from "../currency";
 import {verifiedFxRate,type VerifiedFxRate} from "../fx";
 import {normalizeCountryCode} from "../shipping";
 import {CjCatalogProvider} from "./cj-client";
+import {resolveCjFreightAcrossOrigins} from "./cj-origin-freight";
 import {calculateSupplierPrice,convertSupplierPriceForBuyer,DEFAULT_SUPPLIER_TARGET_MARGIN} from "./pricing";
 import type {BuyerDropshippingPricingResponse} from "./buyer-pricing";
 
@@ -42,14 +43,14 @@ export async function resolveDropshippingPricing(db:PrismaClient,input:{productI
  try{
   const supplier=await provider.getProduct(link!.supplierProductId),supplierVariant=supplier.variants.find((candidate)=>candidate.supplierVariantId===variant.supplierVariantId);
   if(!supplierVariant||supplierVariant.cost==null||!supplierVariant.available)throw new DropshippingCommerceError("DROPSHIPPING_COST_UNAVAILABLE");
-  if(supplierVariant.originCountryCodes.length!==1)throw new DropshippingCommerceError("DROPSHIPPING_ORIGIN_UNAVAILABLE");
-  const freight=await provider.calculateFreight({originCountry:supplierVariant.originCountryCodes[0],destinationCountry,variantId:supplierVariant.supplierVariantId,quantity:input.quantity});
+  if(!supplierVariant.originCountryCodes.length)throw new DropshippingCommerceError("DROPSHIPPING_ORIGIN_UNAVAILABLE");
+  const freight=await resolveCjFreightAcrossOrigins(provider,{originCountryCodes:supplierVariant.originCountryCodes,destinationCountry,variantId:supplierVariant.supplierVariantId,quantity:input.quantity});
   const calculation=calculateSupplierPrice({supplierCost:supplierVariant.cost as Prisma.Decimal.Value,supplierCurrency:supplierVariant.currency,sellingCurrency:supplierVariant.currency,shipping:{status:"KNOWN",amount:freight.selected.amount,currency:freight.selected.currency}});
   const mode=eligibility.pricingMode as "AUTOMATIC"|"MANUAL_OVERRIDE",fx=await (dependencies.fx??verifiedFxRate)(mode==="AUTOMATIC"?calculation.sellingCurrency:product.currency,buyerCurrency);
   const converted=mode==="AUTOMATIC"?convertSupplierPriceForBuyer(calculation,buyerCurrency,fx):convertSupplierPriceForBuyer({...calculation,finalSellingPrice:(variant.priceOverride??product.price).toString(),sellingCurrency:product.currency},buyerCurrency,fx);
   const unit=new Prisma.Decimal(converted.finalSellingPrice),line=unit.mul(input.quantity),days=deliveryDays(freight.selected.estimatedDelivery),pricedAt=new Date().toISOString(),shippingIncluded=mode==="AUTOMATIC";
   const buyer:BuyerDropshippingPrice={eligible:true,pricingMode:mode,provider:"CJ",productId:product.id,variantId:variant.id,quantity:input.quantity,buyerCurrency,buyerUnitPrice:unit.toString(),buyerLineTotal:line.toString(),shippingIncluded,freeShipping:shippingIncluded,shippingMethod:freight.selected.name,deliveryMinDays:days.min,deliveryMaxDays:days.max,pricedAt};
-  return{eligibility,buyer,snapshot:{pricingMode:mode,provider:"CJ",productId:product.id,variantId:variant.id,supplierProductId:supplier.supplierProductId,supplierVariantId:supplierVariant.supplierVariantId,originCountry:supplierVariant.originCountryCodes[0],quantity:input.quantity,supplierCurrency:supplierVariant.currency,supplierUnitCost:new Prisma.Decimal(supplierVariant.cost).toFixed(2),freightCurrency:freight.selected.currency,freightTotal:freight.selected.amount,supportedFees:[],includedCost:calculation.totalIncludedCost,targetMargin:DEFAULT_SUPPLIER_TARGET_MARGIN.toString(),calculatedSellingPrice:calculation.finalSellingPrice,buyerCurrency,fx,buyerUnitPrice:unit.toString(),buyerLineTotal:line.toString(),shippingIncluded,freeShipping:shippingIncluded,shippingMethod:freight.selected.name,deliveryMinDays:days.min,deliveryMaxDays:days.max,pricedAt,pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"}};
+  return{eligibility,buyer,snapshot:{pricingMode:mode,provider:"CJ",productId:product.id,variantId:variant.id,supplierProductId:supplier.supplierProductId,supplierVariantId:supplierVariant.supplierVariantId,originCountry:freight.selected.originCountry,quantity:input.quantity,supplierCurrency:supplierVariant.currency,supplierUnitCost:new Prisma.Decimal(supplierVariant.cost).toFixed(2),freightCurrency:freight.selected.currency,freightTotal:freight.selected.amount,supportedFees:[],includedCost:calculation.totalIncludedCost,targetMargin:DEFAULT_SUPPLIER_TARGET_MARGIN.toString(),calculatedSellingPrice:calculation.finalSellingPrice,buyerCurrency,fx,buyerUnitPrice:unit.toString(),buyerLineTotal:line.toString(),shippingIncluded,freeShipping:shippingIncluded,shippingMethod:freight.selected.name,deliveryMinDays:days.min,deliveryMaxDays:days.max,pricedAt,pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"}};
  }catch(error){logFailure(error,{productId:input.productId,variantId:input.variantId,quantity:input.quantity,destinationCountry,buyerCurrency});throw error;}
 }
 export function buyerSafeDropshippingResult(result:ResolvedDropshippingPricing){return result.buyer??{eligible:false,pricingMode:result.eligibility.pricingMode,freeShipping:false,shippingIncluded:false};}

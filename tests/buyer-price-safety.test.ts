@@ -60,7 +60,7 @@ test("reference freight-inclusive prices replace rather than reuse deferred snap
 });
 
 test("checkout remains server-authoritative and does not trust cart proof",()=>{
- const commerce=source("lib/suppliers/commerce-pricing.ts"),checkout=source("lib/payments.ts");
- assert.match(commerce,/provider\.calculateFreight/);assert.match(commerce,/verifiedFxRate/);assert.match(commerce,/calculateSupplierPrice/);
+ const commerce=source("lib/suppliers/commerce-pricing.ts"),originFreight=source("lib/suppliers/cj-origin-freight.ts"),checkout=source("lib/payments.ts");
+ assert.match(commerce,/resolveCjFreightAcrossOrigins\(provider/);assert.match(originFreight,/provider\.calculateFreight/);assert.match(commerce,/verifiedFxRate/);assert.match(commerce,/calculateSupplierPrice/);
  assert.match(checkout,/resolveDropshippingPricing/);assert.doesNotMatch(checkout,/authoritativePrice/);
 });
