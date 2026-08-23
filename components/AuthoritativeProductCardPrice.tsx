@@ -26,20 +26,22 @@ function loadQuote(productId:string,destinationCountry:string,buyerCurrency:stri
 
 export default function AuthoritativeProductCardPrice({productId,fallbackPrice,currency,className=""}:{productId:string;fallbackPrice:number;currency:string;className?:string}){
   const locale=useLocale() as Locale,root=useRef<HTMLSpanElement>(null),market=useBuyerMarket(),[state,setState]=useState<State>({status:"idle",price:null}),[retry,setRetry]=useState(0);
+  const sourceCurrency=currency.toUpperCase();
+  const displayFallback=sourceCurrency===market.currency;
   useEffect(()=>{
-    const element=root.current;if(!element)return;
+    const element=root.current;if(!element||!market.ready)return;
     let active=true;
     const observer=new IntersectionObserver((entries)=>{
       if(!entries.some(entry=>entry.isIntersecting))return;
       observer.disconnect();
       const country=market.country;
       if(!country){setState({status:"error",price:null});return;}
-      setState(current=>current.status==="ready"&&current.currency===market.currency?current:currency===market.currency?{status:"ready",price:fallbackPrice,currency}:{status:"loading",price:null});
+      setState(current=>current.status==="ready"&&current.currency===market.currency?current:displayFallback?{status:"ready",price:fallbackPrice,currency:sourceCurrency}:{status:"loading",price:null});
       void loadQuote(productId,country,market.currency).then(data=>{if(active)setState({status:"ready",price:Number(data.buyerUnitPrice),currency:data.buyerCurrency})}).catch(()=>{if(active)setState(current=>current.status==="ready"&&current.currency===market.currency?current:{status:"error",price:null})});
     },{rootMargin:"180px"});
     observer.observe(element);
     return()=>{active=false;observer.disconnect()};
-  },[currency,fallbackPrice,market.country,market.currency,productId,retry]);
-  if(state.status==="error")return <span ref={root} className={className}><button type="button" className="priceRetry" onClick={()=>setRetry(value=>value+1)} aria-label={productPriceUi[locale].retry}>↻</button></span>;
-  return <span ref={root} className={className} aria-live="polite" aria-busy={state.status!=="ready"}>{state.status==="ready"?new Intl.NumberFormat(locale,{style:"currency",currency:state.currency}).format(state.price):<span className="priceSkeleton" aria-label={productPriceUi[locale].updating}>…</span>}</span>;
+  },[displayFallback,fallbackPrice,market.country,market.currency,market.ready,productId,retry,sourceCurrency]);
+  if(state.status==="error")return <span ref={root} className={className}>{displayFallback?<>{new Intl.NumberFormat(locale,{style:"currency",currency:sourceCurrency}).format(fallbackPrice)}</>:<button type="button" className="priceRetry" onClick={()=>setRetry(value=>value+1)} aria-label={productPriceUi[locale].retry}>↻</button>}</span>;
+  return <span ref={root} className={className} aria-live="polite" aria-busy={state.status!=="ready"}>{state.status==="ready"?new Intl.NumberFormat(locale,{style:"currency",currency:state.currency}).format(state.price):displayFallback?new Intl.NumberFormat(locale,{style:"currency",currency:sourceCurrency}).format(fallbackPrice):<span className="priceSkeleton" aria-label={productPriceUi[locale].updating}>…</span>}</span>;
 }
