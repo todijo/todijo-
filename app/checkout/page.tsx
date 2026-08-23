@@ -9,6 +9,7 @@ import { useCart } from "@/components/CartProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { cartLineKey } from "@/lib/cart-line";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
+import {useBuyerMarket} from "@/components/BuyerMarketProvider";
 
 export default function CheckoutPage() {
   const { items, subtotal, currency, updateDisplayPricing, removeItem } = useCart();
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
   const shipping = useTranslations("Shipping");
   const locale = useLocale();
   const common=useTranslations("Common");
+  const market=useBuyerMarket();
 
   useEffect(()=>{fetch("/api/account/addresses",{cache:"no-store"}).then(async r=>r.ok?await r.json():{addresses:[]}).then(data=>setAddress(data.addresses?.[0]??null)).catch(()=>setAddress(null))},[]);
 
@@ -45,12 +47,12 @@ export default function CheckoutPage() {
     setQuote(null);setError("");setBlockedLines({});
     if (!items.length || !address) { setQuoteLoading(false); return; }
     let active = true; setQuoteLoading(true);
-    const timer=window.setTimeout(()=>fetch("/api/shipping/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items:items.map(item=>({productId:item.id,variantId:item.variantId,quantity:item.quantity})) }) })
+    const timer=window.setTimeout(()=>fetch("/api/shipping/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ buyerCurrency:market.currency,items:items.map(item=>({productId:item.id,variantId:item.variantId,quantity:item.quantity})) }) })
       .then(async (response) => ({ ok: response.ok, data: await response.json() as { code?: string; method?: string; amount?: string; currency?: string; free?: boolean; estimatedMinDays?: number; estimatedMaxDays?: number; carrier?: string | null;lines?:Array<{lineKey:string;available?:boolean;code?:string;allowedCountries?:string[];unitPrice?:string;currency?:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}> } }))
       .then(({ok,data}) => { if (!active) return;const available=data.lines?.filter(line=>line.available!==false&&line.unitPrice&&line.currency)??[];if(available.length)updateDisplayPricing(available.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency!,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));if(!ok){const blocked=data.lines?.filter(line=>line.available===false)??[];setBlockedLines(Object.fromEntries(blocked.map(line=>[line.lineKey,{code:line.code??"SHIPPING_NOT_CONFIGURED",allowedCountries:line.allowedCountries??[]}])));setError(blocked.length?"":data.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : data.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : data.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : shipping("notConfigured"));}else setQuote(data as NonNullable<typeof quote>); })
       .catch(()=>{ if (active) setError(shipping("quoteError")); }).finally(()=>{ if (active) setQuoteLoading(false); }),250);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [address, items, shipping, connect,updateDisplayPricing]);
+  }, [address, items, market.currency, shipping, connect,updateDisplayPricing]);
 
   async function beginCheckout() {
     setLoading(true); setError("");
@@ -59,7 +61,7 @@ export default function CheckoutPage() {
     const requestId = window.localStorage.getItem(storageKey) ?? crypto.randomUUID();
     window.localStorage.setItem(storageKey, requestId);
     try {
-      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });
+      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, shoppingCountry:market.country,buyerCurrency:market.currency,items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });
       const result = await response.json() as { url?: string; error?: string; code?: string; details?:{lines?:Array<{lineKey:string;unitPrice:string;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>} };
       if(response.status===409&&result.code==="CHECKOUT_PRICE_CHANGED"&&result.details?.lines?.length){updateDisplayPricing(result.details.lines.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));setError(t("startError"));setLoading(false);return;}
       if (!response.ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : result.code === "SELLER_STATUS_REQUIRED" ? sellerTransparency("checkoutBlocked") : result.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : result.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : result.code === "SHIPPING_NOT_CONFIGURED" ? shipping("notConfigured") : t("startError"));

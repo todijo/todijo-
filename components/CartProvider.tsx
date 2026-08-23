@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cartLineKey, normalizeCartOption, removePurchasedCartLines, type CartLineQuantity } from "@/lib/cart-line";
+import {useBuyerMarket} from "@/components/BuyerMarketProvider";
 
 export type CartProduct = {
   id: string;
@@ -59,10 +60,12 @@ function pendingCheckouts() {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const market=useBuyerMarket();
   const [items, setItems] = useState<CartItem[]>([]);
   const [storageKey, setStorageKey] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const storageKeyRef = useRef<string | null>(null);
+  const itemsRef=useRef(items);itemsRef.current=items;
   const pathname = usePathname();
   const clearCart = useCallback(() => setItems([]), []);
 
@@ -132,9 +135,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return () => { active = false; if (retryTimer) window.clearTimeout(retryTimer); };
   }, [hydrated, storageKey]);
 
+  useEffect(()=>{const snapshot=itemsRef.current;if(!hydrated||!snapshot.length||!market.ready)return;let active=true;setItems(current=>current.map(item=>({...item,authoritativePrice:false})));void(async()=>{const normal=snapshot.filter(item=>!item.requiresAuthoritativePrice),updates:Array<{lineKey:string;price:number;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>=[];if(normal.length){try{const response=await fetch("/api/products/buyer-pricing",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({country:market.country,currency:market.currency,items:normal.map(item=>({productId:item.id,variantId:item.variantId}))})}),data=await response.json() as {prices?:Array<{productId:string;variantId:string|null;amount:string;currency:string}>};if(response.ok)for(const item of normal){const price=data.prices?.find(value=>value.productId===item.id&&value.variantId===(item.variantId??null));if(price)updates.push({lineKey:item.lineKey!,price:Number(price.amount),currency:price.currency});}}catch{}}for(const item of snapshot.filter(value=>value.requiresAuthoritativePrice&&value.variantId)){try{const response=await fetch(`/api/products/${encodeURIComponent(item.id)}/dropshipping-pricing`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variantId:item.variantId,quantity:item.quantity,destinationCountry:market.country,buyerCurrency:market.currency}),cache:"no-store"}),data=await response.json() as {buyerUnitPrice?:string;buyerCurrency?:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null};if(response.ok&&data.buyerUnitPrice&&data.buyerCurrency)updates.push({lineKey:item.lineKey!,price:Number(data.buyerUnitPrice),currency:data.buyerCurrency,freeShipping:data.freeShipping,deliveryMinDays:data.deliveryMinDays,deliveryMaxDays:data.deliveryMaxDays});}catch{}}if(active&&updates.length){const byLine=new Map(updates.map(update=>[update.lineKey,update]));setItems(current=>current.map(item=>{const update=byLine.get(item.lineKey??"");return update?{...item,...update,authoritativePrice:true}:item}));}})();return()=>{active=false};},[hydrated,market.country,market.currency,market.ready]);
+
   const value = useMemo<CartContextValue>(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotal = items.reduce((sum, item) => sum + (item.requiresAuthoritativePrice&&!item.authoritativePrice?0:item.price * item.quantity), 0);
+    const subtotal = items.reduce((sum, item) => sum + (item.authoritativePrice===false?0:item.price * item.quantity), 0);
     const currency = items[0]?.currency ?? "EUR";
 
     return {

@@ -14,8 +14,8 @@ export async function POST(request: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   try {
-    const body = await request.json() as { requestId?: string; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?:string|number|null; displayedCurrency?:string|null }> };
-    const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? []);
+    const body = await request.json() as { requestId?: string;shoppingCountry?:unknown;buyerCurrency?:unknown; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?:string|number|null; displayedCurrency?:string|null }> };
+    const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? [],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency});
     return NextResponse.json(checkout);
   } catch (error) {
     const status = error instanceof CheckoutError ? error.status : 500;

@@ -76,6 +76,15 @@ test("single-seller checkout uses one platform payment and defers seller payout"
   assert.equal(order.shippingCountry, "FR");
 });
 
+test("ordinary seller checkout converts authoritative product and shipping amounts into one buyer currency",async()=>{
+  const fixture=checkoutDb();let stripeInput:any;
+  const marketplaceFx:any=async(baseCurrency:string,quoteCurrency:string)=>({provider:"OPEN_EXCHANGE_RATES",baseCurrency,quoteCurrency,rate:"1.1",fetchedAt:"2026-08-23T00:00:00.000Z",effectiveAt:"2026-08-23T00:00:00.000Z"});
+  await createCheckout(fixture.db,"buyer_1","request_usd",[{productId:"prod_1",quantity:1,displayedUnitPrice:"13.75",displayedCurrency:"USD"}],async(input:any)=>{stripeInput=input;return{id:"cs_usd",url:"https://checkout.stripe.test/usd"};},"FR",undefined,{buyerCurrency:"USD",marketplaceFx});
+  const order=await fixture.db.order.findUnique();assert.equal(order.currency,"USD");assert.equal(order.subtotal.toString(),"13.75");assert.equal(order.shippingCost.toString(),"4.95");assert.equal(order.total.toString(),"18.7");
+  assert.equal(stripeInput.items[0].currency,"USD");assert.equal(stripeInput.items[0].unitAmount,1375);assert.equal(stripeInput.shipping.currency,"USD");assert.equal(stripeInput.shipping.amount,495);
+  assert.equal(fixture.product.currency,"EUR");assert.equal(fixture.product.price.toString(),"12.5");
+});
+
 test("real checkout group persistence creates Seller A, Seller B and CJ exactly once",async()=>{
  const items=[{id:"ia",lineKey:"a",orderId:"o",orderGroupId:null},{id:"ib",lineKey:"b",orderId:"o",orderGroupId:null},{id:"icj",lineKey:"cj",orderId:"o",orderGroupId:null}],groups:any[]=[];
  const tx:any={orderGroup:{upsert:async({where,create}:any)=>{const key=where.orderId_groupKey.groupKey,existing=groups.find(group=>group.groupKey===key);if(existing)return existing;const group={id:`g${groups.length+1}`,...create};groups.push(group);return group}},orderItem:{updateMany:async({where,data}:any)=>{let count=0;for(const item of items)if(item.orderId===where.orderId&&where.lineKey.in.includes(item.lineKey)&&item.orderGroupId===null){item.orderGroupId=data.orderGroupId;count++}return{count}},count:async({where}:any)=>items.filter(item=>item.orderId===where.orderId&&item.orderGroupId===null).length}};

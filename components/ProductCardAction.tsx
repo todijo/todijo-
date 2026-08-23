@@ -6,7 +6,7 @@ import { useCart, type CartProduct } from "@/components/CartProvider";
 import { type Locale } from "@/i18n/config";
 import { productCardOptionHref, resolveProductCardAction } from "@/lib/product-card-action";
 
-type ProductCardActionProduct = Pick<CartProduct, "id" | "name" | "price" | "currency" | "image" | "storeName" | "storeSlug"> & {
+type ProductCardActionProduct = Pick<CartProduct, "id" | "name" | "price" | "currency" | "image" | "storeName" | "storeSlug"|"authoritativePrice"> & {
   stock: number | null;
   hasActiveVariants: boolean;
   isGenerallyAvailable: boolean;

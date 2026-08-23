@@ -18,24 +18,25 @@ test("all public product-card sources propagate the deferred-price safety marker
   assert.match(source(path),/requiresAuthoritativeDropshippingPrice/);
  }
  const card=source("components/MarketplaceProductCard.tsx"),cardPrice=source("components/AuthoritativeProductCardPrice.tsx"),action=source("components/ProductCardAction.tsx"),home=source("app/HomeClient.tsx");
- assert.match(card,/requiresAuthoritativePrice\?<strong><AuthoritativeProductCardPrice/);
- assert.match(cardPrice,/readShoppingCountry\(window\.localStorage\)/);
+ assert.match(card,/<BuyerProductPrice[^>]+requiresAuthoritativePrice=\{product\.requiresAuthoritativePrice\}/);
+ assert.match(card,/authoritativePrice:\s*Boolean\(presentment\)/);
+ assert.match(cardPrice,/useBuyerMarket\(\)/);
  assert.match(cardPrice,/IntersectionObserver/);
  assert.match(cardPrice,/pendingQuotes/);
- assert.match(cardPrice,/dropshippingPricingRequestKey\(\{productId,variantId:data\.variantId,quantity:1,destinationCountry\}\)/);
- assert.match(cardPrice,/fallbackPrice:number;currency:string/);assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat/);
- assert.match(cardPrice,/productPriceUi\[locale\]\.from\(minimum\)/);assert.doesNotMatch(cardPrice,/common\("loading"\)/);
+ assert.match(cardPrice,/dropshippingPricingRequestKey\(\{productId,variantId:data\.variantId,quantity:1,destinationCountry\}\)\}:\$\{buyerCurrency\}/);
+ assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat/);
+ assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*:"…"/);assert.doesNotMatch(cardPrice,/common\("loading"\)|from\(minimum\)/);
  assert.match(action,/CHOOSE_OPTIONS"\|\|product\.requiresAuthoritativePrice/);
- assert.match(home,/requiresAuthoritativePrice\?<AuthoritativeProductCardPrice/);
+ assert.match(home,/<BuyerProductPrice/);
  assert.doesNotMatch(card+home,/pricingUnavailable/);
 });
 
-test("product detail renders a safe minimum but invalidates cart eligibility until a matching quote",()=>{
+test("product detail fails closed without a buyer-market price and invalidates cart eligibility until a matching quote",()=>{
  const price=source("app/product/[id]/ProductDetailPrice.tsx"),panel=source("components/ProductPurchasePanel.tsx"),live=source("components/DropshippingProductPricing.tsx");
- assert.match(price,/Intl\.NumberFormat/);assert.match(price,/initialMinimum/);assert.match(price,/exact\?formatted:text\.from\(formatted\)/);assert.match(price,/useLayoutEffect/);
+ assert.match(price,/Intl\.NumberFormat/);assert.match(price,/pendingPresentment\?"…"/);assert.match(price,/useLayoutEffect/);assert.doesNotMatch(price,/pendingPresentment\?formatted/);
  assert.match(panel,/verifiedPricing\.variantId===selectedVariant\?\.id&&verifiedPricing\.quantity===quantity/);
- assert.match(panel,/useLayoutEffect/);assert.match(panel,/activePricing\|\|!requiresAuthoritativePrice\?\{price:selectedPrice,currency:selectedCurrency,verified:true\}:\{verified:false\}/);
- assert.match(panel,/pricingReady=!requiresAuthoritativePrice\|\|Boolean\(activePricing\)/);
+ assert.match(panel,/useLayoutEffect/);assert.match(panel,/pricingReady=dropshippingEligible\?Boolean\(activePricing\):Boolean\(marketplacePricing\)/);
+ assert.match(panel,/<BuyerProductPrice[^>]+onResolved=\{updateMarketplacePricing\}/);
  assert.match(panel,/disabled=\{!available\|\|!pricingReady\}/);
  assert.match(live,/setState\(\{status:"loading",data:null\}\);onChange\(null,true\)/);
  assert.match(live,/setState\(\{status:"error",data:null\}\);onChange\(null,false\)/);
@@ -44,9 +45,9 @@ test("product detail renders a safe minimum but invalidates cart eligibility unt
 
 test("cart excludes unverified deferred lines and records authoritative server updates",()=>{
  const provider=source("components/CartProvider.tsx"),cart=source("app/cart/page.tsx");
- assert.match(provider,/requiresAuthoritativePrice&&!item\.authoritativePrice\?0:item\.price \* item\.quantity/);
+ assert.match(provider,/item\.authoritativePrice===false\?0:item\.price \* item\.quantity/);
  assert.match(provider,/authoritativePrice:true/);
- assert.match(cart,/requiresAuthoritativePrice && !item\.authoritativePrice \? pricing\("pricingLoading"\)/);
+ assert.match(cart,/item\.authoritativePrice===false \? pricing\("pricingLoading"\)/);
 });
 
 test("reference freight-inclusive prices replace rather than reuse deferred snapshots",()=>{

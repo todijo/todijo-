@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Grid2X2, Heart, Home, Menu, MessageCircle, P
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ShoppingCountrySwitcher from "@/components/ShoppingCountrySwitcher";
 import { useCart } from "@/components/CartProvider";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId, subcategoryImagePath } from "@/lib/desktop-category-taxonomy";
@@ -111,7 +112,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
           <a href={localizedPath(locale, "/info/privacy")} onClick={closeDrawer}>{footer("privacy")}</a>
         </div>
       </nav>
-      <LanguageSwitcher className="buyerMobileDrawerLanguage"/>
+      <div className="buyerMobileMarketControls"><ShoppingCountrySwitcher className="buyerMobileDrawerMarket"/><LanguageSwitcher className="buyerMobileDrawerLanguage"/></div>
       {accountName ? <form action="/api/auth/logout" method="post"><button type="submit">{common("logout")}</button></form> : null}</>}
     </aside>
   </div>, document.body) : null;

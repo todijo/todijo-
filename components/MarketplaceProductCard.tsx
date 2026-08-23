@@ -3,11 +3,11 @@
 import Image from "next/image";
 import { Package } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import {useCallback,useState} from "react";
 import ProductCardWishlist from "@/components/ProductCardWishlist";
 import ProductCardAction from "@/components/ProductCardAction";
 import { categoryLabel } from "@/lib/categories";
-import { formatCurrency } from "@/lib/formatters";
-import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCardPrice";
+import BuyerProductPrice from "@/components/BuyerProductPrice";
 
 export type MarketplaceCardProduct = {
   id: string; name: string; price: string; compareAtPrice: string | null; currency: string;
@@ -22,6 +22,8 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
   const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
   const price = Number(product.price);
   const discount = oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0;
+  const [presentment,setPresentment]=useState<{price:number;currency:string}|null>(null);
+  const resolved=useCallback((value:{amount:string;currency:string})=>setPresentment({price:Number(value.amount),currency:value.currency}),[]);
 
   return <article className="discoveryCard">
     <a className="discoveryImageWrap" href={`/${locale}/product/${product.id}`} aria-label={product.name}>
@@ -33,7 +35,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
     <div className="discoveryCardBody">
       {showCategory && <span className="cartRecommendationCategory">{categoryLabel(product.category, (key) => categories(key))}</span>}
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
-      <div className="cardBottom"><div>{product.requiresAuthoritativePrice?<strong><AuthoritativeProductCardPrice productId={product.id} fallbackPrice={price} currency={product.currency}/></strong>:<><strong>{formatCurrency(price, product.currency, locale)}</strong>{oldPrice && oldPrice > price ? <del>{formatCurrency(oldPrice, product.currency, locale)}</del> : null}</>}</div><ProductCardAction product={{ ...product, price, image: product.image ?? undefined }}/></div>
+      <div className="cardBottom"><div><strong><BuyerProductPrice productId={product.id} sourcePrice={price} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice} onResolved={resolved}/></strong></div>{product.requiresAuthoritativePrice||presentment?<ProductCardAction product={{ ...product, price:presentment?.price??price,currency:presentment?.currency??product.currency,authoritativePrice:Boolean(presentment), image: product.image ?? undefined }}/>:<span className="productCardPricePending" aria-hidden="true">…</span>}</div>
     </div>
   </article>;
 }

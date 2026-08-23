@@ -141,7 +141,7 @@ test("French pricing copy is UTF-8 and the double-encoded source is gone", () =>
 test("pricing, cart and country continue to use canonical selection identity", () => {
   const panel = readFileSync("components/ProductPurchasePanel.tsx", "utf8"), pricing = readFileSync("components/DropshippingProductPricing.tsx", "utf8");
   assert.match(panel, /variantId=\{selectedVariant\?\.id\?\?null\}/); assert.match(panel, /quantity=\{quantity\}/);
-  assert.match(pricing, /variantId,quantity,destinationCountry:country/); assert.match(pricing, /readShoppingCountry\(window\.localStorage\)/); assert.doesNotMatch(pricing,/api\/account\/addresses|addShippingAddress|changeAddress/);
+  assert.match(pricing, /variantId,quantity,destinationCountry:country,buyerCurrency:market\.currency/); assert.match(pricing, /useBuyerMarket\(\)/); assert.doesNotMatch(pricing,/api\/account\/addresses|addShippingAddress|changeAddress/);
   assert.match(panel, /setVerifiedPricing\(pricing\)/); assert.match(panel, /verifiedPricing\.variantId===selectedVariant\?\.id/);
   assert.match(panel,/\)\?\.position\?\?0\)<position/);assert.doesNotMatch(panel,/setQuantity\(1\)/);
 });
@@ -160,10 +160,10 @@ test("the main product heading area never substitutes a country prompt for price
   assert.doesNotMatch(price, /selectDeliveryCountry/);
 });
 
-test("CJ deferred price display starts from a safe minimum until the exact canonical quote is verified",()=>{
+test("CJ deferred price display fails closed until the exact canonical buyer-currency quote is verified",()=>{
   const price=readFileSync("app/product/[id]/ProductDetailPrice.tsx","utf8"),panel=readFileSync("components/ProductPurchasePanel.tsx","utf8"),live=readFileSync("components/DropshippingProductPricing.tsx","utf8");
   assert.match(price,/selectedPrice, setSelectedPrice\] = useState\(price\)/);assert.doesNotMatch(price,/return null/);
   assert.match(panel,/selectedVariant\?\.priceOverride \?\? product\.price/);assert.match(panel,/activePricing\?Number\(activePricing\.buyerUnitPrice\)/);assert.match(panel,/detail: activePricing\|\|!requiresAuthoritativePrice\?\{price:selectedPrice,currency:selectedCurrency,verified:true\}:\{verified:false\}/);
-  assert.match(price,/initialMinimum/);assert.match(price,/exact\?formatted:text\.from\(formatted\)/);assert.doesNotMatch(price,/verified:false[\s\S]{0,100}price:/);
+  assert.match(price,/pendingPresentment\?"…"/);assert.doesNotMatch(price,/pendingPresentment\?formatted/);assert.doesNotMatch(price,/verified:false[\s\S]{0,100}price:/);
   assert.match(live,/state\.status==="loading"/);assert.match(live,/state\.status==="error"/);assert.doesNotMatch(live,/status==="loading"[\s\S]{0,120}buyerUnitPrice/);
 });

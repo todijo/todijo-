@@ -12,14 +12,14 @@ import {normalizeShoppingCountry} from "@/lib/suppliers/buyer-pricing";
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
-  const {id}=await params,body=await request.json() as {variantId?:unknown;quantity?:unknown;destinationCountry?:unknown};
+  const {id}=await params,body=await request.json() as {variantId?:unknown;quantity?:unknown;destinationCountry?:unknown;buyerCurrency?:unknown};
   const previewRequested=new URL(request.url).searchParams.get("adminPreview")==="1";
   if(previewRequested)await requireAdmin(prisma,await readSession());
   const destinationCountry=normalizeShoppingCountry(body.destinationCountry);if(!destinationCountry)return NextResponse.json({error:"INVALID_DESTINATION"},{status:400});
   const requestedVariantId=typeof body.variantId==="string"?body.variantId.trim():"";
   const defaultVariant=requestedVariantId?null:await prisma.productVariant.findFirst({where:{productId:id,active:true,stock:{gt:0},supplierVariantId:{not:null}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true}});
   const variantId=requestedVariantId||defaultVariant?.id||"";
-  const result=await resolveDropshippingPricing(prisma,{productId:id,variantId,quantity:Number(body.quantity),destinationCountry,buyerCurrency:undefined},{allowUnpublished:previewRequested});
+  const result=await resolveDropshippingPricing(prisma,{productId:id,variantId,quantity:Number(body.quantity),destinationCountry,buyerCurrency:body.buyerCurrency},{allowUnpublished:previewRequested});
   return NextResponse.json(buyerSafeDropshippingResult(result));
  }catch(error){
   if(error instanceof AdminAccessError)return NextResponse.json({error:error.code},{status:error.status});
