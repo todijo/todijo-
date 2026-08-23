@@ -19,8 +19,11 @@ export default function ShoppingCountrySwitcher({className="marketHeaderLanguage
     return()=>{active=false};
   },[]);
 
-  return <label className={className}><span className="srOnly">Country</span><select value={country} aria-label="Country" onChange={event=>{const next=persistShoppingCountry(window.localStorage,event.target.value);if(!next)return;setCountry(next);window.location.reload();}}>
-    <option value="" disabled>Country</option>
-    {SHIPPING_COUNTRY_CODES.map(code=><option key={code} value={code}>{code}</option>)}
-  </select></label>;
+  const choose=(code:string)=>{const next=persistShoppingCountry(window.localStorage,code);if(!next)return;setCountry(next);window.location.reload();};
+  return <details className={className} data-shopping-country-switcher="true">
+    <summary aria-label="Country">{country||"Country"}</summary>
+    <div role="menu" aria-label="Country">
+      {SHIPPING_COUNTRY_CODES.map(code=><button key={code} type="button" role="menuitem" onClick={()=>choose(code)} aria-current={country===code?"true":undefined}>{code}</button>)}
+    </div>
+  </details>;
 }
