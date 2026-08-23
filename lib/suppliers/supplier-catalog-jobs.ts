@@ -8,6 +8,7 @@ import { defaultSupplierMediaProvider, importSupplierProduct } from "./supplier-
 import { catalogComplianceDecision, publicCatalogError, resolveCatalogCategory } from "./supplier-catalog-policy";
 import type { SupplierCatalogProvider, SupplierProductSnapshot } from "./types";
 import { classifyCjProductByTaxonomyId } from "./cj-taxonomy-classifier";
+import { resolveCjFreightAcrossOrigins } from "./cj-origin-freight";
 
 export const MAX_CATALOG_JOB_ITEMS=500;
 export const DEFAULT_CATALOG_PROCESS_LIMIT=3;
@@ -54,12 +55,21 @@ export async function createCatalogImportJob(db:PrismaClient,input:JobCategoryIn
 
 async function verifiedCatalogPricing(provider:SupplierCatalogProvider,snapshot:SupplierProductSnapshot,destinationCountry:string,sellingCurrency:string){
   if(!provider.calculateFreight)throw new Error("CJ_FREIGHT_UNAVAILABLE");
-  const variant=snapshot.variants.find((candidate)=>candidate.available&&candidate.cost!=null&&candidate.originCountryCodes.length===1);
-  if(!variant)throw new Error("DROPSHIPPING_ORIGIN_OR_COST_UNAVAILABLE");
-  const freight=await provider.calculateFreight({originCountry:variant.originCountryCodes[0],destinationCountry,variantId:variant.supplierVariantId,quantity:1});
-  const calculation=calculateSupplierVariantPriceWithFreight(snapshot,variant.supplierVariantId,{amount:freight.selected.amount,currency:freight.selected.currency});
-  const fx=await verifiedFxRate(calculation.sellingCurrency,sellingCurrency),presentment=convertSupplierPriceForBuyer(calculation,sellingCurrency as never,fx);
-  return{status:"VERIFIED_LIVE_FREIGHT",evidence:{supplierVariantId:variant.supplierVariantId,quantity:1,originCountry:variant.originCountryCodes[0],destinationCountry,freightMethod:freight.selected.name,freightAmount:freight.selected.amount,freightCurrency:freight.selected.currency,totalIncludedCost:calculation.totalIncludedCost,targetMargin:calculation.targetMargin,sellingCurrency,referenceSellingPrice:presentment.finalSellingPrice,fx:{provider:fx.provider,rate:fx.rate,effectiveAt:fx.effectiveAt},calculatedAt:new Date().toISOString(),source:"CJ_LIVE_FREIGHT_VERIFIED_FX"}};
+  const variants=snapshot.variants.filter((candidate)=>candidate.available&&candidate.cost!=null&&candidate.originCountryCodes.length>0);
+  if(!variants.length)throw new Error("DROPSHIPPING_ORIGIN_OR_COST_UNAVAILABLE");
+  let best:null|{variant:typeof variants[number];freight:Awaited<ReturnType<typeof resolveCjFreightAcrossOrigins>>;calculation:ReturnType<typeof calculateSupplierVariantPriceWithFreight>;presentment:ReturnType<typeof convertSupplierPriceForBuyer>;fx:Awaited<ReturnType<typeof verifiedFxRate>>}=null;
+  let firstError:unknown=null;
+  const freightProvider={calculateFreight:provider.calculateFreight.bind(provider)};
+  for(const variant of variants){
+    try{
+      const freight=await resolveCjFreightAcrossOrigins(freightProvider,{originCountryCodes:variant.originCountryCodes,destinationCountry,variantId:variant.supplierVariantId,quantity:1});
+      const calculation=calculateSupplierVariantPriceWithFreight(snapshot,variant.supplierVariantId,{amount:freight.selected.amount,currency:freight.selected.currency});
+      const fx=await verifiedFxRate(calculation.sellingCurrency,sellingCurrency),presentment=convertSupplierPriceForBuyer(calculation,sellingCurrency as never,fx);
+      if(!best||new Prisma.Decimal(presentment.finalSellingPrice).lt(best.presentment.finalSellingPrice))best={variant,freight,calculation,presentment,fx};
+    }catch(error){firstError??=error;}
+  }
+  if(!best)throw firstError??new Error("CJ_FREIGHT_NO_METHODS");
+  return{status:"VERIFIED_LIVE_FREIGHT",evidence:{supplierVariantId:best.variant.supplierVariantId,quantity:1,originCountry:best.freight.selected.originCountry,destinationCountry,freightMethod:best.freight.selected.name,freightAmount:best.freight.selected.amount,freightCurrency:best.freight.selected.currency,totalIncludedCost:best.calculation.totalIncludedCost,targetMargin:best.calculation.targetMargin,sellingCurrency,referenceSellingPrice:best.presentment.finalSellingPrice,fx:{provider:best.fx.provider,rate:best.fx.rate,effectiveAt:best.fx.effectiveAt},calculatedAt:new Date().toISOString(),source:"CJ_LIVE_FREIGHT_VERIFIED_FX"}};
 }
 
 function quarantineCode(code:string){return code.includes("PRICING")||code.startsWith("FX_")||code.includes("FREIGHT")||code.includes("ORIGIN_OR_COST")||code==="CJ_PRODUCT_NOT_FOUND"||code==="SUPPLIER_PRODUCT_INVALID"||code==="CJ_PRODUCT_INVALID";}
