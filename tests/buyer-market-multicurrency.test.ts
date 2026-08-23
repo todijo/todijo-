@@ -18,7 +18,7 @@ test("buyer markets resolve independently from locale with safe USD fallback",()
 });
 
 test("supported native country currencies are explicit and unsupported markets fall back to USD",()=>{
- const expected={FR:"EUR",DE:"EUR",BE:"EUR",ES:"EUR",IT:"EUR",NL:"EUR",PT:"EUR",AT:"EUR",IE:"EUR",FI:"EUR",GR:"EUR",LU:"EUR",GB:"GBP",US:"USD",CA:"CAD",AU:"AUD",CH:"CHF",JP:"JPY",SE:"SEK",NO:"NOK",DK:"DKK",PL:"PLN",CZ:"CZK",HU:"HUF",RO:"RON",TR:"TRY",AE:"AED",SA:"SAR",QA:"QAR",SG:"SGD",HK:"HKD",NZ:"NZD",KR:"KRW",IN:"INR",MX:"MXN",BR:"BRL",ZA:"ZAR",IQ:"USD"};
+ const expected={AD:"EUR",FR:"EUR",DE:"EUR",BE:"EUR",ES:"EUR",IT:"EUR",NL:"EUR",PT:"EUR",AT:"EUR",IE:"EUR",FI:"EUR",GR:"EUR",LU:"EUR",MC:"EUR",ME:"EUR",SM:"EUR",VA:"EUR",GB:"GBP",JE:"GBP",US:"USD",CA:"CAD",AU:"AUD",CH:"CHF",LI:"CHF",JP:"JPY",SE:"SEK",NO:"NOK",DK:"DKK",PL:"PLN",CZ:"CZK",HU:"HUF",RO:"RON",TR:"TRY",AE:"AED",SA:"SAR",QA:"QAR",SG:"SGD",HK:"HKD",NZ:"NZD",KR:"KRW",IN:"INR",MX:"MXN",BR:"BRL",ZA:"ZAR",IQ:"USD"};
  for(const [country,currency] of Object.entries(expected))assert.equal(preferredCurrencyForCountry(country),currency,country);
  assert.equal(preferredCurrencyForCountry("ZZ"),"USD");
 });
@@ -42,10 +42,10 @@ test("market selector is controlled and mobile is paired with language",()=>{
  assert.match(mobile,/buyerMobileMarketControls/);assert.match(mobile,/ShoppingCountrySwitcher/);assert.match(layout,/BuyerMarketProvider/);
 });
 
-test("ordinary cards batch only the active currency and CJ cards use the shared one-QPS queue with retry",()=>{
+test("ordinary cards batch only the active currency and CJ cards use batched FX estimates plus the one-QPS live queue",()=>{
  const ordinary=readFileSync("components/BuyerProductPrice.tsx","utf8"),cj=readFileSync("components/AuthoritativeProductCardPrice.tsx","utf8"),route=readFileSync("app/api/products/buyer-pricing/route.ts","utf8");
  assert.match(ordinary,/timer=setTimeout/);assert.match(ordinary,/groups\.set\(item\.currency/);assert.doesNotMatch(ordinary,/SHIPPING_COUNTRY_CODES|for\(const country/);assert.match(ordinary,/priceCache/);assert.match(ordinary,/priceRetry/);
- assert.match(route,/memoizeFxResolver\(\)/);assert.match(cj,/scheduleCj/);assert.match(cj,/nextCjStart=Date\.now\(\)\+1000/);assert.match(cj,/priceRetry/);
+ assert.match(route,/memoizeFxResolver\(\)/);assert.match(route,/estimatePrice/);assert.match(cj,/loadEstimate/);assert.match(cj,/estimateQueue/);assert.match(cj,/kind:"estimatePrice"/);assert.match(cj,/scheduleCj/);assert.match(cj,/nextCjStart=Date\.now\(\)\+1000/);assert.match(cj,/priceRetry/);
 });
 
 test("same-currency country changes do not reprice ordinary shipping or cart lines",()=>{
