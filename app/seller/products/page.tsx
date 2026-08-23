@@ -11,6 +11,15 @@ import { canPublish } from "@/lib/seller-subscription";
 
 export const dynamic = "force-dynamic";
 
+const dynamicPriceLabel:Record<string,string>={
+  en:"Final price depends on destination and live delivery",fr:"Prix final selon la destination et la livraison en direct",ku:"نرخی کۆتایی بە شوێنی گەیاندن و گەیاندنی ڕاستەوخۆ پەیوەستە",de:"Endpreis abhängig von Zielort und Live-Versand",es:"Precio final según destino y envío en vivo",it:"Prezzo finale in base a destinazione e spedizione in tempo reale",nl:"Eindprijs volgens bestemming en live verzending",pt:"Preço final conforme destino e envio em tempo real",tr:"Nihai fiyat varış noktası ve canlı gönderime göre",ru:"Итоговая цена зависит от адреса и актуальной доставки",ar:"السعر النهائي حسب الوجهة والشحن المباشر",fa:"قیمت نهایی بر اساس مقصد و ارسال زنده",hi:"अंतिम कीमत गंतव्य और लाइव डिलीवरी पर निर्भर है",zh:"最终价格取决于目的地和实时配送"
+};
+function hasDeferredAutomaticPrice(metadata:unknown){
+  if(!metadata||typeof metadata!=="object"||Array.isArray(metadata))return false;
+  const pricing=(metadata as Record<string,unknown>).pricing;
+  return Boolean(pricing&&typeof pricing==="object"&&!Array.isArray(pricing)&&(pricing as Record<string,unknown>).mode==="AUTOMATIC"&&(pricing as Record<string,unknown>).shippingStatus==="DEFERRED");
+}
+
 export default async function SellerProductsPage() {
   const [t, control, p, common, dashboardText, transparency, compliance, supplierText, locale, session] = await Promise.all([
     getTranslations("Seller"), getTranslations("SellerControl"), getTranslations("DashboardPremium"),
@@ -26,7 +35,7 @@ export default async function SellerProductsPage() {
       owner: { select: { firstName: true, lastName: true } },
       subscription: { select: { status: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
-      products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true } },
+      products: { orderBy: { createdAt: "desc" }, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true, supplierLink:{select:{sourceMetadata:true}} } },
     },
   });
   if (!store) redirect("/seller/create-store");
@@ -64,14 +73,14 @@ export default async function SellerProductsPage() {
     </section>
 
     {store.products.length === 0 ? <section className="emptyProductsPanel sellerProductsEmpty"><Package size={48} aria-hidden="true"/><h2>{t("noProducts")}</h2><p>{t("noProductsText")}</p><Link className="sellerControlButton primary" href={subscriptionActive ? `/${locale}/seller/products/new` : readinessHref}>{subscriptionActive ? <Plus size={17} aria-hidden="true"/> : sellerTypeRequired || vatStatusRequired ? <Boxes size={17} aria-hidden="true"/> : <CreditCard size={17} aria-hidden="true"/>}{subscriptionActive ? t("firstProduct") : readinessAction}</Link></section>
-      : <section className="sellerProductsGrid sellerProductsGridPremium">{store.products.map((product) => <article className="sellerProductCard" key={product.id}>
+      : <section className="sellerProductsGrid sellerProductsGridPremium">{store.products.map((product) => {const deferred=hasDeferredAutomaticPrice(product.supplierLink?.sourceMetadata);return <article className="sellerProductCard" key={product.id}>
         <Link className="sellerProductVisual" href={`/${locale}/seller/products/${product.id}/edit`}>
           {product.images[0] ? <Image src={product.images[0]} alt={product.name} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 340px" unoptimized/> : <span className="sellerProductPlaceholder"><Package size={48}/></span>}
         </Link>
         <div className="sellerProductBody"><div className="productStatusLine"><span className={product.status === "PUBLISHED" ? "statusPublished" : "statusDraft"}>{product.status === "PUBLISHED" ? control("published") : control("draftStatus")}</span><span>{control("stockCount", { count: product.stock })}</span></div>
-          <h2>{product.name}</h2><strong>{product.price.toString()} {product.currency}</strong>
+          <h2>{product.name}</h2>{deferred?<><strong>{dynamicPriceLabel[locale]??dynamicPriceLabel.en}</strong><small>{product.price.toString()} {product.currency} · reference hors livraison live</small></>:<strong>{product.price.toString()} {product.currency}</strong>}
           <div className="sellerProductActions"><Link href={`/${locale}/seller/products/${product.id}/edit`}><Pencil size={16} aria-hidden="true"/>{common("edit")}</Link>{product.status === "PUBLISHED" ? <Link href={`/${locale}/product/${product.id}`}><Eye size={16} aria-hidden="true"/>{t("viewListing")}</Link> : <span className="draftHint">{t("draft")}</span>}</div>
         </div>
-      </article>)}</section>}
+      </article>})}</section>}
   </SellerDashboardLayout>;
 }
