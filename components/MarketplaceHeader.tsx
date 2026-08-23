@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
 import CartLink from "@/components/CartLink";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ShoppingCountrySwitcher from "@/components/ShoppingCountrySwitcher";
 import MarketplaceCategoryNavigation from "@/components/MarketplaceCategoryNavigation";
 import MarketplaceBrowseFilterBar from "@/components/MarketplaceBrowseFilterBar";
 import TodijoLogo from "@/components/TodijoLogo";
@@ -54,6 +55,7 @@ export default function MarketplaceHeader({ showCategoryNav = true, showFilterDo
           <Link className="marketHeaderIconAction" href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined} aria-label={ux("favoritesNav")}><Heart size={20} aria-hidden="true"/><span>{ux("favoritesNav")}</span></Link>
           <CartLink label={common("cart")} className="homeCartLink" />
           <Link className="marketAccountAction" href={localizedPath(locale, accountName ? "/dashboard" : "/login")}><UserRound size={20} aria-hidden="true"/><span><small>{header("hello")}</small><strong>{accountName ?? common("account")}</strong></span><ChevronDown size={14} aria-hidden="true"/></Link>
+          <ShoppingCountrySwitcher className="marketHeaderLanguage"/>
           <LanguageSwitcher className="marketHeaderLanguage"/>
         </nav>
         <div className="marketMobileActions"><Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-label={accountName ?? common("account")}><UserRound size={22} aria-hidden="true"/></Link><CartLink label={common("cart")} className="homeCartLink"/></div>
