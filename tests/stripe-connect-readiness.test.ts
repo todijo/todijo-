@@ -20,15 +20,15 @@ test("Connect readiness requires the expected account plus onboarding, charges, 
 
 test("read-only admin counts expose every migration readiness category", () => {
   const counts = connectReadinessCounts([
-    { stripeAccountId: null, stripeOnboardingComplete: false, stripeChargesEnabled: false, stripePayoutsEnabled: false },
-    { stripeAccountId: "acct_incomplete", stripeOnboardingComplete: false, stripeChargesEnabled: false, stripePayoutsEnabled: false },
-    { stripeAccountId: "acct_ready", stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true },
+    { sellerSuspendedAt: null, stripeAccountId: null, stripeOnboardingComplete: false, stripeChargesEnabled: false, stripePayoutsEnabled: false },
+    { sellerSuspendedAt: null, stripeAccountId: "acct_incomplete", stripeOnboardingComplete: false, stripeChargesEnabled: false, stripePayoutsEnabled: false },
+    { sellerSuspendedAt: null, stripeAccountId: "acct_ready", stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true },
   ]);
-  assert.deepEqual(counts, { total: 3, withAccount: 2, withoutAccount: 1, incompleteOnboarding: 2, chargesDisabled: 2, payoutsDisabled: 2, ready: 1, compliance: "ACTION_REQUIRED" });
+  assert.deepEqual(counts, { total: 3, activeTotal: 3, activeReady: 1, activeRequiringRemediation: 2, suspendedHistorical: 0, withAccount: 2, withoutAccount: 1, incompleteOnboarding: 2, chargesDisabled: 2, payoutsDisabled: 2, ready: 1, compliance: "ACTION_REQUIRED" });
 });
 
-test("admin compliance becomes COMPLIANT only when every seller is fully ready", () => {
-  const ready = { stripeAccountId: "acct_ready_123456", stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true };
+test("admin compliance becomes COMPLIANT only when every active seller is fully ready", () => {
+  const ready = { sellerSuspendedAt: null, stripeAccountId: "acct_ready_123456", stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true };
   assert.equal(connectReadinessCounts([ready, ready]).compliance, "COMPLIANT");
   assert.equal(connectReadinessState({ ...ready, stripeAccountId: null }), "NOT_STARTED");
   assert.equal(connectReadinessState({ ...ready, stripeOnboardingComplete: false }), "ONBOARDING_INCOMPLETE");
@@ -39,11 +39,30 @@ test("admin compliance becomes COMPLIANT only when every seller is fully ready",
   assert.equal(maskedStripeAccountId(null), "—");
 });
 
+test("suspended historical sellers remain counted but do not fail active compliance", () => {
+  const ready = { sellerSuspendedAt: null, stripeAccountId: "acct_ready", stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true };
+  const historical = { sellerSuspendedAt: new Date("2026-08-24T00:00:00Z"), stripeAccountId: "acct_historical", stripeOnboardingComplete: false, stripeChargesEnabled: false, stripePayoutsEnabled: false };
+  const snapshot = structuredClone([ready, historical]);
+  const counts = connectReadinessCounts([ready, historical]);
+  assert.equal(counts.compliance, "COMPLIANT");
+  assert.deepEqual({ activeTotal: counts.activeTotal, activeReady: counts.activeReady, activeRequiringRemediation: counts.activeRequiringRemediation, suspendedHistorical: counts.suspendedHistorical, total: counts.total }, { activeTotal: 1, activeReady: 1, activeRequiringRemediation: 0, suspendedHistorical: 1, total: 2 });
+  assert.deepEqual([ready, historical], snapshot, "readiness calculation must not mutate seller records");
+
+  const reactivated = { ...historical, sellerSuspendedAt: null };
+  const afterReactivation = connectReadinessCounts([ready, reactivated]);
+  assert.equal(afterReactivation.compliance, "ACTION_REQUIRED");
+  assert.equal(afterReactivation.activeRequiringRemediation, 1);
+  assert.equal(afterReactivation.suspendedHistorical, 0);
+});
+
 test("admin compliance view identifies sellers and gives a safe remediation path", () => {
   const page = readFileSync(join(process.cwd(), "app/adm-barewbar-182203/connect-readiness/page.tsx"), "utf8");
   assert.match(page, /requireAdmin/);
   assert.match(page, /Seller readiness register/);
   assert.match(page, /ACTION REQUIRED/);
+  assert.match(page, /sellerSuspendedAt/);
+  assert.match(page, /SUSPENDED \/ HISTORICAL — NOT COUNTED IN ACTIVE COMPLIANCE/);
+  assert.match(page, /Reactivation immediately makes Connect readiness required again/);
   assert.match(page, /Dashboard → Connect Stripe/);
   assert.match(page, /maskedStripeAccountId/);
   assert.doesNotMatch(page, /createConnectedAccount|STRIPE_SECRET_KEY/);
