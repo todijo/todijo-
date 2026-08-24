@@ -1,4 +1,5 @@
 export type ConnectReadinessSeller = {
+  sellerSuspendedAt: Date | null;
   stripeAccountId: string | null;
   stripeOnboardingComplete: boolean;
   stripeChargesEnabled: boolean;
@@ -21,14 +22,21 @@ export function maskedStripeAccountId(accountId: string | null) {
 }
 
 export function connectReadinessCounts(sellers: ConnectReadinessSeller[]) {
-  const counts = { total: sellers.length, withAccount: 0, withoutAccount: 0, incompleteOnboarding: 0, chargesDisabled: 0, payoutsDisabled: 0, ready: 0 };
+  const counts = { total: sellers.length, activeTotal: 0, activeReady: 0, activeRequiringRemediation: 0, suspendedHistorical: 0, withAccount: 0, withoutAccount: 0, incompleteOnboarding: 0, chargesDisabled: 0, payoutsDisabled: 0, ready: 0 };
   for (const seller of sellers) {
+    const state = connectReadinessState(seller);
     if (!seller.stripeAccountId) counts.withoutAccount += 1;
     else counts.withAccount += 1;
     if (!seller.stripeOnboardingComplete) counts.incompleteOnboarding += 1;
     if (!seller.stripeChargesEnabled) counts.chargesDisabled += 1;
     if (!seller.stripePayoutsEnabled) counts.payoutsDisabled += 1;
-    if (connectReadinessState(seller) === "READY") counts.ready += 1;
+    if (state === "READY") counts.ready += 1;
+    if (seller.sellerSuspendedAt) counts.suspendedHistorical += 1;
+    else {
+      counts.activeTotal += 1;
+      if (state === "READY") counts.activeReady += 1;
+      else counts.activeRequiringRemediation += 1;
+    }
   }
-  return { ...counts, compliance: counts.ready === counts.total ? "COMPLIANT" as const : "ACTION_REQUIRED" as const };
+  return { ...counts, compliance: counts.activeRequiringRemediation === 0 ? "COMPLIANT" as const : "ACTION_REQUIRED" as const };
 }
