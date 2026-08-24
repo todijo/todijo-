@@ -24,6 +24,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
   const discount = oldPrice && oldPrice > price ? Math.round((1 - price / oldPrice) * 100) : 0;
   const [presentment,setPresentment]=useState<{price:number;currency:string}|null>(null);
   const resolved=useCallback((value:{amount:string;currency:string})=>setPresentment({price:Number(value.amount),currency:value.currency}),[]);
+  const pricingKind=product.requiresAuthoritativePrice?"estimatePrice":"productPrice";
 
   return <article className="discoveryCard">
     <a className="discoveryImageWrap" href={`/${locale}/product/${product.id}`} aria-label={product.name}>
@@ -35,7 +36,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
     <div className="discoveryCardBody">
       {showCategory && <span className="cartRecommendationCategory">{categoryLabel(product.category, (key) => categories(key))}</span>}
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
-      <div className="cardBottom"><div><strong><BuyerProductPrice productId={product.id} sourcePrice={price} sourceCurrency={product.currency} requiresAuthoritativePrice={false} onResolved={resolved}/></strong></div>{product.requiresAuthoritativePrice||presentment?<ProductCardAction product={{ ...product, price:presentment?.price??price,currency:presentment?.currency??product.currency,authoritativePrice:Boolean(presentment), image: product.image ?? undefined }}/>:<span className="productCardPricePending" aria-hidden="true">…</span>}</div>
+      <div className="cardBottom"><div><strong><BuyerProductPrice productId={product.id} sourcePrice={price} sourceCurrency={product.currency} requiresAuthoritativePrice={false} pricingKind={pricingKind} onResolved={resolved}/></strong></div>{presentment?<ProductCardAction product={{ ...product, price:presentment.price,currency:presentment.currency,authoritativePrice:true, image: product.image ?? undefined }}/>:<span className="productCardPricePending" aria-hidden="true">…</span>}</div>
     </div>
   </article>;
 }

@@ -19,8 +19,11 @@ test("public product cards keep deferred safety while avoiding live per-card fre
  }
  const card=source("components/MarketplaceProductCard.tsx"),cardPrice=source("components/AuthoritativeProductCardPrice.tsx"),action=source("components/ProductCardAction.tsx"),home=source("app/HomeClient.tsx");
  assert.match(card,/<BuyerProductPrice[^>]+requiresAuthoritativePrice=\{false\}/);
- assert.match(card,/product\.requiresAuthoritativePrice\|\|presentment/);
- assert.match(card,/authoritativePrice:\s*Boolean\(presentment\)/);
+ assert.match(card,/const pricingKind=product\.requiresAuthoritativePrice\?"estimatePrice":"productPrice"/);
+ assert.match(card,/pricingKind=\{pricingKind\}/);
+ assert.match(card,/\{presentment\?<ProductCardAction/);
+ assert.match(card,/authoritativePrice:\s*true/);
+ assert.doesNotMatch(card,/product\.requiresAuthoritativePrice\|\|presentment/);
  assert.match(cardPrice,/useBuyerMarket\(\)/);
  assert.match(cardPrice,/IntersectionObserver/);
  assert.match(cardPrice,/pendingQuotes/);
