@@ -143,6 +143,12 @@ export function connectedAccountStatus(account: StripeConnectedAccount) {
   return { stripeOnboardingComplete: account.details_submitted, stripeChargesEnabled: account.charges_enabled, stripePayoutsEnabled: account.payouts_enabled };
 }
 
+export function connectedAccountReady(account: StripeConnectedAccount, expectedAccountId?: string) {
+  return account.object === "account" && Boolean(account.id)
+    && (!expectedAccountId || account.id === expectedAccountId)
+    && account.details_submitted && account.charges_enabled && account.payouts_enabled;
+}
+
 export function platformFeePercent() {
   const raw = process.env.STRIPE_PLATFORM_FEE_PERCENT;
   const value = raw == null || raw.trim() === "" ? 10 : Number(raw);

@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { createStripeTransfer } from "./stripe";
+import { connectedAccountReady, connectedAccountStatus, createStripeTransfer, retrieveConnectedAccount } from "./stripe";
 import { resolveSellerMaturity, transferEligibility } from "./seller-maturity";
 
 export async function markSellerGroupsShipmentVerified(db: PrismaClient, orderId: string, storeIds: string[], now = new Date()) {
@@ -12,11 +12,16 @@ export async function markSellerGroupsShipmentVerified(db: PrismaClient, orderId
   return results;
 }
 
-export async function processEligibleSellerTransfer(db: PrismaClient, groupId: string, now = new Date(), submit=createStripeTransfer){
+export async function processEligibleSellerTransfer(db: PrismaClient, groupId: string, now = new Date(), submit=createStripeTransfer, retrieve=retrieveConnectedAccount){
   const claimed=await db.orderGroup.updateMany({where:{id:groupId,kind:"MARKETPLACE",transferStatus:{in:["READY","RETRYABLE"]},transferEligibleAt:{lte:now},stripeConnectedAccountId:{not:null},stripeTransferId:null},data:{transferStatus:"SUBMITTING",transferAttemptCount:{increment:1}}});
   if(claimed.count!==1)return{idempotent:true};
-  const group=await db.orderGroup.findUniqueOrThrow({where:{id:groupId},select:{id:true,orderId:true,stripeConnectedAccountId:true,sellerNetAmountMinor:true,transferIdempotencyKey:true,order:{select:{currency:true}}}});
+  const group=await db.orderGroup.findUniqueOrThrow({where:{id:groupId},select:{id:true,orderId:true,stripeConnectedAccountId:true,sellerNetAmountMinor:true,transferIdempotencyKey:true,store:{select:{owner:{select:{id:true,stripeAccountId:true}}}},order:{select:{currency:true}}}});
   try{
+    const authoritativeId=group.store?.owner.stripeAccountId;
+    if(!authoritativeId||authoritativeId!==group.stripeConnectedAccountId)throw new Error("Seller connected account no longer matches the checkout snapshot.");
+    const account=await retrieve(authoritativeId);
+    await db.user.update({where:{id:group.store!.owner.id},data:connectedAccountStatus(account)});
+    if(!connectedAccountReady(account,authoritativeId))throw new Error("Seller connected account is not ready for transfers.");
     const transfer=await submit({amount:group.sellerNetAmountMinor,currency:group.order.currency,destination:group.stripeConnectedAccountId!,transferGroup:`order:${group.orderId}`,idempotencyKey:group.transferIdempotencyKey!});
     await db.orderGroup.update({where:{id:group.id},data:{transferStatus:"TRANSFERRED",stripeTransferId:transfer.id,transferredAt:now,nextTransferAttemptAt:null,transferErrorMessage:null}});return{transferred:true,id:transfer.id};
   }catch(error){await db.orderGroup.update({where:{id:group.id},data:{transferStatus:"RETRYABLE",nextTransferAttemptAt:new Date(now.getTime()+15*60_000),transferErrorMessage:error instanceof Error?error.message.slice(0,500):"Stripe transfer failed"}});throw error}

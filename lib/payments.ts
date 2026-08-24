@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
+import { connectedAccountReady, connectedAccountStatus, createStripeCheckoutSession, platformFeePercent, retrieveConnectedAccount, retrieveStripeCheckoutSession, retrieveStripeSubscription, type StripeCheckoutSession, type StripeConnectedAccount, type StripeEvent, type StripeInvoice, type StripeSubscription } from "./stripe";
 import { cartLineKey, normalizeCartOption } from "./cart-line";
 import {cartShippingQuote,effectiveShippingRule,normalizeCountryCode,quoteShippingRule,ShippingError} from "./shipping";
 import { assertSupplierPurchasable } from "./suppliers/safety";
@@ -15,7 +15,7 @@ export class CheckoutError extends Error {
 }
 
 type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?: string | number | null; displayedCurrency?: string | null };
-type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3] };
+type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
 
 export function embeddedShippingQuote(lines:Array<{pricingSnapshot:DropshippingPriceSnapshot|null}>,currency:SupportedBuyerCurrency,destinationCountry:unknown){
@@ -64,9 +64,6 @@ export async function createCheckout(
   }
 
   const existing = await db.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
-  if (existing?.stripeCheckoutSessionId && existing.stripeCheckoutUrl) {
-    return { orderId: existing.id, sessionId: existing.stripeCheckoutSessionId, url: existing.stripeCheckoutUrl, reused: true };
-  }
   if (existing && existing.status !== "PENDING") throw new CheckoutError("This checkout request can no longer be reused.", 409);
 
   const lines = [...quantities.values()];
@@ -87,8 +84,15 @@ export async function createCheckout(
     if(store.sellerType==="UNKNOWN")throw new CheckoutError("SELLER_STATUS_REQUIRED",409);
     const vat=await db.store.findUniqueOrThrow({where:{id:store.id},select:{vatStatus:true}});
     if(store.sellerType==="PROFESSIONAL"&&vat.vatStatus==="UNKNOWN")throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
-    if(!store.owner.stripeAccountId||!store.owner.stripeOnboardingComplete||!store.owner.stripeChargesEnabled)throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);
+    if(!store.owner.stripeAccountId)throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);
+    let account:StripeConnectedAccount;
+    try{account=await (pricingDependencies.retrieveConnectedAccount??retrieveConnectedAccount)(store.owner.stripeAccountId);}catch{throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);}
+    const status=connectedAccountStatus(account);
+    if(typeof db.user.update==="function")await db.user.update({where:{stripeAccountId:store.owner.stripeAccountId},data:status});
+    Object.assign(store.owner,status);
+    if(!connectedAccountReady(account,store.owner.stripeAccountId))throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);
   }
+  if (existing?.stripeCheckoutSessionId && existing.stripeCheckoutUrl) return { orderId: existing.id, sessionId: existing.stripeCheckoutSessionId, url: existing.stripeCheckoutUrl, reused: true };
   // Legacy top-level snapshots remain populated for single-group orders while
   // OrderGroup becomes authoritative for mixed carts.
   const seller=products[0].store.owner;

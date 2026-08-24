@@ -65,6 +65,7 @@ export default async function AdminPage() {
     <SiteHeader />
     <section className="adminShell">
       <header className="adminHero">
+        <Link href="/adm-barewbar-182203/connect-readiness">Stripe Connect readiness</Link>
         <div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{t("intro")}</p></div>
         <div><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/content">{contentText.title}</Link><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link></div>
       </header>

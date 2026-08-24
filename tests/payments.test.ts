@@ -5,6 +5,9 @@ import { Prisma } from "@prisma/client";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckoutGroups, processStripeEvent } from "../lib/payments";
 import { assertStripeWebhookMode, configuredStripeMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
+const readyConnectedAccount = async (id = "acct_seller") => ({ id, object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
+const connectDeps = { retrieveConnectedAccount: readyConnectedAccount };
+
 function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
   let order: any = null;
   let creates = 0;
@@ -18,7 +21,7 @@ function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROF
     },
     product: { findMany: async () => [product] },
     store: { findUniqueOrThrow: async () => ({ vatStatus: "REGISTERED" }) },
-    user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com", firstName: "Buyer", lastName: "Example" }) },
+    user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com", firstName: "Buyer", lastName: "Example" }), update: async () => ({}) },
   };
   return { db, product, getCreates: () => creates };
 }
@@ -54,8 +57,8 @@ test("duplicate checkout request creates one order and one Stripe session", asyn
   const fixture = checkoutDb(); let stripeCalls = 0;
   const stripe: any = async () => { stripeCalls++; return { id: "cs_1", url: "https://checkout.stripe.test/cs_1" }; };
   const input = [{ productId: "prod_1", quantity: 1 }];
-  const first = await createCheckout(fixture.db, "buyer_1", "request_123", input, stripe, "FR");
-  const second = await createCheckout(fixture.db, "buyer_1", "request_123", input, stripe, "FR");
+  const first = await createCheckout(fixture.db, "buyer_1", "request_123", input, stripe, "FR", undefined, connectDeps);
+  const second = await createCheckout(fixture.db, "buyer_1", "request_123", input, stripe, "FR", undefined, connectDeps);
   assert.equal(first.orderId, second.orderId); assert.equal(second.reused, true);
   assert.equal(fixture.getCreates(), 1); assert.equal(stripeCalls, 1);
 });
@@ -63,7 +66,7 @@ test("duplicate checkout request creates one order and one Stripe session", asyn
 test("single-seller checkout uses one platform payment and defers seller payout", async () => {
   const fixture = checkoutDb(); let stripeInput: any;
   const stripe: any = async (input: any) => { stripeInput = input; return { id: "cs_fee", url: "https://checkout.stripe.test/cs_fee" }; };
-  await createCheckout(fixture.db, "buyer_1", "request_fee", [{ productId: "prod_1", quantity: 2 }], stripe, "FR");
+  await createCheckout(fixture.db, "buyer_1", "request_fee", [{ productId: "prod_1", quantity: 2 }], stripe, "FR", undefined, connectDeps);
   assert.equal(stripeInput.connectedAccountId, undefined);
   assert.equal(stripeInput.platformFeeAmount, undefined);
   assert.equal(stripeInput.shipping.amount, 450);
@@ -79,7 +82,7 @@ test("single-seller checkout uses one platform payment and defers seller payout"
 test("ordinary seller checkout converts authoritative product and shipping amounts into one buyer currency",async()=>{
   const fixture=checkoutDb();let stripeInput:any;
   const marketplaceFx:any=async(baseCurrency:string,quoteCurrency:string)=>({provider:"OPEN_EXCHANGE_RATES",baseCurrency,quoteCurrency,rate:"1.1",fetchedAt:"2026-08-23T00:00:00.000Z",effectiveAt:"2026-08-23T00:00:00.000Z"});
-  await createCheckout(fixture.db,"buyer_1","request_usd",[{productId:"prod_1",quantity:1,displayedUnitPrice:"13.75",displayedCurrency:"USD"}],async(input:any)=>{stripeInput=input;return{id:"cs_usd",url:"https://checkout.stripe.test/usd"};},"FR",undefined,{buyerCurrency:"USD",marketplaceFx});
+  await createCheckout(fixture.db,"buyer_1","request_usd",[{productId:"prod_1",quantity:1,displayedUnitPrice:"13.75",displayedCurrency:"USD"}],async(input:any)=>{stripeInput=input;return{id:"cs_usd",url:"https://checkout.stripe.test/usd"};},"FR",undefined,{buyerCurrency:"USD",marketplaceFx,...connectDeps});
   const order=await fixture.db.order.findUnique();assert.equal(order.currency,"USD");assert.equal(order.subtotal.toString(),"13.75");assert.equal(order.shippingCost.toString(),"4.95");assert.equal(order.total.toString(),"18.7");
   assert.equal(stripeInput.items[0].currency,"USD");assert.equal(stripeInput.items[0].unitAmount,1375);assert.equal(stripeInput.shipping.currency,"USD");assert.equal(stripeInput.shipping.amount,495);
   assert.equal(fixture.product.currency,"EUR");assert.equal(fixture.product.price.toString(),"12.5");
@@ -105,9 +108,9 @@ test("checkout reprices an eligible supplier line once, preserves mixed shipping
   const snapshot:any={pricingMode:"AUTOMATIC",provider:"CJ",productId:"cj",variantId:"variant_cj",supplierProductId:"supplier",supplierVariantId:"supplier-v",quantity:1,supplierCurrency:"USD",supplierUnitCost:"8.24",freightCurrency:"USD",freightTotal:"4.75",supportedFees:[],includedCost:"12.99",targetMargin:"0.2",calculatedSellingPrice:"16.24",buyerCurrency:"EUR",fx:{base:"USD",quote:"EUR",rate:"0.866341",source:"OPEN_EXCHANGE_RATES",effectiveAt:"2026-08-11T00:00:00.000Z",fetchedAt:"2026-08-11T00:00:00.000Z"},buyerUnitPrice:"14.07",buyerLineTotal:"14.07",shippingIncluded:true,freeShipping:true,shippingMethod:"CJ Standard",deliveryMinDays:8,deliveryMaxDays:15,pricedAt:"2026-08-11T00:00:00.000Z",pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"};
   const resolver:any=async()=>{pricingCalls++;return{eligibility:{eligible:true},buyer:{buyerUnitPrice:"14.07"},snapshot};};
   const items=[{productId:"cj",variantId:"variant_cj",quantity:1,displayedUnitPrice:"9",displayedCurrency:"USD"},{productId:"normal",quantity:1,displayedUnitPrice:"12.50",displayedCurrency:"EUR"}];
-  await assert.rejects(()=>createCheckout(db,"buyer_1","request_mix",items,undefined,"FR",undefined,{resolveDropshipping:resolver}),(error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_PRICE_CHANGED"&&error.status===409);
+  await assert.rejects(()=>createCheckout(db,"buyer_1","request_mix",items,undefined,"FR",undefined,{resolveDropshipping:resolver,...connectDeps}),(error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_PRICE_CHANGED"&&error.status===409);
   items[0].displayedUnitPrice="14.07";items[0].displayedCurrency="EUR";
-  await createCheckout(db,"buyer_1","request_mix",items,async(input:any)=>{stripeInput=input;return{id:"cs_mix",url:"https://stripe.test/mix"};},"FR",undefined,{resolveDropshipping:resolver});
+  await createCheckout(db,"buyer_1","request_mix",items,async(input:any)=>{stripeInput=input;return{id:"cs_mix",url:"https://stripe.test/mix"};},"FR",undefined,{resolveDropshipping:resolver,...connectDeps});
   assert.equal(pricingCalls,2);assert.equal(order.subtotal.toString(),"26.57");assert.equal(order.shippingCost.toString(),"4.5");assert.equal(order.total.toString(),"31.07");
   assert.equal(stripeInput.items[0].unitAmount,1407);assert.equal(stripeInput.shipping.amount,450);assert.equal(stripeInput.items[0].currency,"EUR");
   assert.deepEqual(order.items[0].supplierPricingSnapshot.create.snapshot,snapshot);assert.equal(order.items[1].supplierPricingSnapshot,undefined);
@@ -116,12 +119,23 @@ test("checkout reprices an eligible supplier line once, preserves mixed shipping
 
 test("checkout rejects a destination outside the seller shipping region", async () => {
   const fixture = checkoutDb();
-  await assert.rejects(() => createCheckout(fixture.db, "buyer_1", "request_region", [{ productId: "prod_1", quantity: 1 }], undefined, "US"), (error: unknown) => error instanceof CheckoutError && error.message === "SHIPPING_DESTINATION_UNAVAILABLE");
+  await assert.rejects(() => createCheckout(fixture.db, "buyer_1", "request_region", [{ productId: "prod_1", quantity: 1 }], undefined, "US", undefined, connectDeps), (error: unknown) => error instanceof CheckoutError && error.message === "SHIPPING_DESTINATION_UNAVAILABLE");
 });
 
 test("checkout rejects sellers that cannot accept Connect charges", async () => {
   const fixture = checkoutDb(5, false);
   await assert.rejects(() => createCheckout(fixture.db, "buyer_1", "request_not_ready", [{ productId: "prod_1", quantity: 1 }], undefined, "FR"), (error: unknown) => error instanceof CheckoutError && error.message === "SELLER_STRIPE_NOT_READY");
+});
+
+test("checkout rejects incomplete onboarding and disabled payouts from authoritative Stripe state", async () => {
+  for (const stripeState of [
+    { details_submitted: false, charges_enabled: true, payouts_enabled: true },
+    { details_submitted: true, charges_enabled: true, payouts_enabled: false },
+  ]) {
+    const fixture = checkoutDb();
+    const retrieveConnectedAccount: any = async () => ({ id: "acct_seller", object: "account", ...stripeState });
+    await assert.rejects(() => createCheckout(fixture.db, "buyer_1", `request_${stripeState.details_submitted ? "payout" : "onboard"}`, [{ productId: "prod_1", quantity: 1 }], undefined, "FR", undefined, { retrieveConnectedAccount }), (error: unknown) => error instanceof CheckoutError && error.message === "SELLER_STRIPE_NOT_READY");
+  }
 });
 
 test("duplicate webhook event is acknowledged without processing", async () => {
@@ -148,7 +162,7 @@ test("paid webhook rejects a mismatched destination account", async () => {
 
 test("checkout rejects insufficient stock before creating an order", async () => {
   const fixture = checkoutDb(1);
-  await assert.rejects(() => createCheckout(fixture.db, "buyer_1", "request_123", [{ productId: "prod_1", quantity: 2 }], undefined, "FR"), (error: unknown) => error instanceof CheckoutError && error.status === 409);
+  await assert.rejects(() => createCheckout(fixture.db, "buyer_1", "request_123", [{ productId: "prod_1", quantity: 2 }], undefined, "FR", undefined, connectDeps), (error: unknown) => error instanceof CheckoutError && error.status === 409);
   assert.equal(fixture.getCreates(), 0);
 });
 
@@ -184,7 +198,7 @@ test("checkout blocks unknown sellers and snapshots confirmed status", async () 
   const unknown = checkoutDb(5, true, "UNKNOWN");
   await assert.rejects(() => createCheckout(unknown.db, "buyer_1", "request_unknown", [{ productId: "prod_1", quantity: 1 }], undefined, "FR"), (error: unknown) => error instanceof CheckoutError && error.message === "SELLER_STATUS_REQUIRED");
   const professional = checkoutDb();
-  await createCheckout(professional.db, "buyer_1", "request_status", [{ productId: "prod_1", quantity: 1 }], async () => ({ id: "cs_status", url: "https://checkout.stripe.test/status" }), "FR");
+  await createCheckout(professional.db, "buyer_1", "request_status", [{ productId: "prod_1", quantity: 1 }], async () => ({ id: "cs_status", url: "https://checkout.stripe.test/status" }), "FR", undefined, connectDeps);
   const order = await professional.db.order.findUnique();
   assert.equal(order.sellerTypeSnapshot, "PROFESSIONAL");
   assert.equal(order.storeSnapshot.sellerType, "PROFESSIONAL");

@@ -10,5 +10,5 @@
     "isolatedModules": false
   },
   "include": ["i18n/dropshipping-access.ts", "i18n/site-content.ts", "lib/site-content.ts", "lib/admin-access.ts", "lib/seller-maturity.ts", "lib/refund-policy.ts", "lib/inventory-restock.ts", "lib/auth-redirects.ts", "lib/auth-registration.ts", "lib/buyer-orders.ts", "lib/dashboard.ts", "lib/locale-routing.ts", "lib/payments.ts", "lib/product-images.ts", "lib/product-media.ts", "lib/seller-dashboard.ts", "lib/seller-subscription.ts", "lib/sitemap-partitions.ts", "lib/sitemap-xml.ts", "lib/stripe.ts", "lib/suppliers/cj-auth.ts", "lib/suppliers/cj-client.ts", "lib/suppliers/safety.ts", "lib/suppliers/supplier-access.ts", "lib/suppliers/supplier-provider.ts", "lib/suppliers/types.ts", "lib/turnstile-verification.ts", "tests/**/*.test.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "Todijo-mobile-categories-final"]
 }
