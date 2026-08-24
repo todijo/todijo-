@@ -35,7 +35,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
     <div className="discoveryCardBody">
       {showCategory && <span className="cartRecommendationCategory">{categoryLabel(product.category, (key) => categories(key))}</span>}
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
-      <div className="cardBottom"><div><strong><BuyerProductPrice productId={product.id} sourcePrice={price} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice} onResolved={resolved}/></strong></div>{product.requiresAuthoritativePrice||presentment?<ProductCardAction product={{ ...product, price:presentment?.price??price,currency:presentment?.currency??product.currency,authoritativePrice:Boolean(presentment), image: product.image ?? undefined }}/>:<span className="productCardPricePending" aria-hidden="true">…</span>}</div>
+      <div className="cardBottom"><div><strong><BuyerProductPrice productId={product.id} sourcePrice={price} sourceCurrency={product.currency} requiresAuthoritativePrice={false} onResolved={resolved}/></strong></div>{product.requiresAuthoritativePrice||presentment?<ProductCardAction product={{ ...product, price:presentment?.price??price,currency:presentment?.currency??product.currency,authoritativePrice:Boolean(presentment), image: product.image ?? undefined }}/>:<span className="productCardPricePending" aria-hidden="true">…</span>}</div>
     </div>
   </article>;
 }

@@ -13,12 +13,13 @@ test("only automatic deferred-freight metadata requires an authoritative buyer p
  assert.equal(requiresAuthoritativeDropshippingPrice(null),false);
 });
 
-test("all public product-card sources propagate the deferred-price safety marker",()=>{
+test("public product cards keep deferred safety while avoiding live per-card freight repricing",()=>{
  for(const path of ["app/page.tsx","app/api/products/route.ts","app/api/cart/recommendations/route.ts","app/store/[slug]/page.tsx","app/product/[id]/page.tsx"]){
   assert.match(source(path),/requiresAuthoritativeDropshippingPrice/);
  }
  const card=source("components/MarketplaceProductCard.tsx"),cardPrice=source("components/AuthoritativeProductCardPrice.tsx"),action=source("components/ProductCardAction.tsx"),home=source("app/HomeClient.tsx");
- assert.match(card,/<BuyerProductPrice[^>]+requiresAuthoritativePrice=\{product\.requiresAuthoritativePrice\}/);
+ assert.match(card,/<BuyerProductPrice[^>]+requiresAuthoritativePrice=\{false\}/);
+ assert.match(card,/product\.requiresAuthoritativePrice\|\|presentment/);
  assert.match(card,/authoritativePrice:\s*Boolean\(presentment\)/);
  assert.match(cardPrice,/useBuyerMarket\(\)/);
  assert.match(cardPrice,/IntersectionObserver/);
