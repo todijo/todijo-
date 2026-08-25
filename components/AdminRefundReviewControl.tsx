@@ -44,7 +44,7 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const editable = (request.status === "PENDING" || request.status === "SELLER_REJECTED") && !submitted;
+  const editable = (["PENDING", "SELLER_APPROVED", "SELLER_REJECTED"] as const).includes(request.status as "PENDING" | "SELLER_APPROVED" | "SELLER_REJECTED") && !submitted;
   const date = (value: Date | string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
   async function decide(decision: "approve" | "reject") {

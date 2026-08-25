@@ -1080,6 +1080,7 @@ model OrderGroup {
   transferStatus SellerTransferStatus @default(WAITING_FOR_SHIPMENT)
   transferIdempotencyKey String? @unique @db.VarChar(200)
   stripeTransferId String? @unique
+  transferSubmittedAmountMinor Int?
   transferAttemptCount Int @default(0)
   nextTransferAttemptAt DateTime?
   transferErrorCode String? @db.VarChar(120)
@@ -1185,12 +1186,18 @@ model OrderItem {
 
 model RefundOperation {
  id String @id @default(cuid())
+ refundRequestId String? @unique
  orderId String
  buyerId String
+ currency String? @db.VarChar(3)
  status RefundOperationStatus @default(REQUESTED)
  reason String @db.VarChar(1000)
  stripeRefundId String? @unique
  refundIdempotencyKey String @unique @db.VarChar(200)
+ attemptCount Int @default(0)
+ nextAttemptAt DateTime?
+ errorCode String? @db.VarChar(120)
+ errorMessage String? @db.VarChar(500)
  merchandiseAmountMinor Int @default(0)
  shippingAmountMinor Int @default(0)
  totalAmountMinor Int @default(0)
@@ -1199,10 +1206,12 @@ model RefundOperation {
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
  order Order @relation(fields:[orderId],references:[id],onDelete:Cascade)
+ refundRequest RefundRequest? @relation(fields:[refundRequestId],references:[id],onDelete:SetNull)
  groupAllocations RefundGroupAllocation[]
  itemAllocations RefundItemAllocation[]
  restockEvents InventoryRestockEvent[]
  @@index([buyerId,createdAt])
+ @@index([status,nextAttemptAt])
 }
 model RefundGroupAllocation {
  id String @id @default(cuid())
@@ -1239,16 +1248,21 @@ model TransferReversal {
  orderGroupId String
  refundGroupAllocationId String
  amountMinor Int
+ currency String? @db.VarChar(3)
+ originalStripeTransferId String? @db.VarChar(255)
  idempotencyKey String @unique @db.VarChar(200)
  stripeReversalId String? @unique
  status RefundAllocationStatus @default(REQUESTED)
  attemptCount Int @default(0)
+ nextAttemptAt DateTime?
+ errorCode String? @db.VarChar(120)
  errorMessage String? @db.VarChar(500)
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
  orderGroup OrderGroup @relation(fields:[orderGroupId],references:[id],onDelete:Restrict)
  refundGroupAllocation RefundGroupAllocation @relation(fields:[refundGroupAllocationId],references:[id],onDelete:Cascade)
  @@unique([refundGroupAllocationId,orderGroupId])
+ @@index([status,nextAttemptAt])
 }
 model InventoryRestockEvent {
  id String @id @default(cuid())
@@ -1468,6 +1482,7 @@ model RefundRequest {
   buyer      User  @relation("RefundRequestBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
   reviewedBy User? @relation("RefundRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   evidence   RefundEvidence[]
+  refundOperation RefundOperation?
 
   @@unique([orderId])
   @@index([buyerId, createdAt])

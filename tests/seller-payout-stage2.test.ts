@@ -64,7 +64,7 @@ test("NEW seller reserve is persisted from authoritative shipment time and becom
 
 test("fresh SUBMITTING claims are not stolen while stale claims recover with the original Stripe idempotency key", async () => {
   const originalKey = "seller-transfer:order:store";
-  const state: any = { id: "group", kind: "MARKETPLACE", transferStatus: "SUBMITTING", nextTransferAttemptAt: new Date(shippedAt.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS), shipmentVerifiedAt: shippedAt, transferEligibleAt: shippedAt, transferIdempotencyKey: originalKey, stripeTransferId: null };
+  const state: any = { id: "group", kind: "MARKETPLACE", transferStatus: "SUBMITTING", nextTransferAttemptAt: new Date(shippedAt.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS), shipmentVerifiedAt: shippedAt, transferEligibleAt: shippedAt, transferIdempotencyKey: originalKey, transferSubmittedAmountMinor: 1234, stripeTransferId: null };
   const stripeLogicalTransfers = new Map<string, string>();
   let submissions = 0;
   let claimed = false;
@@ -81,13 +81,13 @@ test("fresh SUBMITTING claims are not stolen while stale claims recover with the
         claimed = true; Object.assign(state, data, { transferStatus: "SUBMITTING" }); return { count: 1 };
       },
       findMany: async () => state.transferStatus === "RETRYABLE" ? [{ id: state.id }] : [],
-      findUniqueOrThrow: async () => ({ ...state, orderId: "order", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 1234, store: { status: "ACTIVE", owner }, order: { currency: "EUR" } }),
+      findUniqueOrThrow: async () => ({ ...state, orderId: "order", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 1234, sellerRecoveredMinor: 400, store: { status: "ACTIVE", owner }, order: { currency: "EUR" } }),
       update: async ({ data }: any) => { Object.assign(state, data); return state; },
     },
     user: { update: async () => ({}) },
   };
   const retrieve = async () => ({ id: "acct_ready", object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
-  const submit = async ({ idempotencyKey }: any) => { submissions += 1; assert.equal(idempotencyKey, originalKey); const id = stripeLogicalTransfers.get(idempotencyKey) ?? "tr_logical_once"; stripeLogicalTransfers.set(idempotencyKey, id); return { id }; };
+  const submit = async ({ idempotencyKey, amount }: any) => { submissions += 1; assert.equal(idempotencyKey, originalKey); if (amount != null) assert.equal(amount, 1234); const id = stripeLogicalTransfers.get(idempotencyKey) ?? "tr_logical_once"; stripeLogicalTransfers.set(idempotencyKey, id); return { id }; };
 
   // Stripe accepted the first logical request, but the process crashed before finalizing the group.
   await submit({ idempotencyKey: originalKey });

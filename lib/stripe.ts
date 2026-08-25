@@ -81,19 +81,27 @@ function stripeSecret() {
   return validateStripeSecretKey(process.env.STRIPE_SECRET_KEY);
 }
 
+export class StripeTransportError extends Error {}
+export class StripeApiError extends Error {}
+
 async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; body?: URLSearchParams; idempotencyKey?: string } = {}) {
-  const response = await fetch(`https://api.stripe.com/v1${path}`, {
-    method: init.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${stripeSecret()}`,
-      ...(init.body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
-      ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
-    },
-    body: init.body,
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`https://api.stripe.com/v1${path}`, {
+      method: init.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${stripeSecret()}`,
+        ...(init.body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+        ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
+      },
+      body: init.body,
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new StripeTransportError(error instanceof Error ? error.message : "Stripe request transport failed.");
+  }
   const json = (await response.json()) as T & { error?: { message?: string } };
-  if (!response.ok) throw new Error(json.error?.message ?? `Stripe request failed (${response.status}).`);
+  if (!response.ok) throw new StripeApiError(json.error?.message ?? `Stripe request failed (${response.status}).`);
   return json;
 }
 
@@ -221,6 +229,22 @@ export function createStripeTransfer(input:{amount:number;currency:string;destin
   const body=new URLSearchParams({amount:String(input.amount),currency:input.currency.toLowerCase(),destination:input.destination,transfer_group:input.transferGroup});
   if(input.sourceTransaction)body.set("source_transaction",input.sourceTransaction);
   return stripeRequest<{id:string}>("/transfers",{method:"POST",idempotencyKey:input.idempotencyKey,body});
+}
+
+export function createStripeRefund(input: { paymentIntentId: string; amount: number; idempotencyKey: string }) {
+  return stripeRequest<{ id: string; status?: string }>("/refunds", {
+    method: "POST",
+    idempotencyKey: input.idempotencyKey,
+    body: new URLSearchParams({ payment_intent: input.paymentIntentId, amount: String(input.amount) }),
+  });
+}
+
+export function createStripeTransferReversal(input: { transferId: string; amount: number; idempotencyKey: string }) {
+  return stripeRequest<{ id: string }>(`/transfers/${encodeURIComponent(input.transferId)}/reversals`, {
+    method: "POST",
+    idempotencyKey: input.idempotencyKey,
+    body: new URLSearchParams({ amount: String(input.amount) }),
+  });
 }
 
 export async function createStripeCustomer(input: { storeId: string; userId: string; email: string; name: string }) {
