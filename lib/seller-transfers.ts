@@ -5,6 +5,7 @@ import { connectedAccountReady, connectedAccountStatus, createStripeTransfer, re
 import { resolveSellerMaturity, transferEligibility } from "./seller-maturity";
 
 type Database = PrismaClient | Prisma.TransactionClient;
+export const SELLER_TRANSFER_STALE_CLAIM_MS = 15 * 60_000;
 
 export async function markSellerGroupsShipmentVerified(db: Database, orderId: string, storeIds: string[], now = new Date()) {
   const results = [];
@@ -44,7 +45,7 @@ export async function releaseHighRiskSellerTransfer(db: PrismaClient, session: {
 }
 
 export async function processEligibleSellerTransfer(db: PrismaClient, groupId: string, now = new Date(), submit = createStripeTransfer, retrieve = retrieveConnectedAccount) {
-  const claimed = await db.orderGroup.updateMany({ where: { id: groupId, kind: "MARKETPLACE", transferStatus: { in: ["READY", "RETRYABLE"] }, transferEligibleAt: { lte: now }, stripeConnectedAccountId: { not: null }, stripeTransferId: null }, data: { transferStatus: "SUBMITTING", transferAttemptCount: { increment: 1 } } });
+  const claimed = await db.orderGroup.updateMany({ where: { id: groupId, kind: "MARKETPLACE", transferStatus: { in: ["READY", "RETRYABLE"] }, transferEligibleAt: { lte: now }, stripeConnectedAccountId: { not: null }, stripeTransferId: null }, data: { transferStatus: "SUBMITTING", nextTransferAttemptAt: new Date(now.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS), transferAttemptCount: { increment: 1 } } });
   if (claimed.count !== 1) return { idempotent: true };
   const group = await db.orderGroup.findUniqueOrThrow({ where: { id: groupId }, select: { id: true, orderId: true, stripeConnectedAccountId: true, sellerNetAmountMinor: true, transferIdempotencyKey: true, store: { select: { status: true, owner: { select: { id: true, stripeAccountId: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true } } } }, order: { select: { currency: true } } } });
   try {
@@ -65,6 +66,7 @@ export async function processEligibleSellerTransfer(db: PrismaClient, groupId: s
 }
 
 export async function processDueSellerTransfers(db: PrismaClient, now = new Date(), limit = 25, process = processEligibleSellerTransfer) {
+  await db.orderGroup.updateMany({ where: { kind: "MARKETPLACE", transferStatus: "SUBMITTING", nextTransferAttemptAt: { lte: now }, shipmentVerifiedAt: { not: null }, transferEligibleAt: { lte: now }, transferIdempotencyKey: { not: null }, stripeTransferId: null }, data: { transferStatus: "RETRYABLE", nextTransferAttemptAt: now, transferErrorCode: "STALE_TRANSFER_CLAIM_RECOVERED", transferErrorMessage: "A stale transfer claim was recovered for idempotent retry." } });
   await db.orderGroup.updateMany({ where: { kind: "MARKETPLACE", maturitySnapshot: "NEW", transferStatus: "RESERVE_PERIOD", shipmentVerifiedAt: { not: null }, transferEligibleAt: { lte: now }, stripeTransferId: null }, data: { transferStatus: "READY" } });
   const due = await db.orderGroup.findMany({ where: { kind: "MARKETPLACE", transferStatus: { in: ["READY", "RETRYABLE"] }, shipmentVerifiedAt: { not: null }, transferEligibleAt: { lte: now }, stripeTransferId: null, OR: [{ nextTransferAttemptAt: null }, { nextTransferAttemptAt: { lte: now } }] }, orderBy: [{ transferEligibleAt: "asc" }, { id: "asc" }], take: Math.max(1, Math.min(limit, 100)), select: { id: true } });
   const results = [];

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { markSellerGroupsShipmentVerified, processDueSellerTransfers, processEligibleSellerTransfer, releaseHighRiskSellerTransfer } from "../lib/seller-transfers";
+import { markSellerGroupsShipmentVerified, processDueSellerTransfers, processEligibleSellerTransfer, releaseHighRiskSellerTransfer, SELLER_TRANSFER_STALE_CLAIM_MS } from "../lib/seller-transfers";
 
 const day = 86_400_000;
 const shippedAt = new Date("2026-08-25T12:00:00.000Z");
@@ -50,6 +50,7 @@ test("NEW seller reserve is persisted from authoritative shipment time and becom
   const workerDb: any = {
     orderGroup: {
       updateMany: async ({ where, data }: any) => {
+        if (where.transferStatus === "SUBMITTING") return { count: 0 };
         if (where.transferEligibleAt.lte >= group.transferEligibleAt!) Object.assign(group, data);
         return { count: 1 };
       },
@@ -59,6 +60,50 @@ test("NEW seller reserve is persisted from authoritative shipment time and becom
   assert.equal((await processDueSellerTransfers(workerDb, new Date(shippedAt.getTime() + 7 * day - 1), 25, async () => { throw new Error("must not run"); })).processed, 0);
   await processDueSellerTransfers(workerDb, new Date(shippedAt.getTime() + 7 * day), 25, async (_db, id) => { processed.push(id); return { transferred: true, id: "tr_new" }; });
   assert.deepEqual(processed, [group.id]);
+});
+
+test("fresh SUBMITTING claims are not stolen while stale claims recover with the original Stripe idempotency key", async () => {
+  const originalKey = "seller-transfer:order:store";
+  const state: any = { id: "group", kind: "MARKETPLACE", transferStatus: "SUBMITTING", nextTransferAttemptAt: new Date(shippedAt.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS), shipmentVerifiedAt: shippedAt, transferEligibleAt: shippedAt, transferIdempotencyKey: originalKey, stripeTransferId: null };
+  const stripeLogicalTransfers = new Map<string, string>();
+  let submissions = 0;
+  let claimed = false;
+  const owner = { id: "seller", stripeAccountId: "acct_ready", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null };
+  const db: any = {
+    orderGroup: {
+      updateMany: async ({ where, data }: any) => {
+        if (where.transferStatus === "SUBMITTING") {
+          if (state.transferStatus !== "SUBMITTING" || state.nextTransferAttemptAt > where.nextTransferAttemptAt.lte) return { count: 0 };
+          Object.assign(state, data); return { count: 1 };
+        }
+        if (where.transferStatus === "RESERVE_PERIOD") return { count: 0 };
+        if (state.transferStatus !== "RETRYABLE" || claimed) return { count: 0 };
+        claimed = true; Object.assign(state, data, { transferStatus: "SUBMITTING" }); return { count: 1 };
+      },
+      findMany: async () => state.transferStatus === "RETRYABLE" ? [{ id: state.id }] : [],
+      findUniqueOrThrow: async () => ({ ...state, orderId: "order", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 1234, store: { status: "ACTIVE", owner }, order: { currency: "EUR" } }),
+      update: async ({ data }: any) => { Object.assign(state, data); return state; },
+    },
+    user: { update: async () => ({}) },
+  };
+  const retrieve = async () => ({ id: "acct_ready", object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
+  const submit = async ({ idempotencyKey }: any) => { submissions += 1; assert.equal(idempotencyKey, originalKey); const id = stripeLogicalTransfers.get(idempotencyKey) ?? "tr_logical_once"; stripeLogicalTransfers.set(idempotencyKey, id); return { id }; };
+
+  // Stripe accepted the first logical request, but the process crashed before finalizing the group.
+  await submit({ idempotencyKey: originalKey });
+  const fresh = await processDueSellerTransfers(db, new Date(shippedAt.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS - 1), 25, async () => { throw new Error("fresh claim must not run"); });
+  assert.equal(fresh.processed, 0); assert.equal(state.transferStatus, "SUBMITTING");
+
+  const recoveryTime = new Date(shippedAt.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS);
+  claimed = false;
+  const [workerA, workerB] = await Promise.all([
+    processDueSellerTransfers(db, recoveryTime, 25, (database, id, now) => processEligibleSellerTransfer(database, id, now, submit, retrieve)),
+    processDueSellerTransfers(db, recoveryTime, 25, (database, id, now) => processEligibleSellerTransfer(database, id, now, submit, retrieve)),
+  ]);
+  assert.equal(workerA.processed + workerB.processed >= 1, true);
+  assert.equal(submissions, 2, "one pre-crash call plus one idempotent recovery call");
+  assert.equal(stripeLogicalTransfers.size, 1, "Stripe sees one logical transfer key");
+  assert.equal(state.transferStatus, "TRANSFERRED"); assert.equal(state.stripeTransferId, "tr_logical_once");
 });
 
 test("HIGH_RISK shipment is held until an authorized, audited, idempotent release", async () => {
