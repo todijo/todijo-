@@ -1080,6 +1080,7 @@ model OrderGroup {
   transferStatus SellerTransferStatus @default(WAITING_FOR_SHIPMENT)
   transferIdempotencyKey String? @unique @db.VarChar(200)
   stripeTransferId String? @unique
+  transferSubmittedAmountMinor Int?
   transferAttemptCount Int @default(0)
   nextTransferAttemptAt DateTime?
   transferErrorCode String? @db.VarChar(120)

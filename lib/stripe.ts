@@ -81,19 +81,27 @@ function stripeSecret() {
   return validateStripeSecretKey(process.env.STRIPE_SECRET_KEY);
 }
 
+export class StripeTransportError extends Error {}
+export class StripeApiError extends Error {}
+
 async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; body?: URLSearchParams; idempotencyKey?: string } = {}) {
-  const response = await fetch(`https://api.stripe.com/v1${path}`, {
-    method: init.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${stripeSecret()}`,
-      ...(init.body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
-      ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
-    },
-    body: init.body,
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`https://api.stripe.com/v1${path}`, {
+      method: init.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${stripeSecret()}`,
+        ...(init.body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+        ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
+      },
+      body: init.body,
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new StripeTransportError(error instanceof Error ? error.message : "Stripe request transport failed.");
+  }
   const json = (await response.json()) as T & { error?: { message?: string } };
-  if (!response.ok) throw new Error(json.error?.message ?? `Stripe request failed (${response.status}).`);
+  if (!response.ok) throw new StripeApiError(json.error?.message ?? `Stripe request failed (${response.status}).`);
   return json;
 }
 

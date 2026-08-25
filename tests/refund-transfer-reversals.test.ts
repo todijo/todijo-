@@ -53,10 +53,21 @@ test("pre-transfer refund reduces the first payout and a full recovery cancels i
   }
 });
 
-test("ambiguous transfer retry preserves the original amount and idempotency identity", async () => {
+test("known failed transfer retries use current entitlement and a full refund suppresses transfer", async () => {
+  for (const [recovered, expected] of [[400, 600], [1000, 0]] as const) {
+    let submitted: any; const updates: any[] = [];
+    const owner = { id: "seller", stripeAccountId: "acct", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null };
+    const db: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group", orderId: "order", stripeConnectedAccountId: "acct", sellerNetAmountMinor: 1000, sellerRecoveredMinor: recovered, transferSubmittedAmountMinor: null, transferErrorCode: "SELLER_TRANSFER_FAILED", transferIdempotencyKey: "same-key", store: { status: "ACTIVE", owner }, order: { currency: "EUR" } }), update: async ({ data }: any) => { updates.push(data); return {}; } }, user: { update: async () => ({}) } };
+    const result: any = await processEligibleSellerTransfer(db, "group", new Date(), async (input) => { submitted = input; return { id: "tr" }; }, async () => ({ id: "acct", object: "account", details_submitted: true, charges_enabled: true, payouts_enabled: true }));
+    if (expected) { assert.equal(submitted.amount, expected); assert.equal(submitted.idempotencyKey, "same-key"); }
+    else { assert.equal(submitted, undefined); assert.equal(result.cancelled, true); assert.equal(updates[0].transferStatus, "CANCELLED"); }
+  }
+});
+
+test("ambiguous stale transfer retry preserves the exact submitted amount and idempotency identity", async () => {
   let submitted: any;
   const owner = { id: "seller", stripeAccountId: "acct", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null };
-  const db: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group", orderId: "order", stripeConnectedAccountId: "acct", sellerNetAmountMinor: 1000, sellerRecoveredMinor: 400, transferAttemptCount: 2, transferIdempotencyKey: "original-key", store: { status: "ACTIVE", owner }, order: { currency: "EUR" } }), update: async () => ({}) }, user: { update: async () => ({}) } };
+  const db: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group", orderId: "order", stripeConnectedAccountId: "acct", sellerNetAmountMinor: 1000, sellerRecoveredMinor: 400, transferSubmittedAmountMinor: 1000, transferErrorCode: "STALE_TRANSFER_CLAIM_RECOVERED", transferIdempotencyKey: "original-key", store: { status: "ACTIVE", owner }, order: { currency: "EUR" } }), update: async () => ({}) }, user: { update: async () => ({}) } };
   await processEligibleSellerTransfer(db, "group", new Date(), async (input) => { submitted = input; return { id: "tr" }; }, async () => ({ id: "acct", object: "account", details_submitted: true, charges_enabled: true, payouts_enabled: true }));
   assert.equal(submitted.amount, 1000); assert.equal(submitted.idempotencyKey, "original-key");
 });
