@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { isEffectiveBlock, validateAdminReason } from "./account-status";
 import { requireAdmin } from "./admin-access";
-import { connectedAccountReady, connectedAccountStatus, createStripeTransfer, retrieveConnectedAccount, StripeTransportError } from "./stripe";
+import { connectedAccountReady, connectedAccountStatus, createStripeTransfer, retrieveConnectedAccount, StripeApiError, StripeTransportError } from "./stripe";
 import { resolveSellerMaturity, transferEligibility } from "./seller-maturity";
 
 type Database = PrismaClient | Prisma.TransactionClient;
@@ -47,7 +47,7 @@ export async function releaseHighRiskSellerTransfer(db: PrismaClient, session: {
 export async function processEligibleSellerTransfer(db: PrismaClient, groupId: string, now = new Date(), submit = createStripeTransfer, retrieve = retrieveConnectedAccount) {
   const claimed = await db.orderGroup.updateMany({ where: { id: groupId, kind: "MARKETPLACE", transferStatus: { in: ["READY", "RETRYABLE"] }, transferEligibleAt: { lte: now }, stripeConnectedAccountId: { not: null }, stripeTransferId: null }, data: { transferStatus: "SUBMITTING", nextTransferAttemptAt: new Date(now.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS), transferAttemptCount: { increment: 1 } } });
   if (claimed.count !== 1) return { idempotent: true };
-  const group = await db.orderGroup.findUniqueOrThrow({ where: { id: groupId }, select: { id: true, orderId: true, stripeConnectedAccountId: true, sellerNetAmountMinor: true, sellerRecoveredMinor: true, transferSubmittedAmountMinor: true, transferErrorCode: true, transferIdempotencyKey: true, store: { select: { status: true, owner: { select: { id: true, stripeAccountId: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true } } } }, order: { select: { currency: true } } } });
+  const group = await db.orderGroup.findUniqueOrThrow({ where: { id: groupId }, select: { id: true, orderId: true, stripeConnectedAccountId: true, sellerNetAmountMinor: true, sellerRecoveredMinor: true, transferSubmittedAmountMinor: true, transferAttemptCount: true, transferErrorCode: true, transferIdempotencyKey: true, store: { select: { status: true, owner: { select: { id: true, stripeAccountId: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true } } } }, order: { select: { currency: true } } } });
   let payableAmount = 0;
   try {
     const ambiguousRetry = group.transferErrorCode === "STALE_TRANSFER_CLAIM_RECOVERED" && group.transferSubmittedAmountMinor != null;
@@ -77,11 +77,19 @@ export async function processEligibleSellerTransfer(db: PrismaClient, groupId: s
     // A transport failure may have reached Stripe. Leave SUBMITTING + submitted amount
     // intact so the stale lease retries the identical request.
     if (error instanceof StripeTransportError) throw error;
-    await db.orderGroup.update({ where: { id: group.id }, data: { transferStatus: "RETRYABLE", transferSubmittedAmountMinor: null, nextTransferAttemptAt: new Date(now.getTime() + 15 * 60_000), transferErrorCode: "SELLER_TRANSFER_FAILED", transferErrorMessage: error instanceof Error ? error.message.slice(0, 500) : "Stripe transfer failed" } });
+    // Unknown post-submit failures are treated as ambiguous for safety: keep SUBMITTING
+    // and retry the exact same request after the stale lease.
+    if (!(error instanceof StripeApiError)) throw error;
+    // Stripe returned a definite API response, so this key has been consumed for these
+    // parameters. Rotate to a deterministic next key before any retry can use a changed
+    // entitlement after a refund. transferAttemptCount is persisted and only used here
+    // as the generation number; ambiguity is still decided solely by durable state.
+    const nextIdempotencyKey = `seller-transfer:${group.id}:retry:${Math.max(1, group.transferAttemptCount ?? 1)}`;
+    await db.orderGroup.update({ where: { id: group.id }, data: { transferStatus: "RETRYABLE", transferSubmittedAmountMinor: null, transferIdempotencyKey: nextIdempotencyKey, nextTransferAttemptAt: new Date(now.getTime() + 15 * 60_000), transferErrorCode: "SELLER_TRANSFER_FAILED", transferErrorMessage: error.message.slice(0, 500) } });
     throw error;
   }
   // If finalization fails after Stripe accepted the request, retain SUBMITTING and the
-  // exact submitted amount for stale idempotent recovery.
+  // exact submitted amount + key for stale idempotent recovery.
   await db.orderGroup.update({ where: { id: group.id }, data: { transferStatus: "TRANSFERRED", stripeTransferId: transfer.id, transferredAt: now, nextTransferAttemptAt: null, transferErrorCode: null, transferErrorMessage: null } });
   return { transferred: true, id: transfer.id };
 }
