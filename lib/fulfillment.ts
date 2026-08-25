@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { markSellerGroupsShipmentVerified } from "./seller-transfers";
 
 export const fulfillmentTransitions = {
   PAID: { nextOrderStatus: "PROCESSING", nextFulfillmentStatus: "PROCESSING", timestamp: "processingAt" },
@@ -42,7 +43,10 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
       select: { id: true, buyerId: true, status: true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true },
     });
     if (!order) throw new FulfillmentError("Order not found.", 404);
-    if (order.status === transition.nextOrderStatus) return { idempotent: true, status: order.status };
+    if (order.status === transition.nextOrderStatus) {
+      const verifiedGroups = transition.nextOrderStatus === "SHIPPED" ? await markSellerGroupsShipmentVerified(tx, order.id, storeIds) : [];
+      return { idempotent: true, status: order.status, verifiedSellerGroups: verifiedGroups.length };
+    }
     if (order.status !== action) throw new FulfillmentError("Invalid fulfillment transition.", 409);
     const now = new Date();
     const data: Prisma.OrderUpdateInput = { status: transition.nextOrderStatus, fulfillmentStatus: transition.nextFulfillmentStatus, [transition.timestamp]: now };
@@ -50,9 +54,10 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
     const updated = await tx.order.update({ where: { id: order.id }, data, select: { id: true, status: true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true } });
     await tx.orderFulfillmentEvent.create({ data: { orderId: order.id, status: transition.nextFulfillmentStatus, source: "SELLER", actorId: sellerId, occurredAt: now, metadata: action === "PROCESSING" && (carrier || number || trackingUrl) ? { trackingCarrier: carrier, trackingNumber: number, trackingUrl } : undefined } });
     await tx.orderLifecycleEvent.create({ data: { orderId: order.id, type: transition.nextOrderStatus, actorId: sellerId, createdAt: now, metadata: action === "PROCESSING" && (carrier || number) ? { trackingCarrier: carrier, trackingNumber: number } : undefined } });
+    const verifiedGroups = transition.nextOrderStatus === "SHIPPED" ? await markSellerGroupsShipmentVerified(tx, order.id, storeIds, now) : [];
     if (transition.nextOrderStatus === "SHIPPED" || transition.nextOrderStatus === "DELIVERED") {
       await tx.notification.create({ data: { userId: order.buyerId, type: `ORDER_${transition.nextOrderStatus}`, title: transition.nextOrderStatus === "SHIPPED" ? "Order shipped" : "Order delivered", body: transition.nextOrderStatus === "SHIPPED" ? "Your order has been shipped." : "Your order has been delivered.", href: `/account/orders/${order.id}` } });
     }
-    return { idempotent: false, order: updated };
+    return { idempotent: false, order: updated, verifiedSellerGroups: verifiedGroups.length };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

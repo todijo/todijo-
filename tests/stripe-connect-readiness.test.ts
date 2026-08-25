@@ -71,7 +71,7 @@ test("admin compliance view identifies sellers and gives a safe remediation path
 test("seller transfer validates the current authoritative account before submission", async () => {
   let submitted = 0; const updates: any[] = [];
   const db: any = {
-    orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group_1", orderId: "order_1", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 900, transferIdempotencyKey: "transfer_1", store: { owner: { id: "seller_1", stripeAccountId: "acct_ready" } }, order: { currency: "EUR" } }), update: async ({ data }: any) => { updates.push(data); return {}; } },
+    orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group_1", orderId: "order_1", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 900, transferIdempotencyKey: "transfer_1", store: { status: "ACTIVE", owner: { id: "seller_1", stripeAccountId: "acct_ready", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null } }, order: { currency: "EUR" } }), update: async ({ data }: any) => { updates.push(data); return {}; } },
     user: { update: async () => ({}) },
   };
   const result = await processEligibleSellerTransfer(db, "group_1", new Date(), async () => { submitted += 1; return { id: "tr_1" }; }, async () => account());
@@ -81,12 +81,12 @@ test("seller transfer validates the current authoritative account before submiss
 test("seller transfer cannot pay a stale, missing, or disabled authoritative account", async () => {
   for (const currentId of [null, "acct_replaced"] as const) {
     let submitted = 0;
-    const db: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group_1", orderId: "order_1", stripeConnectedAccountId: "acct_snapshot", sellerNetAmountMinor: 900, transferIdempotencyKey: "transfer_1", store: { owner: { id: "seller_1", stripeAccountId: currentId } }, order: { currency: "EUR" } }), update: async () => ({}) }, user: { update: async () => ({}) } };
+    const db: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group_1", orderId: "order_1", stripeConnectedAccountId: "acct_snapshot", sellerNetAmountMinor: 900, transferIdempotencyKey: "transfer_1", store: { status: "ACTIVE", owner: { id: "seller_1", stripeAccountId: currentId, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null } }, order: { currency: "EUR" } }), update: async () => ({}) }, user: { update: async () => ({}) } };
     await assert.rejects(() => processEligibleSellerTransfer(db, "group_1", new Date(), async () => { submitted += 1; return { id: "never" }; }, async () => account()), /no longer matches/);
     assert.equal(submitted, 0);
   }
   let submitted = 0;
-  const disabledDb: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group_1", orderId: "order_1", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 900, transferIdempotencyKey: "transfer_1", store: { owner: { id: "seller_1", stripeAccountId: "acct_ready" } }, order: { currency: "EUR" } }), update: async () => ({}) }, user: { update: async () => ({}) } };
+  const disabledDb: any = { orderGroup: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => ({ id: "group_1", orderId: "order_1", stripeConnectedAccountId: "acct_ready", sellerNetAmountMinor: 900, transferIdempotencyKey: "transfer_1", store: { status: "ACTIVE", owner: { id: "seller_1", stripeAccountId: "acct_ready", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null } }, order: { currency: "EUR" } }), update: async () => ({}) }, user: { update: async () => ({}) } };
   await assert.rejects(() => processEligibleSellerTransfer(disabledDb, "group_1", new Date(), async () => { submitted += 1; return { id: "never" }; }, async () => account({ payouts_enabled: false })), /not ready/);
   assert.equal(submitted, 0);
 });
