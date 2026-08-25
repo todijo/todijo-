@@ -19,6 +19,7 @@ function database(order: any, stores = [{ id: "store_1" }]) {
       },
       update: async ({ data }: any) => { updates.push(data); return { ...order, ...data, id: "order_1" }; },
     },
+    orderGroup: { findUnique: async () => null },
     orderFulfillmentEvent: { create: async ({ data }: any) => { events.push(data); return data; } }, orderLifecycleEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
     notification: { create: async ({ data }: any) => { notifications.push(data); return data; } },
   };
