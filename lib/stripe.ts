@@ -223,6 +223,22 @@ export function createStripeTransfer(input:{amount:number;currency:string;destin
   return stripeRequest<{id:string}>("/transfers",{method:"POST",idempotencyKey:input.idempotencyKey,body});
 }
 
+export function createStripeRefund(input: { paymentIntentId: string; amount: number; idempotencyKey: string }) {
+  return stripeRequest<{ id: string; status?: string }>("/refunds", {
+    method: "POST",
+    idempotencyKey: input.idempotencyKey,
+    body: new URLSearchParams({ payment_intent: input.paymentIntentId, amount: String(input.amount) }),
+  });
+}
+
+export function createStripeTransferReversal(input: { transferId: string; amount: number; idempotencyKey: string }) {
+  return stripeRequest<{ id: string }>(`/transfers/${encodeURIComponent(input.transferId)}/reversals`, {
+    method: "POST",
+    idempotencyKey: input.idempotencyKey,
+    body: new URLSearchParams({ amount: String(input.amount) }),
+  });
+}
+
 export async function createStripeCustomer(input: { storeId: string; userId: string; email: string; name: string }) {
   return stripeRequest<{ id: string }>("/customers", {
     method: "POST",

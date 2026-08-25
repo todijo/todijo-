@@ -22,7 +22,7 @@ type SellerRefundRequestFindFirstArgs = { where: { id: string; order: Prisma.Ord
 type SellerRefundRequestUpdateArgs = { where: { id: string; status: "PENDING"; order: Prisma.OrderWhereInput }; data: { status: "SELLER_APPROVED" | "SELLER_REJECTED"; reviewedById: string; reviewedAt: Date; decisionNote: string | null } };
 type AdminUserFindUniqueArgs = { where: { id: string }; select: { id: true; role: true } };
 type AdminRefundRequestFindUniqueArgs = { where: { id: string }; select: { id: true; reason: true; status: true; decisionNote: true; reviewedById: true; reviewedAt: true; createdAt: true; order: { select: { id: true; status: true; paidAt: true; stripePaymentIntentId: true; buyer: { select: { id: true; firstName: true; lastName: true; email: true } }; storeIdSnapshot: true; storeNameSnapshot: true } } } };
-type AdminRefundRequestUpdateArgs = { where: { id: string; status: { in: Array<"PENDING" | "SELLER_REJECTED"> } }; data: { status: "ADMIN_APPROVED" | "ADMIN_REJECTED"; reviewedById: string; reviewedAt: Date; decisionNote: string | null } };
+type AdminRefundRequestUpdateArgs = { where: { id: string; status: { in: Array<"PENDING" | "SELLER_APPROVED" | "SELLER_REJECTED"> } }; data: { status: "ADMIN_APPROVED" | "ADMIN_REJECTED"; reviewedById: string; reviewedAt: Date; decisionNote: string | null } };
 
 type BuyerRefundDb = { order: { findFirst: (args: BuyerOrderFindFirstArgs) => Promise<BuyerOrder | null> }; refundRequest: { create: (args: RefundRequestCreateArgs) => Promise<RefundRequest>; findUnique: (args: RefundRequestFindByOrderArgs) => Promise<RefundRequest | null> } };
 type SellerRefundDb = { store: { findUnique: (args: StoreFindByOwnerArgs) => Promise<{ id: string } | null> }; refundRequest: { findFirst: (args: SellerRefundRequestFindFirstArgs) => Promise<SellerRefundRequest | null> } };
@@ -114,7 +114,7 @@ export async function decideAdminRefundRequest(db: AdminDecisionDb, session: Adm
   const admin = await requireRefundAdmin(db, session);
   if (decision !== "approve" && decision !== "reject") throw new RefundRequestError("Invalid refund decision.", 400);
   const note = normalizedDecisionNote(input.decisionNote);
-  const result = await db.refundRequest.updateMany({ where: { id: requestId, status: { in: ["PENDING", "SELLER_REJECTED"] } }, data: { status: decision === "approve" ? "ADMIN_APPROVED" : "ADMIN_REJECTED", reviewedById: admin.id, reviewedAt: new Date(), decisionNote: note } });
+  const result = await db.refundRequest.updateMany({ where: { id: requestId, status: { in: ["PENDING", "SELLER_APPROVED", "SELLER_REJECTED"] } }, data: { status: decision === "approve" ? "ADMIN_APPROVED" : "ADMIN_REJECTED", reviewedById: admin.id, reviewedAt: new Date(), decisionNote: note } });
   if (result.count === 1) return { decided: true };
   const request = await getAdminRefundRequest(db, session, requestId);
   return { decided: false, request };

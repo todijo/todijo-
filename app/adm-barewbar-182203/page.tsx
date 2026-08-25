@@ -49,7 +49,7 @@ export default async function AdminPage() {
         _count: { select: { products: true } },
       },
     }),
-    prisma.refundRequest.count({ where: { status: "SELLER_REJECTED" } }),
+    prisma.refundRequest.count({ where: { status: { in: ["SELLER_APPROVED", "SELLER_REJECTED"] } } }),
   ]);
   const serializedStores = stores.map((store) => {
     const access = activeAccessSource(store, now);

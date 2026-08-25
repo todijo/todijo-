@@ -47,8 +47,15 @@ export async function releaseHighRiskSellerTransfer(db: PrismaClient, session: {
 export async function processEligibleSellerTransfer(db: PrismaClient, groupId: string, now = new Date(), submit = createStripeTransfer, retrieve = retrieveConnectedAccount) {
   const claimed = await db.orderGroup.updateMany({ where: { id: groupId, kind: "MARKETPLACE", transferStatus: { in: ["READY", "RETRYABLE"] }, transferEligibleAt: { lte: now }, stripeConnectedAccountId: { not: null }, stripeTransferId: null }, data: { transferStatus: "SUBMITTING", nextTransferAttemptAt: new Date(now.getTime() + SELLER_TRANSFER_STALE_CLAIM_MS), transferAttemptCount: { increment: 1 } } });
   if (claimed.count !== 1) return { idempotent: true };
-  const group = await db.orderGroup.findUniqueOrThrow({ where: { id: groupId }, select: { id: true, orderId: true, stripeConnectedAccountId: true, sellerNetAmountMinor: true, transferIdempotencyKey: true, store: { select: { status: true, owner: { select: { id: true, stripeAccountId: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true } } } }, order: { select: { currency: true } } } });
+  const group = await db.orderGroup.findUniqueOrThrow({ where: { id: groupId }, select: { id: true, orderId: true, stripeConnectedAccountId: true, sellerNetAmountMinor: true, sellerRecoveredMinor: true, transferAttemptCount: true, transferIdempotencyKey: true, store: { select: { status: true, owner: { select: { id: true, stripeAccountId: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true } } } }, order: { select: { currency: true } } } });
   try {
+    // After an ambiguous prior submission the original idempotency key must be retried
+    // with its original amount; any concurrent refund is recovered by Stage 3 reversal.
+    const payableAmount = (group.transferAttemptCount ?? 1) > 1 ? group.sellerNetAmountMinor : Math.max(0, group.sellerNetAmountMinor - (group.sellerRecoveredMinor ?? 0));
+    if (payableAmount === 0) {
+      await db.orderGroup.update({ where: { id: group.id }, data: { transferStatus: "CANCELLED", nextTransferAttemptAt: null, transferErrorCode: null, transferErrorMessage: null } });
+      return { transferred: false, cancelled: true };
+    }
     const owner = group.store?.owner;
     if (!owner || group.store?.status !== "ACTIVE" || owner.sellerSuspendedAt || owner.deactivatedAt || isEffectiveBlock(owner, now)) throw new Error("Seller activity is not eligible for transfers.");
     const authoritativeId = owner.stripeAccountId;
@@ -56,7 +63,7 @@ export async function processEligibleSellerTransfer(db: PrismaClient, groupId: s
     const account = await retrieve(authoritativeId);
     await db.user.update({ where: { id: owner.id }, data: connectedAccountStatus(account) });
     if (!connectedAccountReady(account, authoritativeId)) throw new Error("Seller connected account is not ready for transfers.");
-    const transfer = await submit({ amount: group.sellerNetAmountMinor, currency: group.order.currency, destination: group.stripeConnectedAccountId!, transferGroup: `order:${group.orderId}`, idempotencyKey: group.transferIdempotencyKey! });
+    const transfer = await submit({ amount: payableAmount, currency: group.order.currency, destination: group.stripeConnectedAccountId!, transferGroup: `order:${group.orderId}`, idempotencyKey: group.transferIdempotencyKey! });
     await db.orderGroup.update({ where: { id: group.id }, data: { transferStatus: "TRANSFERRED", stripeTransferId: transfer.id, transferredAt: now, nextTransferAttemptAt: null, transferErrorCode: null, transferErrorMessage: null } });
     return { transferred: true, id: transfer.id };
   } catch (error) {
