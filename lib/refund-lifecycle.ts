@@ -11,7 +11,7 @@ function safeMessage(error: unknown) {
 }
 
 /** Creates the immutable allocation once. The public admin path intentionally requests all remaining lines. */
-export async function ensureRefundOperation(db: PrismaClient, refundRequestId: string, actorId: string, now = new Date()) {
+export async function ensureRefundOperation(db: PrismaClient, refundRequestId: string, actorId: string, options: { returnRequired?: boolean } = {}, now = new Date()) {
   return db.$transaction(async (tx) => {
     const existing = await tx.refundOperation.findUnique({ where: { refundRequestId } });
     if (existing) return existing;
@@ -52,7 +52,7 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
     const shippingAmountMinor = groupRows.reduce((sum, row) => sum + row.shippingAmountMinor, 0);
     const operation = await tx.refundOperation.create({ data: {
       refundRequestId, orderId: order.id, buyerId: request.buyerId, currency: order.currency,
-      status: "APPROVED", reason: request.reason, refundIdempotencyKey: `buyer-refund:${refundRequestId}`,
+      status: "APPROVED", reason: request.reason, returnRequired: options.returnRequired === true, refundIdempotencyKey: `buyer-refund:${refundRequestId}`,
       merchandiseAmountMinor, shippingAmountMinor, totalAmountMinor: merchandiseAmountMinor + shippingAmountMinor,
       reviewedById: actorId, reviewedAt: now,
       itemAllocations: { create: itemRows.map((row) => ({ orderItemId: row.item.id, quantity: row.quantity, unitAmountMinor: row.unitAmountMinor, merchandiseAmountMinor: row.merchandiseAmountMinor })) },
@@ -74,6 +74,14 @@ export async function processRefundOperation(db: PrismaClient, operationId: stri
       const finalized = await tx.refundOperation.updateMany({ where: { id: operation.id, status: "PROCESSING", stripeRefundId: null }, data: { status: "COMPLETED", stripeRefundId: refund.id, nextAttemptAt: null, errorCode: null, errorMessage: null } });
       if (finalized.count !== 1) return;
       await tx.refundGroupAllocation.updateMany({ where: { refundOperationId: operation.id }, data: { status: "COMPLETED" } });
+      const itemAllocations = await tx.refundItemAllocation.findMany({ where: { refundOperationId: operation.id }, include: { orderItem: { select: { orderGroup: { select: { kind: true } } } } } });
+      for (const item of itemAllocations) {
+        const returnApplicable = operation.returnRequired && item.orderItem.orderGroup?.kind === "MARKETPLACE";
+        await tx.inventoryRestockEvent.upsert({
+          where: { lifecycleKey: `return:${operation.id}:${item.orderItemId}` }, update: {},
+          create: { refundOperationId: operation.id, orderItemId: item.orderItemId, quantity: item.quantity, status: returnApplicable ? "AWAITING_RETURN" : "NOT_APPLICABLE", reason: returnApplicable ? "RETURN_REQUIRED" : operation.returnRequired ? "CJ_PLATFORM_MANUAL" : "RETURN_NOT_REQUIRED", lifecycleKey: `return:${operation.id}:${item.orderItemId}`, idempotencyKey: `return:${operation.id}:${item.orderItemId}` },
+        });
+      }
       for (const allocation of operation.groupAllocations) {
         await tx.orderGroup.update({ where: { id: allocation.orderGroupId }, data: { refundedMerchandiseMinor: { increment: allocation.merchandiseAmountMinor }, refundedShippingMinor: { increment: allocation.shippingAmountMinor }, commissionReversedMinor: { increment: allocation.commissionReversalMinor }, sellerRecoveredMinor: { increment: allocation.sellerRecoveryMinor } } });
         if (allocation.orderGroup.kind === "MARKETPLACE" && allocation.sellerRecoveryMinor > 0 && allocation.orderGroup.stripeTransferId) {

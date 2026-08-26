@@ -1192,6 +1192,7 @@ model RefundOperation {
  currency String? @db.VarChar(3)
  status RefundOperationStatus @default(REQUESTED)
  reason String @db.VarChar(1000)
+ returnRequired Boolean @default(false)
  stripeRefundId String? @unique
  refundIdempotencyKey String @unique @db.VarChar(200)
  attemptCount Int @default(0)
@@ -1271,7 +1272,16 @@ model InventoryRestockEvent {
  quantity Int
  status RestockStatus
  reason String @db.VarChar(120)
+ lifecycleKey String? @unique @db.VarChar(200)
  idempotencyKey String @unique @db.VarChar(200)
+ trackingCarrier String? @db.VarChar(120)
+ trackingNumber String? @db.VarChar(200)
+ trackingSubmittedAt DateTime?
+ receivedAt DateTime?
+ inspectedAt DateTime?
+ inspectionReason String? @db.VarChar(500)
+ inventoryBefore Int?
+ inventoryAfter Int?
  decidedById String?
  decidedAt DateTime?
  restoredAt DateTime?
