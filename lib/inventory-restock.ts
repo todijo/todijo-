@@ -31,6 +31,21 @@ export async function applyInventoryRestock(db: PrismaClient, input: { refundOpe
 export type ReturnAction = "tracking" | "receive" | "restockable" | "non_restockable" | "restock";
 type ReturnInput = { carrier?: unknown; trackingNumber?: unknown; reason?: unknown };
 
+type ReturnRecordIdentity = {
+  lifecycleKey: string | null;
+  refundOperationId: string;
+  orderItemId: string;
+  refundOperation: { status: string };
+  orderItem: { orderGroup: { kind: string } | null };
+};
+
+/** Only Stage 4 records created for a completed Marketplace refund are actionable returns. */
+export function isAuthoritativeStage4Return(event: ReturnRecordIdentity) {
+  return event.lifecycleKey === `return:${event.refundOperationId}:${event.orderItemId}`
+    && event.refundOperation.status === "COMPLETED"
+    && event.orderItem.orderGroup?.kind === "MARKETPLACE";
+}
+
 function text(value: unknown, max: number) {
   if (value == null) return null;
   if (typeof value !== "string") throw new Error("INVALID_RETURN_INPUT");
@@ -43,7 +58,7 @@ async function authorizeReturnActor(tx: Prisma.TransactionClient, actorId: strin
   const actor = await tx.user.findUnique({ where: { id: actorId }, select: { role: true } });
   if (!actor) throw new Error("RETURN_NOT_FOUND");
   const event = await tx.inventoryRestockEvent.findUnique({ where: { id: eventId }, include: { refundOperation: { select: { orderId: true, status: true } }, orderItem: { select: { id: true, quantity: true, variantId: true, productId: true, orderGroup: { select: { id: true, kind: true, store: { select: { ownerId: true } } } } } } } });
-  if (!event || event.orderItem.orderGroup?.kind !== "MARKETPLACE") throw new Error("RETURN_NOT_FOUND");
+  if (!event || !event.orderItem.orderGroup || !isAuthoritativeStage4Return(event)) throw new Error("RETURN_NOT_FOUND");
   if (!isAdminRole(actor.role) && event.orderItem.orderGroup.store?.ownerId !== actorId) throw new Error("RETURN_NOT_FOUND");
   return event;
 }
