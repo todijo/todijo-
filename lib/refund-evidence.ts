@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { Prisma } from "@prisma/client";
 import type { R2ObjectStore } from "@/lib/r2";
 import { sellerOrderHistoryWhere } from "./order-history";
@@ -81,7 +81,7 @@ export async function validateRefundEvidenceFile(file: EvidenceFile) {
   if (!evidenceTypes.includes(file.type as EvidenceMimeType)) throw new RefundEvidenceError("Unsupported evidence image type.", 400);
   const bytes = Buffer.from(await file.arrayBuffer());
   if (bytes.length !== file.size || bytes.length === 0) throw new RefundEvidenceError("Evidence image is invalid.", 400);
-  let metadata: sharp.Metadata;
+  let metadata: Metadata;
   try {
     metadata = await sharp(bytes, { animated: false, limitInputPixels: MAX_REFUND_EVIDENCE_PIXELS, failOn: "error" }).metadata();
   } catch {
