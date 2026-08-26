@@ -41,6 +41,7 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
   const router = useRouter();
   const t = useTranslations("Orders.refundRequest");
   const [decisionNote, setDecisionNote] = useState("");
+  const [returnRequired, setReturnRequired] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -56,7 +57,7 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
       const response = await fetch(`/api/admin/refund-requests/${encodeURIComponent(request.id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, ...(note ? { decisionNote: note } : {}) }),
+        body: JSON.stringify({ decision, returnRequired: decision === "approve" && returnRequired, ...(note ? { decisionNote: note } : {}) }),
       });
       if (!response.ok) throw new Error();
       setSubmitted(true);
@@ -78,7 +79,7 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
       <div className="refundReviewDates"><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}</div>
       {request.decisionNote && <p className="refundReviewFreeText" dir="auto"><strong>{t("decisionNote")}</strong> {request.decisionNote}</p>}
       {request.evidence.length > 0 && <div className="buyerRefundEvidence"><h4>{t("evidenceTitle")}</h4><div className="buyerRefundEvidenceGrid">{request.evidence.map((evidence) => <AdminEvidencePreview key={evidence.id} orderId={request.orderId} evidence={evidence} />)}</div></div>}
-      {editable && <><textarea className="refundReviewTextarea" dir="auto" value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><div className="refundReviewActions"><button type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}
+      {editable && <><textarea className="refundReviewTextarea" dir="auto" value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><label><input type="checkbox" checked={returnRequired} onChange={(event) => setReturnRequired(event.target.checked)} /> Require a physical return and inspection before inventory can be restored</label><div className="refundReviewActions"><button type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}
       {error && <small role="alert">{error}</small>}
     </section>
   );

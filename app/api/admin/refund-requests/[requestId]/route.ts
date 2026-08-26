@@ -19,7 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ reques
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { requestId } = await context.params;
-  let body: { decision?: unknown; decisionNote?: unknown };
+  let body: { decision?: unknown; decisionNote?: unknown; returnRequired?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -28,7 +28,8 @@ export async function POST(request: Request, context: { params: Promise<{ reques
   try {
     const decision = await decideAdminRefundRequest(prisma, session, requestId, body?.decision, { decisionNote: body?.decisionNote });
     if (body.decision !== "approve") return NextResponse.json(decision);
-    const operation = await ensureRefundOperation(prisma, requestId, session.userId);
+    if (body.returnRequired != null && typeof body.returnRequired !== "boolean") return NextResponse.json({ error: "Invalid return requirement." }, { status: 400 });
+    const operation = await ensureRefundOperation(prisma, requestId, session.userId, { returnRequired: body.returnRequired === true });
     const financial = await processRefundOperation(prisma, operation.id);
     return NextResponse.json({ ...decision, refundOperationId: operation.id, financial });
   } catch (error) {
