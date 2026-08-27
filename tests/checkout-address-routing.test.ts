@@ -39,7 +39,9 @@ test("unresolved buyer pricing is never presented as a final zero and cannot sta
   const cart = readFileSync("app/cart/page.tsx", "utf8");
   const checkout = readFileSync("app/checkout/page.tsx", "utf8");
   assert.match(cart, /const pricingResolved = items\.every/);
-  assert.match(cart, /aria-disabled="true"/);
+  assert.match(cart, /aria-disabled=\{!pricingResolved\}/);
+  assert.match(cart, /tabIndex=\{pricingResolved \? undefined : -1\}/);
+  assert.match(cart, /if \(!pricingResolved\) event\.preventDefault\(\)/);
   assert.match(cart, /pricingResolved \? formatCurrency\(subtotal/);
   assert.match(checkout, /if\(!pricingResolved\)\{setError/);
   assert.match(checkout, /disabled=\{loading\|\|!quote\|\|!pricingResolved\}/);
