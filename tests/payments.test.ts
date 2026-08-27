@@ -102,9 +102,21 @@ test("a stored same-mode session is not reused when authoritative pricing change
   fixture.product.price=new Prisma.Decimal("9.70");
   await assert.rejects(
     ()=>createCheckout(fixture.db,"buyer_1","request_stale_cent",[{productId:"prod_1",quantity:1,displayedUnitPrice:"9.70",displayedCurrency:"EUR"}],create,"FR",undefined,{...connectDeps,stripeMode:"test"}),
-    (error:unknown)=>error instanceof CheckoutError&&error.message.includes("different cart")&&error.status===409,
+    (error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_REQUEST_STALE"&&error.status===409,
   );
   assert.equal(stripeCalls,1);
+});
+
+test("a finalized checkout request is never mutated or reused",async()=>{
+  const fixture=checkoutDb();let stripeCalls=0;
+  const create=async()=>{stripeCalls++;return{id:"cs_test_paid",url:"https://checkout.stripe.test/paid"};};
+  await createCheckout(fixture.db,"buyer_1","request_finalized",[{productId:"prod_1",quantity:1}],create,"FR",undefined,connectDeps);
+  const paid=await fixture.db.order.update({data:{status:"PAID"}});const originalTotal=paid.total.toString();
+  await assert.rejects(
+    ()=>createCheckout(fixture.db,"buyer_1","request_finalized",[{productId:"prod_1",quantity:1}],create,"FR",undefined,connectDeps),
+    (error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_REQUEST_FINALIZED"&&error.status===409,
+  );
+  const unchanged=await fixture.db.order.findUnique();assert.equal(unchanged.status,"PAID");assert.equal(unchanged.total.toString(),originalTotal);assert.equal(stripeCalls,1);
 });
 
 test("a checkout never reuses a stored Stripe session from another mode",async()=>{

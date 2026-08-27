@@ -17,7 +17,7 @@ function positiveMs(value:string|undefined,fallback:number){const parsed=Number(
 function intervalFor(tier:CjRateTier){
   if(tier==="write")return positiveMs(process.env.CJ_WRITE_MIN_INTERVAL_MS,DEFAULT_WRITE_INTERVAL_MS);
   if(tier==="auth")return positiveMs(process.env.CJ_AUTH_MIN_INTERVAL_MS,DEFAULT_AUTH_INTERVAL_MS);
-  return positiveMs(process.env.CJ_READ_MIN_INTERVAL_MS,DEFAULT_READ_INTERVAL_MS);
+  return Math.max(1_000,positiveMs(process.env.CJ_READ_MIN_INTERVAL_MS,DEFAULT_READ_INTERVAL_MS));
 }
 function wait(ms:number){return new Promise((resolve)=>setTimeout(resolve,ms));}
 
@@ -46,7 +46,7 @@ export function scheduleCjRequest<T>(tier:CjRateTier,run:()=>Promise<T>):Promise
 }
 
 export function cjRetryDelay(attempt:number){return 500*Math.pow(2,attempt);}
-export function isRetryableCjFailure(input:{httpStatus?:number;code?:number|string;message?:string}){
+export function isCjRateLimitFailure(input:{httpStatus?:number;code?:number|string;message?:string}){
   const status=input.httpStatus??0,code=String(input.code??""),message=(input.message??"").toLowerCase();
-  return status===408||status===425||status===429||status>=500||code==="429"||message.includes("rate limit")||message.includes("too many request")||message.includes("frequency");
+  return status===429||code==="429"||message.includes("rate limit")||message.includes("too many request")||message.includes("frequency")||message.includes("qps limit");
 }

@@ -98,6 +98,25 @@ test("CJ product retrieval follows the documented v2 contract sequentially", asy
   assert.match(urls[2],/\/product\/stock\/getInventoryByPid\?pid=240626050813160030$/);
 });
 
+test("concurrent identical CJ product-detail requests share one metadata retrieval",async()=>{
+  let calls=0;const pid="DEDUPE-PRODUCT-2026";
+  const fetcher:typeof fetch=async(input)=>{calls++;const url=String(input);if(url.includes("/product/query?"))return new Response(JSON.stringify({code:200,result:true,success:true,data:{pid,productNameEn:"Deduped",productImageSet:[]}}));if(url.includes("/product/variant/query?"))return new Response(JSON.stringify({code:200,result:true,success:true,data:[]}));return new Response(JSON.stringify({code:200,result:true,success:true,data:{variantInventories:[]}}));};
+  const auth={isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined},provider=new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0,useProductCache:true});
+  const [first,second]=await Promise.all([provider.getProduct(pid),provider.getProduct(pid.toLowerCase())]);
+  assert.equal(first,second);assert.equal(calls,3);
+});
+
+test("CJ 429 responses retry twice with bounded backoff and then succeed",async()=>{
+  let calls=0;const delays:number[]=[];
+  const provider=new CjCatalogProvider({isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined},{minimumRequestIntervalMs:0,retryDelay:async attempt=>void delays.push(attempt),fetcher:async()=>{calls++;return calls<3?new Response(JSON.stringify({code:429,result:false,message:"Too Many Requests, QPS limit is 1 time/1second"}),{status:429}):new Response(JSON.stringify({code:200,result:true,success:true,data:{}}));}});
+  await provider.testConnection();assert.equal(calls,3);assert.deepEqual(delays,[0,1]);
+});
+
+test("CJ non-429 failures are not retried",async()=>{
+  let calls=0;const provider=new CjCatalogProvider({isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined},{minimumRequestIntervalMs:0,retryDelay:async()=>{throw new Error("unexpected retry");},fetcher:async()=>{calls++;return new Response(JSON.stringify({code:500,result:false,message:"Unavailable"}),{status:500});}});
+  await assert.rejects(()=>provider.testConnection(),/CJ_UNAVAILABLE/);assert.equal(calls,1);
+});
+
 test("CJ SKU input resolves to canonical pid before variant and inventory requests", async () => {
   const urls: string[] = [];
   const canonicalPid = "91A35D0B-7FD2-4AC9-A4B3-2E55349E9D62";

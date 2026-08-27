@@ -64,7 +64,7 @@ export async function createCheckout(
   }
 
   const existing = await db.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
-  if (existing && existing.status !== "PENDING") throw new CheckoutError("This checkout request can no longer be reused.", 409);
+  if (existing && existing.status !== "PENDING") throw new CheckoutError("CHECKOUT_REQUEST_FINALIZED", 409);
 
   const lines = [...quantities.values()];
   const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, currency: true, sellerType: true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
@@ -143,7 +143,7 @@ export async function createCheckout(
   const sellerAmount = totalAmount - platformFeeAmount;
   if (existing) {
     const sameCart = existing.items.length === resolvedLines.length && existing.items.every((item) => resolvedLines.some((line) => line.productId === item.productId && line.quantity === item.quantity && item.variantId === line.variant?.id && exactMinorAmount(item.unitPrice,paymentCurrency)===line.unitAmountMinor));
-    if (!sameCart || exactMinorAmount(existing.total,paymentCurrency)!==totalAmount || !existing.shippingCost?.equals(shipping.amount) || existing.shippingCountry !== shipping.destinationCountry || existing.currency !== paymentCurrency) throw new CheckoutError("This checkout request belongs to a different cart. Start a new checkout.", 409);
+    if (!sameCart || exactMinorAmount(existing.total,paymentCurrency)!==totalAmount || !existing.shippingCost?.equals(shipping.amount) || existing.shippingCountry !== shipping.destinationCountry || existing.currency !== paymentCurrency) throw new CheckoutError("CHECKOUT_REQUEST_STALE", 409);
     if (existing.stripeCheckoutSessionId && existing.stripeCheckoutUrl && (!pricingDependencies.stripeMode || stripeCheckoutSessionMode(existing.stripeCheckoutSessionId)===pricingDependencies.stripeMode)) return { orderId: existing.id, sessionId: existing.stripeCheckoutSessionId, url: existing.stripeCheckoutUrl, reused: true };
   }
 
