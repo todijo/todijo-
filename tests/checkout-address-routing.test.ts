@@ -24,8 +24,27 @@ test("address selection returns to checkout without touching cart or initiating 
   const manager = readFileSync("app/[locale]/account/addresses/AddressManager.tsx", "utf8");
   assert.match(checkout, /checkoutAddressPath\(locale\)/);
   assert.match(manager, /JSON\.stringify\(\{\s*isDefault:true\s*\}\)/);
+  assert.match(manager, /const formElement = event\.currentTarget/);
+  assert.match(manager, /formElement\.reset\(\)/);
+  assert.match(manager, /selectedForCheckout/);
+  assert.match(manager, /setAddresses\(current/);
   assert.match(manager, /router\.push\(returnTo\)/);
+  assert.doesNotMatch(manager, /event\.currentTarget\.reset/);
   assert.doesNotMatch(manager, /api\/checkout|stripe|clearCart|localStorage/);
+  const route = readFileSync("app/api/account/addresses/route.ts", "utf8");
+  assert.match(route, /selectedForCheckout:address\.isDefault/);
+});
+
+test("unresolved buyer pricing is never presented as a final zero and cannot start checkout", () => {
+  const cart = readFileSync("app/cart/page.tsx", "utf8");
+  const checkout = readFileSync("app/checkout/page.tsx", "utf8");
+  assert.match(cart, /const pricingResolved = items\.every/);
+  assert.match(cart, /aria-disabled="true"/);
+  assert.match(cart, /pricingResolved \? formatCurrency\(subtotal/);
+  assert.match(checkout, /if\(!pricingResolved\)\{setError/);
+  assert.match(checkout, /disabled=\{loading\|\|!quote\|\|!pricingResolved\}/);
+  assert.match(checkout, /item\.authoritativePrice===false\?pricing\("pricingLoading"\)/);
+  assert.match(checkout, /pricingResolved\?formatCurrency\(subtotal/);
 });
 
 test("shipping quote and checkout re-read the selected destination server-side", () => {

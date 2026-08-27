@@ -28,15 +28,20 @@ export default function AddressManager({ returnTo }: { returnTo: string | null }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(""); setBusy("save");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const body = { recipientName:form.get("recipientName"), addressLine1:form.get("addressLine1"), addressLine2:form.get("addressLine2"), postalCode:form.get("postalCode"), city:form.get("city"), country, state:form.get("state"), phone:form.get("phone"), ...(!editing && returnTo ? { isDefault:true } : {}) };
     try {
       const response = await fetch(editing ? `/api/account/addresses/${editing.id}` : "/api/account/addresses", { method:editing ? "PATCH" : "POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
       if (!response.ok) { setError(t("error")); return; }
-      const saved = await response.json() as { address?: Address };
+      const saved = await response.json() as { address?: Address; selectedForCheckout?: boolean };
+      if (!saved.address) { setError(t("error")); return; }
       if (editing && returnTo && !await select(editing.id)) return;
-      setEditing(null); setCountry(""); event.currentTarget.reset(); await load();
-      if (returnTo && (editing || saved.address?.isDefault)) router.push(returnTo);
+      setAddresses(current => [saved.address!, ...current.filter(address => address.id !== saved.address!.id).map(address => saved.address!.isDefault ? { ...address, isDefault:false } : address)].sort((left, right) => Number(right.isDefault) - Number(left.isDefault)));
+      setEditing(null); setCountry(""); formElement.reset();
+      if (returnTo && !editing && !saved.selectedForCheckout) { setError(t("error")); return; }
+      await load();
+      if (returnTo) router.push(returnTo);
     } finally { setBusy(""); }
   }
 

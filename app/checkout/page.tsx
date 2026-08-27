@@ -27,9 +27,11 @@ export default function CheckoutPage() {
   const sellerTransparency = useTranslations("SellerTransparency");
   const compliance = useTranslations("Compliance");
   const shipping = useTranslations("Shipping");
+  const pricing = useTranslations("ProductDetail");
   const locale = useLocale();
   const common=useTranslations("Common");
   const market=useBuyerMarket();
+  const pricingResolved=items.every(item=>item.authoritativePrice!==false);
 
   useEffect(()=>{fetch("/api/account/addresses",{cache:"no-store"}).then(async r=>r.ok?await r.json():{addresses:[]}).then(data=>setAddress(data.addresses?.[0]??null)).catch(()=>setAddress(null))},[]);
 
@@ -56,6 +58,7 @@ export default function CheckoutPage() {
   }, [address, items, market.currency, shipping, connect,updateDisplayPricing]);
 
   async function beginCheckout() {
+    if(!pricingResolved){setError(pricing("pricingLoading"));return;}
     setLoading(true); setError("");
     const cartSignature = items.map(({ lineKey, quantity }) => `${lineKey}:${quantity}`).sort().join("|");
     const storageKey = `todijo-checkout:${cartSignature}`;
@@ -76,7 +79,7 @@ export default function CheckoutPage() {
 
   function orderLine(item:(typeof items)[number]){
     const lineKey=item.lineKey??cartLineKey(item.id,item.selectedColor,item.selectedSize,item.variantId),blocked=blockedLines[lineKey];
-    return <article className={blocked?"checkoutLineBlocked":undefined} key={lineKey}><div className="checkoutThumb">{item.image?<Image src={item.image} alt={item.name} width={58} height={58} unoptimized/>:<span aria-hidden="true">📦</span>}<b>{item.quantity}</b></div><div><strong>{item.name}</strong>{item.storeName&&<small>{item.storeName}</small>}<SellerTypeDisclosure sellerType={sellerTypes[item.id]??"UNKNOWN"} compact/>{item.selectedOptions&&<small>{item.selectedOptions}</small>}<span>{formatCurrency(item.price*item.quantity,item.currency,locale)}</span>{blocked&&<><p className="checkoutLineWarning" role="alert">⚠ {blocked.code==="SHIPPING_DESTINATION_UNAVAILABLE"?shipping("destinationUnavailable"):blocked.code==="SHIPPING_POSTAL_UNAVAILABLE"?shipping("postalUnavailable"):shipping("notConfigured")}</p>{blocked.allowedCountries.length>0&&<small>{blocked.allowedCountries.map(code=>new Intl.DisplayNames([locale],{type:"region"}).of(code)??code).join(", ")}</small>}<button className="checkoutRemoveLine" type="button" onClick={()=>removeItem(lineKey)}>{common("remove")}</button></>}</div></article>;
+    return <article className={blocked?"checkoutLineBlocked":undefined} key={lineKey}><div className="checkoutThumb">{item.image?<Image src={item.image} alt={item.name} width={58} height={58} unoptimized/>:<span aria-hidden="true">📦</span>}<b>{item.quantity}</b></div><div><strong>{item.name}</strong>{item.storeName&&<small>{item.storeName}</small>}<SellerTypeDisclosure sellerType={sellerTypes[item.id]??"UNKNOWN"} compact/>{item.selectedOptions&&<small>{item.selectedOptions}</small>}<span>{item.authoritativePrice===false?pricing("pricingLoading"):formatCurrency(item.price*item.quantity,item.currency,locale)}</span>{blocked&&<><p className="checkoutLineWarning" role="alert">⚠ {blocked.code==="SHIPPING_DESTINATION_UNAVAILABLE"?shipping("destinationUnavailable"):blocked.code==="SHIPPING_POSTAL_UNAVAILABLE"?shipping("postalUnavailable"):shipping("notConfigured")}</p>{blocked.allowedCountries.length>0&&<small>{blocked.allowedCountries.map(code=>new Intl.DisplayNames([locale],{type:"region"}).of(code)??code).join(", ")}</small>}<button className="checkoutRemoveLine" type="button" onClick={()=>removeItem(lineKey)}>{common("remove")}</button></>}</div></article>;
   }
 
   return <main className="checkoutPage"><SiteHeader /><section className="checkoutShell">
@@ -87,9 +90,9 @@ export default function CheckoutPage() {
         <section><div className="checkoutStep"><span>2</span><div><h2>{t("card")}</h2><p>{t("stripeDetails")}</p></div></div><div className="paymentNotice">🔒 {t("notice")}</div></section>
         <aside className="checkoutLegal"><strong>{compliance("precontractTitle")}</strong><p>{compliance("precontractText")}</p><p><Link href={`/${locale}/info/terms`}>{compliance("legalLinks")}</Link></p></aside>
         {error && <p className="formError" role="alert">{error}</p>}
-        <button className="authSubmit" type="button" onClick={beginCheckout} disabled={loading||!quote} aria-busy={loading}>{loading ? t("opening") : compliance("paymentObligation")}</button>
+        <button className="authSubmit" type="button" onClick={beginCheckout} disabled={loading||!quote||!pricingResolved} aria-busy={loading}>{loading ? t("opening") : !pricingResolved ? pricing("pricingLoading") : compliance("paymentObligation")}</button>
       </section>
-      <aside className="checkoutSummary"><h2>{t("order")}</h2>{items.map(orderLine)}<div className="summaryLine"><span>{cart("subtotal")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div><div className="summaryLine"><span>{cart("shipping")}</span><span>{quote?(quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)):shipping("selectDestination")}</span></div>{quote&&<div className="shippingSummaryMeta"><strong>{quote.method}</strong><span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span></div>}<div className="summaryTotal"><span>{cart("total")}</span><strong>{formatCurrency(subtotal+(quote?Number(quote.amount):0), currency, locale)}</strong></div><Link href="/cart">← {t("modify")}</Link></aside>
+      <aside className="checkoutSummary"><h2>{t("order")}</h2>{items.map(orderLine)}<div className="summaryLine"><span>{cart("subtotal")}</span><strong>{pricingResolved?formatCurrency(subtotal, currency, locale):pricing("pricingLoading")}</strong></div><div className="summaryLine"><span>{cart("shipping")}</span><span>{quote?(quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)):shipping("selectDestination")}</span></div>{quote&&<div className="shippingSummaryMeta"><strong>{quote.method}</strong><span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span></div>}<div className="summaryTotal"><span>{cart("total")}</span><strong>{pricingResolved?formatCurrency(subtotal+(quote?Number(quote.amount):0), currency, locale):pricing("pricingLoading")}</strong></div><Link href="/cart">← {t("modify")}</Link></aside>
     </div>}
   </section></main>;
 }
