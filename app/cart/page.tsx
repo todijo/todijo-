@@ -17,13 +17,14 @@ export default function CartPage() {
   const shipping = useTranslations("Shipping");
   const pricing = useTranslations("ProductDetail");
   const locale = useLocale();
+  const pricingResolved = items.every((item) => item.authoritativePrice !== false);
   const sellerGroups = useMemo(() => {
     const groups = new Map<string, typeof items>();
     for (const item of items) {
       const key = item.storeSlug || item.storeName || "todijo";
       groups.set(key, [...(groups.get(key) ?? []), item]);
     }
-    return [...groups.entries()].map(([key, lines]) => ({ key, lines, subtotal: lines.reduce((sum, line) => sum + (line.authoritativePrice===false ? 0 : line.price * line.quantity), 0) }));
+    return [...groups.entries()].map(([key, lines]) => ({ key, lines, pricingResolved:lines.every((line) => line.authoritativePrice !== false), subtotal: lines.reduce((sum, line) => sum + (line.authoritativePrice===false ? 0 : line.price * line.quantity), 0) }));
   }, [items]);
 
   return (
@@ -41,7 +42,7 @@ export default function CartPage() {
               const remaining = threshold != null ? Math.max(0, threshold - group.subtotal) : null;
               const shippingPrice = group.lines.map((line) => line.shippingPrice).find((value): value is number => typeof value === "number" && value >= 0);
               return <section className="cartSellerGroup" key={group.key}>
-                <header className="cartSellerGroupHeader"><div><span className="cartSellerIcon"><Store size={18} aria-hidden="true"/></span><div><strong>{first.storeName || "Todijo"}</strong>{first.storeSlug && <Link href={`/${locale}/store/${first.storeSlug}`}>{first.storeSlug}</Link>}</div></div><strong>{formatCurrency(group.subtotal, first.currency || currency, locale)}</strong></header>
+                <header className="cartSellerGroupHeader"><div><span className="cartSellerIcon"><Store size={18} aria-hidden="true"/></span><div><strong>{first.storeName || "Todijo"}</strong>{first.storeSlug && <Link href={`/${locale}/store/${first.storeSlug}`}>{first.storeSlug}</Link>}</div></div><strong>{group.pricingResolved ? formatCurrency(group.subtotal, first.currency || currency, locale) : pricing("pricingLoading")}</strong></header>
                 <div className="cartSellerShipping"><Truck size={17} aria-hidden="true"/><div>{alwaysFree || thresholdReached ? <strong>{shipping("freeLabel")}</strong> : threshold != null && remaining != null ? <><strong>{shipping("freeThreshold", { currency: formatCurrency(threshold, first.currency || currency, locale) })}</strong><span>{formatCurrency(remaining, first.currency || currency, locale)} · {t("shippingNext")}</span></> : <><strong>{first.shippingMethodName || t("shipping")}</strong><span>{shippingPrice != null ? formatCurrency(shippingPrice, first.currency || currency, locale) : t("shippingNext")}</span></>}</div></div>
                 <div className="cartItems">{group.lines.map((item) => <article className="cartItem" key={item.lineKey}>
                   <Link href={`/product/${item.id}`} className="cartItemImage" style={{ position: "relative" }}>{item.image ? <Image src={item.image} alt={item.name} fill sizes="(max-width: 620px) 95px, 150px" unoptimized/> : <span>📦</span>}</Link>
@@ -51,7 +52,7 @@ export default function CartPage() {
                 </article>)}</div>
               </section>;
             })}</section>
-            <aside className="cartSummary"><h2>{t("summary")}</h2><div><span>{t("subtotal")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div><div><span>{t("shipping")}</span><span>{t("shippingNext")}</span></div><div className="cartTotal"><span>{t("total")}</span><strong>{formatCurrency(subtotal, currency, locale)}</strong></div><Link className="authSubmit checkoutLink cartCheckoutCta" href="/checkout">{t("checkout")}</Link><p>{t("secure")}</p><Link href="/">← {t("continue")}</Link></aside>
+            <aside className="cartSummary"><h2>{t("summary")}</h2><div><span>{t("subtotal")}</span><strong>{pricingResolved ? formatCurrency(subtotal, currency, locale) : pricing("pricingLoading")}</strong></div><div><span>{t("shipping")}</span><span>{t("shippingNext")}</span></div><div className="cartTotal"><span>{t("total")}</span><strong>{pricingResolved ? formatCurrency(subtotal, currency, locale) : pricing("pricingLoading")}</strong></div><Link className="authSubmit checkoutLink cartCheckoutCta" href="/checkout" aria-disabled={!pricingResolved} tabIndex={pricingResolved ? undefined : -1} onClick={(event) => { if (!pricingResolved) event.preventDefault(); }}>{pricingResolved ? t("checkout") : pricing("pricingLoading")}</Link><p>{t("secure")}</p><Link href="/">← {t("continue")}</Link></aside>
             <CartRecommendations productIds={items.map((item) => item.id)}/>
           </div>
         )}

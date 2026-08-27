@@ -88,6 +88,16 @@ test("ordinary seller checkout converts authoritative product and shipping amoun
   assert.equal(fixture.product.currency,"EUR");assert.equal(fixture.product.price.toString(),"12.5");
 });
 
+test("a zero or unresolved displayed price cannot reach Stripe session creation", async () => {
+  const fixture=checkoutDb();let stripeCalls=0;
+  await assert.rejects(
+    ()=>createCheckout(fixture.db,"buyer_1","request_unresolved",[{productId:"prod_1",quantity:1,displayedUnitPrice:"0",displayedCurrency:"EUR"}],async()=>{stripeCalls++;return{id:"cs_forbidden",url:"https://checkout.stripe.test/forbidden"};},"FR",undefined,connectDeps),
+    (error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_PRICE_CHANGED"&&error.status===409,
+  );
+  assert.equal(stripeCalls,0);
+  assert.equal(fixture.getCreates(),0);
+});
+
 test("real checkout group persistence creates Seller A, Seller B and CJ exactly once",async()=>{
  const items=[{id:"ia",lineKey:"a",orderId:"o",orderGroupId:null},{id:"ib",lineKey:"b",orderId:"o",orderGroupId:null},{id:"icj",lineKey:"cj",orderId:"o",orderGroupId:null}],groups:any[]=[];
  const tx:any={orderGroup:{upsert:async({where,create}:any)=>{const key=where.orderId_groupKey.groupKey,existing=groups.find(group=>group.groupKey===key);if(existing)return existing;const group={id:`g${groups.length+1}`,...create};groups.push(group);return group}},orderItem:{updateMany:async({where,data}:any)=>{let count=0;for(const item of items)if(item.orderId===where.orderId&&where.lineKey.in.includes(item.lineKey)&&item.orderGroupId===null){item.orderGroupId=data.orderGroupId;count++}return{count}},count:async({where}:any)=>items.filter(item=>item.orderId===where.orderId&&item.orderGroupId===null).length}};
