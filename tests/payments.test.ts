@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckoutGroups, processStripeEvent } from "../lib/payments";
-import { assertStripeWebhookMode, configuredStripeMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
+import { assertStripeCheckoutSessionMode, assertStripeWebhookMode, configuredStripeMode, stripeCheckoutSessionMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 const readyConnectedAccount = async (id = "acct_seller") => ({ id, object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
 const connectDeps = { retrieveConnectedAccount: readyConnectedAccount };
@@ -86,6 +86,33 @@ test("ordinary seller checkout converts authoritative product and shipping amoun
   const order=await fixture.db.order.findUnique();assert.equal(order.currency,"USD");assert.equal(order.subtotal.toString(),"13.75");assert.equal(order.shippingCost.toString(),"4.95");assert.equal(order.total.toString(),"18.7");
   assert.equal(stripeInput.items[0].currency,"USD");assert.equal(stripeInput.items[0].unitAmount,1375);assert.equal(stripeInput.shipping.currency,"USD");assert.equal(stripeInput.shipping.amount,495);
   assert.equal(fixture.product.currency,"EUR");assert.equal(fixture.product.price.toString(),"12.5");
+});
+
+test("EUR 9.69 remains 969 cents across authoritative checkout, order snapshot, and Stripe",async()=>{
+  const fixture=checkoutDb();fixture.product.price=new Prisma.Decimal("9.69");let stripeInput:any;
+  await createCheckout(fixture.db,"buyer_1","request_969",[{productId:"prod_1",quantity:1,displayedUnitPrice:"9.69",displayedCurrency:"EUR"}],async(input:any)=>{stripeInput=input;return{id:"cs_test_969",url:"https://checkout.stripe.test/969"};},"FR",undefined,connectDeps);
+  const order=await fixture.db.order.findUnique();
+  assert.equal(order.items[0].unitPrice.toString(),"9.69");assert.equal(order.subtotal.toString(),"9.69");assert.equal(stripeInput.items[0].unitAmount,969);
+});
+
+test("a stored same-mode session is not reused when authoritative pricing changes by one cent",async()=>{
+  const fixture=checkoutDb();fixture.product.price=new Prisma.Decimal("9.69");let stripeCalls=0;
+  const create=async()=>{stripeCalls++;return{id:"cs_test_old",url:"https://checkout.stripe.test/old"};};
+  await createCheckout(fixture.db,"buyer_1","request_stale_cent",[{productId:"prod_1",quantity:1,displayedUnitPrice:"9.69",displayedCurrency:"EUR"}],create,"FR",undefined,{...connectDeps,stripeMode:"test"});
+  fixture.product.price=new Prisma.Decimal("9.70");
+  await assert.rejects(
+    ()=>createCheckout(fixture.db,"buyer_1","request_stale_cent",[{productId:"prod_1",quantity:1,displayedUnitPrice:"9.70",displayedCurrency:"EUR"}],create,"FR",undefined,{...connectDeps,stripeMode:"test"}),
+    (error:unknown)=>error instanceof CheckoutError&&error.message.includes("different cart")&&error.status===409,
+  );
+  assert.equal(stripeCalls,1);
+});
+
+test("a checkout never reuses a stored Stripe session from another mode",async()=>{
+  const fixture=checkoutDb();let stripeCalls=0;
+  const create=async()=>{stripeCalls++;return stripeCalls===1?{id:"cs_test_old",url:"https://checkout.stripe.test/old"}:{id:"cs_live_new",url:"https://checkout.stripe.live/new"};};
+  await createCheckout(fixture.db,"buyer_1","request_mode",[{productId:"prod_1",quantity:1}],create,"FR",undefined,{...connectDeps,stripeMode:"test"});
+  const live=await createCheckout(fixture.db,"buyer_1","request_mode",[{productId:"prod_1",quantity:1}],create,"FR",undefined,{...connectDeps,stripeMode:"live"});
+  assert.equal(stripeCalls,2);assert.equal(live.reused,false);assert.equal(live.sessionId,"cs_live_new");
 });
 
 test("a zero or unresolved displayed price cannot reach Stripe session creation", async () => {
@@ -194,6 +221,13 @@ test("Stripe mode fails closed for absent production mode and mismatched credent
   assert.throws(() => configuredStripeMode({ NODE_ENV: "production" }), /STRIPE_MODE/);
   assert.throws(() => validateStripeSecretKey("sk_live_example", "test"), /does not match/);
   assert.throws(() => validateStripeSecretKey("sk_test_example", "live"), /does not match/);
+});
+
+test("live mode cannot accept or intentionally reuse a test Checkout session",()=>{
+  assert.equal(stripeCheckoutSessionMode("cs_live_example"),"live");assert.equal(stripeCheckoutSessionMode("cs_test_example"),"test");
+  assert.doesNotThrow(()=>assertStripeCheckoutSessionMode("cs_live_example","live"));
+  assert.throws(()=>assertStripeCheckoutSessionMode("cs_test_example","live"),/configured live mode/);
+  assert.throws(()=>assertStripeCheckoutSessionMode("cs_unknown","live"),/configured live mode/);
 });
 
 test("Stripe webhook livemode must match configured mode", () => {
