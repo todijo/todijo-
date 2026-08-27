@@ -4,6 +4,7 @@ import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
 import { CjFreightError, countryCode, freightCacheKey, normalizeCjFreightMethods, readFreightCache, selectCjFreightMethod, writeFreightCache, type CjFreightQuote } from "./cj-freight";
+import { cjRetryDelay, isCjRateLimitFailure, scheduleCjRequest } from "./cj-rate-limiter";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 const PRODUCT_CACHE_TTL_MS=5*60*1000;
@@ -99,7 +100,7 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
   private nextRequestAt = 0;
   constructor(
     private readonly auth: Pick<CjAuthService, "isConfigured" | "getAccessToken" | "invalidateAccessToken"> = cjAuth,
-    private readonly options: { fetcher?:typeof fetch; minimumRequestIntervalMs?:number } = {},
+    private readonly options: { fetcher?:typeof fetch; minimumRequestIntervalMs?:number;useProductCache?:boolean;schedule?:(run:()=>Promise<Response>)=>Promise<Response>;retryDelay?:(attempt:number)=>Promise<void> } = {},
   ) {}
   isConfigured() { return this.auth.isConfigured(); }
   private async throttle() {
@@ -107,13 +108,18 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
     this.nextRequestAt = Date.now() + (this.options.minimumRequestIntervalMs ?? 1_050);
   }
+  private async dispatch(run:()=>Promise<Response>){
+    if(this.options.schedule)return this.options.schedule(run);
+    if(this.options.minimumRequestIntervalMs!=null){await this.throttle();return run();}
+    return scheduleCjRequest("read",run);
+  }
   private async request(operation:string,path:string,context:Record<string,string>={},body?:unknown){
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    let authRetries=0,rateRetries=0;
+    for (;;) {
       const accessToken = await this.auth.getAccessToken();
-      await this.throttle();
       let response: Response;
       try {
-        response = await (this.options.fetcher ?? fetch)(`${CJ_BASE_URL}${path}`, {method:body===undefined?"GET":"POST",headers:{"CJ-Access-Token":accessToken,"Accept":"application/json",...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000),cache:"no-store"});
+        response = await this.dispatch(()=>(this.options.fetcher ?? fetch)(`${CJ_BASE_URL}${path}`, {method:body===undefined?"GET":"POST",headers:{"CJ-Access-Token":accessToken,"Accept":"application/json",...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000),cache:"no-store"}));
       } catch (error) {
         logCjFailure({operation,stage:"product-retrieval",path,responseMessage:error instanceof Error?error.message:"Network request failed",context},[accessToken]);
         throw new Error("CJ_UNAVAILABLE");
@@ -124,7 +130,9 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
         throw new Error(response.ok ? "CJ_API_REQUEST_FAILED" : "CJ_UNAVAILABLE");
       }
       const authFailed = response.status === 401 || payload.code === 1600001 || payload.code === 1600002;
-      if (authFailed && attempt === 0) { this.auth.invalidateAccessToken(); continue; }
+      if (authFailed && authRetries++ === 0) { this.auth.invalidateAccessToken(); continue; }
+      const rateLimited=isCjRateLimitFailure({httpStatus:response.status,code:payload.code,message:payload.message});
+      if(rateLimited&&rateRetries<2){logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);const attempt=rateRetries++;await (this.options.retryDelay?.(attempt)??new Promise(resolve=>setTimeout(resolve,cjRetryDelay(attempt))));continue;}
       if (authFailed || !response.ok || payload.result === false || payload.success === false) {
         logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);
         if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
@@ -140,10 +148,12 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
   async getProduct(supplierProductId: string):Promise<SupplierProductSnapshot> {
     const identifier = supplierProductId.trim();
     if (!/^[A-Za-z0-9-]{4,200}$/.test(identifier)) throw new Error("CJ_PRODUCT_ID_INVALID");
-    if(this.options.fetcher)return this.loadProduct(identifier);
+    if(this.options.useProductCache??!this.options.fetcher){
     const key=identifier.toUpperCase(),cached=readCjProductCache(key);if(cached)return cached;
     const pending=pendingProducts.get(key);if(pending)return pending;
     const request=this.loadProduct(identifier).then(value=>{productCache.set(key,{expiresAt:Date.now()+PRODUCT_CACHE_TTL_MS,value});return value;}).finally(()=>pendingProducts.delete(key));pendingProducts.set(key,request);return request;
+    }
+    return this.loadProduct(identifier);
   }
   private async loadProduct(identifier:string):Promise<SupplierProductSnapshot> {
     const isSku = /^CJ[A-Za-z0-9-]+$/i.test(identifier);
