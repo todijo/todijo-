@@ -23,7 +23,7 @@ test("address selection returns to checkout without touching cart or initiating 
   const checkout = readFileSync("app/checkout/page.tsx", "utf8");
   const manager = readFileSync("app/[locale]/account/addresses/AddressManager.tsx", "utf8");
   assert.match(checkout, /checkoutAddressPath\(locale\)/);
-  assert.match(manager, /JSON\.stringify\(\{isDefault:true\}\)/);
+  assert.match(manager, /JSON\.stringify\(\{\s*isDefault:true\s*\}\)/);
   assert.match(manager, /router\.push\(returnTo\)/);
   assert.doesNotMatch(manager, /api\/checkout|stripe|clearCart|localStorage/);
 });
@@ -37,4 +37,19 @@ test("shipping quote and checkout re-read the selected destination server-side",
   assert.match(payments, /destinationCountry = buyerAddress\.country/);
   assert.match(payments, /embeddedShippingQuote\(groupLines,paymentCurrency,destinationCountry\)/);
   assert.match(payments, /quoteShippingRule\(effectiveShippingRule/);
+});
+
+test("address management uses scoped Todijo form and card styling without global form overrides", () => {
+  const page = readFileSync("app/[locale]/account/addresses/page.tsx", "utf8");
+  const manager = readFileSync("app/[locale]/account/addresses/AddressManager.tsx", "utf8");
+  const css = readFileSync("app/globals.css", "utf8");
+  assert.match(page, /className="addressPage"/);
+  assert.match(manager, /className="addressCard"/);
+  assert.match(manager, /className="addressForm"/);
+  assert.match(manager, /htmlFor="address-recipient"/);
+  assert.match(manager, /aria-busy=/);
+  assert.match(css, /\.addressPage\{/);
+  assert.match(css, /\.addressForm input,\.addressForm select/);
+  assert.match(css, /@media\(max-width:600px\)[\s\S]*\.addressFormRow\{grid-template-columns:1fr\}/);
+  assert.doesNotMatch(css, /(^|[},])\s*(input|button|form)\s*\{/m);
 });
