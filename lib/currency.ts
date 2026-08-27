@@ -18,6 +18,8 @@ export function requireBuyerCurrency(value:unknown){const currency=supportedBuye
 export function currencyMinorUnits(currency:SupportedBuyerCurrency){return zeroDecimal.has(currency)?0:2;}
 export function roundCurrencyUp(value:Prisma.Decimal.Value,currency:SupportedBuyerCurrency){const factor=new Prisma.Decimal(10).pow(currencyMinorUnits(currency));return new Prisma.Decimal(value).mul(factor).ceil().div(factor);}
 export function stripeMinorAmount(value:Prisma.Decimal.Value,currency:SupportedBuyerCurrency){const rounded=roundCurrencyUp(value,currency),factor=new Prisma.Decimal(10).pow(currencyMinorUnits(currency)),minor=rounded.mul(factor);if(!minor.isInteger()||minor.isNegative()||minor.greaterThan(Number.MAX_SAFE_INTEGER))throw new CurrencyError("CURRENCY_AMOUNT_INVALID");return minor.toNumber();}
+export function exactMinorAmount(value:Prisma.Decimal.Value,currency:SupportedBuyerCurrency){const minor=new Prisma.Decimal(value).mul(new Prisma.Decimal(10).pow(currencyMinorUnits(currency)));if(!minor.isInteger()||minor.isNegative()||minor.greaterThan(Number.MAX_SAFE_INTEGER))throw new CurrencyError("CURRENCY_AMOUNT_INVALID");return minor.toNumber();}
+export function majorAmountFromMinor(minor:number,currency:SupportedBuyerCurrency){if(!Number.isSafeInteger(minor)||minor<0)throw new CurrencyError("CURRENCY_AMOUNT_INVALID");return new Prisma.Decimal(minor).div(new Prisma.Decimal(10).pow(currencyMinorUnits(currency)));}
 export function stripePresentmentSupported(value:unknown){return supportedBuyerCurrency(value)!=null;}
 
 const countryCurrency:Record<string,SupportedBuyerCurrency>={

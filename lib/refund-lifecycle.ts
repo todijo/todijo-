@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { stripeMinorAmount, type SupportedBuyerCurrency } from "./currency";
+import { exactMinorAmount, type SupportedBuyerCurrency } from "./currency";
 import { createStripeRefund, createStripeTransferReversal } from "./stripe";
 
 export const REFUND_CLAIM_MS = 15 * 60_000;
@@ -27,7 +27,7 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
       if (!item.orderGroupId) throw new Error("Refundable order line has no authoritative order group.");
       const already = item.refundAllocations.reduce((sum, row) => sum + row.quantity, 0);
       const quantity = item.quantity - already;
-      const unitAmountMinor = stripeMinorAmount(item.unitPrice, order.currency as SupportedBuyerCurrency);
+      const unitAmountMinor = exactMinorAmount(item.unitPrice, order.currency as SupportedBuyerCurrency);
       return { item, quantity, unitAmountMinor, merchandiseAmountMinor: unitAmountMinor * quantity };
     }).filter((row) => row.quantity > 0);
     if (!itemRows.length) throw new Error("Order has no refundable quantity remaining.");

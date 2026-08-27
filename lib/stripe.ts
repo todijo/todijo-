@@ -77,6 +77,9 @@ export function assertStripeWebhookMode(event: Pick<StripeEvent, "livemode">, mo
   }
 }
 
+export function stripeCheckoutSessionMode(sessionId:string):StripeMode|null{return sessionId.startsWith("cs_live_")?"live":sessionId.startsWith("cs_test_")?"test":null;}
+export function assertStripeCheckoutSessionMode(sessionId:string,mode=configuredStripeMode()){if(stripeCheckoutSessionMode(sessionId)!==mode)throw new Error(`Stripe Checkout session does not match configured ${mode} mode.`);return sessionId;}
+
 function stripeSecret() {
   return validateStripeSecretKey(process.env.STRIPE_SECRET_KEY);
 }
@@ -222,6 +225,7 @@ export async function createStripeCheckoutSession(input: {
 
   const json = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", { method: "POST", idempotencyKey: input.idempotencyKey, body });
   if (!json.id || !json.url) throw new Error("Stripe Checkout session creation failed.");
+  assertStripeCheckoutSessionMode(json.id);
   return { id: json.id, url: json.url };
 }
 

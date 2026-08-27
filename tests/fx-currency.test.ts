@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {currencyMinorUnits,preferredCurrencyForCountry,resolveBuyerCurrency,roundCurrencyUp,stripeMinorAmount,stripePresentmentSupported,SUPPORTED_BUYER_CURRENCIES} from "../lib/currency";
+import {currencyMinorUnits,exactMinorAmount,majorAmountFromMinor,preferredCurrencyForCountry,resolveBuyerCurrency,roundCurrencyUp,stripeMinorAmount,stripePresentmentSupported,SUPPORTED_BUYER_CURRENCIES} from "../lib/currency";
 import {FxError,resetFxCacheForTests,verifiedFxRate} from "../lib/fx";
 import {calculateSupplierPrice,convertSupplierPriceForBuyer} from "../lib/suppliers/pricing";
 import {authorizedEmbeddedFreight} from "../lib/suppliers/dropshipping-pricing";
@@ -21,6 +21,12 @@ test("FX conversion happens after the 20 percent margin and rounds upward by cur
   const eur=convertSupplierPriceForBuyer(calculation,"EUR",await verifiedFxRate("USD","EUR",fetcher));assert.equal(eur.finalSellingPrice,"13.8");assert.equal(eur.marginGuaranteed,true);
   const jpy=convertSupplierPriceForBuyer(calculation,"JPY",await verifiedFxRate("USD","JPY",fetcher));assert.equal(jpy.finalSellingPrice,"2250");assert.equal(currencyMinorUnits("JPY"),0);assert.equal(stripeMinorAmount(jpy.finalSellingPrice,"JPY"),2250);
   assert.equal(roundCurrencyUp("13.801","EUR").toString(),"13.81");assert.equal(stripeMinorAmount("13.81","EUR"),1381);
+});
+
+test("the authoritative minor-unit boundary rounds fractional CJ/FX output exactly once",()=>{
+  const minor=stripeMinorAmount("9.6890000001","EUR"),major=majorAmountFromMinor(minor,"EUR");
+  assert.equal(minor,969);assert.equal(major.toString(),"9.69");assert.equal(exactMinorAmount(major,"EUR"),969);
+  assert.throws(()=>exactMinorAmount("9.6890000001","EUR"),/CURRENCY_AMOUNT_INVALID/);
 });
 
 test("market defaults and explicit supported preferences are centralized and safe",()=>{
