@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Prisma } from "@prisma/client";
-import { adminBuyerWhere, adminPage, isPaidOrder, moneyGroups, paidOrderWhere, sellerItemAmount, sellerOrderMetrics } from "../lib/admin-marketplace";
+import { adminBuyerWhere, adminOrderWhere,adminPage, isPaidOrder, moneyGroups, paidOrderWhere, sellerItemAmount, sellerOrderMetrics } from "../lib/admin-marketplace";
 
 test("buyer membership includes customers and users with buyer orders", () => {
   const where: any = adminBuyerWhere("");
@@ -48,3 +48,5 @@ test("pagination is bounded and clamps malformed or out-of-range pages", () => {
   assert.deepEqual(adminPage(41, "999999"), { page: 3, pages: 3, skip: 40, take: 20 });
   assert.equal(adminPage(41, "1.5").page, 1);
 });
+
+test("default admin order scope is operationally paid while diagnostics remain explicit",()=>{const active:any=adminOrderWhere(""),pending:any=adminOrderWhere("","pending"),all:any=adminOrderWhere("","all");assert.ok(active.AND[0].OR);assert.equal(pending.AND[0].paidAt,null);assert.deepEqual(all.AND[0],{})});

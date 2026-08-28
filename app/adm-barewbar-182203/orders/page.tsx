@@ -4,11 +4,13 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { AdminRefundReviewControl } from "@/components/AdminRefundReviewControl";
 import { AdminSupplierFulfillmentControl } from "@/components/AdminSupplierFulfillmentControl";
 import { requireAdmin } from "@/lib/admin-access";
-import { adminOrderWhere, adminPage, normalizeAdminSearch, orderStoreNames } from "@/lib/admin-marketplace";
+import { adminOrderViews,adminOrderWhere, adminPage, isPaidOrder,normalizeAdminOrderView, normalizeAdminSearch, orderStoreNames } from "@/lib/admin-marketplace";
 import { buyerPaymentState } from "@/lib/buyer-orders";
 import { fulfillmentStepFor } from "@/lib/order-status";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import {adminOrderFilterMessages} from "@/i18n/admin-order-filters";
+import {isLocale} from "@/i18n/config";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,8 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
   }
 
   const search = normalizeAdminSearch(one(params.q));
-  const where = adminOrderWhere(search);
+  const view=normalizeAdminOrderView(one(params.view)||(one(params.refundReview)==="pending"?"refund":""));
+  const where = adminOrderWhere(search,view);
   const total = await prisma.order.count({ where });
   const paging = adminPage(total, one(params.page));
   const rows = await prisma.order.findMany({
@@ -49,6 +52,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       createdAt: true,
       paidAt: true,
       stripePaymentIntentId: true,
+      checkoutExpiredAt:true,
       shippedAt: true,
       deliveredAt: true,
       storeIdSnapshot: true,
@@ -82,9 +86,10 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
     },
   });
 
-  const href = (page: number) => `/adm-barewbar-182203/orders?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(page) })}`;
+  const href = (page: number) => `/adm-barewbar-182203/orders?${new URLSearchParams({view,...(search ? { q: search } : {}), page: String(page) })}`;
   const date = (value: Date | null) => value ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(value) : t("notAvailable");
   const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
+  const labels=adminOrderFilterMessages[isLocale(locale)?locale:"en"];
 
   return <main className="adminPage adminOrdersPage">
     <section className="adminShell">
@@ -98,7 +103,9 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       </header>
 
       <section className="adminPanel adminOrdersPanel">
+        <nav className="moderationFilters" aria-label={orders("history.filtersLabel")}>{adminOrderViews.map(item=><Link key={item} aria-current={item===view?"page":undefined} href={`/adm-barewbar-182203/orders?view=${item}`}>{labels[item]}</Link>)}</nav>
         <form className="adminForm" action="/adm-barewbar-182203/orders">
+          <input type="hidden" name="view" value={view}/>
           <label>{t("searchOrders")}<input name="q" maxLength={100} defaultValue={search} placeholder={t("searchOrdersPlaceholder")} /></label>
           <button>{t("search")}</button>
         </form>
@@ -108,6 +115,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
             const step = fulfillmentStepFor(order.status);
             const buyer = `${order.buyer.firstName} ${order.buyer.lastName}`.trim();
             const stores = orderStoreNames(order).join(", ") || t("notAvailable");
+            const paid=isPaidOrder(order);
             return <article className="adminOrderCard" key={order.id}>
               <header className="adminOrderCardHeader">
                 <div>
@@ -132,8 +140,10 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 <div>{order.items.map((item) => <small key={item.id}>{item.productNameSnapshot ?? item.product.name} × {item.quantity}</small>)}</div>
               </section>
 
+              {!paid&&<p className="subscriptionWarning" role="status">{order.checkoutExpiredAt?labels.expired:labels.unpaid}</p>}
+
               {order.refundRequest && <section className="adminOrderRefund"><h2>{orders("refundRequest.title")}</h2><AdminRefundReviewControl request={order.refundRequest} totalLabel={orders("total")} total={money(Number(order.total), order.currency)} /></section>}
-              {order.supplierFulfillments.map((fulfillment) => <AdminSupplierFulfillmentControl key={fulfillment.id} fulfillment={fulfillment}/>)}
+              {paid&&order.supplierFulfillments.map((fulfillment) => <AdminSupplierFulfillmentControl key={fulfillment.id} fulfillment={fulfillment}/>)}
             </article>;
           })}
         </section> : <p className="adminOrdersEmpty">{t("noOrders")}</p>}

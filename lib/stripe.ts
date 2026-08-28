@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type StripeCheckoutSession = {
   id: string;
+  status?: "open" | "complete" | "expired";
+  expires_at?: number;
   mode?: string;
   customer?: string | { id: string } | null;
   subscription?: string | { id: string } | null;
@@ -223,10 +225,10 @@ export async function createStripeCheckoutSession(input: {
     body.set(`line_items[${index}][price_data][product_data][name]`, item.name);
   });
 
-  const json = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", { method: "POST", idempotencyKey: input.idempotencyKey, body });
+  const json = await stripeRequest<{ id: string; url: string; expires_at?:number }>("/checkout/sessions", { method: "POST", idempotencyKey: input.idempotencyKey, body });
   if (!json.id || !json.url) throw new Error("Stripe Checkout session creation failed.");
   assertStripeCheckoutSessionMode(json.id);
-  return { id: json.id, url: json.url };
+  return { id: json.id, url: json.url, expiresAt:json.expires_at?new Date(json.expires_at*1000):undefined };
 }
 
 export function createStripeTransfer(input:{amount:number;currency:string;destination:string;transferGroup:string;sourceTransaction?:string;idempotencyKey:string}){

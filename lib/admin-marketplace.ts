@@ -55,8 +55,18 @@ export function adminSellerWhere(search: string): Prisma.StoreWhereInput {
   };
 }
 
-export function adminOrderWhere(search: string): Prisma.OrderWhereInput {
-  return search ? { id: { contains: search, mode: "insensitive" } } : {};
+export const adminOrderViews=["active","refund","pending","abandoned","all"] as const;
+export type AdminOrderView=typeof adminOrderViews[number];
+export function normalizeAdminOrderView(value:unknown):AdminOrderView{return typeof value==="string"&&adminOrderViews.includes(value as AdminOrderView)?value as AdminOrderView:"active";}
+export function adminOrderWhere(search:string,view:AdminOrderView="active"):Prisma.OrderWhereInput{
+ const scope:Record<AdminOrderView,Prisma.OrderWhereInput>={
+  active:{OR:[{paidAt:{not:null}},{stripePaymentIntentId:{not:null}},{status:{in:["PAID","PROCESSING","SHIPPED","DELIVERED","REFUNDED"]}}]},
+  refund:{refundRequest:{is:{status:{in:["SELLER_APPROVED","SELLER_REJECTED"]}}}},
+  pending:{status:"PENDING",paidAt:null,stripePaymentIntentId:null,checkoutExpiredAt:null},
+  abandoned:{status:"CANCELLED",checkoutExpiredAt:{not:null},paidAt:null,stripePaymentIntentId:null},
+  all:{},
+ };
+ return{AND:[scope[view],...(search?[{id:{contains:search,mode:Prisma.QueryMode.insensitive}}]:[])]};
 }
 
 export function moneyGroups(rows: Array<{ currency: string | null; amount: Prisma.Decimal | null }>, fallbackCurrency?: string) {
