@@ -1,22 +1,12 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { processStripeEvent } from "@/lib/payments";
-import { assertStripeWebhookMode, verifyStripeWebhook, type StripeCheckoutSession } from "@/lib/stripe";
+import { type StripeCheckoutSession, type StripeEvent } from "@/lib/stripe";
+import { handleStripeWebhookRequest } from "@/lib/stripe-webhook-request";
 import { automaticCjFulfillmentEnabled, processOrderSupplierFulfillments } from "@/lib/suppliers/supplier-fulfillment";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
-  const rawBody = await request.text();
-  let event;
-  try {
-    event = verifyStripeWebhook(rawBody, request.headers.get("stripe-signature"), process.env.STRIPE_WEBHOOK_SECRET ?? "");
-    assertStripeWebhookMode(event);
-  } catch (error) {
-    console.error("Stripe webhook signature rejected", error);
-    return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
-  }
-  try {
+async function processAuthenticatedStripeEvent(event: StripeEvent) {
     console.info(`[Stripe webhook ${event.id}] Received ${event.type}.`);
     const session = event.data.object as StripeCheckoutSession;
     const sellerCheckout = event.type === "checkout.session.completed"
@@ -33,15 +23,7 @@ export async function POST(request: Request) {
       const customerId = stripeId(session.customer);
       const subscriptionId = stripeId(session.subscription);
       const storeId = session.metadata?.storeId ?? session.client_reference_id;
-      const userId = session.metadata?.userId;
-      console.info(`[Stripe webhook ${event.id}] Subscription Checkout payload.`, {
-        checkoutSessionId: session.id,
-        customerId,
-        subscriptionId,
-        metadata: session.metadata ?? {},
-        storeId,
-        userId,
-      });
+      console.info(`[Stripe webhook ${event.id}] Validated a subscription Checkout payload.`);
       const lookup = [
         ...(storeId ? [{ storeId }] : []),
         ...(subscriptionId ? [{ stripeSubscriptionId: subscriptionId }] : []),
@@ -52,9 +34,7 @@ export async function POST(request: Request) {
         where: { OR: lookup },
         select: { id: true, storeId: true, status: true, stripeSubscriptionId: true, stripePriceId: true, store: { select: { id: true, ownerId: true, stripeCustomerId: true } } },
       });
-      console.info(`[Stripe webhook ${event.id}] Pre-processing database lookup.`, initialRecord
-        ? { found: true, record: initialRecord }
-        : { found: false, lookup: { storeId, customerId, subscriptionId, userId } });
+      console.info(`[Stripe webhook ${event.id}] Subscription lookup completed (found=${Boolean(initialRecord)}).`);
     }
     const result = await processStripeEvent(prisma, event);
     const paidOrderId = !sellerCheckout && "paid" in result && result.paid === true
@@ -84,14 +64,14 @@ export async function POST(request: Request) {
       if (!updated || !["ACTIVE", "TRIALING"].includes(updated.status)) {
         throw new Error(`Subscription Checkout ${session.id} completed without an active local SellerSubscription update.`);
       }
-      console.info(`[Stripe webhook ${event.id}] Post-processing database update result.`, updated);
+      console.info(`[Stripe webhook ${event.id}] Subscription state verified after processing.`);
     }
     console.info(`[Stripe webhook ${event.id}] Completed ${event.type}.`, result);
-    return NextResponse.json({ received: true, ...result });
-  } catch (error) {
-    console.error(`[Stripe webhook ${event.id}] Processing failed for ${event.type}. Stripe should retry this event.`, error);
-    return NextResponse.json({ error: "Webhook processing failed." }, { status: 500 });
-  }
+    return result;
+}
+
+export async function POST(request: Request) {
+  return handleStripeWebhookRequest(request, { processEvent: processAuthenticatedStripeEvent });
 }
 
 function stripeId(value: string | { id: string } | null | undefined) {
