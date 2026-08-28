@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { refundPaymentModeMessage } from "@/i18n/refund-admin-errors";
 
 type RefundRequest = {
   id: string;
@@ -13,6 +14,7 @@ type RefundRequest = {
   decisionNote: string | null;
   createdAt: Date | string;
   reviewedAt: Date | string | null;
+  refundOperation?: { errorCode: string | null } | null;
   evidence: Array<{
     id: string;
     originalFilename: string;
@@ -39,6 +41,7 @@ function AdminEvidencePreview({ orderId, evidence }: { orderId: string; evidence
 
 export function AdminRefundReviewControl({ request, totalLabel, total }: { request: RefundRequest; totalLabel: string; total: string }) {
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations("Orders.refundRequest");
   const [decisionNote, setDecisionNote] = useState("");
   const [returnRequired, setReturnRequired] = useState(false);
@@ -59,11 +62,15 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision, returnRequired: decision === "approve" && returnRequired, ...(note ? { decisionNote: note } : {}) }),
       });
-      if (!response.ok) throw new Error();
+      const payload = await response.json().catch(() => ({})) as { code?: string };
+      if (!response.ok) {
+        if (payload.code === "REFUND_PAYMENT_MODE_MISMATCH" || payload.code === "REFUND_PAYMENT_MODE_UNRESOLVED") throw new Error(refundPaymentModeMessage(locale));
+        throw new Error(t("decisionFailed"));
+      }
       setSubmitted(true);
       router.refresh();
-    } catch {
-      setError(t("decisionFailed"));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : t("decisionFailed"));
     } finally {
       setSaving(false);
     }
@@ -78,6 +85,7 @@ export function AdminRefundReviewControl({ request, totalLabel, total }: { reque
       <p className="refundReviewFreeText" dir="auto"><strong>{t("reasonLabel")}</strong> {request.reason}</p>
       <div className="refundReviewDates"><small>{t("submittedAt", { date: date(request.createdAt) })}</small>{request.reviewedAt && <small>{t("reviewedAt", { date: date(request.reviewedAt) })}</small>}</div>
       {request.decisionNote && <p className="refundReviewFreeText" dir="auto"><strong>{t("decisionNote")}</strong> {request.decisionNote}</p>}
+      {(request.refundOperation?.errorCode === "REFUND_PAYMENT_MODE_MISMATCH" || request.refundOperation?.errorCode === "REFUND_PAYMENT_MODE_UNRESOLVED") && <p className="subscriptionWarning" role="alert">{refundPaymentModeMessage(locale)}</p>}
       {request.evidence.length > 0 && <div className="buyerRefundEvidence"><h4>{t("evidenceTitle")}</h4><div className="buyerRefundEvidenceGrid">{request.evidence.map((evidence) => <AdminEvidencePreview key={evidence.id} orderId={request.orderId} evidence={evidence} />)}</div></div>}
       {editable && <><textarea className="refundReviewTextarea" dir="auto" value={decisionNote} maxLength={1000} placeholder={t("decisionNotePlaceholder")} onChange={(event) => setDecisionNote(event.target.value)} /><label><input type="checkbox" checked={returnRequired} onChange={(event) => setReturnRequired(event.target.checked)} /> Require a physical return and inspection before inventory can be restored</label><div className="refundReviewActions"><button type="button" disabled={saving} onClick={() => decide("approve")}>{t("approve")}</button><button type="button" disabled={saving} onClick={() => decide("reject")}>{t("reject")}</button></div></>}
       {error && <small role="alert">{error}</small>}

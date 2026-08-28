@@ -76,6 +76,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
           decisionNote: true,
           createdAt: true,
           reviewedAt: true,
+          refundOperation: { select: { errorCode: true } },
           evidence: {
             select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true },
             orderBy: { createdAt: "asc" },
@@ -103,7 +104,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       </header>
 
       <section className="adminPanel adminOrdersPanel">
-        <nav className="moderationFilters" aria-label={orders("history.filtersLabel")}>{adminOrderViews.map(item=><Link key={item} aria-current={item===view?"page":undefined} href={`/adm-barewbar-182203/orders?view=${item}`}>{labels[item]}</Link>)}</nav>
+        <nav className="moderationFilters" aria-label={`${labels.all}: ${labels.active}`}>{adminOrderViews.map(item=><Link key={item} aria-current={item===view?"page":undefined} href={`/adm-barewbar-182203/orders?view=${item}`}>{labels[item]}</Link>)}</nav>
         <form className="adminForm" action="/adm-barewbar-182203/orders">
           <input type="hidden" name="view" value={view}/>
           <label>{t("searchOrders")}<input name="q" maxLength={100} defaultValue={search} placeholder={t("searchOrdersPlaceholder")} /></label>
