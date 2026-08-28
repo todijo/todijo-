@@ -716,6 +716,9 @@ model Product {
   shippingCarrier String?
   shippingProvider String?
   shippingExternalServiceId String?
+  removedAt DateTime?
+  removedById String?
+  removalActorRole UserRole?
 
   storeId String
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -736,6 +739,7 @@ model Product {
 
   @@unique([storeId, slug])
   @@index([storeId, status])
+  @@index([removedAt])
   @@index([category])
 }
 

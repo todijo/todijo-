@@ -91,6 +91,7 @@ test("invalid duration is rejected", () => {
 test("public product visibility requires Stripe, a live admin grant, or admin exemption", () => {
   const now = new Date("2026-01-01T00:00:00Z");
   assert.deepEqual(publicProductAccessWhere(now), {
+    removedAt: null,
     store: {
       status: "ACTIVE",
       owner: { sellerSuspendedAt: null, deactivatedAt: null },

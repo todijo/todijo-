@@ -13,6 +13,7 @@ import { assertProductPublicationEligible } from "@/lib/suppliers/safety";
 import { AdminAccessError } from "@/lib/admin-access";
 import { assertSellerActivity } from "@/lib/account-status";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
+import { productRemovalErrorResponse, removeProductListing } from "@/lib/product-removal";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -27,7 +28,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const { id } = await context.params;
     const product = await prisma.product.findFirst({
-      where: { id, store: { ownerId: session.userId } },
+      where: { id, removedAt:null, store: { ownerId: session.userId } },
       select: {
         id: true, complianceDeclaredAt: true, deactivationReason: true,
         supplierLink: { select: { provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
@@ -96,18 +97,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await readSession();
-    if (!session) return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
-    await assertSellerActivity(prisma, session.userId);
-    const { id } = await context.params;
-    const product = await prisma.product.findFirst({ where: { id, store: { ownerId: session.userId } }, select: { id: true } });
-    if (!product) return NextResponse.json({ error: "Produit introuvable ou accès refusé." }, { status: 404 });
-    await prisma.product.delete({ where: { id } });
+    const result=await removeProductListing(prisma,await readSession(),(await context.params).id);
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true,...result });
   } catch (error) {
-    if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     console.error("Delete product error:", error);
-    return NextResponse.json({ error: "Impossible de supprimer le produit." }, { status: 500 });
+    const failure=productRemovalErrorResponse(error);return NextResponse.json({error:failure.error},{status:failure.status});
   }
 }

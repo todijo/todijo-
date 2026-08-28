@@ -17,7 +17,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   const locale = await getLocale(); const session = await readSession();
   if (!session) redirect("/login");
   const { id } = await params;
-  const product = await prisma.product.findFirst({ where: { id, store: { ownerId: session.userId } }, select: {
+  const product = await prisma.product.findFirst({ where: { id, removedAt:null, store: { ownerId: session.userId } }, select: {
     id:true,name:true,description:true,price:true,compareAtPrice:true,stock:true,category:true,condition:true,status:true,colors:true,sizes:true,images:true,currency:true,allowPrepurchaseQuestions:true,productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,complianceDeclaredAt:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
     options:{where:{active:true},orderBy:{position:"asc"},select:{id:true,name:true,values:{where:{active:true},orderBy:{position:"asc"},select:{id:true,value:true}}}},
     imageRecords:{orderBy:{position:"asc"},select:{url:true,optionValueImages:{orderBy:{position:"asc"},select:{isPrimary:true,optionValue:{select:{id:true}}}}}},

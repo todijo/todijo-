@@ -75,6 +75,7 @@ export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput
 
 export function publicProductAccessWhere(now = new Date()): Prisma.ProductWhereInput {
   return {
+    removedAt: null,
     store: publicStoreAccessWhere(now),
     OR: [
       { supplierLink: { is: null } },
@@ -188,7 +189,7 @@ export async function extendManagedAccess(
       select: { storeId: true, endsAt: true },
     }));
     await db.product.updateMany({
-      where: { storeId: store.id, status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" },
+      where: { storeId: store.id, removedAt:null, status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" },
       data: { status: "PUBLISHED", deactivationReason: "NONE" },
     });
   }
