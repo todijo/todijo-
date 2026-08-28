@@ -1,10 +1,38 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { exactMinorAmount, type SupportedBuyerCurrency } from "./currency";
-import { createStripeRefund, createStripeTransferReversal } from "./stripe";
+import { configuredStripeMode, createStripeRefund, createStripeTransferReversal, stripeCheckoutSessionMode, type StripeMode } from "./stripe";
 
 export const REFUND_CLAIM_MS = 15 * 60_000;
 export const REFUND_RETRY_MS = 15 * 60_000;
 export const MAX_FINANCIAL_ATTEMPTS = 8;
+
+export class RefundPaymentModeError extends Error {
+  readonly code: "REFUND_PAYMENT_MODE_MISMATCH" | "REFUND_PAYMENT_MODE_UNRESOLVED";
+  readonly status = 409;
+  constructor(code: RefundPaymentModeError["code"], readonly expectedMode: StripeMode, readonly actualMode: StripeMode | null) {
+    super(code === "REFUND_PAYMENT_MODE_MISMATCH" ? "The original payment mode does not match the current Stripe mode." : "The original payment mode cannot be determined safely.");
+    this.code = code;
+  }
+}
+
+type PaymentModeOrder = { stripePaymentMode?: string | null; stripeCheckoutSessionId?: string | null };
+export function orderPaymentMode(order: PaymentModeOrder): StripeMode | null {
+  const stored = order.stripePaymentMode?.toLowerCase();
+  if (stored === "test" || stored === "live") return stored;
+  return order.stripeCheckoutSessionId ? stripeCheckoutSessionMode(order.stripeCheckoutSessionId) : null;
+}
+
+export function assertRefundPaymentMode(order: PaymentModeOrder, runtimeMode = configuredStripeMode()) {
+  const paymentMode = orderPaymentMode(order);
+  if (!paymentMode) throw new RefundPaymentModeError("REFUND_PAYMENT_MODE_UNRESOLVED", runtimeMode, null);
+  if (paymentMode !== runtimeMode) throw new RefundPaymentModeError("REFUND_PAYMENT_MODE_MISMATCH", runtimeMode, paymentMode);
+  return paymentMode;
+}
+
+export async function assertRefundRequestPaymentMode(db: PrismaClient, refundRequestId: string, runtimeMode = configuredStripeMode()) {
+  const request = await db.refundRequest.findUniqueOrThrow({ where: { id: refundRequestId }, select: { order: { select: { id: true, stripePaymentMode: true, stripeCheckoutSessionId: true } } } });
+  return { orderId: request.order.id, paymentMode: assertRefundPaymentMode(request.order, runtimeMode) };
+}
 
 function safeMessage(error: unknown) {
   return (error instanceof Error ? error.message : "Stripe financial operation failed").slice(0, 500);
@@ -22,6 +50,7 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
     if (request.status !== "ADMIN_APPROVED") throw new Error("Refund request is not admin approved.");
     const order = request.order;
     if (!order.stripePaymentIntentId || !order.paidAt) throw new Error("Order has no authoritative paid Stripe PaymentIntent.");
+    const paymentMode = assertRefundPaymentMode(order);
 
     const itemRows = order.items.map((item) => {
       if (!item.orderGroupId) throw new Error("Refundable order line has no authoritative order group.");
@@ -52,7 +81,7 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
     const shippingAmountMinor = groupRows.reduce((sum, row) => sum + row.shippingAmountMinor, 0);
     const operation = await tx.refundOperation.create({ data: {
       refundRequestId, orderId: order.id, buyerId: request.buyerId, currency: order.currency,
-      status: "APPROVED", reason: request.reason, returnRequired: options.returnRequired === true, refundIdempotencyKey: `buyer-refund:${refundRequestId}`,
+      status: "APPROVED", reason: request.reason, returnRequired: options.returnRequired === true, paymentMode: paymentMode.toUpperCase(), refundIdempotencyKey: `buyer-refund:${refundRequestId}`,
       merchandiseAmountMinor, shippingAmountMinor, totalAmountMinor: merchandiseAmountMinor + shippingAmountMinor,
       reviewedById: actorId, reviewedAt: now,
       itemAllocations: { create: itemRows.map((row) => ({ orderItemId: row.item.id, quantity: row.quantity, unitAmountMinor: row.unitAmountMinor, merchandiseAmountMinor: row.merchandiseAmountMinor })) },
@@ -64,6 +93,16 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
 }
 
 export async function processRefundOperation(db: PrismaClient, operationId: string, now = new Date(), submit = createStripeRefund) {
+  const context = await db.refundOperation.findUniqueOrThrow({ where: { id: operationId }, select: { paymentMode: true, order: { select: { stripePaymentMode: true, stripeCheckoutSessionId: true } } } });
+  const runtimeMode = configuredStripeMode();
+  let paymentMode: StripeMode;
+  try {
+    paymentMode = assertRefundPaymentMode(context.order, runtimeMode);
+    if (context.paymentMode && context.paymentMode.toLowerCase() !== paymentMode) throw new RefundPaymentModeError("REFUND_PAYMENT_MODE_MISMATCH", runtimeMode, context.paymentMode.toLowerCase() as StripeMode);
+  } catch (error) {
+    if (error instanceof RefundPaymentModeError) await db.refundOperation.updateMany({ where: { id: operationId, stripeRefundId: null }, data: { status: "MANUAL_ACTION_REQUIRED", nextAttemptAt: null, errorCode: error.code, errorMessage: error.message } });
+    throw error;
+  }
   const claimed = await db.refundOperation.updateMany({ where: { id: operationId, status: { in: ["APPROVED", "RETRYABLE"] }, OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }], stripeRefundId: null }, data: { status: "PROCESSING", attemptCount: { increment: 1 }, nextAttemptAt: new Date(now.getTime() + REFUND_CLAIM_MS), errorCode: null, errorMessage: null } });
   if (claimed.count !== 1) return { idempotent: true };
   const operation = await db.refundOperation.findUniqueOrThrow({ where: { id: operationId }, include: { order: { select: { stripePaymentIntentId: true } }, groupAllocations: { include: { orderGroup: true } } } });

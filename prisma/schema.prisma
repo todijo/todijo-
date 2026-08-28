@@ -967,6 +967,7 @@ model Order {
   stripeCheckoutSessionId  String?     @unique
   stripeCheckoutUrl        String?
   stripePaymentIntentId    String?     @unique
+  stripePaymentMode        String?     @db.VarChar(4)
   checkoutExpiresAt        DateTime?
   checkoutExpiredAt        DateTime?
   stripeConnectedAccountId String?
@@ -1202,6 +1203,7 @@ model RefundOperation {
  reason String @db.VarChar(1000)
  returnRequired Boolean @default(false)
  stripeRefundId String? @unique
+ paymentMode String? @db.VarChar(4)
  refundIdempotencyKey String @unique @db.VarChar(200)
  attemptCount Int @default(0)
  nextAttemptAt DateTime?
