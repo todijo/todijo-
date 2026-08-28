@@ -30,7 +30,9 @@ FX-backed multi-currency pricing requires `OPEN_EXCHANGE_RATES_APP_ID` and fails
 
 ## Stripe and Connect
 
-Configure the production webhook at `POST /api/stripe/webhook`. Todijo uses Checkout completion/async success/expiry, payment failure, Connect account updates, and seller-subscription lifecycle events. Subscribe only to events exercised by the deployment. The handler verifies the raw-body signature, rejects a mismatched `event.livemode`, and records webhook identity before stock/payment finalization.
+Configure the production webhook at `POST https://todijo.com/api/stripe/webhook`. Todijo uses Checkout completion/async success/expiry, payment failure, Connect account updates, and seller-subscription lifecycle events. Subscribe only to events exercised by the deployment. The handler verifies the raw-body signature, rejects a mismatched `event.livemode`, and records webhook identity before stock/payment finalization.
+
+The legacy WooCommerce destination `https://todijo.com/?wc-api=wc_stripe` is not a Todijo application endpoint and has no code, configuration, or runtime dependency in this repository. After the production endpoint above is enabled with its own `STRIPE_WEBHOOK_SECRET` and successful deliveries are confirmed, an operator can disable or remove the legacy destination in Stripe. Do not reuse the legacy endpoint secret: each Stripe event destination has its own signing secret.
 
 Confirm Stripe live keys belong to the intended account, Connect is enabled, payout settings are intentional, and every active marketplace seller has the persisted connected account expected by Todijo. Do not replace historical transfer destinations when an account changes.
 

@@ -23,8 +23,9 @@ test("read-only production diagnostic covers durable financial and inventory inv
 
 test("production test routes, Stripe mode, runner secrets, and CJ flag fail closed", () => {
   assert.match(read("app/e2e-ux/page.tsx"), /NODE_ENV === "production"\) notFound\(\)/);
-  const webhook = read("app/api/stripe/webhook/route.ts"), stripe = read("lib/stripe.ts"), cj = read("lib/suppliers/supplier-fulfillment.ts");
-  assert.match(webhook, /request\.text\(\)/); assert.match(webhook, /verifyStripeWebhook/); assert.match(webhook, /assertStripeWebhookMode/);
+  const webhookRoute = read("app/api/stripe/webhook/route.ts"), webhookAuth = read("lib/stripe-webhook-request.ts"), stripe = read("lib/stripe.ts"), cj = read("lib/suppliers/supplier-fulfillment.ts");
+  assert.match(webhookRoute, /handleStripeWebhookRequest/); assert.match(webhookRoute, /processStripeEvent/);
+  assert.match(webhookAuth, /request\.text\(\)/); assert.match(webhookAuth, /verifyStripeWebhook/); assert.match(webhookAuth, /assertStripeWebhookMode/);
   assert.match(stripe, /STRIPE_MODE must be explicitly configured/); assert.match(stripe, /STRIPE_SECRET_KEY does not match configured/);
   assert.match(cj, /CJ_AUTOMATIC_FULFILLMENT_ENABLED/);
   for (const [path, secret] of [["app/api/internal/supplier-sync/route.ts", "SUPPLIER_SYNC_CRON_SECRET"], ["app/api/internal/seller-transfers/route.ts", "SELLER_TRANSFER_CRON_SECRET"], ["app/api/internal/refund-financials/route.ts", "REFUND_FINANCIAL_CRON_SECRET"]]) {
