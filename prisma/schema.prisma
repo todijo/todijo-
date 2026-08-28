@@ -967,6 +967,8 @@ model Order {
   stripeCheckoutSessionId  String?     @unique
   stripeCheckoutUrl        String?
   stripePaymentIntentId    String?     @unique
+  checkoutExpiresAt        DateTime?
+  checkoutExpiredAt        DateTime?
   stripeConnectedAccountId String?
   platformFeeAmount        Int?
   sellerAmount             Int?
@@ -1027,6 +1029,8 @@ model Order {
 
   @@unique([buyerId, checkoutRequestId])
   @@index([buyerId, status, createdAt])
+  @@index([status, checkoutExpiresAt])
+  @@index([checkoutExpiredAt, createdAt])
   @@index([storeIdSnapshot])
   @@index([fulfillmentStatus])
 }

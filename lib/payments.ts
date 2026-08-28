@@ -44,7 +44,7 @@ export async function createCheckout(
   buyerId: string,
   requestId: string,
   requestedItems: CheckoutItem[],
-  stripeCreate = createStripeCheckoutSession,
+  stripeCreate:((input:Parameters<typeof createStripeCheckoutSession>[0])=>Promise<{id:string;url:string;expiresAt?:Date}>) = createStripeCheckoutSession,
   destinationCountry?: unknown,
   destinationPostalCode?: unknown,
   pricingDependencies: CheckoutPricingDependencies = {},
@@ -172,7 +172,7 @@ export async function createCheckout(
   });
   await db.order.update({where:{id:order.id},data:{stripeConnectedAccountId:null,platformFeeAmount:null,sellerAmount:null,shippingPolicySnapshot:shipping.policies,...(buyerAddress?{recipientName:buyerAddress.recipientName,recipientPhone:buyerAddress.phone,shippingAddressLine1:buyerAddress.addressLine1,shippingAddressLine2:buyerAddress.addressLine2,shippingCity:buyerAddress.city,shippingPostalCode:buyerAddress.postalCode,shippingState:buyerAddress.state}:{})}});
   const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: shippingAmountMinor, currency: paymentCurrency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: line.unitAmountMinor, quantity: line.quantity, currency: paymentCurrency })) });
-  await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url } });
+  await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url,checkoutExpiresAt:session.expiresAt??new Date(Date.now()+25*60*60*1000) } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
 }
 
@@ -286,7 +286,8 @@ export async function processStripeEvent(
         return { paid: true };
       }
       if (event.type === "checkout.session.expired" || event.type === "payment_intent.payment_failed") {
-        await tx.order.updateMany({ where: { id: orderId, status: "PENDING" }, data: { status: "CANCELLED" } });
+        const checkoutExpired=event.type==="checkout.session.expired",changed=await tx.order.updateMany({ where: { id: orderId, status: "PENDING",paidAt:null,stripePaymentIntentId:null,shippedAt:null,deliveredAt:null,...(checkoutExpired?{checkoutExpiredAt:null,stripeCheckoutSessionId:session.id}:{}) }, data: { status: "CANCELLED",...(checkoutExpired?{checkoutExpiredAt:new Date()}:{}) } });
+        if(checkoutExpired&&changed.count===1&&tx.orderLifecycleEvent)await tx.orderLifecycleEvent.create({data:{orderId,type:"CHECKOUT_EXPIRED",metadata:{stripeCheckoutSessionId:session.id,stripeStatus:"expired"}}});
         return { cancelled: true };
       }
       return { ignored: true };
