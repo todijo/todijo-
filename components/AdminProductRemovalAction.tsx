@@ -1,0 +1,10 @@
+"use client";
+import {useRef,useState} from "react";
+import {Trash2} from "lucide-react";
+import {useRouter} from "next/navigation";
+
+export default function AdminProductRemovalAction({productId,productName}:{productId:string;productName:string}){
+ const dialog=useRef<HTMLDialogElement>(null),router=useRouter(),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ async function remove(){if(busy)return;setBusy(true);setError("");try{const response=await fetch(`/api/admin/products/${productId}`,{method:"DELETE"}),body=await response.json().catch(()=>({}));if(!response.ok){const messages:Record<string,string>={PRODUCT_NOT_FOUND:"This listing no longer exists.",PRODUCT_REMOVE_FORBIDDEN:"You are not authorized to remove this listing.",AUTH_REQUIRED:"Your session expired. Sign in again."};throw new Error(messages[body.error]??"The listing could not be removed. Please try again.");}dialog.current?.close();router.refresh();}catch(value){setError(value instanceof Error?value.message:"The listing could not be removed.");}finally{setBusy(false)}}
+ return <><button className="sellerControlButton danger" type="button" disabled={busy} onClick={()=>dialog.current?.showModal()}><Trash2 size={16}/>Remove</button><dialog ref={dialog} className="sellerDeleteDialog" onCancel={event=>{if(busy)event.preventDefault()}}><div><span className="sellerDeleteDialogIcon"><Trash2 size={24}/></span><h2>Remove this listing?</h2><p><strong>{productName}</strong> will be unavailable for future sales. Todijo will retain protected order, refund, return, transfer, and audit history.</p>{error&&<p role="alert" className="sellerControlFeedback">{error}</p>}<div className="sellerDeleteDialogActions"><button className="sellerControlButton secondary" type="button" disabled={busy} onClick={()=>dialog.current?.close()}>Cancel</button><button className="sellerControlButton danger" type="button" disabled={busy} onClick={()=>void remove()}>{busy?"Removing…":"Remove listing"}</button></div></div></dialog></>;
+}
