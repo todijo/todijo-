@@ -15,6 +15,7 @@ import { clearMarketplaceFilters, marketplaceUrl, normalizeMarketplacePriceRange
 import { categoryLabel } from "@/lib/categories";
 import BuyerProductPrice from "@/components/BuyerProductPrice";
 import MarketplaceFilterDock, { type MarketplaceFacets } from "@/components/MarketplaceFilterDock";
+import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -68,14 +69,6 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length, [filters]);
   const featuredProducts = heroProducts.filter((product) => product.image).slice(0, 5);
   const featuredCategories = categories.slice(0, 4);
-  const categoryImages = useMemo(() => {
-    const images = new Map<string, string>();
-    [...products, ...newArrivals, ...bestSellers, ...heroProducts].forEach((product) => {
-      if (product.image && !images.has(product.category)) images.set(product.category, product.image);
-    });
-    return images;
-  }, [bestSellers, heroProducts, newArrivals, products]);
-
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 860px)").matches;
     setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
@@ -153,7 +146,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
               </a>)}
             </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
               <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>
-              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><Package size={18} aria-hidden="true"/>{displayCategory(category)}</button>)}
+              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><SemanticCategoryIcon category={category} size={18}/>{displayCategory(category)}</button>)}
             </div> : <div className="heroMarketplaceFallback"><Store size={54} aria-hidden="true"/><strong>Todijo Marketplace</strong><span>{h("marketplaceVisual")}</span></div>}
           </div>
         </div>
@@ -164,7 +157,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>
-        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category, index) => <a key={category} href={buildUrl({ ...filters, category })}><span className="categoryShowcaseImage"><Image src={categoryImages.get(category) ?? `/images/mobile-categories/category-${index % 16}.webp`} alt="" fill sizes="92px" unoptimized={Boolean(categoryImages.get(category))}/></span><strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
+        <div className="categoryShowcaseGrid">{categories.slice(0,8).map((category) => <a key={category} href={buildUrl({ ...filters, category })}><SemanticCategoryIcon category={category} size={30} className="categoryShowcaseSemanticIcon"/><strong>{displayCategory(category)}</strong><ArrowRight size={16} aria-hidden="true"/></a>)}</div>
       </section>}
 
       <div className="marketplaceDiscoverySections">

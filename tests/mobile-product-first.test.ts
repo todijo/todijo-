@@ -62,10 +62,10 @@ test("mobile categories are visual and info pages retain category navigation", (
   const home = read("app/HomeClient.tsx");
   const drawer = read("components/BuyerMobileNavigation.tsx");
   const header = read("components/SiteHeader.tsx");
-  assert.match(home, /categoryShowcaseImage/);
+  assert.match(home, /SemanticCategoryIcon/);
   assert.match(drawer, /DESKTOP_CATEGORY_TAXONOMY/);
   assert.match(drawer, /buyerMobileCategoryBrowser/);
-  assert.match(drawer, /images\/mobile-categories\/category-/);
+  assert.match(drawer, /buyerMobileCategoryParentIcon/);
   assert.match(header, /path\.startsWith\("\/info\/"\).*showCategoryNav/);
   assert.match(drawer, /useTranslations\("HomeFooter"\)/);
   assert.match(drawer, /footer\("helpCenter"\)/);
