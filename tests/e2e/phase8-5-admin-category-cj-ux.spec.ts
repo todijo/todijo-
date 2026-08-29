@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { dismissCookieConsent } from "./helpers";
 
 test("desktop categories open only on click and close outside or with Escape", async ({ page }) => {
   await page.goto("/fr/e2e-ux?view=home", { waitUntil: "domcontentloaded" });
+  await dismissCookieConsent(page);
   const category = page.locator(".marketQuickCategory").first();
   await category.hover();
   await expect(page.locator("#market-category-mega-menu")).toHaveCount(0);
