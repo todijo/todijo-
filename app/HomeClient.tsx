@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight, Languages, LockKeyhole, MapPin, MessageCircle, Package, SearchX, ShoppingBag, Store } from "lucide-react";
+import { ArrowRight, BadgeCheck, Headphones, LockKeyhole, MapPin, Package, SearchX, ShieldCheck, ShoppingBag, Sparkles, Store, Truck } from "lucide-react";
 import { rtlLocales, type Locale } from "@/i18n/config";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MobileAppPromotion from "@/components/MobileAppPromotion";
@@ -26,9 +26,10 @@ type MarketplaceStore = { id: string; name: string; slug: string; description: s
 const MOBILE_BATCH_SIZE = 24;
 
 
-function ProductRail({ id, title, titleHref, products, soldOut }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string }) {
+function ProductRail({ id, title, titleHref, products, soldOut, icon = "sparkles", viewAll }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string; icon?: "sparkles" | "shopping"; viewAll: string }) {
   if (!products.length) return null;
-  return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading"><h2><a className="marketplaceRailTitleLink" href={titleHref}>{title}</a></h2></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
+  const Icon = icon === "shopping" ? ShoppingBag : Sparkles;
+  return <section id={id} className="container marketplaceRailSection"><div className="marketplaceRailHeading marketplaceSectionHeading"><div><span className="marketplaceHeadingIcon"><Icon size={20} aria-hidden="true"/></span><span><small>Todijo</small><h2><a className="marketplaceRailTitleLink" href={titleHref}>{title}</a></h2></span></div><a className="marketplaceViewAll" href={titleHref}>{viewAll}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="marketplaceProductRail">{products.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={soldOut}/>)}</div></section>;
 }
 
 export default function HomeClient({ products, heroProducts, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters, facets, resultsOnly = false }: {
@@ -138,10 +139,11 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
       <section className="discoveryHero">
         <div className="container discoveryHeroGrid">
           <div className="discoveryHeroContent">
-            <span className="badge">Todijo Marketplace</span>
-            <h1>{t.title}</h1>
-            <p>{t.subtitle}</p>
+            <span className="badge"><Sparkles size={15} aria-hidden="true"/>{h("heroEyebrow")}</span>
+            <h1>{h("heroTitle")}</h1>
+            <p>{h("heroText")}</p>
             <div className="discoveryHeroActions"><a className="discoveryHeroCta" href="#products">{h("exploreProducts")}<ArrowRight size={18} aria-hidden="true"/></a><a className="discoveryHeroCta discoveryHeroSellerCta" href={`/${activeLocale}/sell`}>{h("sellerCta")}</a></div>
+            <div className="discoveryHeroSignals" aria-label={d("trustTitle")}><span><ShieldCheck size={16} aria-hidden="true"/>{d("secureTitle")}</span><span><BadgeCheck size={16} aria-hidden="true"/>{d("independentTitle")}</span></div>
           </div>
           <div className="discoveryHeroVisual" aria-label={h("marketplaceVisual")}>
             {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
@@ -157,6 +159,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
         </div>
       </section>
 
+      <section className="container todijoTrust todijoTrustPrimary" aria-labelledby="todijo-trust-title"><div className="todijoTrustGrid"><article><span className="trustIcon secure"><LockKeyhole/></span><div><h2 id="todijo-trust-title">{d("secureTitle")}</h2><p>{d("secureText")}</p></div></article><article><span className="trustIcon delivery"><Truck/></span><div><h2>{d("deliveryTitle")}</h2><p>{d("deliveryText")}</p></div></article><article><span className="trustIcon support"><Headphones/></span><div><h2>{d("messagesTitle")}</h2><p>{d("messagesText")}</p></div></article><article><span className="trustIcon marketplace"><Store/></span><div><h2>{d("independentTitle")}</h2><p>{d("independentText")}</p></div></article></div></section>
+
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
         <div className="marketplaceRailHeading"><div><span>{d("categoryLabel")}</span><h2 id="category-showcase-title">{d("categoryTitle")}</h2></div>{categories.length > 8 && <a href="#categories">{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a>}</div>
@@ -164,10 +168,10 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
       </section>}
 
       <div className="marketplaceDiscoverySections">
-        <ProductRail title={h("newArrivals")} titleHref={`/${activeLocale}#products`} products={newArrivals} soldOut={t.soldOut}/>
-        <ProductRail id="best-sellers" title={h("bestSellers")} titleHref={`/${activeLocale}/best-sellers`} products={bestSellers} soldOut={t.soldOut}/>
+        <ProductRail title={h("newArrivals")} titleHref={`/${activeLocale}#products`} products={newArrivals} soldOut={t.soldOut} viewAll={h("viewAll")}/>
+        <ProductRail id="best-sellers" title={h("bestSellers")} titleHref={`/${activeLocale}/best-sellers`} products={bestSellers} soldOut={t.soldOut} icon="shopping" viewAll={h("viewAll")}/>
         <aside className="container discoveryPromoBanner"><div><span>{d("discoverLabel")}</span><h2>{d("discoverTitle")}</h2><p>{d("discoverText")}</p></div><a href={`/${activeLocale}/store`}>{d("storesTitle")}<ArrowRight size={17} aria-hidden="true"/></a><ShoppingBag size={82} aria-hidden="true"/></aside>
-        {stores.length > 0 && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading"><div><span>{d("storesLabel")}</span><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></div></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={52} height={52} unoptimized/> : <span><Store size={24} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="90px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
+        {stores.length > 0 && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading marketplaceSectionHeading storeSectionHeading"><div><span className="marketplaceHeadingIcon"><Store size={20} aria-hidden="true"/></span><span><small>{d("storesLabel")}</small><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></span></div><a className="marketplaceViewAll" href={`/${activeLocale}/store`}>{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={58} height={58} unoptimized/> : <span><Store size={25} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="110px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
       </div>
 
       <section id="products" className="container discoveryLayout">
@@ -190,8 +194,6 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
           </nav>}
         </div>
       </section>
-
-      <section className="container todijoTrust" aria-labelledby="todijo-trust-title"><div className="marketplaceRailHeading"><div><span>{d("trustLabel")}</span><h2 id="todijo-trust-title">{d("trustTitle")}</h2></div></div><div className="todijoTrustGrid"><article><LockKeyhole/><h3>{d("secureTitle")}</h3><p>{d("secureText")}</p></article><article><Store/><h3>{d("independentTitle")}</h3><p>{d("independentText")}</p></article><article><MessageCircle/><h3>{d("messagesTitle")}</h3><p>{d("messagesText")}</p></article><article><Languages/><h3>{d("languagesTitle")}</h3><p>{d("languagesText")}</p></article></div></section>
 
       <section className="container sellerGrowthCta" aria-labelledby="seller-growth-title"><div><span>{d("sellerLabel")}</span><h2 id="seller-growth-title">{d("sellerTitle")}</h2><p>{d("sellerText")}</p></div><div><a className="sellerGrowthPrimary" href={`/${activeLocale}/sell`}>{d("sellerPrimary")}<ArrowRight size={17} aria-hidden="true"/></a><a className="sellerGrowthSecondary" href={`/${activeLocale}/store`}>{d("sellerSecondary")}</a></div></section>
 

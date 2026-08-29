@@ -6,10 +6,10 @@ const home = readFileSync("app/HomeClient.tsx", "utf8");
 const page = readFileSync("app/page.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 
-test("home rails use linked headings without legacy Tout voir rail links", () => {
+test("home rails use linked headings with a localized view-all action", () => {
   assert.match(home, /titleHref=\{`\/\$\{activeLocale\}#products`\}/);
   assert.match(home, /titleHref=\{`\/\$\{activeLocale\}\/best-sellers`\}/);
-  assert.doesNotMatch(home, /<ProductRail[^>]+viewAll=/);
+  assert.match(home, /<ProductRail[^>]+viewAll=\{h\("viewAll"\)\}/);
 });
 
 test("best sellers are placed before the store discovery area", () => {
