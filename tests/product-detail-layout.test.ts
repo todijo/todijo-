@@ -8,7 +8,9 @@ test("product detail renders one full description below the bounded gallery grid
   assert.equal(source.match(/<ProductDescription/g)?.length, 1);
   assert.ok(source.indexOf("productDetailTop") < source.indexOf("productDetailDescriptionSection"));
   assert.ok(source.indexOf("productGallerySticky") < source.indexOf("productDetailDescriptionSection"));
-  assert.equal(source.match(/\{product\.description\}/g)?.length, 2); // metadata/JSON-LD and the safe description component
+  assert.equal(source.match(/\{product\.description\}/g)?.length, 1); // the safe description component
+  assert.match(source,/const content=resolveBuyerProductContent/); // metadata uses the same locale-aware content resolver
+  assert.match(source,/concise\(`\$\{content\.description\}/);
 });
 
 test("shop wording and Ask Seller order match their actions", async () => {

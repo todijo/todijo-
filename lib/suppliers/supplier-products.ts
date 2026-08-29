@@ -9,6 +9,7 @@ import { syncSupplierReviews } from "./supplier-reviews";
 import { verifiedFxRate } from "../fx";
 import { classifyCjProduct, type CjClassification, validateTodijoClassification } from "./cj-classification";
 import type { SupplierProductSnapshot } from "./types";
+import { createImportedProductContent } from "../product-content";
 
 type Database = PrismaClient;
 
@@ -71,12 +72,13 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     const stored=await mediaProvider.copyRemote(source);copied.push(stored);copiedSources.push(source);if(source.type==="IMAGE")imageBySource.set(source.url,stored.url);
   }
   const images = copied.filter((item) => item.type === "IMAGE").map((item) => item.url);
-  const slug = await uniqueSlug(db,input.storeId,snapshot.title);
+  const content=createImportedProductContent({title:snapshot.title,description:snapshot.description,rawMetadata:snapshot.rawMetadata});
+  const slug = await uniqueSlug(db,input.storeId,content.title);
   const product=await db.$transaction(async (tx) => {
     const product = await tx.product.create({data:{
-      storeId:input.storeId,name:snapshot.title.slice(0,120),slug,description:snapshot.description.slice(0,5000),category:category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
+      storeId:input.storeId,name:content.title,slug,description:content.description,category:category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
       price:sellingPrice,currency:sellingCurrency,stock:snapshot.stock,images,
-      supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),classificationStatus:input.quarantine===true?"QUARANTINED":"REVIEWED",sourceMetadata:{...snapshot.rawMetadata,classification:{...classification,selectedCanonicalCategoryId:selected.id,reviewStatus:input.quarantine===true?"QUARANTINED":"REVIEWED"},pricing:automaticPricing??{mode:"MANUAL_OVERRIDE",shippingStatus:"DEFERRED",marginGuaranteed:false}} as Prisma.InputJsonValue}},
+      supplierLink:{create:{provider:provider.id,ownerType:input.ownerType,connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,sourceUrl:snapshot.sourceUrl,supplierCost:centsSafe(snapshot.cost),supplierCurrency:snapshot.currency,supplierStock:snapshot.stock,supplierAvailable:snapshot.available,syncStatus:snapshot.available?"HEALTHY":"UNAVAILABLE",lastSyncedAt:new Date(),classificationStatus:input.quarantine===true?"QUARANTINED":"REVIEWED",sourceMetadata:{...snapshot.rawMetadata,productContent:content.metadata,classification:{...classification,selectedCanonicalCategoryId:selected.id,reviewStatus:input.quarantine===true?"QUARANTINED":"REVIEWED"},pricing:automaticPricing??{mode:"MANUAL_OVERRIDE",shippingStatus:"DEFERRED",marginGuaranteed:false}} as Prisma.InputJsonValue}},
       media:{create:copied.map((item,index)=>({type:item.type,provider:item.provider,publicId:item.publicId,url:item.url,posterUrl:item.posterUrl,position:index,width:item.width,height:item.height,durationMs:item.durationMs,sourceUrl:copiedSources[index]?.url??null}))},
     }});
     let variantImageAssignments:Array<{optionValueId:string;imageUrls:string[];primaryUrl:string}> = [];

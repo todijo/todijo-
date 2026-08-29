@@ -7,6 +7,7 @@ import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
 import { countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplace-facets";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
+import { resolveBuyerProductContent } from "@/lib/product-content";
 
 const PAGE_SIZE = 24;
 const productSelect = {
@@ -19,10 +20,11 @@ const productSelect = {
 } satisfies Prisma.ProductSelect;
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
-function serializeProduct(product: ProductRow) {
+function serializeProduct(product: ProductRow,locale:string) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
+  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale});
   return {
-    id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null,
+    id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null,
     currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock,
     hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
     condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name,
@@ -32,6 +34,7 @@ function serializeProduct(product: ProductRow) {
 }
 
 export async function GET(request: NextRequest) {
+  const locale=request.cookies.get("NEXT_LOCALE")?.value??request.headers.get("accept-language")?.slice(0,2)??"en";
   const raw = Object.fromEntries(request.nextUrl.searchParams.entries());
   const { filters, page, invalidPriceRange } = normalizeMarketplaceSearch(raw);
   const requestedOffset = Number.parseInt(request.nextUrl.searchParams.get("offset") ?? "", 10);
@@ -57,7 +60,7 @@ export async function GET(request: NextRequest) {
     ...(!invalidPriceRange && filters.maxPrice ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } } : {}),
     ...(country ? { store: { ...publicStoreAccess, OR: countryAliasesForCode(country).map((alias) => ({ country: { equals: alias, mode: "insensitive" as const } })) } } : {}),
     ...(q ? { OR: [
-      { name: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } },
+      { name: { contains: q, mode: "insensitive" } }, { supplierLink:{sourceMetadata:{path:["productContent","source","title"],string_contains:q}} }, { description: { contains: q, mode: "insensitive" } },
       { category: { contains: q, mode: "insensitive" } }, { condition: { contains: q, mode: "insensitive" } },
       { store: { name: { contains: q, mode: "insensitive" } } }, { store: { city: { contains: q, mode: "insensitive" } } },
       { store: { country: { contains: q, mode: "insensitive" } } },
@@ -81,5 +84,5 @@ export async function GET(request: NextRequest) {
     rows = await prisma.product.findMany({ where, orderBy: [primaryOrder, { id: "asc" }], skip: offset, take: PAGE_SIZE, select: productSelect });
   }
   const total = await prisma.product.count({ where: sort === "best-selling" ? { ...where, orderItems: { some: { order: { status: { in: qualifying } } } } } : where });
-  return NextResponse.json({ products: rows.map(serializeProduct), hasMore: offset + rows.length < total, nextOffset: offset + rows.length });
+  return NextResponse.json({ products: rows.map(product=>serializeProduct(product,locale)), hasMore: offset + rows.length < total, nextOffset: offset + rows.length });
 }

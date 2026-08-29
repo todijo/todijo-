@@ -15,6 +15,7 @@ import { replaceProductVideo } from "@/lib/product-media";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
+import {resolveBuyerProductContent} from "@/lib/product-content";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -22,7 +23,8 @@ export async function GET(request: Request) {
   const ids = [...new Set(new URL(request.url).searchParams.get("ids")?.split(",").map((id) => id.trim()).filter(Boolean) ?? [])].slice(0, 100);
   if (!ids.length) return NextResponse.json({ products: [] });
   const products = await prisma.product.findMany({ where: { id: { in: ids }, status: "PUBLISHED", ...publicProductAccessWhere(new Date()) }, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true, stock: true, images: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } }, store: { select: { name: true, slug: true, sellerType: true } },supplierLink:{select:{sourceMetadata:true}} } });
-  return NextResponse.json({ products: products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }); return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug, sellerType: product.store.sellerType,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) }; }) });
+  const locale=request.headers.get("accept-language")?.slice(0,2)??"en";
+  return NextResponse.json({ products: products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }); const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale});return { id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug, sellerType: product.store.sellerType,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) }; }) });
 }
 
 function makeSlug(value: string) {
