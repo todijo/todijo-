@@ -30,6 +30,7 @@ import type {SupplierVariantSnapshot} from "@/lib/suppliers/types";
 import BuyerProductPrice from "@/components/BuyerProductPrice";
 import BuyerShippingPrice from "@/components/BuyerShippingPrice";
 import { requireAdmin } from "@/lib/admin-access";
+import { resolveBuyerProductContent } from "@/lib/product-content";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }>; searchParams?:Promise<{adminPreview?:string}> };
@@ -38,18 +39,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
   const product = await prisma.product.findFirst({
     where: { id, status: "PUBLISHED", ...publicProductAccessWhere() },
-    select: { name: true, description: true, images: true, store: { select: { name: true } } },
+    select: { name: true, description: true, images: true, supplierLink:{select:{sourceMetadata:true}}, store: { select: { name: true } } },
   });
   if (!product) return { title: metadataText("title"), robots: { index: false, follow: false } };
-  const description = concise(`${product.description} ${product.store.name}`);
+  const content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  const description = concise(`${content.description} ${product.store.name}`);
   const pathname = `product/${id}`;
   const canonical = localizedPath(locale, pathname);
   return {
-    title: product.name,
+    title: content.title,
     description,
     alternates: localizedAlternates(locale, pathname),
-    openGraph: { type: "website", title: `${product.name} · Todijo`, description, url: canonical, images: product.images[0] ? [{ url: product.images[0], alt: product.name }] : undefined },
-    twitter: { card: product.images[0] ? "summary_large_image" : "summary", title: `${product.name} · Todijo`, description, images: product.images[0] ? [product.images[0]] : undefined },
+    openGraph: { type: "website", title: `${content.title} · Todijo`, description, url: canonical, images: product.images[0] ? [{ url: product.images[0], alt: content.title }] : undefined },
+    twitter: { card: product.images[0] ? "summary_large_image" : "summary", title: `${content.title} · Todijo`, description, images: product.images[0] ? [product.images[0]] : undefined },
   };
 }
 
@@ -82,7 +84,10 @@ export default async function ProductPage({ params, searchParams }: Props) {
     },
   });
   if (!product) notFound();
+  const buyerContent=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  product.name=buyerContent.title;product.description=buyerContent.description;
   const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true,supplierLink:{select:{sourceMetadata:true}}} });
+  for(const item of related)item.name=resolveBuyerProductContent({name:item.name,description:"",sourceMetadata:item.supplierLink?.sourceMetadata,locale}).title;
   const persistedPrice=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const minimumVariantPrice=minimumPurchasableVariantPrice({basePrice:persistedPrice,activeOptionCount:product.options.length,variants:product.variants.map((variant)=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
   const price=minimumVariantPrice??persistedPrice;

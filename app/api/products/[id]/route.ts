@@ -15,6 +15,8 @@ import { assertSellerActivity } from "@/lib/account-status";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 import { productRemovalErrorResponse, removeProductListing } from "@/lib/product-removal";
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
+import { Prisma } from "@prisma/client";
+import { readProductContentMetadata } from "@/lib/product-content";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -32,7 +34,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       where: { id, removedAt:null, store: { ownerId: session.userId } },
       select: {
         id: true, complianceDeclaredAt: true, deactivationReason: true,
-        supplierLink: { select: { provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
+        supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
         variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierAvailable: true } },
       },
     });
@@ -79,6 +81,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         ...productShipping,
         complianceDeclaredAt: product.complianceDeclaredAt ?? (status === "PUBLISHED" ? new Date() : null),
       } });
+      const content=readProductContentMetadata(product.supplierLink?.sourceMetadata);
+      if(product.supplierLink&&content){
+        const previous=product.supplierLink.sourceMetadata&&typeof product.supplierLink.sourceMetadata==="object"&&!Array.isArray(product.supplierLink.sourceMetadata)?product.supplierLink.sourceMetadata as Record<string,unknown>:{};
+        await tx.supplierProductLink.update({where:{id:product.supplierLink.id},data:{sourceMetadata:{...previous,productContent:{...content,normalized:{title:name,description,locale:content.normalized.locale,generated:false}}} as Prisma.InputJsonValue}});
+      }
       await replaceProductVariantImages(tx, id, images, body.variantImages);
       await replaceProductVideo(tx,id,body.video);
     });

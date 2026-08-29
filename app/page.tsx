@@ -7,6 +7,8 @@ import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 import { canonicalMarketplaceColor, countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplace-facets";
+import { getLocale } from "next-intl/server";
+import { resolveBuyerProductContent } from "@/lib/product-content";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,9 +26,10 @@ const productSelect = {
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
-function serializeProduct(p: ProductRow) {
+function serializeProduct(p: ProductRow, locale: string) {
   const availability = resolveProductAvailability({ stock: p.stock, activeOptionCount: p.options.length, variants: p.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  return { id: p.id, name: p.name, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
+  const content=resolveBuyerProductContent({name:p.name,description:"",sourceMetadata:p.supplierLink?.sourceMetadata,locale});
+  return { id: p.id, name: content.title, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
     currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
     storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString(),requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(p.supplierLink?.sourceMetadata) };
 }
@@ -35,6 +38,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
+  const locale=await getLocale();
   const resultsOnly = params.__resultsOnly === "1";
   const { filters, page, invalidPriceRange } = normalizeMarketplaceSearch(params);
   const { q, category, condition, country, sort, availability, color, size, season } = filters;
@@ -77,6 +81,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       ? {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
+            { supplierLink: { sourceMetadata: { path: ["productContent","source","title"], string_contains: q } } },
             { description: { contains: q, mode: "insensitive" } },
             { category: { contains: q, mode: "insensitive" } },
             { condition: { contains: q, mode: "insensitive" } },
@@ -155,7 +160,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       orderBy: { updatedAt: "desc" },
       take: 4,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
-        products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
+        products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
     prisma.product.findMany({
@@ -180,8 +185,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const bestSellerIds = bestSellerCounts.map((item) => item.productId);
   const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED", ...publicProductAccess }, select: productSelect }) : [];
   const bestSellerById = new Map(bestSellerRows.map((product) => [product.id, product]));
-  const bestSellers = bestSellerIds.map((id) => bestSellerById.get(id)).filter((product): product is ProductRow => Boolean(product)).map(serializeProduct);
-  const products = rows.map(serializeProduct);
+  const bestSellers = bestSellerIds.map((id) => bestSellerById.get(id)).filter((product): product is ProductRow => Boolean(product)).map(product=>serializeProduct(product,locale));
+  const products = rows.map(product=>serializeProduct(product,locale));
   const isColorName = (name: string) => /^(color|colour|couleur|farbe|لون|ڕەنگ)$/i.test(name.trim());
   const isSizeName = (name: string) => /^(size|taille|größe|groesse|قەبارە)$/i.test(name.trim());
   const isSeasonName = (name: string) => /^(season|saison)$/i.test(name.trim());
@@ -199,10 +204,10 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   return (
     <HomeClient
       products={products}
-      heroProducts={heroRows.map(serializeProduct)}
-      newArrivals={newArrivalRows.map(serializeProduct)}
+      heroProducts={heroRows.map(product=>serializeProduct(product,locale))}
+      newArrivals={newArrivalRows.map(product=>serializeProduct(product,locale))}
       bestSellers={bestSellers}
-      stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: product.name, image: product.images[0] ?? null })) }))}
+      stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale}).title, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
       page={normalizedPage}

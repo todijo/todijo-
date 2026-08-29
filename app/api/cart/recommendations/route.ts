@@ -5,6 +5,7 @@ import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { CART_RECOMMENDATION_LIMIT, mergeCartRecommendations } from "@/lib/cart-recommendations";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
+import {resolveBuyerProductContent} from "@/lib/product-content";
 
 const recommendationSelect = {
   id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true,
@@ -17,15 +18,17 @@ const recommendationSelect = {
 
 type RecommendationRow = Prisma.ProductGetPayload<{ select: typeof recommendationSelect }>;
 
-function serializeProduct(product: RecommendationRow) {
+function serializeProduct(product: RecommendationRow,locale:string) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency,
+  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  return { id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency,
     category: product.category, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
     condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) };
 }
 
 export async function POST(request: Request) {
   try {
+    const locale=request.headers.get("accept-language")?.slice(0,2)??"en";
     const body = await request.json() as { productIds?: unknown };
     const productIds = Array.isArray(body.productIds)
       ? [...new Set(body.productIds.filter((value): value is string => typeof value === "string" && value.length > 0))].slice(0, 50)
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
       orderBy, take: CART_RECOMMENDATION_LIMIT - similar.length, select: recommendationSelect,
     }) : [];
     const result = mergeCartRecommendations(similar, recent, productIds);
-    return NextResponse.json({ products: result.products.map(serializeProduct), source: result.source });
+    return NextResponse.json({ products: result.products.map(product=>serializeProduct(product,locale)), source: result.source });
   } catch (error) {
     console.error("Cart recommendations unavailable", error);
     return NextResponse.json({ products: [], source: "recent" });
