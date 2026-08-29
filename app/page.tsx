@@ -151,11 +151,11 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       _sum: { quantity: true }, orderBy: { _sum: { quantity: "desc" } }, take: 8,
     }),
     prisma.store.findMany({
-      where: { ...publicStoreAccess, products: { some: { status: "PUBLISHED" } } },
+      where: { ...publicStoreAccess, products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } },
       orderBy: { updatedAt: "desc" },
       take: 4,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
-        products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
+        products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, images: true } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
     prisma.product.findMany({

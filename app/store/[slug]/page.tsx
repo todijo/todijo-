@@ -50,8 +50,8 @@ export default async function StorePage({ params, searchParams }: Props) {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, createdAt: true, sellerType: true,
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true,
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
-      _count: { select: { products: { where: { status: "PUBLISHED" } } } },
-      products: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, skip: (page - 1) * STORE_PAGE_SIZE, take: STORE_PAGE_SIZE, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
+      _count: { select: { products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } } },
+      products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, skip: (page - 1) * STORE_PAGE_SIZE, take: STORE_PAGE_SIZE, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
     },
   });
 

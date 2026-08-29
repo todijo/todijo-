@@ -18,6 +18,11 @@ enum ProductStatus {
   PUBLISHED
 }
 
+enum CatalogDataClass {
+  PRODUCTION
+  TEST_DEMO
+}
+
 enum SellerStatus {
   PENDING
   ACTIVE
@@ -568,6 +573,7 @@ model Store {
   currency         String       @default("EUR")
   language         String       @default("fr")
   status           SellerStatus @default(PENDING)
+  dataClass        CatalogDataClass @default(PRODUCTION)
   stripeCustomerId String?      @unique
   sellerType       SellerType   @default(UNKNOWN)
   legalBusinessName String?
@@ -615,6 +621,8 @@ model Store {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([dataClass, status])
 }
 
 enum OrderSnapshotSource {
@@ -693,6 +701,7 @@ model Product {
   condition          String
   images             String[]
   status             ProductStatus             @default(PUBLISHED)
+  dataClass          CatalogDataClass           @default(PRODUCTION)
   deactivationReason ProductDeactivationReason @default(NONE)
   allowPrepurchaseQuestions Boolean               @default(true)
   productIdentifier String?
@@ -739,6 +748,7 @@ model Product {
 
   @@unique([storeId, slug])
   @@index([storeId, status])
+  @@index([dataClass, status, removedAt])
   @@index([removedAt])
   @@index([category])
 }

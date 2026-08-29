@@ -14,6 +14,7 @@ import { AdminAccessError } from "@/lib/admin-access";
 import { assertSellerActivity } from "@/lib/account-status";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 import { productRemovalErrorResponse, removeProductListing } from "@/lib/product-removal";
+import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -61,6 +62,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const images = imageValidation.images;
 
     if (name.length < 2 || name.length > 120) return NextResponse.json({ error: "Le nom doit contenir entre 2 et 120 caractères." }, { status: 400 });
+    if (status === "PUBLISHED" && product.supplierLink?.provider !== "CJ") assertCatalogNameQuality(name);
     if (description.length < 10 || description.length > 5000) return NextResponse.json({ error: "La description doit contenir entre 10 et 5000 caractères." }, { status: 400 });
     if (!category || category.length > 160 || !isCanonicalLeafCategoryId(category)) return NextResponse.json({ error: "Choisissez une catégorie valide." }, { status: 400 });
     if (!Number.isFinite(price) || price <= 0 || price > 1000000) return NextResponse.json({ error: "Le prix est invalide." }, { status: 400 });
@@ -89,6 +91,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     if (error instanceof Error && ["PRODUCT_ADMIN_BLOCKED", "SUPPLIER_PRODUCT_REQUIRES_REVIEW"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });

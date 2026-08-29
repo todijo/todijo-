@@ -14,6 +14,7 @@ import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
+import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
     if (name.length < 2 || name.length > 120) {
       return NextResponse.json({ error: "Le nom doit contenir entre 2 et 120 caractères." }, { status: 400 });
     }
+    if (status === "PUBLISHED") assertCatalogNameQuality(name);
     if (description.length < 10 || description.length > 5000) {
       return NextResponse.json({ error: "La description doit contenir entre 10 et 5000 caractères." }, { status: 400 });
     }
@@ -124,6 +126,7 @@ export async function POST(request: Request) {
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }

@@ -63,6 +63,7 @@ export function activeAccessSource(store: {
 
 export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
   return {
+    dataClass: "PRODUCTION",
     status: "ACTIVE",
     owner: { sellerSuspendedAt: null, deactivatedAt: null },
     OR: [
@@ -75,6 +76,7 @@ export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput
 
 export function publicProductAccessWhere(now = new Date()): Prisma.ProductWhereInput {
   return {
+    dataClass: "PRODUCTION",
     removedAt: null,
     store: publicStoreAccessWhere(now),
     OR: [
