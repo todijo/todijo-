@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { advanceSellerFulfillment, FulfillmentError } from "../lib/fulfillment";
 
 function database(order: any, stores = [{ id: "store_1" }]) {
+  if(order&&!Object.hasOwn(order,"paidAt")&&!Object.hasOwn(order,"stripePaymentIntentId"))order={paidAt:new Date("2026-01-01T00:00:00Z"),...order};
   const updates: any[] = [];
   const events: any[] = [];
   const notifications: any[] = [];
@@ -28,14 +29,14 @@ function database(order: any, stores = [{ id: "store_1" }]) {
 
 test("seller with an owned order can advance only the next forward fulfillment transition with tracking", async () => {
   const { db, updates, events, notifications, storeOwners } = database({ id: "order_1", buyerId: "buyer_1", status: "PROCESSING" });
-  const result = await advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingCarrier: "  La Poste  ", trackingNumber: " AB  123 ", trackingUrl: "https://tracking.example/AB123" });
+  const result = await advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingCarrier: "  DHL  ", trackingNumber: " AB  123 " });
   assert.equal(result.idempotent, false);
   assert.equal(updates.length, 1);
   assert.equal(updates[0].status, "SHIPPED");
   assert.equal(updates[0].fulfillmentStatus, "SHIPPED");
-  assert.equal(updates[0].trackingCarrier, "La Poste");
+  assert.equal(updates[0].trackingCarrier, "DHL");
   assert.equal(updates[0].trackingNumber, "AB 123");
-  assert.equal(updates[0].trackingUrl, "https://tracking.example/AB123");
+  assert.equal(updates[0].trackingUrl, "https://www.dhl.com/global-en/home/tracking.html?tracking-id=AB%20123");
   assert.equal(events[0].source, "SELLER");
   assert.equal(events[0].status, "SHIPPED");
   assert.deepEqual(notifications, [{ userId: "buyer_1", type: "ORDER_SHIPPED", title: "Order shipped", body: "Your order has been shipped.", href: "/account/orders/order_1" }]);
@@ -96,8 +97,10 @@ test("tracking values are rejected outside the shipping transition", async () =>
   await assert.rejects(() => advanceSellerFulfillment(db, "seller_1", "order_1", "PAID", { trackingNumber: "AB123" }), FulfillmentError);
 });
 
-test("tracking URL must be HTTPS", async () => {
+test("seller-provided tracking URLs are never accepted", async () => {
   const { db } = database({ id: "order_1", status: "PROCESSING" });
-  await assert.rejects(() => advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingUrl: "javascript:alert(1)" }), /Invalid tracking URL/);
-  await assert.rejects(() => advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingUrl: "http://tracking.example/x" }), /Invalid tracking URL/);
+  await assert.rejects(() => advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingUrl: "javascript:alert(1)" }), /Custom tracking URLs/);
+  await assert.rejects(() => advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING", { trackingUrl: "https://tracking.example/x" }), /Custom tracking URLs/);
 });
+
+test("unpaid orders cannot advance fulfillment",async()=>{const{db,updates}=database({id:"order_1",status:"PROCESSING",paidAt:null,stripePaymentIntentId:null});await assert.rejects(()=>advanceSellerFulfillment(db,"seller_1","order_1","PROCESSING",{trackingCarrier:"UPS",trackingNumber:"1Z123"}),/Paid order required/);assert.equal(updates.length,0)});
