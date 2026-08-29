@@ -8,6 +8,7 @@ import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
 import { countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplace-facets";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 import { resolveBuyerProductContent } from "@/lib/product-content";
+import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 
 const PAGE_SIZE = 24;
 const productSelect = {
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     ...(!invalidPriceRange && filters.maxPrice ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } } : {}),
     ...(country ? { store: { ...publicStoreAccess, OR: countryAliasesForCode(country).map((alias) => ({ country: { equals: alias, mode: "insensitive" as const } })) } } : {}),
     ...(q ? { OR: [
-      { name: { contains: q, mode: "insensitive" } }, { supplierLink:{sourceMetadata:{path:["productContent","source","title"],string_contains:q}} }, { description: { contains: q, mode: "insensitive" } },
+      { name: { contains: q, mode: "insensitive" } },...localizedSupplierContentSearch(q,locale), { description: { contains: q, mode: "insensitive" } },
       { category: { contains: q, mode: "insensitive" } }, { condition: { contains: q, mode: "insensitive" } },
       { store: { name: { contains: q, mode: "insensitive" } } }, { store: { city: { contains: q, mode: "insensitive" } } },
       { store: { country: { contains: q, mode: "insensitive" } } },

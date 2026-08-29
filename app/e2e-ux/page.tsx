@@ -11,6 +11,7 @@ import ProductPurchasePanel from "@/components/ProductPurchasePanel";
 import ShipmentTrackingCard from "@/components/ShipmentTrackingCard";
 import {isLocale} from "@/i18n/config";
 import{getLocale}from"next-intl/server";
+import{createImportedProductContent,resolveBuyerProductContent}from"@/lib/product-content";
 
 const products = [
   { id: "e2e-product-x", name: "Buyer A favorite", price: "29.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test", city: "Paris", country: "France", createdAt: new Date(0).toISOString() },
@@ -26,6 +27,8 @@ export default async function UxVerificationPage({ searchParams }: { searchParam
   if (process.env.NODE_ENV === "production") notFound();
   const { view } = await searchParams;
   const activeLocale=await getLocale(),locale=isLocale(activeLocale)?activeLocale:"en";
+  const localizedFixture=createImportedProductContent({title:"HOT SALE Portable Pet Bottle Bottle FREE SHIPPING",description:"A portable 500 ml bottle for pets.",rawMetadata:{localizedContent:{fr:{title:"Gourde portable pour animaux",description:"Gourde portable de 500 ml pour animaux."},ar:{title:"قارورة ماء محمولة للحيوانات",description:"قارورة محمولة سعة 500 مل للحيوانات."},ku:{title:"بوتڵی ئاوی گەڕۆک بۆ ئاژەڵ",description:"بوتڵی گەڕۆکی 500 مل بۆ ئاژەڵ."}}}}),localizedContent=resolveBuyerProductContent({name:localizedFixture.title,description:localizedFixture.description,sourceMetadata:{productContent:localizedFixture.metadata},locale});
+  if(view==="localized-catalog")return <main className="catalogLocalizationQa"><section className="catalogLocalizationHero"><small>Catalog</small><h1 data-testid="hero-localized-title">{localizedContent.title}</h1></section><article className="catalogLocalizationCard"><h2 data-testid="card-localized-title">{localizedContent.title}</h2><p data-testid="localized-description">{localizedContent.description}</p></article></main>;
   if(view==="tracking")return <main className="buyerOrdersPage"><section className="buyerOrdersShell"><div className="shipmentTrackingList"><ShipmentTrackingCard locale={locale} shipment={{id:"e2e",source:"MARKETPLACE",status:"in_transit",carrier:"DHL",trackingNumber:"TODIJO-VERY-LONG-TRACKING-NUMBER-1234567890",trackingUrl:"https://www.dhl.com/global-en/home/tracking.html?tracking-id=TODIJO-VERY-LONG-TRACKING-NUMBER-1234567890",shippedAt:new Date(0),deliveredAt:null,latestUpdateAt:new Date(1)}}/></div></section></main>;
   if (view === "seller") return <main><NewProductForm currency="EUR" productCount={0} productLimit={null}/></main>;
   if (view === "stripe") return <main className="premiumDashboard"><section className="premiumDashboardMain"><div className="premiumDashboardContent"><StripeConnectSection initialStatus={{ connected: true, onboardingComplete: false, chargesEnabled: false, payoutsEnabled: false }}/></div></section></main>;

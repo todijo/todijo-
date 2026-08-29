@@ -7,6 +7,7 @@ import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { prisma } from "@/lib/prisma";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
+import{resolveBuyerProductContent}from"@/lib/product-content";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const productSelect = {
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
-function serializeProduct(product: ProductRow) {
+function serializeProduct(product: ProductRow,locale:string) {
   const availability = resolveProductAvailability({
     stock: product.stock,
     activeOptionCount: product.options.length,
@@ -29,7 +30,7 @@ function serializeProduct(product: ProductRow) {
   });
   return {
     id: product.id,
-    name: product.name,
+    name: resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale}).title,
     price: product.price.toString(),
     compareAtPrice: product.compareAtPrice?.toString() ?? null,
     currency: product.currency,
@@ -59,7 +60,7 @@ export default async function BestSellersPage() {
   const ids = sales.map((sale) => sale.productId);
   const rows = ids.length ? await prisma.product.findMany({ where: { id: { in: ids }, status: "PUBLISHED", ...publicAccess }, select: productSelect }) : [];
   const byId = new Map(rows.map((product) => [product.id, product]));
-  const products = ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product)).map(serializeProduct);
+  const products = ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product)).map(product=>serializeProduct(product,locale));
 
   return <main className="bestSellerPage">
     <MarketplaceHeader/>
