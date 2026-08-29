@@ -91,7 +91,7 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
     {message && <p className="adminFeedback" role="status">{message}</p>}
 
     <div className="adminColumns">
-      <section className="adminPanel">
+      <section className="adminPanel adminAccessPanel">
         <div className="adminPanelHeading"><Store/><div><h2>{t("createStore")}</h2><p>{t("createStoreHelp")}</p></div></div>
         {adminStore && <div className="adminOwnStoreAction"><p>{adminStore.name} · {t("createStoreHelp")}</p><button type="button" onClick={exemptMyStore} disabled={busy || adminStore.accessSource === "ADMIN_EXEMPT"}>{t("source.ADMIN_EXEMPT")}</button></div>}
         <form className="adminForm" onSubmit={createStore}>
@@ -109,15 +109,15 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
       <section className="adminPanel">
         <div className="adminPanelHeading"><CalendarPlus/><div><h2>{t("grantAccess")}</h2><p>{t("grantAccessHelp")}</p></div></div>
         <form className="adminGrantForm" onSubmit={extend}>
-          <select name="months" defaultValue="1" aria-label={t("duration")}><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select>
+          <label><span>{t("duration")}</span><select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
           <button disabled={busy || !selected.length}>{t("extendSelected", { count: selected.length })}</button>
         </form>
         <div className="adminStoreList">
-          {sellerStores.map((store) => <label key={store.id}>
+          {sellerStores.map((store) => <label key={store.id} className={selected.includes(store.id) ? "isSelected" : ""}>
             <input type="checkbox" checked={selected.includes(store.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, store.id] : current.filter((id) => id !== store.id))}/>
-            <span><strong>{store.name}</strong><small>{store.owner.firstName} {store.owner.lastName} · {store.owner.email}</small></span>
+            <span className="adminStoreIdentity"><strong>{store.name}</strong><small>{store.owner.firstName} {store.owner.lastName}</small><small>{store.owner.email}</small></span>
             <span className={`adminBadge source-${store.accessSource.toLowerCase()}`}>{t(`source.${store.accessSource}`)}</span>
-            <button type="button" disabled={busy} onClick={(event)=>{event.preventDefault();void setDropshipping(store.id,!store.dropshippingEnabled);}}>{supplierText(store.dropshippingEnabled?"disablePermission":"enablePermission")}</button>
+            <button className="adminDropshippingAction" type="button" disabled={busy} onClick={(event)=>{event.preventDefault();void setDropshipping(store.id,!store.dropshippingEnabled);}}>{supplierText(store.dropshippingEnabled?"disablePermission":"enablePermission")}</button>
           </label>)}
           {!sellerStores.length && <p>{t("noSellerStores")}</p>}
         </div>
