@@ -1,21 +1,22 @@
 "use client";
 
 import {createContext,useCallback,useContext,useEffect,useMemo,useState} from "react";
-import {BUYER_CURRENCY_COOKIE,BUYER_CURRENCY_STORAGE_KEY,BUYER_MARKET_COOKIE,BUYER_MARKET_EVENT,marketCookie,resolveBuyerMarket,type BuyerMarket} from "@/lib/buyer-market";
-import {persistShoppingCountry,readShoppingCountry} from "@/lib/suppliers/buyer-pricing";
+import {BUYER_CURRENCY_COOKIE,BUYER_MARKET_COOKIE,BUYER_MARKET_EVENT,BUYER_MARKET_GUEST_SCOPE,marketCookie,persistScopedBuyerMarket,readBuyerCurrency,readScopedBuyerMarket,resolveBuyerMarket,type BuyerMarket} from "@/lib/buyer-market";
+import {readShoppingCountry} from "@/lib/suppliers/buyer-pricing";
 import type {SupportedBuyerCurrency} from "@/lib/currency";
 
 type MarketContext=BuyerMarket&{ready:boolean;selectCountry:(country:string)=>void;selectCurrency:(currency:SupportedBuyerCurrency|null)=>void};
 const Context=createContext<MarketContext|null>(null);
 
 export default function BuyerMarketProvider({children}:{children:React.ReactNode}){
- const [market,setMarket]=useState<BuyerMarket>(()=>resolveBuyerMarket({})),[ready,setReady]=useState(false);
+ const [market,setMarket]=useState<BuyerMarket>(()=>resolveBuyerMarket({})),[ready,setReady]=useState(false),[scope,setScope]=useState(BUYER_MARKET_GUEST_SCOPE);
  const publish=useCallback((next:BuyerMarket)=>{setMarket(next);document.cookie=marketCookie(BUYER_MARKET_COOKIE,next.country);document.cookie=marketCookie(BUYER_CURRENCY_COOKIE,next.currency);window.dispatchEvent(new CustomEvent(BUYER_MARKET_EVENT,{detail:next}));},[]);
- useEffect(()=>{let active=true;const explicitCountry=readShoppingCountry(localStorage);try{localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}
-  if(explicitCountry){publish(resolveBuyerMarket({explicitCountry}));setReady(true);return()=>{active=false};}
-  fetch("/api/geo/country",{cache:"no-store"}).then(response=>response.ok?response.json():null).then((data:{country?:unknown}|null)=>{if(active){publish(resolveBuyerMarket({detectedCountry:data?.country}));setReady(true);}}).catch(()=>{if(active){publish(resolveBuyerMarket({}));setReady(true);}});return()=>{active=false};},[publish]);
- const selectCountry=useCallback((country:string)=>{const explicitCountry=persistShoppingCountry(localStorage,country);if(!explicitCountry)return;try{localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}publish(resolveBuyerMarket({explicitCountry}));},[publish]);
- const selectCurrency=useCallback((currency:SupportedBuyerCurrency|null)=>{try{if(currency)localStorage.setItem(BUYER_CURRENCY_STORAGE_KEY,currency);else localStorage.removeItem(BUYER_CURRENCY_STORAGE_KEY);}catch{}publish(resolveBuyerMarket({explicitCountry:readShoppingCountry(localStorage),explicitCurrency:currency}));},[publish]);
+ useEffect(()=>{let active=true;Promise.all([
+  fetch("/api/auth/session",{cache:"no-store"}).then(response=>response.ok?response.json():null).catch(()=>null),
+  fetch("/api/geo/country",{cache:"no-store"}).then(response=>response.ok?response.json():null).catch(()=>null),
+ ]).then(([session,geo]:[{authenticated?:unknown;userId?:unknown}|null,{country?:unknown}|null])=>{if(!active)return;const nextScope=session?.authenticated===true&&typeof session.userId==="string"?`user:${session.userId}`:BUYER_MARKET_GUEST_SCOPE;let saved=readScopedBuyerMarket(localStorage,nextScope);if(nextScope===BUYER_MARKET_GUEST_SCOPE&&!saved.country&&!saved.currency){saved=persistScopedBuyerMarket(localStorage,nextScope,{country:readShoppingCountry(localStorage),currency:readBuyerCurrency(localStorage)});}const next=resolveBuyerMarket({explicitCountry:saved.country??undefined,explicitCurrency:saved.currency??undefined,detectedCountry:geo?.country});setScope(nextScope);publish(next);setReady(true);});return()=>{active=false};},[publish]);
+ const selectCountry=useCallback((country:string)=>{const current=readScopedBuyerMarket(localStorage,scope),saved=persistScopedBuyerMarket(localStorage,scope,{country,currency:current.currency});if(!saved.country)return;publish(resolveBuyerMarket({explicitCountry:saved.country,explicitCurrency:saved.currency}));},[publish,scope]);
+ const selectCurrency=useCallback((currency:SupportedBuyerCurrency|null)=>{const current=readScopedBuyerMarket(localStorage,scope),saved=persistScopedBuyerMarket(localStorage,scope,{country:current.country??market.country,currency});publish(resolveBuyerMarket({explicitCountry:saved.country??market.country,explicitCurrency:saved.currency}));},[market.country,publish,scope]);
  const value=useMemo(()=>({...market,ready,selectCountry,selectCurrency}),[market,ready,selectCountry,selectCurrency]);
  return <Context.Provider value={value}>{children}</Context.Provider>;
 }

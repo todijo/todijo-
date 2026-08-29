@@ -6,6 +6,7 @@ import AuthoritativeProductCardPrice from "@/components/AuthoritativeProductCard
 import {useBuyerMarket} from "@/components/BuyerMarketProvider";
 import {productPriceUi} from "@/i18n/product-price-ui";
 import type {Locale} from "@/i18n/config";
+import {formatCurrency} from "@/lib/formatters";
 
 type Price={amount:string;currency:string};
 type PricingKind="productPrice"|"estimatePrice";
@@ -19,5 +20,5 @@ export default function BuyerProductPrice({productId,variantId=null,sourcePrice,
  useEffect(()=>{if(requiresAuthoritativePrice||!market.ready)return;let active=true;setFailed(false);if(pricingKind==="productPrice"&&sourceCurrency.toUpperCase()===market.currency){const value={amount:String(sourcePrice),currency:market.currency};setPrice(value);onResolved?.(value);return()=>{active=false}}setPrice(current=>current?.currency===market.currency?current:null);void enqueue({productId,variantId,currency:market.currency,kind:pricingKind}).then(value=>{if(active){setPrice(value);onResolved?.(value)}}).catch(()=>{if(active)setFailed(true)});return()=>{active=false}},[market.currency,market.ready,onResolved,pricingKind,productId,requiresAuthoritativePrice,retry,sourceCurrency,sourcePrice,variantId]);
  if(requiresAuthoritativePrice)return <AuthoritativeProductCardPrice productId={productId} fallbackPrice={sourcePrice} currency={sourceCurrency} className={className}/>;
  if(failed&&!price)return <button type="button" className={`priceRetry ${className}`} onClick={()=>setRetry(value=>value+1)} aria-label={productPriceUi[locale].retry}>↻</button>;
- return <span className={className} aria-busy={!price}>{price?new Intl.NumberFormat(locale,{style:"currency",currency:price.currency}).format(Number(price.amount)):<span className="priceSkeleton" aria-label={productPriceUi[locale].updating}>…</span>}</span>;
+ return <span className={className} aria-busy={!price}>{price?formatCurrency(Number(price.amount),price.currency,locale):<span className="priceSkeleton" aria-label={productPriceUi[locale].updating}>…</span>}</span>;
 }
