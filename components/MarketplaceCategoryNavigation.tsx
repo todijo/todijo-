@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref } from "@/lib/desktop-category-taxonomy";
@@ -14,7 +14,6 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
   const categoryTitle = useTranslations("CategoryNavigation");
   const [activeCategory, setActiveCategory] = useState(DESKTOP_CATEGORY_TAXONOMY[0].id);
   const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -23,32 +22,37 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
   const activeLabel = categoryTitle(active.id);
 
   useLayoutEffect(() => { contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" }); }, [activeCategory]);
-  const cancelClose = () => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; } };
-  const scheduleClose = () => { cancelClose(); closeTimer.current = setTimeout(() => setOpen(false), 170); };
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
   const scrollCategories = (direction: -1 | 1) => railRef.current?.scrollBy({ left: direction * Math.max(280, railRef.current.clientWidth * 0.72), behavior: "smooth" });
+  const toggleCategory = (categoryId: string) => { setActiveCategory(categoryId); setOpen((current) => categoryId === activeCategory ? !current : true); };
 
-  return <div ref={rootRef} className={`marketCategoryNavigation ${className}`.trim()} onMouseEnter={cancelClose} onMouseLeave={scheduleClose} onKeyDown={(event) => { if (event.key === "Escape") { cancelClose(); setOpen(false); } }}>
+  return <div ref={rootRef} className={`marketCategoryNavigation ${className}`.trim()} onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); (event.target as HTMLElement).focus(); } }}>
     <div className="marketCategoryNavigationShell">
       <button className="marketCategoryScrollButton previous" type="button" onClick={() => scrollCategories(-1)} aria-label={`${common("categories")} ←`}><ChevronLeft size={18} aria-hidden="true"/></button>
       <div ref={railRef} className="marketCategoryNavigationInner" role="navigation" aria-label={common("categories")}>
       {DESKTOP_CATEGORY_TAXONOMY.map((category) => {
-        return <Link
+        return <button
           key={category.id}
-          href={categoryHref(category.label)}
+          type="button"
           className={activeCategory === category.id && open ? "marketQuickCategory active" : "marketQuickCategory"}
-          onMouseEnter={() => { setActiveCategory(category.id); setOpen(true); }}
-          onFocus={() => { setActiveCategory(category.id); setOpen(true); }}
+          onClick={() => toggleCategory(category.id)}
           aria-haspopup="true"
           aria-expanded={activeCategory === category.id && open}
-        ><SemanticCategoryIcon category={category.id} size={22}/><span>{categoryTitle(category.id)}</span><ChevronDown size={13} aria-hidden="true"/></Link>;
+          aria-controls="market-category-mega-menu"
+        ><SemanticCategoryIcon category={category.id} size={22}/><span>{categoryTitle(category.id)}</span><ChevronDown size={13} aria-hidden="true"/></button>;
       })}
-      <button className="marketQuickCategory marketQuickMore" type="button" aria-haspopup="true" aria-expanded={open} onMouseEnter={() => setOpen(true)} onFocus={() => setOpen(true)} onClick={() => setOpen((value) => !value)}><span>{common("categories")}</span><ChevronDown size={13} aria-hidden="true"/></button>
+      <button className="marketQuickCategory marketQuickMore" type="button" aria-haspopup="true" aria-expanded={open} aria-controls="market-category-mega-menu" onClick={() => setOpen((value) => !value)}><span>{common("categories")}</span><ChevronDown size={13} aria-hidden="true"/></button>
       </div>
       <button className="marketCategoryScrollButton next" type="button" onClick={() => scrollCategories(1)} aria-label={`${common("categories")} →`}><ChevronRight size={18} aria-hidden="true"/></button>
     </div>
-    {open ? <section className="marketQuickMegaMenu" aria-label={activeLabel}>
+    {open ? <section id="market-category-mega-menu" className="marketQuickMegaMenu" aria-label={activeLabel}>
       <div className="marketQuickMegaSidebar">
-        {DESKTOP_CATEGORY_TAXONOMY.map((category) => <button key={category.id} type="button" aria-pressed={active.id === category.id} className={active.id === category.id ? "active" : ""} onMouseEnter={() => setActiveCategory(category.id)} onFocus={() => setActiveCategory(category.id)}><SemanticCategoryIcon category={category.id} size={20}/><span>{categoryTitle(category.id)}</span><ChevronRight size={14} aria-hidden="true"/></button>)}
+        {DESKTOP_CATEGORY_TAXONOMY.map((category) => <button key={category.id} type="button" aria-pressed={active.id === category.id} className={active.id === category.id ? "active" : ""} onClick={() => setActiveCategory(category.id)}><SemanticCategoryIcon category={category.id} size={20}/><span>{categoryTitle(category.id)}</span><ChevronRight size={14} aria-hidden="true"/></button>)}
       </div>
       <div className="marketQuickMegaContent" ref={contentRef}>
         <header><div><strong>{activeLabel}</strong><small>{header("discoverCategories")}</small></div><Link href={categoryHref(active.label)} onClick={() => setOpen(false)}>{header("viewAll")}</Link></header>
