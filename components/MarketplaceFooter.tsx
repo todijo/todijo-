@@ -43,7 +43,6 @@ export default function MarketplaceFooter() {
     { title: t("legalTitle"), links: [
       { label: t("terms"), href: info("terms") },
       { label: legal("seller.title"), href: info("seller-terms") },
-      { label: t("returns"), href: info("returns") },
       { label: t("privacy"), href: info("privacy") },
       { label: t("cookies"), href: info("cookies") },
       { label: privacy("privacyData"), href: info("privacy-data") },
@@ -56,7 +55,7 @@ export default function MarketplaceFooter() {
   return <footer className="marketplaceFooter">
     <div className="marketplaceFooterCompact">
       <TodijoLogo href={`/${locale}`} inverse/>
-      <nav aria-label={t("helpTitle")}><a href={info("help")}>{t("helpCenter")}</a><a href={info("returns")}>{t("returns")}</a><a href={info("privacy")}>{t("privacy")}</a></nav>
+      <nav aria-label={t("helpTitle")}><a href={info("help")}>{t("helpCenter")}</a><a href={info("privacy")}>{t("privacy")}</a></nav>
       <small>© {new Date().getFullYear()} Todijo</small>
     </div>
     <div className="marketplaceFooterTrust">
