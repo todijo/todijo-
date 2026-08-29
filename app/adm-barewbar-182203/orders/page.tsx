@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import {adminOrderFilterMessages} from "@/i18n/admin-order-filters";
 import {isLocale} from "@/i18n/config";
+import ShipmentTrackingCard from "@/components/ShipmentTrackingCard";
+import {canonicalOrderShipments} from "@/lib/tracking";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +57,8 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
       checkoutExpiredAt:true,
       shippedAt: true,
       deliveredAt: true,
+      trackingCarrier:true,
+      trackingNumber:true,
       storeIdSnapshot: true,
       storeNameSnapshot: true,
       buyer: { select: { firstName: true, lastName: true } },
@@ -83,7 +87,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
           },
         },
       },
-      supplierFulfillments: { select: { id: true, status: true, supplierStatus: true, attemptCount: true, lastErrorCode: true, lastErrorMessage: true }, orderBy: { createdAt: "asc" } },
+      supplierFulfillments: { select: { id: true, status: true, supplierStatus: true,lastSyncedAt:true, attemptCount: true, lastErrorCode: true, lastErrorMessage: true,tracking:{select:{carrier:true,trackingNumber:true,shippedAt:true,updatedAt:true},orderBy:{createdAt:"asc"}} }, orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -117,6 +121,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
             const buyer = `${order.buyer.firstName} ${order.buyer.lastName}`.trim();
             const stores = orderStoreNames(order).join(", ") || t("notAvailable");
             const paid=isPaidOrder(order);
+            const shipments=canonicalOrderShipments(order),trackingLocale=isLocale(locale)?locale:"en";
             return <article className="adminOrderCard" key={order.id}>
               <header className="adminOrderCardHeader">
                 <div>
@@ -140,6 +145,8 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams: 
                 <span>{t("products")}</span>
                 <div>{order.items.map((item) => <small key={item.id}>{item.productNameSnapshot ?? item.product.name} × {item.quantity}</small>)}</div>
               </section>
+
+              <section className="adminShipmentInspection">{shipments.map(shipment=><ShipmentTrackingCard key={shipment.id} shipment={shipment} locale={trackingLocale}/>)}</section>
 
               {!paid&&<p className="subscriptionWarning" role="status">{order.checkoutExpiredAt?labels.expired:labels.unpaid}</p>}
 

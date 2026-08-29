@@ -7,6 +7,9 @@ import { readSession } from "@/lib/session";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { fulfillmentStepFor } from "@/lib/order-status";
+import {canonicalOrderShipments} from "@/lib/tracking";
+import {trackingUi} from "@/i18n/tracking-ui";
+import {isLocale} from "@/i18n/config";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +24,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
   const t = await getTranslations("Orders");
   const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
   const date = (value: Date) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
+  const trackingText=trackingUi[isLocale(locale)?locale:"en"];
 
   return (
     <main className="buyerOrdersPage scopedPublicPage">
@@ -45,6 +49,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
               const store = order.storeNameSnapshot ?? order.items[0]?.product.store.name;
               const paymentState = buyerPaymentState(order);
               const fulfillmentStep = fulfillmentStepFor(order.status);
+              const shipment=canonicalOrderShipments(order)[0];
               return (
                 <article className="buyerOrderCard" key={order.id}>
                   <header>
@@ -57,6 +62,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
                   <div className="buyerOrderMeta">
                     <span>{t("purchasedOn", { date: date(order.createdAt) })}</span>
                     <span>{t("store")}: <strong>{store ?? t("unknownStore")}</strong></span>
+                    <span className="buyerOrderTrackingSummary">{trackingText.delivery}: <strong>{trackingText.status[shipment.status]}</strong>{shipment.trackingNumber?` · ${shipment.trackingNumber}`:""}</span>
                   </div>
                   <div className="buyerOrderProducts">
                     {order.items.map((item) => (

@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { markSellerGroupsShipmentVerified } from "./seller-transfers";
+import {safeCarrierTrackingUrl} from "./tracking";
 
 export const fulfillmentTransitions = {
   PAID: { nextOrderStatus: "PROCESSING", nextFulfillmentStatus: "PROCESSING", timestamp: "processingAt" },
@@ -28,8 +29,8 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
   const carrier = normalizedTracking(input.trackingCarrier, 120);
   const number = normalizedTracking(input.trackingNumber, 160);
   const urlText = normalizedTracking(input.trackingUrl, 500);
-  let trackingUrl: string | null = null;
-  if (urlText) { try { const url = new URL(urlText); if (url.protocol !== "https:") throw new Error(); trackingUrl = url.toString(); } catch { throw new FulfillmentError("Invalid tracking URL."); } }
+  if(urlText)throw new FulfillmentError("Custom tracking URLs are not accepted.");
+  const trackingUrl=safeCarrierTrackingUrl(carrier,number);
   if (action !== "PROCESSING" && (carrier || number || trackingUrl)) throw new FulfillmentError("Tracking can only be set when shipping an order.");
 
   return db.$transaction(async (tx) => {
@@ -40,9 +41,10 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
         { storeIdSnapshot: { in: storeIds } },
         { storeIdSnapshot: null, items: { some: { product: { store: { ownerId: sellerId } } } } },
       ] },
-      select: { id: true, buyerId: true, status: true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true },
+      select: { id: true, buyerId: true, status: true,paidAt:true,stripePaymentIntentId:true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true },
     });
     if (!order) throw new FulfillmentError("Order not found.", 404);
+    if(!order.paidAt&&!order.stripePaymentIntentId)throw new FulfillmentError("Paid order required.",409);
     if (order.status === transition.nextOrderStatus) {
       const verifiedGroups = transition.nextOrderStatus === "SHIPPED" ? await markSellerGroupsShipmentVerified(tx, order.id, storeIds) : [];
       return { idempotent: true, status: order.status, verifiedSellerGroups: verifiedGroups.length };

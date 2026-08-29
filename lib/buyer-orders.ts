@@ -5,7 +5,9 @@ const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
   supplierFulfillments: {
     select: {
       status: true,
-      tracking: { select: { carrier: true, trackingNumber: true, trackingUrl: true, shippedAt: true }, orderBy: { createdAt: "asc" } },
+      supplierStatus: true,
+      lastSyncedAt: true,
+      tracking: { select: { carrier: true, trackingNumber: true, shippedAt: true, updatedAt: true }, orderBy: { createdAt: "asc" } },
     },
     orderBy: { createdAt: "asc" },
   },
