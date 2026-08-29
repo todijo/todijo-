@@ -3,6 +3,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {useLocale,useTranslations} from "next-intl";
 import {dropshippingPricingRequestKey,type BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
 import {productPriceUi} from "@/i18n/product-price-ui";
+import {formatCurrency} from "@/lib/formatters";
 import type {Locale} from "@/i18n/config";
 import {useBuyerMarket} from "@/components/BuyerMarketProvider";
 
@@ -47,5 +48,5 @@ export default function DropshippingProductPricing({productId,variantId,availabl
  },[country,market.currency,prefetchEnabled,prefetchIdentity,prefetchIds,productId,quantity,state.status]);
 
  if(!enabled)return null;
- return <section className="dropshippingBuyerPricing" aria-live="polite">{country&&!variantId&&<p>{t("chooseCombination")}</p>}{state.status==="loading"&&<p className="isLoading">{productPriceUi[locale].updating}</p>}{state.status==="error"&&<div className="pricingRetry"><button type="button" onClick={()=>setRetry(value=>value+1)}>{productPriceUi[locale].retry}</button></div>} {state.status==="ready"&&<div className="dropshippingVerifiedPrice"><strong>{new Intl.NumberFormat(locale,{style:"currency",currency:state.data.buyerCurrency}).format(Number(state.data.buyerUnitPrice))}</strong>{state.data.freeShipping&&<b>{shipping("freeLabel")}</b>}{state.data.deliveryMinDays!=null&&state.data.deliveryMaxDays!=null&&<span>{shipping("estimate",{min:state.data.deliveryMinDays,max:state.data.deliveryMaxDays})}</span>}</div>}</section>;
+ return <section className="dropshippingBuyerPricing" aria-live="polite">{country&&!variantId&&<p>{t("chooseCombination")}</p>}{state.status==="loading"&&<p className="isLoading">{productPriceUi[locale].updating}</p>}{state.status==="error"&&<div className="pricingRetry"><button type="button" onClick={()=>setRetry(value=>value+1)}>{productPriceUi[locale].retry}</button></div>} {state.status==="ready"&&<div className="dropshippingVerifiedPrice"><strong>{formatCurrency(Number(state.data.buyerUnitPrice),state.data.buyerCurrency,locale)}</strong>{state.data.freeShipping&&<b>{shipping("freeLabel")}</b>}{state.data.deliveryMinDays!=null&&state.data.deliveryMaxDays!=null&&<span>{shipping("estimate",{min:state.data.deliveryMinDays,max:state.data.deliveryMaxDays})}</span>}</div>}</section>;
 }

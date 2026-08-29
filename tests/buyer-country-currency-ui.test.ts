@@ -17,11 +17,11 @@ test("marketplace exposes a persisted country selector and safe proxy country de
   assert.match(header,/ShoppingCountrySwitcher/);
   assert.match(selector,/useBuyerMarket/);
   assert.match(selector,/selectCountry/);
-  assert.match(provider,/readShoppingCountry/);
-  assert.match(provider,/persistShoppingCountry/);
-  assert.match(provider,/localStorage\.removeItem\(BUYER_CURRENCY_STORAGE_KEY\)/);
-  assert.match(provider,/resolveBuyerMarket\(\{explicitCountry\}\)/);
-  assert.doesNotMatch(provider,/resolveBuyerMarket\(\{explicitCountry,explicitCurrency:readBuyerCurrency/);
+  assert.match(provider,/readScopedBuyerMarket/);
+  assert.match(provider,/persistScopedBuyerMarket/);
+  assert.doesNotMatch(provider,/localStorage\.removeItem\(BUYER_CURRENCY_STORAGE_KEY\)/);
+  assert.match(provider,/explicitCurrency:saved\.currency/);
+  assert.match(provider,/user:\$\{session\.userId\}/);
   assert.match(provider,/\/api\/geo\/country/);
   assert.match(geo,/cf-ipcountry/);
   assert.match(geo,/x-vercel-ip-country/);

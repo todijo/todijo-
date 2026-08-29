@@ -28,8 +28,8 @@ test("public product cards keep deferred safety while avoiding live per-card fre
  assert.match(cardPrice,/IntersectionObserver/);
  assert.match(cardPrice,/pendingQuotes/);
  assert.match(cardPrice,/dropshippingPricingRequestKey\(\{productId,variantId:data\.variantId,quantity:1,destinationCountry\}\)\}:\$\{buyerCurrency\}/);
- assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat/);
- assert.match(cardPrice,/state\.status==="ready"\?new Intl\.NumberFormat[\s\S]*priceSkeleton[\s\S]*productPriceUi\[locale\]\.updating/);
+ assert.match(cardPrice,/state\.status==="ready"\?formatCurrency/);
+ assert.match(cardPrice,/state\.status==="ready"\?formatCurrency[\s\S]*priceSkeleton[\s\S]*productPriceUi\[locale\]\.updating/);
  assert.match(cardPrice,/state\.status==="error"[\s\S]*productPriceUi\[locale\]\.retry/);
  assert.match(cardPrice,/setRetry\(value=>value\+1\)/);assert.doesNotMatch(cardPrice,/common\("loading"\)|from\(minimum\)/);
  assert.match(action,/CHOOSE_OPTIONS"\|\|product\.requiresAuthoritativePrice/);
@@ -39,7 +39,7 @@ test("public product cards keep deferred safety while avoiding live per-card fre
 
 test("product detail fails closed without a buyer-market price and invalidates cart eligibility until a matching quote",()=>{
  const price=source("app/product/[id]/ProductDetailPrice.tsx"),panel=source("components/ProductPurchasePanel.tsx"),live=source("components/DropshippingProductPricing.tsx");
- assert.match(price,/Intl\.NumberFormat/);assert.match(price,/pendingPresentment\?"…"/);assert.match(price,/useLayoutEffect/);assert.doesNotMatch(price,/pendingPresentment\?formatted/);
+ assert.match(price,/formatCurrency/);assert.match(price,/pendingPresentment\?"…"/);assert.match(price,/useLayoutEffect/);assert.doesNotMatch(price,/pendingPresentment\?formatted/);
  assert.match(panel,/verifiedPricing\.variantId===selectedVariant\?\.id&&verifiedPricing\.quantity===quantity/);
  assert.match(panel,/useLayoutEffect/);assert.match(panel,/pricingReady=dropshippingEligible\?Boolean\(activePricing\):Boolean\(marketplacePricing\)/);
  assert.match(panel,/<BuyerProductPrice[^>]+onResolved=\{updateMarketplacePricing\}/);

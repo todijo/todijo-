@@ -4,6 +4,7 @@ import { useLayoutEffect, useState } from "react";
 import {useLocale} from "next-intl";
 import { productPriceUi } from "@/i18n/product-price-ui";
 import type { Locale } from "@/i18n/config";
+import {formatCurrency} from "@/lib/formatters";
 
 type VariantPriceDetail = { price?: number;currency?:string;verified?:boolean };
 
@@ -17,10 +18,10 @@ export default function ProductDetailPrice({ price, compareAtPrice, currency, in
   }, [currency]);
 
   const comparable=exact&&selectedCurrency===currency,discount = comparable&&compareAtPrice && compareAtPrice > selectedPrice ? Math.round((1 - selectedPrice / compareAtPrice) * 100) : null;
-  const formatted=new Intl.NumberFormat(locale,{style:"currency",currency:selectedCurrency}).format(selectedPrice);
+  const formatted=formatCurrency(selectedPrice,selectedCurrency,locale);
   return <div className="productPriceRow" aria-live="polite">
     <strong className="productDetailPrice">{exact?formatted:pendingPresentment?"…":text.from(formatted)}</strong>
-    {comparable&&compareAtPrice && compareAtPrice > selectedPrice ? <del>{compareAtPrice.toFixed(2)} {currency}</del> : null}
+    {comparable&&compareAtPrice && compareAtPrice > selectedPrice ? <del>{formatCurrency(compareAtPrice,currency,locale)}</del> : null}
     {discount ? <span>-{discount}%</span> : null}
   </div>;
 }

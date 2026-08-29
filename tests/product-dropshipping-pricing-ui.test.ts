@@ -53,7 +53,7 @@ test("buyer UI performs no money, freight, margin or FX calculation",()=>{
 });
 
 test("free shipping, delivery and EUR formatting derive only from buyer-safe response without exposing the unavailable-price sentence",()=>{
- const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/state\.data\.freeShipping/);assert.match(ui,/shipping\("estimate"/);assert.doesNotMatch(ui,/pricingUnavailable/);assert.match(ui,/Intl\.NumberFormat/);assert.doesNotMatch(ui,/freeShipping:\s*true/);
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/state\.data\.freeShipping/);assert.match(ui,/shipping\("estimate"/);assert.doesNotMatch(ui,/pricingUnavailable/);assert.match(ui,/formatCurrency/);assert.doesNotMatch(ui,/freeShipping:\s*true/);
 });
 
 test("deferred-price buyer surfaces never render the temporary-unavailable translation",()=>{

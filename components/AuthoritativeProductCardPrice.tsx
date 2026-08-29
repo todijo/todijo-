@@ -5,6 +5,7 @@ import {useLocale} from "next-intl";
 import {dropshippingPricingRequestKey,type BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
 import type {Locale} from "@/i18n/config";
 import {useBuyerMarket} from "@/components/BuyerMarketProvider";
+import {formatCurrency} from "@/lib/formatters";
 import {productPriceUi} from "@/i18n/product-price-ui";
 
 type State={status:"idle"|"loading"|"error";price:null}|{status:"ready";price:number;currency:string};
@@ -50,6 +51,6 @@ export default function AuthoritativeProductCardPrice({productId,fallbackPrice,c
     observer.observe(element);
     return()=>{active=false;observer.disconnect()};
   },[displayFallback,fallbackPrice,market.country,market.currency,market.ready,productId,retry,sourceCurrency]);
-  if(state.status==="error")return <span ref={root} className={className}>{displayFallback?<>{new Intl.NumberFormat(locale,{style:"currency",currency:sourceCurrency}).format(fallbackPrice)}</>:<button type="button" className="priceRetry" onClick={()=>setRetry(value=>value+1)} aria-label={productPriceUi[locale].retry}>↻</button>}</span>;
-  return <span ref={root} className={className} aria-live="polite" aria-busy={state.status!=="ready"}>{state.status==="ready"?new Intl.NumberFormat(locale,{style:"currency",currency:state.currency}).format(state.price):displayFallback?new Intl.NumberFormat(locale,{style:"currency",currency:sourceCurrency}).format(fallbackPrice):<span className="priceSkeleton" aria-label={productPriceUi[locale].updating}>…</span>}</span>;
+  if(state.status==="error")return <span ref={root} className={className}>{displayFallback?<>{formatCurrency(fallbackPrice,sourceCurrency,locale)}</>:<button type="button" className="priceRetry" onClick={()=>setRetry(value=>value+1)} aria-label={productPriceUi[locale].retry}>↻</button>}</span>;
+  return <span ref={root} className={className} aria-live="polite" aria-busy={state.status!=="ready"}>{state.status==="ready"?formatCurrency(state.price,state.currency,locale):displayFallback?formatCurrency(fallbackPrice,sourceCurrency,locale):<span className="priceSkeleton" aria-label={productPriceUi[locale].updating}>…</span>}</span>;
 }
