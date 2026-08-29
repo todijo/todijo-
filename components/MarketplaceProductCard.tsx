@@ -36,6 +36,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
     <div className="discoveryCardBody">
       {showCategory && <span className="cartRecommendationCategory">{categoryLabel(product.category, (key) => categories(key))}</span>}
       <h3><a href={`/${locale}/product/${product.id}`}>{product.name}</a></h3>
+      <a className="marketplaceStore" href={`/${locale}/store/${product.storeSlug}`}>{product.storeName}</a>
       <div className="cardBottom"><div><strong><BuyerProductPrice productId={product.id} sourcePrice={price} sourceCurrency={product.currency} requiresAuthoritativePrice={false} pricingKind={pricingKind} onResolved={resolved}/></strong></div>{presentment?<ProductCardAction product={{ ...product, price:presentment.price,currency:presentment.currency,authoritativePrice:true, image: product.image ?? undefined }}/>:<span className="productCardPricePending" aria-hidden="true">…</span>}</div>
     </div>
   </article>;
