@@ -8,6 +8,7 @@ import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { parseShippingSettings, ShippingError } from "@/lib/shipping";
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
+import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
 
 function makeSlug(value: string) {
   return value
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    assertCatalogNameQuality(name);
 
     if (slug.length < 3) {
       return NextResponse.json(
@@ -125,6 +127,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
+    if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
@@ -175,6 +178,7 @@ export async function PATCH(request: Request) {
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json({ error: "Le nom de la boutique doit contenir entre 2 et 80 caractères." }, { status: 400 });
     }
+    assertCatalogNameQuality(name);
     if (description.length > 1000) {
       return NextResponse.json({ error: "La description est trop longue." }, { status: 400 });
     }
@@ -233,6 +237,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, store });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
+    if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
         return NextResponse.json({ error: "Ce nom de boutique est déjà utilisé." }, { status: 409 });

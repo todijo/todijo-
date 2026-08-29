@@ -19,7 +19,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       const products = await prisma.product.findMany({ where: { status: "PUBLISHED", ...publicProductAccessWhere(now) }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], skip, take: SITEMAP_ENTITY_CHUNK_SIZE, select: { id: true, updatedAt: true } });
       entities = products.map((product) => ({ pathname: `product/${product.id}`, lastModified: product.updatedAt }));
     } else {
-      const stores = await prisma.store.findMany({ where: { ...publicStoreAccessWhere(now), products: { some: { status: "PUBLISHED" } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], skip, take: SITEMAP_ENTITY_CHUNK_SIZE, select: { slug: true, updatedAt: true } });
+      const stores = await prisma.store.findMany({ where: { ...publicStoreAccessWhere(now), products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], skip, take: SITEMAP_ENTITY_CHUNK_SIZE, select: { slug: true, updatedAt: true } });
       entities = stores.map((store) => ({ pathname: `store/${store.slug}`, lastModified: store.updatedAt }));
     }
   }

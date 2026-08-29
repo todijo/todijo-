@@ -10,11 +10,11 @@ import { unstable_cache } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 
 const listPublicStores = unstable_cache(async () => prisma.store.findMany({
-  where: { ...publicStoreAccessWhere(), products: { some: { status: "PUBLISHED" } } },
+  where: { ...publicStoreAccessWhere(), products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } },
   orderBy: { updatedAt: "desc" },
   select: {
     id: true, name: true, slug: true, description: true, logo: true,
-    _count: { select: { products: { where: { status: "PUBLISHED" } } } },
+    _count: { select: { products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } } },
   },
 }), ["public-store-directory"], { revalidate: 60, tags: [PUBLIC_STORES_CACHE_TAG] });
 

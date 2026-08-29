@@ -10,7 +10,7 @@ export async function GET() {
   const now = new Date();
   const [products, stores] = await Promise.all([
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccessWhere(now) } }),
-    prisma.store.count({ where: { ...publicStoreAccessWhere(now), products: { some: { status: "PUBLISHED" } } } }),
+    prisma.store.count({ where: { ...publicStoreAccessWhere(now), products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } } }),
   ]);
   return new Response(sitemapIndexXml(siteUrl(), sitemapPartitionDescriptors(products, stores)), { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
 }
