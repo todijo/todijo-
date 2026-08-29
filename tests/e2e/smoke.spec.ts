@@ -4,6 +4,7 @@ import { SignJWT } from "jose";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { DESKTOP_CATEGORY_TAXONOMY } from "../../lib/desktop-category-taxonomy";
+import { categoryNavigationMessages } from "../../i18n/category-navigation";
 
 const e2eSecret = "e2e-only-placeholder-secret-at-least-32-characters";
 const databaseUsers = [
@@ -172,26 +173,38 @@ test("marketplace routes render one shared header with core navigation", async (
 });
 
 test("desktop category rail opens its canonical menu and preserves localized routing", async ({ page }) => {
+  const locale = "en";
+  const localizedCategories = categoryNavigationMessages[locale];
+  const localizedCategoryLabel = (id: string) => {
+    if (!(id in localizedCategories)) throw new Error(`Missing localized category label: ${id}`);
+    return localizedCategories[id as keyof typeof localizedCategories];
+  };
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: false } }));
   await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
   const rail = page.getByRole("navigation", { name: "Categories" });
   await expect(rail).toBeVisible();
   await expect(rail.getByRole("link")).toHaveCount(DESKTOP_CATEGORY_TAXONOMY.length);
-  const category = rail.getByRole("link").first();
-  const categoryName = (await category.innerText()).trim();
+  const firstCategory = DESKTOP_CATEGORY_TAXONOMY[0];
+  const firstVisibleLabel = localizedCategoryLabel(firstCategory.id);
+  const category = rail.getByRole("link", { name: firstVisibleLabel, exact: true });
   await expect(category).toHaveAttribute("href", /^\/en\/search\?category=/);
   await category.hover();
-  const menu = page.getByRole("region", { name: categoryName });
+  const menu = page.getByRole("region", { name: firstVisibleLabel });
   await expect(menu).toBeVisible();
   await expect(category).toHaveAttribute("aria-expanded", "true");
   const secondCategory = DESKTOP_CATEGORY_TAXONOMY[1];
-  await menu.getByRole("button", { name: secondCategory.label, exact: true }).hover();
-  const secondMenu = page.getByRole("region", { name: secondCategory.label });
+  const secondVisibleLabel = localizedCategoryLabel(secondCategory.id);
+  await menu.getByRole("button", { name: secondVisibleLabel, exact: true }).hover();
+  const secondMenu = page.getByRole("region", { name: secondVisibleLabel });
   await expect(secondMenu).toBeVisible();
-  await secondMenu.getByRole("button", { name: categoryName, exact: true }).hover();
-  await expect(menu.getByRole("link", { name: "View all" })).toBeVisible();
-  await Promise.all([page.waitForURL(/\/en\/search\?category=/), menu.getByRole("link", { name: "View all" }).click()]);
+  const canonicalChildCategory = secondCategory.groups[0].items[0];
+  const child = secondMenu.getByRole("link", { name: canonicalChildCategory, exact: true });
+  await child.hover();
+  await Promise.all([page.waitForURL(/\/en\/search\?category=/), child.click()]);
+  const navigated = new URL(page.url());
+  expect(navigated.pathname).toBe(`/${locale}/search`);
+  expect(navigated.searchParams.get("category")).toBe(canonicalChildCategory);
   await page.goto("/en/e2e-ux?view=home");
   await expect(page.locator(".categoryStripSection")).toBeHidden();
   await expect(page.locator(".categoryShowcase")).toBeHidden();

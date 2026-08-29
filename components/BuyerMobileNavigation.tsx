@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Grid2X2, Heart, Home, Menu, MessageCircle, Package, Search, ShoppingCart, Store, UserRound, X } from "lucide-react";
@@ -12,12 +11,8 @@ import ShoppingCountrySwitcher from "@/components/ShoppingCountrySwitcher";
 import { useCart } from "@/components/CartProvider";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId, subcategoryImagePath } from "@/lib/desktop-category-taxonomy";
-
-const categoryArtwork: Record<string, number> = {
-  women: 0, men: 1, kids: 2, "bags-shoes": 3, beauty: 4,
-  electronics: 5, phones: 5, computers: 5, home: 6, improvement: 7,
-  sports: 8, pets: 9, jewelry: 10, auto: 12,
-};
+import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
+import Image from "next/image";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
   const locale = useLocale();
@@ -27,6 +22,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const product = useTranslations("Product");
   const ux = useTranslations("Ux");
   const footer = useTranslations("HomeFooter");
+  const categoryTitle = useTranslations("CategoryNavigation");
   const { totalItems } = useCart();
   const [open, setOpen] = useState(false);
   const [hash, setHash] = useState("");
@@ -79,21 +75,17 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const favoritesHref = localizedPath(locale, "/favorites");
   const sellerHref = `${localizedPath(locale, "/register")}?role=seller`;
   const activeCategory = DESKTOP_CATEGORY_TAXONOMY.find((category) => category.id === activeCategoryId) ?? DESKTOP_CATEGORY_TAXONOMY[0];
-  const categoryImage = (categoryId: string, groupIndex = 0) => {
-    const base = categoryArtwork[categoryId] ?? 15;
-    return `/images/mobile-categories/category-${groupIndex % 3 === 2 && categoryId === "home" ? 14 : base}.webp`;
-  };
 
   const drawer = open && typeof document !== "undefined" ? createPortal(<div className="buyerMobileDrawerLayer">
     <button className="buyerMobileDrawerBackdrop" type="button" onClick={closeDrawer} aria-label={product("close")} />
     <aside id="buyer-mobile-drawer" className={`buyerMobileDrawer${categoriesOpen ? " showingCategoryBrowser" : ""}`} ref={drawerRef} role="dialog" aria-modal="true" aria-label={header("mobileNavigation")}>
-      <div className="buyerMobileDrawerHeader"><div>{categoriesOpen ? <button className="buyerMobileCategoryBack" type="button" onClick={() => setCategoriesOpen(false)} aria-label={common("back")}><ChevronLeft size={22} aria-hidden="true"/></button> : <UserRound size={22} aria-hidden="true"/>}<span><small>{categoriesOpen ? common("categories") : header("hello")}</small><strong>{categoriesOpen ? activeCategory.label : accountName ?? common("account")}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
+      <div className="buyerMobileDrawerHeader"><div>{categoriesOpen ? <button className="buyerMobileCategoryBack" type="button" onClick={() => setCategoriesOpen(false)} aria-label={common("back")}><ChevronLeft size={22} aria-hidden="true"/></button> : <UserRound size={22} aria-hidden="true"/>}<span><small>{categoriesOpen ? common("categories") : header("hello")}</small><strong>{categoriesOpen ? categoryTitle(activeCategory.id) : accountName ?? common("account")}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
       {categoriesOpen ? <section className="buyerMobileCategoryBrowser" aria-label={common("categories")}>
         <div className="buyerMobileCategoryParents" role="tablist" aria-orientation="vertical">
-          {DESKTOP_CATEGORY_TAXONOMY.map((category) => <button key={category.id} type="button" role="tab" aria-selected={activeCategory.id === category.id} className={activeCategory.id === category.id ? "active" : ""} onClick={() => setActiveCategoryId(category.id)}><span className="buyerMobileCategoryParentImage"><Image src={categoryImage(category.id)} alt="" width={42} height={42}/></span><span>{category.label}</span></button>)}
+          {DESKTOP_CATEGORY_TAXONOMY.map((category) => <button key={category.id} type="button" role="tab" aria-selected={activeCategory.id === category.id} className={activeCategory.id === category.id ? "active" : ""} onClick={() => setActiveCategoryId(category.id)}><SemanticCategoryIcon category={category.id} size={24} className="buyerMobileCategoryParentIcon"/><span>{categoryTitle(category.id)}</span></button>)}
         </div>
         <div className="buyerMobileCategoryChildren" role="tabpanel">
-          <a className="buyerMobileCategoryAll" href={categorySearchHref(locale, activeCategory.label)} onClick={closeDrawer}><strong>{activeCategory.label}</strong><span>{header("viewAll")} <ChevronRight size={15} aria-hidden="true"/></span></a>
+          <a className="buyerMobileCategoryAll" href={categorySearchHref(locale, activeCategory.label)} onClick={closeDrawer}><strong>{categoryTitle(activeCategory.id)}</strong><span>{header("viewAll")} <ChevronRight size={15} aria-hidden="true"/></span></a>
           {activeCategory.groups.map((group) => <section key={group.id} className="buyerMobileCategoryGroup"><h3>{group.label}</h3><div>{group.items.map((item) => <a key={subcategoryId(activeCategory.id, group.id, item)} href={categorySearchHref(locale, item)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={subcategoryImagePath(activeCategory.id, group.id, item)} alt="" width={84} height={84}/></span><span>{item}</span></a>)}</div></section>)}
         </div>
       </section> : <><nav aria-label={header("mobileNavigation")}>

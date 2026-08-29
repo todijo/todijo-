@@ -15,6 +15,7 @@ import {supplierBulkMessages} from "./supplier-bulk";
 import {oauthReadinessMessages} from "./oauth-readiness";
 import {helpCenterMessages} from "./help-center";
 import {accountStatusMessages} from "./account-status";
+import {categoryNavigationMessages} from "./category-navigation";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -25,6 +26,7 @@ export default getRequestConfig(async () => {
   messages.Auth = {...(await import(`../messages/auth/${locale}.json`)).default,...buyerAddressMessages[locale],...accountStatusMessages[locale]};
   messages.Connect = (await import(`../messages/connect/${locale}.json`)).default;
   messages.Categories = (await import(`../messages/categories/${locale}.json`)).default;
+  messages.CategoryNavigation = categoryNavigationMessages[locale];
   messages.CartRecommendations = (await import(`../messages/cart-recommendations/${locale}.json`)).default;
   messages.DashboardPremium = (await import(`../messages/dashboard-premium/${locale}.json`)).default;
   messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
