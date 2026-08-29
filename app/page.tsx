@@ -9,6 +9,7 @@ import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-pr
 import { canonicalMarketplaceColor, countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplace-facets";
 import { getLocale } from "next-intl/server";
 import { resolveBuyerProductContent } from "@/lib/product-content";
+import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -81,7 +82,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       ? {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
-            { supplierLink: { sourceMetadata: { path: ["productContent","source","title"], string_contains: q } } },
+            ...localizedSupplierContentSearch(q,locale),
             { description: { contains: q, mode: "insensitive" } },
             { category: { contains: q, mode: "insensitive" } },
             { condition: { contains: q, mode: "insensitive" } },

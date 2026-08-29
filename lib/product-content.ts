@@ -1,6 +1,6 @@
 type JsonObject = Record<string, unknown>;
 
-export type LocalizedProductContent = { title?: string; description?: string };
+export type LocalizedProductContent = { title?: string; description?: string; generated?: boolean; approved?: boolean; source?: "SUPPLIER"|"GENERATED"|"MANUAL" };
 export type ProductContentMetadata = {
   version: 1;
   source: { title: string; description: string; locale: string | null };
@@ -49,19 +49,20 @@ export function normalizeSupplierTitle(source: string) {
   return { title: normalized, confidence: lowConfidence ? "LOW" as const : "HIGH" as const, usedFallback: lowConfidence, source: original };
 }
 
-function localizedRecord(value: unknown) {
+function localizedRecord(value: unknown,normalizeTitles=false) {
   const output: Record<string, LocalizedProductContent> = {};
   for (const [locale, candidate] of Object.entries(object(value))) {
     if (!/^[a-z]{2}(?:-[A-Z]{2})?$/.test(locale)) continue;
-    const entry = object(candidate), title = text(entry.title, 120), description = cleanSupplierDescription(text(entry.description, 5000));
-    if (title || description) output[locale] = { ...(title ? { title } : {}), ...(description ? { description } : {}) };
+    const entry = object(candidate), rawTitle = text(entry.title, 120), title=rawTitle&&normalizeTitles?normalizeSupplierTitle(rawTitle).title:rawTitle, description = cleanSupplierDescription(text(entry.description, 5000));
+    const source=["SUPPLIER","GENERATED","MANUAL"].includes(String(entry.source))?entry.source as LocalizedProductContent["source"]:undefined;
+    if (title || description) output[locale] = { ...(title ? { title } : {}), ...(description ? { description } : {}),...(typeof entry.generated==="boolean"?{generated:entry.generated}:{}),...(typeof entry.approved==="boolean"?{approved:entry.approved}:{}),...(source?{source}:{}) };
   }
   return output;
 }
 
 export function createImportedProductContent(source: { title: string; description: string; rawMetadata?: unknown; sourceLocale?: string | null }) {
   const normalized = normalizeSupplierTitle(source.title), description = cleanSupplierDescription(source.description);
-  const raw = object(source.rawMetadata), localized = localizedRecord(raw.localizedContent ?? raw.translations);
+  const raw = object(source.rawMetadata), localized = localizedRecord(raw.localizedContent ?? raw.translations,true);
   const metadata: ProductContentMetadata = { version: 1, source: { title: text(source.title, 10000), description: text(source.description, 50000), locale: source.sourceLocale ?? null }, normalized: { title: normalized.title, description, locale: "en", generated: true }, localized };
   return { title: normalized.title, description: description || "Supplier product pending seller review.", metadata, confidence: normalized.confidence };
 }
@@ -76,12 +77,16 @@ export function readProductContentMetadata(sourceMetadata: unknown): ProductCont
 }
 
 export function resolveBuyerProductContent(input: { name: string; description: string; sourceMetadata?: unknown; locale: string }) {
-  const metadata = readProductContentMetadata(input.sourceMetadata), exact = metadata?.localized[input.locale];
-  return { title: exact?.title || input.name || metadata?.source.title || "Product", description: exact?.description || input.description || metadata?.normalized.description || metadata?.source.description || "", localeStatus: exact ? "LOCALIZED" as const : metadata ? "NORMALIZED_DEFAULT" as const : "PRODUCT_DEFAULT" as const, sourceTitle: metadata?.source.title ?? null, generated: metadata?.normalized.generated ?? false };
+  const metadata=readProductContentMetadata(input.sourceMetadata),requested=input.locale.trim(),base=requested.split("-")[0],exact=metadata?.localized[requested]??metadata?.localized[base];
+  const exactManual=exact&&(exact.source==="MANUAL"||exact.generated===false||exact.approved===true)?exact:null,defaultManual=metadata?.normalized.generated===false;
+  const title=(exactManual?.title||(defaultManual?(input.name||metadata?.normalized.title):exact?.title)||(input.name||metadata?.normalized.title)||metadata?.source.title||"Product").trim()||"Product";
+  const description=exactManual?.description||(defaultManual?(input.description||metadata?.normalized.description):exact?.description)||input.description||metadata?.normalized.description||metadata?.source.description||"";
+  const localeStatus=exactManual?"LOCALIZED_MANUAL" as const:defaultManual?"MANUAL_DEFAULT" as const:exact?"LOCALIZED" as const:metadata?"NORMALIZED_DEFAULT" as const:"PRODUCT_DEFAULT" as const;
+  return {title,description,localeStatus,sourceTitle:metadata?.source.title??null,generated:exact?exact.generated!==false:metadata?.normalized.generated??false,locale:exact?requested:metadata?.normalized.locale??null};
 }
 
-export function proposedExistingSupplierContent(input: { name: string; description: string; sourceMetadata?: unknown }) {
+export function proposedExistingSupplierContent(input: { name: string; description: string; sourceMetadata?: unknown;locale?:string }) {
   const existing = readProductContentMetadata(input.sourceMetadata);
-  if (existing) return { title: existing.normalized.title, sourceTitle: existing.source.title, generated: existing.normalized.generated, status: "STORED" as const };
-  return { title: normalizeSupplierTitle(input.name).title, sourceTitle: input.name, generated: true, status: "PROPOSED_ONLY" as const };
+  if (existing){const locale=input.locale??existing.normalized.locale,resolved=resolveBuyerProductContent({...input,locale});return { title: existing.normalized.title, sourceTitle: existing.source.title,currentTitle:input.name,proposedLocalizedTitle:existing.localized[locale]?.title??null,locale,availableLocales:Object.keys(existing.localized).sort(),generated: existing.normalized.generated,sourceStatus:resolved.localeStatus,confidence:existing.localized[locale]?.title?"HIGH" as const:"REVIEW" as const,status: "STORED" as const };}
+  const normalized=normalizeSupplierTitle(input.name);return { title: normalized.title, sourceTitle: input.name,currentTitle:input.name,proposedLocalizedTitle:null,locale:input.locale??"en",availableLocales:[],generated: true,sourceStatus:"PROPOSED_ONLY" as const,confidence:normalized.confidence,status: "PROPOSED_ONLY" as const };
 }
