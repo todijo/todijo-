@@ -27,6 +27,8 @@ test("all supported locales have complete parent-category labels", () => {
   for (const [locale, labels] of Object.entries(categoryNavigationMessages)) assert.deepEqual(Object.keys(labels).sort(), expected, `category label parity: ${locale}`);
   assert.equal(categoryNavigationMessages.en.women, "Women's clothing");
   assert.equal(categoryNavigationMessages.fr.women, "Vêtements pour femmes");
+  assert.notEqual(categoryNavigationMessages.en.pets, DESKTOP_CATEGORY_TAXONOMY[1].label);
+  assert.equal(categorySearchHref("en", DESKTOP_CATEGORY_TAXONOMY[1].label), "/en/search?category=Fournitures%20pour%20animaux%20de%20compagnie");
   assert.notEqual(categoryNavigationMessages.ar.women, DESKTOP_CATEGORY_TAXONOMY[0].label);
   assert.notEqual(categoryNavigationMessages.ku.women, DESKTOP_CATEGORY_TAXONOMY[0].label);
 });
