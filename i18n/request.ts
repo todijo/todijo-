@@ -16,6 +16,7 @@ import {oauthReadinessMessages} from "./oauth-readiness";
 import {helpCenterMessages} from "./help-center";
 import {accountStatusMessages} from "./account-status";
 import {categoryNavigationMessages} from "./category-navigation";
+import { legalPhase5Messages } from "./legal-phase5";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -38,9 +39,13 @@ export default getRequestConfig(async () => {
   messages.HomeFooter = (await import(`../messages/home-footer/${locale}.json`)).default;
   messages.Privacy = { ...(await import("../messages/privacy/en.json")).default, ...(await import(`../messages/privacy/${locale}.json`)).default, ...oauthReadinessMessages[locale] };
   messages.HelpCenter = helpCenterMessages[locale];
-  messages.Legal = (await import(`../messages/legal/${locale}.json`)).default;
-  messages.LegalCleanup = (await import(`../messages/legal-cleanup/${locale}.json`)).default;
-  messages.InfoPages = (await import(`../messages/info-pages/${locale}.json`)).default;
+  const legalEnglish = (await import("../messages/legal/en.json")).default;
+  const legalLocalized = (await import(`../messages/legal/${locale}.json`)).default;
+  messages.Legal = { ...legalEnglish, ...legalLocalized, common: { ...legalEnglish.common, ...legalLocalized.common, ...legalPhase5Messages[locale] } };
+  const legalCleanupEnglish = (await import("../messages/legal-cleanup/en.json")).default;
+  messages.LegalCleanup = { ...legalCleanupEnglish, ...(await import(`../messages/legal-cleanup/${locale}.json`)).default };
+  const infoPagesEnglish = (await import("../messages/info-pages/en.json")).default;
+  messages.InfoPages = { ...infoPagesEnglish, ...(await import(`../messages/info-pages/${locale}.json`)).default };
   messages.PublicStore = (await import(`../messages/public-store/${locale}.json`)).default;
   messages.SellerTransparency = (await import(`../messages/seller-transparency/${locale}.json`)).default;
   messages.Compliance = { ...(await import("../messages/compliance/en.json")).default, ...(await import(`../messages/compliance/${locale}.json`)).default };

@@ -84,6 +84,24 @@ test("public marketplace information page renders without live services", async 
   assertNoRuntimeErrors();
 });
 
+test("Phase 5 legal pages show truthful protection copy and remain contained in RTL and mobile", async ({ page }) => {
+  const response = await page.goto("/en/info/returns");
+  expect(response?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "How buyer protection works" })).toBeVisible();
+  await expect(page.getByText(/final approval or rejection with an authorised Todijo administrator/i)).toBeVisible();
+  await expect(page.getByText(/not escrow/i)).toBeVisible();
+  await expect(page.getByText(/Todijo does not receive full card details/i)).toHaveCount(0);
+  const footerReturns = page.locator(".marketplaceFooterMain a[href='/en/info/returns']");
+  await expect(footerReturns).toHaveCount(1);
+
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/ar/info/returns");
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  await expect(page.getByRole("heading", { name: "كيفية عمل حماية المشتري" })).toBeVisible();
+  const overflow = await page.locator("main").evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test("unauthenticated visitors are redirected away from the dashboard", async ({ page }) => {
   const assertNoRuntimeErrors = collectRuntimeErrors(page);
 
