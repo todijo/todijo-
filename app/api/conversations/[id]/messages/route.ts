@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -19,11 +20,13 @@ export async function POST(request: Request, { params }: Context) {
   if (!conversation) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   const recipientId = conversation.buyerId === session.userId ? conversation.sellerId : conversation.buyerId;
 
-  await prisma.$transaction(async (tx) => {
+  const notificationId = await prisma.$transaction(async (tx) => {
     await tx.message.create({ data: { conversationId: id, senderId: session.userId, body } });
     await tx.conversation.update({ where: { id }, data: { lastMessageAt: new Date() } });
     await tx.notification.deleteMany({ where: { userId: recipientId, type: "NEW_MESSAGE", href: `/messages/${id}`, readAt: null } });
-    await tx.notification.create({ data: { userId: recipientId, type: "NEW_MESSAGE", title: "Nouveau message", body: `Nouveau message concernant ${conversation.product.name}.`, href: `/messages/${id}` } });
+    const notification=await tx.notification.create({ data: { userId: recipientId, type: "NEW_MESSAGE", title: "Nouveau message", body: `Nouveau message concernant ${conversation.product.name}.`, href: `/messages/${id}` },select:{id:true} });
+    return notification.id;
   });
+  dispatchNotificationPushBestEffort(notificationId);
   return NextResponse.json({ ok: true }, { status: 201 });
 }
