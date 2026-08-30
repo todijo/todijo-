@@ -1,6 +1,7 @@
 type JsonObject = Record<string, unknown>;
 
-export type LocalizedProductContent = { title?: string; description?: string; generated?: boolean; approved?: boolean; source?: "SUPPLIER"|"GENERATED"|"MANUAL" };
+export type ProductTranslationMetadata = { sourceFingerprint: string; provider: string; providerVersion: string; translatedAt: string; qualityScore?: number };
+export type LocalizedProductContent = { title?: string; description?: string; generated?: boolean; approved?: boolean; source?: "SUPPLIER"|"GENERATED"|"MANUAL"; translation?: ProductTranslationMetadata };
 export type ProductContentMetadata = {
   version: 1;
   source: { title: string; description: string; locale: string | null };
@@ -51,8 +52,10 @@ function localizedRecord(value: unknown,normalizeTitles=false) {
   for (const [locale, candidate] of Object.entries(object(value))) {
     if (!/^[a-z]{2}(?:-[A-Z]{2})?$/.test(locale)) continue;
     const entry = object(candidate), rawTitle = text(entry.title, 120), title=rawTitle&&normalizeTitles?normalizeSupplierTitle(rawTitle).title:rawTitle, description = cleanSupplierDescription(text(entry.description, 5000));
-    const source=["SUPPLIER","GENERATED","MANUAL"].includes(String(entry.source))?entry.source as LocalizedProductContent["source"]:undefined;
-    if (title || description) output[locale] = { ...(title ? { title } : {}), ...(description ? { description } : {}),...(typeof entry.generated==="boolean"?{generated:entry.generated}:{}),...(typeof entry.approved==="boolean"?{approved:entry.approved}:{}),...(source?{source}:{}) };
+    const source=["SUPPLIER","GENERATED","MANUAL"].includes(String(entry.source))?entry.source as LocalizedProductContent["source"]:undefined,rawTranslation=object(entry.translation);
+    const sourceFingerprint=text(rawTranslation.sourceFingerprint,128),provider=text(rawTranslation.provider,80),providerVersion=text(rawTranslation.providerVersion,80),translatedAt=text(rawTranslation.translatedAt,40),qualityScore=typeof rawTranslation.qualityScore==="number"&&Number.isFinite(rawTranslation.qualityScore)&&rawTranslation.qualityScore>=0&&rawTranslation.qualityScore<=1?rawTranslation.qualityScore:undefined;
+    const translation=sourceFingerprint&&provider&&providerVersion&&translatedAt?{sourceFingerprint,provider,providerVersion,translatedAt,...(qualityScore===undefined?{}:{qualityScore})}:undefined;
+    if (title || description) output[locale] = { ...(title ? { title } : {}), ...(description ? { description } : {}),...(typeof entry.generated==="boolean"?{generated:entry.generated}:{}),...(typeof entry.approved==="boolean"?{approved:entry.approved}:{}),...(source?{source}:{}),...(translation?{translation}:{}) };
   }
   return output;
 }
@@ -101,7 +104,7 @@ export function resolveBuyerProductContent(input: { name: string; description: s
 
 export function proposedExistingSupplierContent(input: { name: string; description: string; sourceMetadata?: unknown;locale?:string }) {
   const existing = readProductContentMetadata(input.sourceMetadata);
-  if (existing){const locale=localeCandidates(input.locale??existing.normalized.locale)[0]??"en",proposal=existing.localized[locale],resolved=resolveBuyerProductContent({...input,locale});return { title: existing.normalized.title, sourceTitle: existing.source.title,sourceDescription:existing.source.description,currentTitle:input.name,currentDescription:input.description,proposedLocalizedTitle:proposal?.title??null,proposedLocalizedDescription:proposal?.description??null,proposalSource:proposal?.source??(proposal?.generated?"GENERATED":null),proposalApproved:proposal?buyerVisible(proposal)!==null:null,locale,availableLocales:Object.keys(existing.localized).sort(),generated: existing.normalized.generated,sourceStatus:resolved.localeStatus,confidence:proposal?.title?"HIGH" as const:"REVIEW" as const,status: "STORED" as const };}
+  if (existing){const locale=localeCandidates(input.locale??existing.normalized.locale)[0]??"en",proposal=existing.localized[locale],resolved=resolveBuyerProductContent({...input,locale});return { title: existing.normalized.title, sourceTitle: existing.source.title,sourceDescription:existing.source.description,sourceLocale:existing.normalized.locale,currentTitle:input.name,currentDescription:input.description,proposedLocalizedTitle:proposal?.title??null,proposedLocalizedDescription:proposal?.description??null,proposalSource:proposal?.source??(proposal?.generated?"GENERATED":null),proposalApproved:proposal?buyerVisible(proposal)!==null:null,translation:proposal?.translation??null,locale,availableLocales:Object.keys(existing.localized).sort(),generated: existing.normalized.generated,sourceStatus:resolved.localeStatus,confidence:proposal?.translation?.qualityScore??(proposal?.title?"HIGH" as const:"REVIEW" as const),status: "STORED" as const };}
   const normalized=normalizeSupplierTitle(input.name);return { title: normalized.title, sourceTitle: input.name,currentTitle:input.name,proposedLocalizedTitle:null,locale:input.locale??"en",availableLocales:[],generated: true,sourceStatus:"PROPOSED_ONLY" as const,confidence:normalized.confidence,status: "PROPOSED_ONLY" as const };
 }
 
