@@ -73,7 +73,7 @@ test("CJ read calls invalidate and retry authentication at most once", async () 
   } finally { global.fetch = originalFetch; }
 });
 
-test("CJ product retrieval follows the documented v2 contract sequentially", async () => {
+test("CJ product retrieval follows the documented v2 contract with bounded metadata overlap", async () => {
   const urls: string[] = [];
   let active = 0;
   let concurrent = false;
@@ -90,7 +90,7 @@ test("CJ product retrieval follows the documented v2 contract sequentially", asy
   const auth = {isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
   const result = await new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0}).getProduct("240626050813160030");
   assert.equal(result.supplierProductId,"240626050813160030");
-  assert.equal(concurrent,false);
+  assert.equal(concurrent,true);
   assert.equal(urls.length,3);
   assert.match(urls[0],/\/product\/query\?pid=240626050813160030&features=enable_video$/);
   assert.doesNotMatch(urls[0],/enable_description/);

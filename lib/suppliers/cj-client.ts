@@ -4,7 +4,7 @@ import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
 import { CjFreightError, countryCode, freightCacheKey, normalizeCjFreightMethods, readFreightCache, selectCjFreightMethod, writeFreightCache, type CjFreightQuote } from "./cj-freight";
-import { cjRetryDelay, isCjRateLimitFailure, scheduleCjRequest } from "./cj-rate-limiter";
+import { cjRetryAfterMs, cjRetryDelay, isCjRateLimitFailure, scheduleCjRequest } from "./cj-rate-limiter";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 const PRODUCT_CACHE_TTL_MS=5*60*1000;
@@ -144,7 +144,7 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
       const authFailed = response.status === 401 || payload.code === 1600001 || payload.code === 1600002;
       if (authFailed && authRetries++ === 0) { this.auth.invalidateAccessToken(); continue; }
       const rateLimited=isCjRateLimitFailure({httpStatus:response.status,code:payload.code,message:payload.message});
-      if(rateLimited&&rateRetries<2){logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);const attempt=rateRetries++;await (this.options.retryDelay?.(attempt)??new Promise(resolve=>setTimeout(resolve,cjRetryDelay(attempt))));continue;}
+      if(rateLimited&&rateRetries<2){logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);const attempt=rateRetries++,delay=Math.max(cjRetryDelay(attempt),cjRetryAfterMs(response)??0);await (this.options.retryDelay?.(attempt)??new Promise(resolve=>setTimeout(resolve,delay)));continue;}
       if (authFailed || !response.ok || payload.result === false || payload.success === false) {
         logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);
         if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
@@ -200,8 +200,10 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const canonicalPid = text(object(product).pid ?? object(product).productId);
     if (!canonicalPid) throw new Error("CJ_PRODUCT_NOT_FOUND");
     const canonicalContext = {...context,canonicalPid};
-    const variants = await this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
-    const inventory = await this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext);
+    const [variants,inventory] = await Promise.all([
+      this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext),
+      this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext),
+    ]);
     return normalizeCjProduct(product, variants.data, inventory.data);
   }
   async searchProducts(query:string,page=1,pageSize=20):Promise<SupplierCatalogSearchPage>{
