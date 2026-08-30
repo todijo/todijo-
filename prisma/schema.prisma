@@ -356,6 +356,7 @@ model User {
   sellerConversations Conversation[] @relation("ConversationSeller")
   sentMessages        Message[]
   notifications       Notification[]
+  pushSubscriptions   PushSubscription[]
   orders              Order[]
   reviews             Review[]
   reviewReports       ReviewReport[]
@@ -1121,11 +1122,33 @@ model Notification {
   body      String
   href      String?
   readAt    DateTime?
+  pushDispatchedAt DateTime?
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
+}
+
+model PushSubscription {
+  id                String    @id @default(cuid())
+  userId            String
+  endpointHash      String    @unique @db.VarChar(64)
+  endpointEncrypted String    @db.Text
+  p256dhEncrypted   String    @db.Text
+  authEncrypted     String    @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastUsedAt        DateTime?
+  lastSuccessAt     DateTime?
+  expirationTime    DateTime?
+  revokedAt         DateTime?
+  failureCount      Int       @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([revokedAt, updatedAt])
 }
 
 model Order {

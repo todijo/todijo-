@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
 
 export async function POST(request: Request) {
   const session = await readSession();
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     });
     await tx.message.create({ data: { conversationId: convo.id, senderId: session.userId, body: message } });
     await tx.notification.deleteMany({ where: { userId: product.store.ownerId, type: "NEW_MESSAGE", href: `/messages/${convo.id}`, readAt: null } });
-    await tx.notification.create({
+    const notification=await tx.notification.create({
       data: {
         userId: product.store.ownerId,
         type: "NEW_MESSAGE",
@@ -45,9 +46,12 @@ export async function POST(request: Request) {
         body: `Un acheteur vous a écrit au sujet de ${product.name}.`,
         href: `/messages/${convo.id}`,
       },
+      select:{id:true},
     });
-    return convo;
+    return {...convo,notificationId:notification.id};
   });
+
+  dispatchNotificationPushBestEffort(conversation.notificationId);
 
   return NextResponse.json({ conversationId: conversation.id }, { status: 201 });
 }

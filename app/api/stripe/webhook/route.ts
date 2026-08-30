@@ -3,6 +3,7 @@ import { processStripeEvent } from "@/lib/payments";
 import { type StripeCheckoutSession, type StripeEvent } from "@/lib/stripe";
 import { handleStripeWebhookRequest } from "@/lib/stripe-webhook-request";
 import { automaticCjFulfillmentEnabled, processOrderSupplierFulfillments } from "@/lib/suppliers/supplier-fulfillment";
+import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
 
 export const runtime = "nodejs";
 
@@ -40,6 +41,7 @@ async function processAuthenticatedStripeEvent(event: StripeEvent) {
     const paidOrderId = !sellerCheckout && "paid" in result && result.paid === true
       ? session.metadata?.orderId ?? session.client_reference_id
       : null;
+    if(paidOrderId){const notification=await prisma.notification.findFirst({where:{type:"ORDER_PAID",href:`/account/orders/${paidOrderId}`},orderBy:{createdAt:"desc"},select:{id:true}});if(notification)dispatchNotificationPushBestEffort(notification.id);}
     if (paidOrderId && automaticCjFulfillmentEnabled()) {
       try {
         const fulfillment = await processOrderSupplierFulfillments(paidOrderId);
