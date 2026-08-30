@@ -120,6 +120,46 @@ enum SupplierCatalogItemStatus {
   FAILED
 }
 
+enum CatalogTranslationJobStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  CANCELLED
+}
+
+enum CatalogTranslationItemStatus {
+  QUEUED
+  CLAIMED
+  RETRYABLE
+  COMPLETED
+  SKIPPED
+  MANUAL_ACTION_REQUIRED
+  CANCELLED
+}
+
+enum CatalogTranslationAttemptStatus {
+  RESERVED
+  SUBMITTED
+  SUCCEEDED
+  DEFINITE_FAILURE
+  AMBIGUOUS
+}
+
+enum CatalogTranslationApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum CatalogTranslationBudgetPeriod {
+  DAY
+  MONTH
+}
+
 enum SupplierFulfillmentStatus {
   PENDING
   SUBMITTING
@@ -322,6 +362,8 @@ model User {
   refundRequests      RefundRequest[] @relation("RefundRequestBuyer")
   reviewedRefundRequests RefundRequest[] @relation("RefundRequestReviewer")
   uploadedRefundEvidence RefundEvidence[] @relation("RefundEvidenceUploader")
+  createdCatalogTranslationJobs CatalogTranslationJob[] @relation("CatalogTranslationJobCreator")
+  approvedCatalogTranslations CatalogTranslationItem[] @relation("CatalogTranslationApprover")
   productReports      ProductReport[]
   productReportsReviewed ProductReport[] @relation("ProductReportReviewer")
   productModerationEvents ProductModerationEvent[] @relation("ProductModerationActor")
@@ -745,6 +787,7 @@ model Product {
   reports       ProductReport[]
   supplierLink  SupplierProductLink?
   media         ProductMedia[]
+  catalogTranslationItems CatalogTranslationItem[]
 
   @@unique([storeId, slug])
   @@index([storeId, status])
@@ -781,6 +824,7 @@ model SupplierProductLink {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   connection SupplierConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
   reviews SupplierReview[]
+  catalogTranslationItems CatalogTranslationItem[]
 
   @@unique([connectionId, supplierProductId])
   @@index([provider, syncStatus, lastSyncedAt])
@@ -851,6 +895,124 @@ model SupplierCatalogImportItem {
   @@index([canonicalSupplierId])
   @@index([productId])
 }
+
+model CatalogTranslationJob {
+  id                  String                      @id @default(cuid())
+  status              CatalogTranslationJobStatus @default(QUEUED)
+  provider            String                      @db.VarChar(40)
+  providerVersion     String                      @db.VarChar(80)
+  pipelineVersion     String                      @db.VarChar(80)
+  sourceLocale        String?                     @db.VarChar(12)
+  targetLocales       String[]
+  requestedItemCount  Int
+  estimatedCharacters BigInt
+  batchLimit          Int
+  createdById         String
+  startedAt           DateTime?
+  pausedAt            DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  lastErrorCode       String?                     @db.VarChar(100)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  createdBy User                     @relation("CatalogTranslationJobCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  items     CatalogTranslationItem[]
+
+  @@index([status, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model CatalogTranslationItem {
+  id                    String                           @id @default(cuid())
+  jobId                 String
+  productId             String
+  supplierProductLinkId String
+  sourceLocale          String                           @db.VarChar(12)
+  targetLocale          String                           @db.VarChar(12)
+  sourceFingerprint     String                           @db.Char(64)
+  provider              String                           @db.VarChar(40)
+  providerVersion       String                           @db.VarChar(80)
+  pipelineVersion       String                           @db.VarChar(80)
+  status                CatalogTranslationItemStatus     @default(QUEUED)
+  attemptCount          Int                              @default(0)
+  nextAttemptAt         DateTime?
+  claimToken            String?                          @db.VarChar(64)
+  claimedAt             DateTime?
+  leaseExpiresAt        DateTime?
+  estimatedCharacters   Int
+  submittedCharacters   Int                              @default(0)
+  completedCharacters   Int                              @default(0)
+  lastErrorCode         String?                          @db.VarChar(100)
+  lastErrorMessage      String?                          @db.VarChar(500)
+  proposalWrittenAt     DateTime?
+  approvalStatus        CatalogTranslationApprovalStatus @default(PENDING)
+  approvedById          String?
+  approvedAt            DateTime?
+  completedAt           DateTime?
+  skippedAt             DateTime?
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
+
+  job                 CatalogTranslationJob       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  product             Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  supplierProductLink SupplierProductLink         @relation(fields: [supplierProductLinkId], references: [id], onDelete: Restrict)
+  approvedBy          User?                       @relation("CatalogTranslationApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  attempts            CatalogTranslationAttempt[]
+
+  @@unique([productId, sourceFingerprint, sourceLocale, targetLocale, provider, providerVersion, pipelineVersion], map: "CatalogTranslationItem_idempotency_key")
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, leaseExpiresAt])
+  @@index([jobId, status])
+  @@index([productId, targetLocale, createdAt])
+  @@index([supplierProductLinkId, targetLocale])
+}
+
+model CatalogTranslationAttempt {
+  id                  String                          @id @default(cuid())
+  itemId              String
+  attemptNumber       Int
+  status              CatalogTranslationAttemptStatus @default(RESERVED)
+  providerRequestKey  String                          @unique @db.VarChar(120)
+  reservedCharacters  Int
+  submittedCharacters Int                             @default(0)
+  completedCharacters Int                             @default(0)
+  billedCharacters    Int?
+  billingConfirmed    Boolean                         @default(false)
+  dailyPeriodStart    DateTime
+  monthlyPeriodStart  DateTime
+  providerRequestId   String?                         @db.VarChar(200)
+  safeErrorCode       String?                         @db.VarChar(100)
+  safeErrorMessage    String?                         @db.VarChar(500)
+  reservedAt          DateTime                        @default(now())
+  submittedAt         DateTime?
+  completedAt         DateTime?
+
+  item CatalogTranslationItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([itemId, attemptNumber])
+  @@index([itemId, status])
+  @@index([status, submittedAt])
+  @@index([dailyPeriodStart, status])
+  @@index([monthlyPeriodStart, status])
+}
+
+model CatalogTranslationBudget {
+  id                  String                         @id @default(cuid())
+  provider            String                         @db.VarChar(40)
+  periodType          CatalogTranslationBudgetPeriod
+  periodStart         DateTime
+  limitCharacters     BigInt
+  reservedCharacters  BigInt                         @default(0)
+  submittedCharacters BigInt                         @default(0)
+  completedCharacters BigInt                         @default(0)
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+
+  @@unique([provider, periodType, periodStart])
+  @@index([provider, periodType, periodStart])
+}
+
 
 model SupplierConnection {
   id                String                   @id @default(cuid())
