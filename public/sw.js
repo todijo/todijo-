@@ -1,5 +1,5 @@
 /* Todijo Stage 1 service worker: public shell assets only; commerce stays network-authoritative. */
-const CACHE_VERSION = "phase9-stage1-v1";
+const CACHE_VERSION = "phase9-stages2-6-v1";
 const CACHE_PREFIX = "todijo-pwa-";
 const SHELL_CACHE = CACHE_PREFIX + "shell-" + CACHE_VERSION;
 const STATIC_CACHE = CACHE_PREFIX + "static-" + CACHE_VERSION;
@@ -36,6 +36,47 @@ function isCacheableStatic(request, url) {
   if (url.pathname.startsWith("/_next/static/")) return true;
   return STATIC_DESTINATIONS.has(request.destination) && PUBLIC_IMAGE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
 }
+
+const PUSH_PATH = /^\/(?:en|fr|ar|ku|tr|de|es|it|nl|zh|fa|hi|pt|ru)\/(?:account\/orders(?:\/[a-zA-Z0-9_-]+)?|track-order|messages(?:\/[a-zA-Z0-9_-]+)?|notifications)$/;
+const PUSH_COPY = {
+  ORDER: "Your Todijo order has an update.",
+  SHIPMENT: "Your Todijo order has a shipping update.",
+  REFUND: "Your Todijo refund has an update.",
+  RETURN: "Your Todijo return has an update.",
+  MESSAGE: "You have a new Todijo message.",
+};
+
+function safePushData(event) {
+  try {
+    const value = event.data?.json();
+    const category = typeof value?.category === "string" && PUSH_COPY[value.category] ? value.category : "ORDER";
+    const href = typeof value?.href === "string" && PUSH_PATH.test(value.href) ? value.href : "/en/notifications";
+    return { category, href };
+  } catch { return { category: "ORDER", href: "/en/notifications" }; }
+}
+
+self.addEventListener("push", (event) => {
+  const data = safePushData(event);
+  event.waitUntil(self.registration.showNotification("Todijo", {
+    body: PUSH_COPY[data.category],
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: `todijo-${data.category.toLowerCase()}`,
+    data: { href: data.href },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const href = typeof event.notification.data?.href === "string" && PUSH_PATH.test(event.notification.data.href)
+    ? event.notification.data.href : "/en/notifications";
+  const destination = new URL(href, self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+    const existing = windows.find((client) => new URL(client.url).origin === self.location.origin);
+    if (existing) { await existing.navigate(destination); return existing.focus(); }
+    return self.clients.openWindow(destination);
+  }));
+});
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;

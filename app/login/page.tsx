@@ -15,6 +15,13 @@ export default function LoginPage() {
   const params = useSearchParams();
   const t = useTranslations("Auth");
   const resetSucceeded = params.get("reset") === "success";
+  const socialFailure = params.get("social");
+  const socialCopy = locale === "fr"
+    ? { cancelled: "La connexion a été annulée. Réessayez ou continuez par e-mail.", failed: "La connexion n’a pas pu être finalisée en toute sécurité. Veuillez réessayer." }
+    : locale === "ar"
+      ? { cancelled: "تم إلغاء تسجيل الدخول. يمكنك المحاولة مجددًا أو المتابعة بالبريد الإلكتروني.", failed: "تعذّر إكمال تسجيل الدخول بأمان. يرجى المحاولة مجددًا." }
+      : { cancelled: "Authentication was cancelled. You can try again or continue with email.", failed: "Authentication could not be completed safely. Please try again." };
+  const socialMessage = socialFailure === "CANCELLED" ? socialCopy.cancelled : socialFailure ? socialCopy.failed : "";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,6 +58,7 @@ export default function LoginPage() {
         <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></div>
         <div className="formField"><div className="passwordLine"><label htmlFor="password">{t("password")}</label><a href={`${localizedHome(locale)}/forgot-password`}>{t("forgot")}</a></div><input id="password" name="password" type="password" autoComplete="current-password" minLength={10} required /></div>
         {resetSucceeded && <p className="authMessage isSuccess" role="status">{t("resetSuccess")}</p>}
+        {socialMessage && <p className="authMessage" role="alert">{socialMessage}</p>}
         {message && <p className="authMessage" role="alert">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading} aria-busy={loading}>{loading ? t("signingIn") : t("login")}</button>
       </form>

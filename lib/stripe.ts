@@ -188,16 +188,18 @@ export async function createStripeCheckoutSession(input: {
   platformFeeAmount?: number;
   allowedCountries?: string[];
   shipping?: { name: string; amount: number; currency: string; minDays: number; maxDays: number };
+  returnLocale?: string;
 }) {
   const origin = appUrl();
+  const returnPrefix = /^(?:en|fr|ar|ku|tr|de|es|it|nl|zh|fa|hi|pt|ru)$/.test(input.returnLocale ?? "") ? `/${input.returnLocale}` : "/en";
   const body = new URLSearchParams({
     mode: "payment",
     client_reference_id: input.orderId,
     customer_email: input.email,
     billing_address_collection: "required",
     "phone_number_collection[enabled]": "true",
-    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/checkout/cancel?order_id=${encodeURIComponent(input.orderId)}`,
+    success_url: `${origin}${returnPrefix}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}${returnPrefix}/checkout/cancel?order_id=${encodeURIComponent(input.orderId)}`,
     "metadata[orderId]": input.orderId,
     "payment_intent_data[metadata][orderId]": input.orderId,
   });

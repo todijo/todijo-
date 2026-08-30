@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete } from "@/lib/payments";
 import { readSession } from "@/lib/session";
 import { configuredStripeMode } from "@/lib/stripe";
+import { localeFromReferer } from "@/lib/auth-redirects";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   try {
     const body = await request.json() as { requestId?: string;shoppingCountry?:unknown;buyerCurrency?:unknown; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?:string|number|null; displayedCurrency?:string|null }> };
-    const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? [],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode()});
+    const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? [],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode(),returnLocale:localeFromReferer(request.headers.get("referer"))});
     return NextResponse.json(checkout);
   } catch (error) {
     const status = error instanceof CheckoutError ? error.status : 500;

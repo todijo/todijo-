@@ -15,7 +15,7 @@ export class CheckoutError extends Error {
 }
 
 type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?: string | number | null; displayedCurrency?: string | null };
-type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount;stripeMode?:StripeMode };
+type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount;stripeMode?:StripeMode;returnLocale?:string };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
 
 export function embeddedShippingQuote(lines:Array<{pricingSnapshot:DropshippingPriceSnapshot|null}>,currency:SupportedBuyerCurrency,destinationCountry:unknown){
@@ -171,7 +171,7 @@ export async function createCheckout(
     await persistCheckoutGroups(tx as unknown as CheckoutGroupPersistence,order!.id,plans);
   });
   await db.order.update({where:{id:order.id},data:{stripeConnectedAccountId:null,platformFeeAmount:null,sellerAmount:null,shippingPolicySnapshot:shipping.policies,...(buyerAddress?{recipientName:buyerAddress.recipientName,recipientPhone:buyerAddress.phone,shippingAddressLine1:buyerAddress.addressLine1,shippingAddressLine2:buyerAddress.addressLine2,shippingCity:buyerAddress.city,shippingPostalCode:buyerAddress.postalCode,shippingState:buyerAddress.state}:{})}});
-  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: shippingAmountMinor, currency: paymentCurrency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: line.unitAmountMinor, quantity: line.quantity, currency: paymentCurrency })) });
+  const session = await stripeCreate({ orderId: order.id, idempotencyKey: `checkout:${buyerId}:${requestId}`, email: buyer.email, returnLocale: pricingDependencies.returnLocale, allowedCountries: [shipping.destinationCountry], shipping: { name: shipping.method, amount: shippingAmountMinor, currency: paymentCurrency, minDays: shipping.estimatedMinDays, maxDays: shipping.estimatedMaxDays }, items: resolvedLines.map((line) => ({ name: [line.product.name, line.variant ? line.selectedOptions.map((value) => value.value).join(" / ") : line.selectedColor, line.variant ? undefined : line.selectedSize].filter(Boolean).join(" / "), unitAmount: line.unitAmountMinor, quantity: line.quantity, currency: paymentCurrency })) });
   await db.order.update({ where: { id: order.id }, data: { stripeCheckoutSessionId: session.id, stripeCheckoutUrl: session.url,checkoutExpiresAt:session.expiresAt??new Date(Date.now()+25*60*60*1000) } });
   return { orderId: order.id, sessionId: session.id, url: session.url, reused: false };
 }

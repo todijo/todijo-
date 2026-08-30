@@ -12,8 +12,9 @@ async function callback(request:Request,provider:string,values:URLSearchParams){
   const config=configuredSocialProvider(provider);if(!config)return NextResponse.json({error:"PROVIDER_NOT_CONFIGURED"},{status:503});
   const cookieStore=await cookies(),cookieName=`todijo_oauth_${config.provider}`,saved=cookieStore.get(cookieName)?.value,state=values.get("state")??"";
   cookieStore.delete(cookieName);const stateData=state===saved?readOauthState(saved,config.provider):null;
-  const failure=(code:string)=>NextResponse.redirect(new URL(`/login?social=${encodeURIComponent(code)}`,publicAppUrl()),303);
-  if(!stateData||values.get("error"))return failure("CANCELLED");
+  const failure=(code:string)=>{const locale=stateData?.locale??"en",url=new URL(`/${locale}/login`,publicAppUrl());url.searchParams.set("social",code);if(stateData?.next)url.searchParams.set("next",stateData.next);return NextResponse.redirect(url,303)};
+  if(!stateData)return failure("INVALID_STATE");
+  if(values.get("error"))return failure("CANCELLED");
   const code=values.get("code");if(!code)return failure("INVALID_CALLBACK");
   try{
     const profile=await exchangeSocialCode(config,code);if(!profile.accountId)return failure("INVALID_IDENTITY");
