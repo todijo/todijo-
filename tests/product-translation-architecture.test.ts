@@ -48,7 +48,7 @@ test("manual and supplier localization cannot be overwritten by generated propos
   assert.throws(()=>storeGeneratedTranslationProposal({sourceMetadata:manual,targetLocale:"fr",title:"Generated",description:"Generated",sourceFingerprint:"x",provider:"TEST",providerVersion:"v1",translatedAt:"2026-08-30T12:00:00.000Z"}),/TRANSLATION_AUTHORITATIVE_CONTENT_PROTECTED/);
 });
 
-test("buyer rendering has no provider path and Admin reports the provider-disabled state honestly",()=>{
+test("buyer rendering has no provider path and Admin exposes only the bounded translation center",()=>{
   for(const path of ["app/page.tsx","app/product/[id]/page.tsx","app/api/marketplace/products/route.ts"]){const source=readFileSync(path,"utf8");assert.doesNotMatch(source,/product-translation|TRANSLATION_API|translateText|generateTranslation/,path);}
-  const admin=readFileSync("app/adm-barewbar-182203/products/page.tsx","utf8");assert.match(admin,/Translation provider not configured/);assert.doesNotMatch(admin,/Generate missing translation|Retry failed/);
+  const admin=readFileSync("app/adm-barewbar-182203/products/page.tsx","utf8"),center=readFileSync("components/AdminTranslationCenter.tsx","utf8");assert.match(admin,/AdminTranslationCenter/);assert.match(center,/Select first 5/);assert.match(center,/Select first 20/);assert.doesNotMatch(center,/translate everything/i);
 });

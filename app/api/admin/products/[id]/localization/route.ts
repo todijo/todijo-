@@ -4,20 +4,22 @@ import type { Prisma } from "@prisma/client";
 import { isLocale } from "@/i18n/config";
 import { AdminAccessError, requireAdmin } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
-import { reviewGeneratedProductLocalization } from "@/lib/product-content";
+import { readProductContentMetadata, reviewGeneratedProductLocalization } from "@/lib/product-content";
 import { assertAdminMutationRequest, MutationOriginError } from "@/lib/request-security";
 import { readSession } from "@/lib/session";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     assertAdminMutationRequest(request);
-    await requireAdmin(prisma, await readSession());
+    const admin=await requireAdmin(prisma, await readSession());
     const { id }=await params,body=await request.json() as {locale?:unknown;approved?:unknown};
     if (typeof body.locale!=="string" || !isLocale(body.locale) || typeof body.approved!=="boolean") return NextResponse.json({error:"LOCALIZATION_REVIEW_INVALID"},{status:400});
+    const reviewedLocale=body.locale;
     const link=await prisma.supplierProductLink.findUnique({where:{productId:id},select:{sourceMetadata:true}});
     if (!link) return NextResponse.json({error:"SUPPLIER_LINK_NOT_FOUND"},{status:404});
+    const fingerprint=readProductContentMetadata(link.sourceMetadata)?.localized[reviewedLocale]?.translation?.sourceFingerprint;
     const sourceMetadata=reviewGeneratedProductLocalization(link.sourceMetadata,body.locale,body.approved) as Prisma.InputJsonValue;
-    await prisma.supplierProductLink.update({where:{productId:id},data:{sourceMetadata}});
+    await prisma.$transaction(async tx=>{await tx.supplierProductLink.update({where:{productId:id},data:{sourceMetadata}});if(fingerprint)await tx.catalogTranslationItem.updateMany({where:{productId:id,targetLocale:reviewedLocale,sourceFingerprint:fingerprint,status:"COMPLETED",approvalStatus:"PENDING"},data:{approvalStatus:body.approved?"APPROVED":"REJECTED",approvedById:admin.id,approvedAt:new Date()}});});
     revalidatePath("/");revalidatePath(`/product/${id}`);revalidatePath("/best-sellers");
     return NextResponse.json({ok:true,approved:body.approved});
   } catch (error) {

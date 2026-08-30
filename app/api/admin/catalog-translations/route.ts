@@ -1,0 +1,11 @@
+import { NextResponse } from "next/server";
+import { AdminAccessError, requireAdmin } from "@/lib/admin-access";
+import { catalogTranslationStatus } from "@/lib/catalog-translation-config";
+import { CatalogTranslationError, enqueueCatalogTranslationJob } from "@/lib/catalog-translation-jobs";
+import { prisma } from "@/lib/prisma";
+import { assertAdminMutationRequest, MutationOriginError } from "@/lib/request-security";
+import { readSession } from "@/lib/session";
+
+function failure(error:unknown){if(error instanceof AdminAccessError)return NextResponse.json({error:error.code},{status:error.status});if(error instanceof MutationOriginError)return NextResponse.json({error:error.message},{status:403});if(error instanceof CatalogTranslationError)return NextResponse.json({error:error.code},{status:error.status});return NextResponse.json({error:error instanceof Error?error.message:"TRANSLATION_JOB_FAILED"},{status:503});}
+export async function GET(){try{await requireAdmin(prisma,await readSession());const jobs=await prisma.catalogTranslationJob.findMany({orderBy:{createdAt:"desc"},take:30,select:{id:true,status:true,targetLocales:true,requestedItemCount:true,estimatedCharacters:true,createdAt:true,startedAt:true,completedAt:true,lastErrorCode:true,items:{select:{id:true,status:true,attemptCount:true,lastErrorCode:true,lastErrorMessage:true,product:{select:{name:true}}}}}});return NextResponse.json({ok:true,configuration:catalogTranslationStatus(),jobs:jobs.map(job=>({...job,estimatedCharacters:job.estimatedCharacters.toString(),counts:Object.fromEntries(Object.entries(job.items.reduce<Record<string,number>>((out,item)=>(out[item.status]=(out[item.status]??0)+1,out),{})))}))});}catch(error){return failure(error);}}
+export async function POST(request:Request){try{assertAdminMutationRequest(request);const admin=await requireAdmin(prisma,await readSession()),body=await request.json().catch(()=>({})) as Record<string,unknown>,job=await enqueueCatalogTranslationJob(prisma,{adminId:admin.id,productIds:body.productIds,targetLocale:body.targetLocale});return NextResponse.json({ok:true,job:{...job,estimatedCharacters:job.estimatedCharacters.toString()}},{status:201});}catch(error){return failure(error);}}
