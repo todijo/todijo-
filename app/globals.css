@@ -1255,13 +1255,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 /* Cold mobile launch branding. The server-rendered overlay owns the first paint, never application readiness or pointer input. */
 .todijoLaunchSplash{display:none}
 body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
-@media(max-width:860px){.todijoLaunchSplash{position:fixed;z-index:2000;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,#32108a 0,#16074c 42%,#090529 100%);display:grid;place-items:center;animation:todijo-splash-exit 2.75s cubic-bezier(.4,0,.2,1) both}}
+@media(max-width:860px){.todijoLaunchSplash{position:fixed;z-index:2000;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,#32108a 0,#16074c 42%,#090529 100%);display:grid;place-items:center;animation:todijo-splash-exit .65s cubic-bezier(.4,0,.2,1) both}}
 .todijoLaunchMark{width:min(82vw,380px);filter:drop-shadow(0 0 34px rgba(157,105,255,.42))}.todijoLaunchMark .umbrellaWord{font:900 26px/1 system-ui,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:.7px;letter-spacing:-1px;filter:drop-shadow(0 2px 1px rgba(33,8,74,.35)) brightness(1.08)}.todijoLaunchMark.isAnimated .umbrellaPanel{transform-box:fill-box;transform-origin:50% 0;animation:todijo-canopy-open 1.8s cubic-bezier(.16,.72,.22,1) both}.todijoLaunchMark.isAnimated .umbrellaPanelCenter{animation-delay:.04s}.todijoLaunchMark.isAnimated .umbrellaPanelLeft{transform-origin:100% 0;animation-delay:.16s}.todijoLaunchMark.isAnimated .umbrellaPanelRight{transform-origin:0 0;animation-delay:.28s}.todijoLaunchMark.isAnimated .umbrellaWord{animation:todijo-letter-reveal .72s 1.25s cubic-bezier(.2,.7,.2,1) both}.todijoLaunchMark.isAnimated .umbrellaShaft{animation:todijo-shaft-reveal .9s .55s ease both}
-.todijoLaunchSplash.isReducedMotion{animation:todijo-splash-exit .28s ease both}.todijoLaunchSplash.isReducedMotion .todijoLaunchMark{width:min(46vw,190px)}
+.todijoLaunchSplash.isReducedMotion{animation:todijo-splash-exit .12s ease both}.todijoLaunchSplash.isReducedMotion .todijoLaunchMark{width:min(46vw,190px)}
 @keyframes todijo-canopy-open{0%{opacity:.72;transform:scaleX(.025) scaleY(.92) rotate(.8deg)}42%{opacity:.94;transform:scaleX(.48) scaleY(.97)}76%{transform:scaleX(.92) scaleY(1.01)}100%{opacity:1;transform:scale(1) rotate(0)}}
 @keyframes todijo-letter-reveal{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @keyframes todijo-shaft-reveal{from{opacity:0;stroke-dasharray:1 190;stroke-dashoffset:190}to{opacity:1;stroke-dasharray:190 190;stroke-dashoffset:0}}
-@keyframes todijo-splash-exit{0%,91%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden}}
+@keyframes todijo-splash-exit{0%,62%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden}}
 
 .pricingRetry{display:flex;align-items:center;justify-content:space-between;gap:10px}.pricingRetry p{margin:0}.pricingRetry button{min-height:44px;padding:8px 12px;border:1px solid #cdb9e8;border-radius:10px;background:#fff;color:#5b21b6;font:800 12px/1.2 inherit;cursor:pointer}
 
@@ -1333,3 +1333,9 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 /* Phase 8.10 authenticated carrier-neutral tracking */
 .trackOrderShell{max-width:960px}.trackOrderPanel{display:grid;gap:1rem}.trackOrderPanel>h2 code{overflow-wrap:anywhere}.shipmentTrackingCard code{overflow-wrap:anywhere;word-break:break-word}.shipmentTrackingCard dl>div{min-width:0}.shipmentTrackingCard dd{min-width:0}
 @media(max-width:390px){.trackOrderShell{padding-inline:12px}.trackOrderPanel,.shipmentTrackingCard{min-width:0}.shipmentTrackingCard header{align-items:flex-start;gap:.5rem}.shipmentTrackingCard dd{flex-wrap:wrap}}
+
+/* Phase 9 PWA offline state */
+.offlinePage{min-height:100dvh;display:grid;place-items:center;padding:calc(24px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));background:radial-gradient(circle at top,#32108a,#16074c 46%,#090529);color:#fff}
+.offlineCard{width:min(100%,520px);padding:clamp(24px,7vw,42px);border:1px solid rgba(255,255,255,.18);border-radius:28px;background:rgba(18,7,57,.88);box-shadow:0 24px 70px rgba(0,0,0,.34);text-align:center}
+.offlineCard img{display:block;margin:0 auto 18px;border-radius:20px}.offlineCard p{margin:0 0 8px;color:#d8c9ff;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.offlineCard h1{margin:0;font-size:clamp(30px,8vw,48px)}.offlineCard>span{display:block;margin:16px auto 0;max-width:44ch;color:#eee8ff;line-height:1.7}
+.offlineActions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:26px}.offlineActions button,.offlineActions a{min-height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0 20px;border-radius:14px;font:inherit;font-weight:850;cursor:pointer}.offlineActions button{border:0;background:#fff;color:#3d1380}.offlineActions a{border:1px solid rgba(255,255,255,.4);color:#fff;text-decoration:none}

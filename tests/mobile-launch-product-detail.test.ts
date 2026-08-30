@@ -24,12 +24,12 @@ test("cold mobile splash is session-scoped, reduced-motion aware and bounded",()
   assert.match(splash,/matchMedia\("\(max-width: 860px\)"\)/);
   assert.match(splash,/sessionStorage\.getItem/);assert.match(splash,/sessionStorage\.setItem/);
   assert.match(splash,/prefers-reduced-motion: reduce/);
-  assert.match(splash,/useState\(true\)/);assert.match(splash,/reduced \? 280 : 2750/);assert.match(splash,/FALLBACK_MS = 2950/);
+  assert.match(splash,/useState\(true\)/);assert.match(splash,/reduced \? 120 : DISPLAY_MS/);assert.match(splash,/DISPLAY_MS = 650/);assert.match(splash,/FALLBACK_MS = 900/);
   assert.match(splash,/aria-hidden="true"/);assert.match(css,/\.todijoLaunchSplash\{[^}]*pointer-events:none/);
   const splashCss=css.slice(css.indexOf("/* Cold mobile launch branding"));
   assert.match(css,/html \{[^}]*background:#16074c/);assert.match(splashCss,/background:radial-gradient\([^}]*#32108a[^}]*#16074c[^}]*#090529/);
   assert.doesNotMatch(splashCss,/#0d1714|#063a2c|#07553e/);
-  assert.match(css,/\.todijoLaunchMark\{width:min\(82vw,380px\)/);assert.match(css,/todijo-canopy-open 1\.8s/);assert.match(css,/animation:todijo-splash-exit 2\.75s/);
+  assert.match(css,/\.todijoLaunchMark\{width:min\(82vw,380px\)/);assert.match(css,/todijo-canopy-open 1\.8s/);assert.match(css,/animation:todijo-splash-exit \.65s/);
 });
 
 test("umbrella identity, exact default title and install icons are wired",()=>{

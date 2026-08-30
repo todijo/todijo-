@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Todijo" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/todijo_violet</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/todijo_mark</item>
+        <item name="android:windowSplashScreenAnimationDuration">250</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowNavigationBarContrastEnforced">false</item>
+    </style>
+</resources>
