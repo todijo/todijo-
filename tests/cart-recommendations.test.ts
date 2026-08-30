@@ -53,7 +53,7 @@ test("Cart uses the shared product card, hides empty results, and leaves totals 
   assert.match(recommendations, /if \(!result\?\.products\.length\) return null/);
   assert.match(recommendations, /<MarketplaceProductCard/);
   assert.match(card, /categoryLabel\(product\.category/);
-  assert.match(card, /href=\{`\/\$\{locale\}\/product\/\$\{product\.id\}`\}/);
+  assert.match(card, /href=\{productPath\(locale,product\.id,product\.name\)\}/);
 });
 
 test("recommendations expose a matched skeleton and responsive non-overflow layout", async () => {

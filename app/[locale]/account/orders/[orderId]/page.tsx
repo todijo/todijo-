@@ -12,6 +12,7 @@ import OrderCommercialDocuments from "@/components/OrderCommercialDocuments";
 import ShipmentTrackingCard from "@/components/ShipmentTrackingCard";
 import {canonicalOrderShipments} from "@/lib/tracking";
 import {isLocale} from "@/i18n/config";
+import {trackingUi} from "@/i18n/tracking-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
               </ol>
             )}
             <section className="shipmentTrackingList" aria-label={t("fulfillment.tracking")}>{shipments.map(shipment=><ShipmentTrackingCard key={shipment.id} shipment={shipment} locale={trackingLocale}/>)}</section>
+            {shipments.some(shipment=>shipment.trackingNumber)&&<Link className="quickActionLink primary" href={`/${locale}/track-order?orderId=${encodeURIComponent(order.id)}`}>{trackingUi[trackingLocale].title}</Link>}
 
             {order.lifecycleEvents.length > 0 && <section className="buyerLifecycleTimeline" aria-label={t("lifecycle.title")}><h2>{t("lifecycle.title")}</h2><ol>{order.lifecycleEvents.map((event) => <li key={event.id}><i aria-hidden="true"/><div><strong>{lifecycleLabel(event.type)}</strong><time dateTime={event.createdAt.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(event.createdAt)}</time></div></li>)}</ol></section>}
             <h2>{t("products")}</h2>

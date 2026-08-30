@@ -76,6 +76,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
                   </div>
                   <footer>
                     <div><span>{t("total")}</span><strong>{money(Number(order.total), order.currency)}</strong></div>
+                    {shipment.trackingNumber&&<Link className="quickActionLink secondary" href={`/${locale}/track-order?orderId=${encodeURIComponent(order.id)}`}>{trackingText.title}</Link>}
                     <Link className="quickActionLink primary" href={`/${locale}/account/orders/${order.id}`}>{t("details")}</Link>
                   </footer>
                 </article>

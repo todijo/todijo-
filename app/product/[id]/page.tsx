@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ProductGallery from "./ProductGallery";
 import ProductDetailPrice from "./ProductDetailPrice";
@@ -18,9 +18,10 @@ import { buyerVisibleVariantWhere, minimumPurchasableVariantPrice, resolveProduc
 import { categoryLabel } from "@/lib/categories";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 import ProductReportButton from "@/components/ProductReportButton";
-import { concise, localizedAlternates, localizedPath } from "@/lib/seo";
+import { concise, localizedPath } from "@/lib/seo";
 import { type Locale } from "@/i18n/config";
-import { productStructuredData } from "@/lib/product-seo";
+import { productPath, productSlug, productStructuredData } from "@/lib/product-seo";
+import {locales} from "@/i18n/config";
 import {resolveDropshippingEligibility,usesEmbeddedDropshippingShipping} from "@/lib/suppliers/commerce-pricing";
 import { buyerVariantPresentation } from "@/lib/product-option-display";
 import ProductDescription from "@/components/ProductDescription";
@@ -33,7 +34,7 @@ import { requireAdmin } from "@/lib/admin-access";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 
 export const dynamic = "force-dynamic";
-type Props = { params: Promise<{ id: string }>; searchParams?:Promise<{adminPreview?:string}> };
+type Props = { params: Promise<{ id: string;slug?:string }>; searchParams?:Promise<{adminPreview?:string}> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
@@ -44,12 +45,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!product) return { title: metadataText("title"), robots: { index: false, follow: false } };
   const content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale});
   const description = concise(`${content.description} ${product.store.name}`);
-  const pathname = `product/${id}`;
+  const pathname = `product/${id}/${productSlug(content.title)}`;
   const canonical = localizedPath(locale, pathname);
+  const languages=Object.fromEntries(locales.map(item=>{const localized=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale:item});return[item,productPath(item,id,localized.title)];}));
   return {
     title: content.title,
     description,
-    alternates: localizedAlternates(locale, pathname),
+    alternates: {canonical,languages},
     openGraph: { type: "website", title: `${content.title} · Todijo`, description, url: canonical, images: product.images[0] ? [{ url: product.images[0], alt: content.title }] : undefined },
     twitter: { card: product.images[0] ? "summary_large_image" : "summary", title: `${content.title} · Todijo`, description, images: product.images[0] ? [product.images[0]] : undefined },
   };
@@ -61,7 +63,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"), getTranslations("SellerControl"),
     params, readSession(), getLocale(),
   ]);
-  const { id } = resolvedParams;
+  const { id,slug } = resolvedParams;
   const previewRequested=(await searchParams)?.adminPreview==="1";
   if(previewRequested){try{await requireAdmin(prisma,session);}catch{notFound();}}
   const publicAccess = previewRequested?{}:publicProductAccessWhere();
@@ -85,6 +87,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
   });
   if (!product) notFound();
   const buyerContent=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  const canonicalSlug=productSlug(buyerContent.title);
+  if(!previewRequested&&slug!==canonicalSlug)permanentRedirect(productPath(locale,id,buyerContent.title));
   product.name=buyerContent.title;product.description=buyerContent.description;
   const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true,supplierLink:{select:{sourceMetadata:true}}} });
   for(const item of related)item.name=resolveBuyerProductContent({name:item.name,description:"",sourceMetadata:item.supplierLink?.sourceMetadata,locale}).title;

@@ -16,6 +16,7 @@ import { categoryLabel } from "@/lib/categories";
 import BuyerProductPrice from "@/components/BuyerProductPrice";
 import MarketplaceFilterDock, { type MarketplaceFacets } from "@/components/MarketplaceFilterDock";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
+import {productPath} from "@/lib/product-seo";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -140,7 +141,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
           </div>
           <div className="discoveryHeroVisual" aria-label={h("marketplaceVisual")}>
             {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
-              {featuredProducts.map((product, index) => <a href={`/${activeLocale}/product/${product.id}`} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
+              {featuredProducts.map((product, index) => <a href={productPath(activeLocale,product.id,product.name)} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
                 <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
                 <span><strong>{product.name}</strong><b><BuyerProductPrice productId={product.id} sourcePrice={Number(product.price)} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice}/></b></span>
               </a>)}
