@@ -15,6 +15,14 @@ test("CJ product normalization preserves supplier and variant identity with boun
   assert.equal(snapshot.media.filter((item)=>item.type==="IMAGE").length,30); assert.equal(snapshot.media.filter((item)=>item.type==="VIDEO").length,1);
 });
 
+test("CJ normalization preserves documented English and Chinese supplier content without inventing translations",()=>{
+  const snapshot=normalizeCjProduct({pid:"cj-localized",productNameEn:"Portable bottle",productName:'["便携水瓶","水瓶"]',description:"Supplier description",saleStatus:"3"},{list:[]},{data:{variantInventories:[]}});
+  assert.equal(snapshot.title,"Portable bottle");
+  assert.deepEqual(snapshot.rawMetadata.localizedContent,{zh:{title:"便携水瓶",source:"SUPPLIER"}});
+  assert.deepEqual(snapshot.rawMetadata.cjSourceContent,{productName:'["便携水瓶","水瓶"]',productNameEn:"Portable bottle",description:"Supplier description"});
+  assert.equal("fr" in (snapshot.rawMetadata.localizedContent as Record<string,unknown>),false);
+});
+
 test("CJ image normalization filters, deduplicates, preserves order, and caps after filtering",()=>{
   const tail=Array.from({length:35},(_,index)=>`https://example.com/${index}.jpg`);
   const images=normalizeCjProductImages({bigImage:" https://example.com/cover.jpg ",productImageSet:["", "invalid", "https://example.com/cover.jpg", ...tail]});

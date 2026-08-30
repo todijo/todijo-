@@ -27,6 +27,16 @@ function reviewText(value:unknown){return text(value).replace(/[\u0000-\u0008\u0
 
 function firstText(row:Record<string,unknown>,keys:string[]){for(const key of keys){const value=text(row[key]);if(value)return value;}return "";}
 
+function cjChineseTitle(value: unknown) {
+  const raw=text(value);
+  if (!raw) return "";
+  try {
+    const parsed=JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return parsed.map(text).find(Boolean)??"";
+  } catch { /* CJ also returns a plain Chinese title for some products. */ }
+  return raw;
+}
+
 export function normalizeCjCategoryHierarchy(productValue:unknown):SupplierCategoryHierarchy{
   const product=object(productValue);
   const rawCategoryName=firstText(product,["categoryName","categoryPath","categoryFullName"]);
@@ -80,9 +90,11 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
   const variantCosts = variants.map((variant) => variant.cost).filter((cost): cost is number => cost != null);
   const summaryCost = productCost ?? (variantCosts.length ? Math.min(...variantCosts) : null);
   const categoryReference=categoryHierarchy.thirdCategoryId??categoryHierarchy.categoryId;
+  const englishTitle=text(product.productNameEn ?? product.productName),chineseTitle=cjChineseTitle(product.productName);
+  const localizedContent=chineseTitle&&chineseTitle!==englishTitle?{zh:{title:chineseTitle,source:"SUPPLIER" as const}}:{};
   return {
     provider:"CJ", supplierProductId:productId, sku:text(product.productSku) || null,
-    title:text(product.productNameEn ?? product.productName) || "Imported CJ product",
+    title:englishTitle || "Imported CJ product",
     description:text(product.description) || "Supplier product pending seller review.",
     categoryReference,
     categoryHierarchy,
@@ -91,7 +103,7 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     available:text(product.saleStatus) !== "0" && (variants.length ? variants.some((variant) => variant.available) : stock > 0),
     weightGrams:number(product.productWeight), variants,
     media:[...imageUrls.map((url) => ({type:"IMAGE" as const,url})), ...(videoUrl ? [{type:"VIDEO" as const,url:videoUrl}] : [])],
-    rawMetadata:{...categoryHierarchy,productType:product.productType??null,deliveryCycle:product.deliveryCycle??null,cjOptionNormalization:{version:1,status:semantic?"SEMANTIC":"AMBIGUOUS",reason:semantic?null:"AUTHORITATIVE_DIMENSIONS_OR_VARIANT_KEYS_INSUFFICIENT",source:semantic?.source??null,dimensions:semantic?.dimensions??null,productKeyEn:typeof product.productKeyEn==="string"?product.productKeyEn.slice(0,500):null,productKeySet:list(product.productKeySet).slice(0,20).map((value)=>{if(typeof value==="string")return value.slice(0,100);const row=object(value);return{keyEn:text(row.keyEn).slice(0,100)||null,nameEn:text(row.nameEn).slice(0,100)||null,key:text(row.key).slice(0,100)||null,name:text(row.name).slice(0,100)||null};}),variants:parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,variantKey:variant.variantKey,variantName:variant.variantName,optionValues:semantic?.variants.find((item)=>item.supplierVariantId===variant.supplierVariantId)?.optionValues??null,imageUrl:variant.imageUrl})).slice(0,200)}},
+    rawMetadata:{...categoryHierarchy,localizedContent,cjSourceContent:{productName:product.productName??null,productNameEn:product.productNameEn??null,description:product.description??null},productType:product.productType??null,deliveryCycle:product.deliveryCycle??null,cjOptionNormalization:{version:1,status:semantic?"SEMANTIC":"AMBIGUOUS",reason:semantic?null:"AUTHORITATIVE_DIMENSIONS_OR_VARIANT_KEYS_INSUFFICIENT",source:semantic?.source??null,dimensions:semantic?.dimensions??null,productKeyEn:typeof product.productKeyEn==="string"?product.productKeyEn.slice(0,500):null,productKeySet:list(product.productKeySet).slice(0,20).map((value)=>{if(typeof value==="string")return value.slice(0,100);const row=object(value);return{keyEn:text(row.keyEn).slice(0,100)||null,nameEn:text(row.nameEn).slice(0,100)||null,key:text(row.key).slice(0,100)||null,name:text(row.name).slice(0,100)||null};}),variants:parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,variantKey:variant.variantKey,variantName:variant.variantName,optionValues:semantic?.variants.find((item)=>item.supplierVariantId===variant.supplierVariantId)?.optionValues??null,imageUrl:variant.imageUrl})).slice(0,200)}},
   };
 }
 
