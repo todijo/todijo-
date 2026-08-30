@@ -5,6 +5,8 @@ import { LockKeyhole, Mail, MapPin } from "lucide-react";
 import LanguageSwitcher from "./LanguageSwitcher";
 import TodijoLogo from "./TodijoLogo";
 import { OPEN_COOKIE_PREFERENCES_EVENT } from "@/lib/privacy-consent";
+import {trackingUi} from "@/i18n/tracking-ui";
+import {isLocale} from "@/i18n/config";
 
 type FooterLink = { label: string; href: string };
 
@@ -23,6 +25,7 @@ export default function MarketplaceFooter() {
     ] },
     { title: t("helpTitle"), links: [
       { label: t("helpCenter"), href: info("help") },
+      { label: trackingUi[isLocale(locale)?locale:"en"].title, href: `/${locale}/track-order` },
       { label: t("howToBuy"), href: info("how-to-buy") },
       { label: t("howToSell"), href: info("how-to-sell") },
       { label: t("delivery"), href: info("delivery") },

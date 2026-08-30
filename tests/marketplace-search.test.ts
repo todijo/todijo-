@@ -40,7 +40,7 @@ test("search UI uses one locale-safe URL builder, accessible click facets, and l
   assert.match(dock, /name="sort-dock"/);
   assert.match(dock, /name="condition-dock"/);
   assert.match(dock, /name="rating-dock"/);
-  assert.match(productCard, /href=\{`\/\$\{locale\}\/product\/\$\{product\.id\}`\}/);
+  assert.match(productCard, /href=\{productPath\(locale,product\.id,product\.name\)\}/);
   assert.match(mobile, /new URLSearchParams\(window\.location\.search\)\.get\("q"\)/);
   assert.match(server, /const qualifyingOrderStatuses: OrderStatus\[\] = \["PAID", "PROCESSING", "SHIPPED", "DELIVERED"\]/);
   assert.match(server, /having: \{ rating: \{ _avg: \{ gte: ratingThreshold \} \} \}/);
