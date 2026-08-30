@@ -32,9 +32,16 @@ test("raw supplier content is preserved separately from normalized buyer content
 test("requested locale wins and missing locale falls back deterministically",()=>{
   const imported=createImportedProductContent({title:"Portable Pet Bottle",description:"Supplier description",rawMetadata:{localizedContent:{fr:{title:"Gourde portable pour animaux",description:"Description française"},ar:{title:"قارورة ماء للحيوانات"}}}});
   const french=resolveBuyerProductContent({name:imported.title,description:imported.description,sourceMetadata:{productContent:imported.metadata},locale:"fr"});
-  assert.equal(french.title,"Gourde portable pour animaux");assert.equal(french.description,"Description française");assert.equal(french.localeStatus,"LOCALIZED");
+  assert.equal(french.title,"Gourde portable pour animaux");assert.equal(french.description,"Description française");assert.equal(french.localeStatus,"LOCALIZED_SUPPLIER");
   const german=resolveBuyerProductContent({name:imported.title,description:imported.description,sourceMetadata:{productContent:imported.metadata},locale:"de"});
   assert.equal(german.title,imported.title);assert.equal(german.description,imported.description);assert.equal(german.localeStatus,"NORMALIZED_DEFAULT");
+});
+
+test("generated locale content requires approval while supplier localization is authoritative",()=>{
+  const generated=createImportedProductContent({title:"Bottle",description:"Default",rawMetadata:{localizedContent:{fr:{title:"Bouteille proposée",generated:true,source:"GENERATED"}}}});
+  assert.equal(resolveBuyerProductContent({name:generated.title,description:generated.description,sourceMetadata:{productContent:generated.metadata},locale:"fr"}).title,"Bottle");
+  const supplier=createImportedProductContent({title:"Bottle",description:"Default",rawMetadata:{localizedContent:{de:{title:"Flasche",source:"SUPPLIER"}}}});
+  assert.equal(resolveBuyerProductContent({name:supplier.title,description:supplier.description,sourceMetadata:{productContent:supplier.metadata},locale:"de-DE"}).title,"Flasche");
 });
 
 test("existing supplier listings receive a proposal without mutation",()=>{

@@ -72,7 +72,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     const stored=await mediaProvider.copyRemote(source);copied.push(stored);copiedSources.push(source);if(source.type==="IMAGE")imageBySource.set(source.url,stored.url);
   }
   const images = copied.filter((item) => item.type === "IMAGE").map((item) => item.url);
-  const content=createImportedProductContent({title:snapshot.title,description:snapshot.description,rawMetadata:snapshot.rawMetadata});
+  const content=createImportedProductContent({title:snapshot.title,description:snapshot.description,rawMetadata:snapshot.rawMetadata,sourceLocale:"en"});
   const slug = await uniqueSlug(db,input.storeId,content.title);
   const product=await db.$transaction(async (tx) => {
     const product = await tx.product.create({data:{

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createImportedProductContent, proposedExistingSupplierContent, resolveBuyerProductContent } from "../lib/product-content";
+import { createImportedProductContent, proposedExistingSupplierContent, resolveBuyerProductContent, reviewGeneratedProductLocalization } from "../lib/product-content";
 import { localizedSupplierContentSearch } from "../lib/product-content-search";
 
 const sourceMetadata = {
@@ -10,7 +10,7 @@ const sourceMetadata = {
     source: { title: "HOT SALE Original supplier bottle", description: "Original supplier description", locale: "en" },
     normalized: { title: "Portable pet bottle", description: "Normalized description", locale: "en", generated: true },
     localized: {
-      fr: { title: "Gourde portable", description: "Description française", generated: true, source: "GENERATED" },
+      fr: { title: "Gourde portable", description: "Description française", generated: true, approved: true, source: "GENERATED" },
       ar: { title: "قارورة محمولة", description: "وصف عربي", approved: true, source: "MANUAL" },
       ku: { title: "بوتڵی هەڵگرتن", description: "وەسفی کوردی", generated: false },
     },
@@ -30,8 +30,17 @@ test("manual default and locale-specific content always outrank generated conten
   const resolvedDefault = resolveBuyerProductContent({ name: "Seller-approved default", description: "Seller-approved description", sourceMetadata: manualDefault, locale: "fr" });
   assert.equal(resolvedDefault.title, "Seller-approved default");
   assert.equal(resolvedDefault.localeStatus, "MANUAL_DEFAULT");
+  assert.equal(resolveBuyerProductContent({ name: "Seller-approved default", description: "Seller-approved description", sourceMetadata: manualDefault, locale: "ar" }).title, "قارورة محمولة");
   const resolvedArabic = resolveBuyerProductContent({ name: "Seller-approved default", description: "Seller-approved description", sourceMetadata, locale: "ar" });
   assert.equal(resolvedArabic.title, "قارورة محمولة");
+});
+
+test("unapproved generated proposals stay private until explicit Admin approval", () => {
+  const pending=structuredClone(sourceMetadata);pending.productContent.localized.fr.approved=false;
+  assert.equal(resolveBuyerProductContent({name:"Portable pet bottle",description:"Normalized description",sourceMetadata:pending,locale:"fr"}).title,"Portable pet bottle");
+  const reviewed=reviewGeneratedProductLocalization(pending,"fr-FR",true);
+  assert.equal(resolveBuyerProductContent({name:"Portable pet bottle",description:"Normalized description",sourceMetadata:reviewed,locale:"fr"}).title,"Gourde portable");
+  assert.equal((pending.productContent.localized.fr as {approved:boolean}).approved,false);
 });
 
 test("imports preserve raw facts, normalize supplier-localized noise and never expose a blank title", () => {
