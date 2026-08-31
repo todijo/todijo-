@@ -11,7 +11,7 @@ import { localizedPath, navigationBackFallback, pathWithoutLocale } from "@/lib/
 
 export default function BuyerMobileHeader({ accountName: initialAccountName }: { accountName?: string | null }) {
   const locale = useLocale();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const router = useRouter();
   const common = useTranslations("Common");
   const [fetchedAccountName, setFetchedAccountName] = useState<string | null>(null);

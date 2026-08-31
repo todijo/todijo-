@@ -14,8 +14,8 @@ export default function LoginPage() {
   const locale = useLocale();
   const params = useSearchParams();
   const t = useTranslations("Auth");
-  const resetSucceeded = params.get("reset") === "success";
-  const socialFailure = params.get("social");
+  const resetSucceeded = params?.get("reset") === "success";
+  const socialFailure = params?.get("social");
   const socialCopy = locale === "fr"
     ? { cancelled: "La connexion a été annulée. Réessayez ou continuez par e-mail.", failed: "La connexion n’a pas pu être finalisée en toute sécurité. Veuillez réessayer." }
     : locale === "ar"
@@ -36,7 +36,7 @@ export default function LoginPage() {
       });
       const data: { error?: string; code?: string; role?: "CUSTOMER" | "SELLER" | "ADMIN" } = await response.json().catch(() => ({}));
       if (!response.ok) return setMessage(data.code === "ACCOUNT_UNAVAILABLE" ? t("accountUnavailable") : data.error ?? t("error"));
-      window.location.assign(postLoginDestination(data.role, params.get("next"), locale as Locale));
+      window.location.assign(postLoginDestination(data.role, params?.get("next") ?? null, locale as Locale));
     } catch {
       setMessage(t("error"));
     } finally {

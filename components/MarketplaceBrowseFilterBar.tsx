@@ -10,7 +10,7 @@ const EMPTY_FACETS = { countries: [], colors: [], sizes: [], seasons: [] };
 
 export default function MarketplaceBrowseFilterBar() {
   const locale = useLocale();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const router = useRouter();
   const t = useTranslations("Marketplace");
   const h = useTranslations("HomeHeader");

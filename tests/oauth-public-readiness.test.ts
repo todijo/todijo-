@@ -23,7 +23,7 @@ test("social identity cannot infer roles or unsafe duplicate linking", () => {
 
 test("all social providers preserve localized validated login destinations",()=>{
   const buttons=source("components/SocialLoginButtons.tsx"),start=source("app/api/auth/social/[provider]/start/route.ts"),callback=source("app/api/auth/social/[provider]/callback/route.ts"),server=source("lib/social-auth-server.ts");
-  assert.match(buttons,/URLSearchParams\(\{locale\}\)/);assert.match(buttons,/params\.get\("next"\)/);
+  assert.match(buttons,/URLSearchParams\(\{locale\}\)/);assert.match(buttons,/params\?\.get\("next"\)/);
   assert.match(start,/createOauthState\(config\.provider,requestUrl\.searchParams\.get\("next"\),locale\)/);
   assert.match(server,/next:safeLoginDestination\(next,locale\)/);assert.match(server,/locale/);
   assert.match(callback,/safeLoginDestination\(stateData\.next,stateData\.locale\)/);

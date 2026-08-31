@@ -14,7 +14,7 @@ import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navi
 function LegacySiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeName?: string; storeSlug?: string; buyerMobile?: boolean }) {
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const router = useRouter();
   const t = useTranslations("Common");
   const ux = useTranslations("Ux");
@@ -67,7 +67,7 @@ function LegacySiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeN
 }
 
 export default function SiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeName?: string; storeSlug?: string; buyerMobile?: boolean }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const path = pathWithoutLocale(pathname);
   if (path.startsWith("/seller") || path.startsWith("/adm-barewbar-182203")) return <LegacySiteHeader storeName={storeName} storeSlug={storeSlug} buyerMobile={buyerMobile}/>;
   if (path.startsWith("/info/")) return <MarketplaceHeader showCategoryNav showFilterDock={false}/>;
