@@ -11,7 +11,7 @@ export default function VerifyEmailPage() {
   const params = useSearchParams();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const status = params.get("status");
+  const status = params?.get("status");
   const verified = status === "success";
   const resultKey = status === "success" ? "verificationSuccessResult" : status === "expired" ? "verificationExpiredResult" : status === "already-used" ? "verificationUsedResult" : "verificationInvalidResult";
 

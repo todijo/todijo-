@@ -15,7 +15,7 @@ function readIds(key: string) {
 }
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const [ids, setIds] = useState<string[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
 

@@ -67,7 +67,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const storageKeyRef = useRef<string | null>(null);
   const itemsRef=useRef(items);itemsRef.current=items;
   const ordinaryCurrencyRef=useRef<string|null>(null);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const clearCart = useCallback(() => setItems([]), []);
 
   useEffect(() => {

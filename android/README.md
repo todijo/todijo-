@@ -1,4 +1,4 @@
-# Todijo Android TWA foundation
+# Todijo Android TWA release project
 
 This Stage 1 project is a thin Trusted Web Activity. It contains no marketplace,
 pricing, payment, or authentication logic.
@@ -19,12 +19,14 @@ deliberately absent and remain in browser UI.
 The deployed public/.well-known/assetlinks.json intentionally contains an empty
 array. An unconfigured build therefore falls back visibly to a Custom Tab.
 
-Before release:
+Before an Internal Testing release:
 
 1. Enroll in Play App Signing.
 2. Copy the App signing key certificate SHA-256 fingerprint from Play Console.
-3. Replace the placeholder in android/assetlinks.template.json.
-4. Publish the completed JSON at the well-known assetlinks URL.
+3. Copy `android/assetlinks.template.json`, replacing the placeholder only with
+   that Play App Signing fingerprint (not the upload or debug certificate).
+4. Publish the completed JSON at the well-known assetlinks URL. Never commit a
+   guessed or temporary fingerprint.
 5. Confirm HTTP 200, JSON content type, no redirect, exact package and fingerprint.
 6. Install the Play-signed build and run the commands below.
 
@@ -40,9 +42,20 @@ address bar or failed verification blocks release.
 ## Build prerequisites
 
 Install JDK 17, Android SDK Platform 36, Build Tools 36.0.0, and Gradle 9.1.0.
-From android run: gradle :app:assembleDebug
+Provide all four release-only properties through a private Gradle user property
+file or environment variables:
 
-No signing key is included or generated.
+- `TODIJO_UPLOAD_STORE_FILE`
+- `TODIJO_UPLOAD_STORE_PASSWORD`
+- `TODIJO_UPLOAD_KEY_ALIAS`
+- `TODIJO_UPLOAD_KEY_PASSWORD`
+
+From `android`, run `gradle :app:bundleRelease`. The task fails closed when any
+signing value is absent. The expected bundle is
+`android/app/build/outputs/bundle/release/app-release.aab`.
+
+No signing key is included or generated. See
+`docs/phase9-stage7-google-play-release.md` for the complete owner runbook.
 
 ## Android 16 QA
 

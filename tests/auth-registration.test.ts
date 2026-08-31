@@ -60,7 +60,7 @@ test("login and registration entry points send buyer and seller sessions to loca
   const registerForm = readFileSync("app/register/RegisterForm.tsx", "utf8");
   const registerPage = readFileSync("app/register/page.tsx", "utf8");
 
-  assert.match(loginPage, /postLoginDestination\(data\.role, params\.get\("next"\), locale as Locale\)/);
+  assert.match(loginPage, /postLoginDestination\(data\.role, params\?\.get\("next"\) \?\? null, locale as Locale\)/);
   assert.match(loginLayout, /redirect\(localizedHome\(await getLocale\(\)\)\)/);
   assert.match(registerForm, /router\.push\(localizedHome\(locale\)\)/);
   assert.match(registerPage, /redirect\(localizedHome\(await getLocale\(\)\)\)/);

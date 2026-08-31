@@ -16,7 +16,7 @@ import Image from "next/image";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
   const locale = useLocale();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const common = useTranslations("Common");
   const header = useTranslations("HomeHeader");
   const product = useTranslations("Product");

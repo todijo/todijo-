@@ -7,3 +7,6 @@ test-results/
 .env
 .env.local
 *.tsbuildinfo
+android/local.properties
+*.jks
+*.keystore

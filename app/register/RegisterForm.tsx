@@ -25,7 +25,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   const footer = useTranslations("HomeFooter");
 
   useEffect(() => {
-    if (params.get("role") === "seller") setRole("seller");
+    if (params?.get("role") === "seller") setRole("seller");
   }, [params]);
 
   const resetVerification = useCallback((error: string) => {
