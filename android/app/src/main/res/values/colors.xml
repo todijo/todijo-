@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="todijo_violet">#16074C</color>
-    <color name="todijo_violet_dark">#090529</color>
-    <color name="todijo_cyan">#22C8DF</color>
+    <color name="todijo_violet">#5B21B6</color>
+    <color name="todijo_violet_dark">#100331</color>
+    <color name="todijo_cyan">#B967FF</color>
     <color name="white">#FFFFFF</color>
 </resources>

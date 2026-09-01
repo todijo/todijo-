@@ -17,6 +17,7 @@ import BuyerProductPrice from "@/components/BuyerProductPrice";
 import MarketplaceFilterDock, { type MarketplaceFacets } from "@/components/MarketplaceFilterDock";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import {productPath} from "@/lib/product-seo";
+import PremiumHeroSlider from "@/components/PremiumHeroSlider";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -130,8 +131,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
       />
       <div id="categories" className="marketCategoryStickyBoundary"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters"/></div>
 
-      <section className="discoveryHero">
-        <div className="container discoveryHeroGrid">
+      <section className="discoveryHero"><div className="container">
+        <PremiumHeroSlider previous={t.previous} next={t.next} productCollage={featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>{featuredProducts.slice(0,3).map((product, index) => <a href={productPath(activeLocale,product.id,product.name)} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}><Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/><span><strong>{product.name}</strong><b><BuyerProductPrice productId={product.id} sourcePrice={Number(product.price)} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice}/></b></span></a>)}</div> : <div className="heroCategoryHighlights"><div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>{featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><SemanticCategoryIcon category={category} size={18}/>{displayCategory(category)}</button>)}</div>}>
           <div className="discoveryHeroContent">
             <span className="badge"><Sparkles size={15} aria-hidden="true"/>{h("heroEyebrow")}</span>
             <h1>{h("heroTitle")}</h1>
@@ -139,21 +140,10 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
             <div className="discoveryHeroActions"><a className="discoveryHeroCta" href="#products">{h("exploreProducts")}<ArrowRight size={18} aria-hidden="true"/></a><a className="discoveryHeroCta discoveryHeroSellerCta" href={`/${activeLocale}/sell`}>{h("sellerCta")}</a></div>
             <div className="discoveryHeroSignals" aria-label={d("trustTitle")}><span><ShieldCheck size={16} aria-hidden="true"/>{d("secureTitle")}</span><span><BadgeCheck size={16} aria-hidden="true"/>{d("independentTitle")}</span></div>
           </div>
-          <div className="discoveryHeroVisual" aria-label={h("marketplaceVisual")}>
-            {featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>
-              {featuredProducts.map((product, index) => <a href={productPath(activeLocale,product.id,product.name)} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}>
-                <Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/>
-                <span><strong>{product.name}</strong><b><BuyerProductPrice productId={product.id} sourcePrice={Number(product.price)} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice}/></b></span>
-              </a>)}
-            </div> : featuredCategories.length > 0 ? <div className="heroCategoryHighlights">
-              <div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>
-              {featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><SemanticCategoryIcon category={category} size={18}/>{displayCategory(category)}</button>)}
-            </div> : <div className="heroMarketplaceFallback"><Store size={54} aria-hidden="true"/><strong>Todijo Marketplace</strong><span>{h("marketplaceVisual")}</span></div>}
-          </div>
-        </div>
-      </section>
+        </PremiumHeroSlider>
+      </div></section>
 
-      <section className="container todijoTrust todijoTrustPrimary" aria-labelledby="todijo-trust-title"><div className="todijoTrustGrid"><article><span className="trustIcon secure"><LockKeyhole/></span><div><h2 id="todijo-trust-title">{d("secureTitle")}</h2><p>{d("secureText")}</p></div></article><article><span className="trustIcon delivery"><Truck/></span><div><h2>{d("deliveryTitle")}</h2><p>{d("deliveryText")}</p></div></article><article><span className="trustIcon support"><Headphones/></span><div><h2>{d("messagesTitle")}</h2><p>{d("messagesText")}</p></div></article><article><span className="trustIcon marketplace"><Store/></span><div><h2>{d("independentTitle")}</h2><p>{d("independentText")}</p></div></article></div></section>
+      <section className="container todijoTrust todijoTrustPrimary" aria-labelledby="todijo-trust-title"><div className="todijoTrustGrid">{[["payment","secure",LockKeyhole,d("secureTitle"),d("secureText")],["delivery","delivery",Truck,d("deliveryTitle"),d("deliveryText")],["messages","support",Headphones,d("messagesTitle"),d("messagesText")],["sellers","marketplace",Store,d("independentTitle"),d("independentText")]].map(([image,kind,Icon,title,text],index)=><article key={String(image)}><Image className="trustArtwork" src={`/images/homepage/benefit-${image}.webp`} alt="" fill sizes="(max-width: 860px) 82vw, 25vw"/><span className={`trustIcon ${kind}`}><Icon/></span><div><h2 id={index===0?"todijo-trust-title":undefined}>{String(title)}</h2><p>{String(text)}</p></div></article>)}</div></section>
 
 
       {categories.length > 0 && <section className="container categoryShowcase" aria-labelledby="category-showcase-title">
