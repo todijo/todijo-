@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Grid2X2, Heart, Home, Menu, MessageCircle, Package, Search, ShoppingCart, Store, UserRound, X } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Grid2X2, Heart, Home, Menu, MessageCircle, Package, Search, ShoppingCart, Store, UserRound, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -21,6 +21,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const header = useTranslations("HomeHeader");
   const product = useTranslations("Product");
   const ux = useTranslations("Ux");
+  const dashboard = useTranslations("DashboardPremium");
   const footer = useTranslations("HomeFooter");
   const categoryTitle = useTranslations("CategoryNavigation");
   const { totalItems } = useCart();
@@ -73,6 +74,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const messagesHref = localizedPath(locale, "/messages");
   const cartHref = localizedPath(locale, "/cart");
   const favoritesHref = localizedPath(locale, "/favorites");
+  const notificationsHref = localizedPath(locale, "/notifications");
   const sellerHref = `${localizedPath(locale, "/register")}?role=seller`;
   const activeCategory = DESKTOP_CATEGORY_TAXONOMY.find((category) => category.id === activeCategoryId) ?? DESKTOP_CATEGORY_TAXONOMY[0];
 
@@ -96,6 +98,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
         <a href={ordersHref} onClick={closeDrawer} className={isNavigationActive(pathname, ordersHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, ordersHref, true) ? "page" : undefined}><Package size={20} aria-hidden="true"/>{header("orders")}</a>
         <a href={messagesHref} onClick={closeDrawer} className={isNavigationActive(pathname, messagesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, messagesHref, true) ? "page" : undefined}><MessageCircle size={20} aria-hidden="true"/>{common("messages")}</a>
         {accountName ? <a href={favoritesHref} onClick={closeDrawer} className={isNavigationActive(pathname, favoritesHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, favoritesHref, true) ? "page" : undefined}><Heart size={20} aria-hidden="true"/>{ux("favoritesNav")}</a> : null}
+        {accountName ? <a href={notificationsHref} onClick={closeDrawer} className={isNavigationActive(pathname, notificationsHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, notificationsHref, true) ? "page" : undefined}><Bell size={20} aria-hidden="true"/>{dashboard("notifications")}</a> : null}
         <a href={accountHref} onClick={closeDrawer} className={isNavigationActive(pathname, accountHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, accountHref, true) ? "page" : undefined}><UserRound size={20} aria-hidden="true"/>{common("account")}</a>
         <a href={sellerHref} onClick={closeDrawer}><Store size={20} aria-hidden="true"/>{common("sell")}</a>
         <div className="buyerMobileInformationLinks">

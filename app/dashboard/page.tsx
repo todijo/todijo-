@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Boxes, CreditCard, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
+import { Bell, Boxes, CreditCard, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
 import { DashboardEmptyState, DashboardHeader, DashboardQuickAction, DashboardSection, DashboardSidebar, DashboardStatCard, DashboardStatusBadge, type DashboardNavItem } from "@/components/DashboardUI";
 import StripeConnectSection from "@/components/StripeConnectSection";
 import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer-orders";
@@ -82,6 +82,7 @@ export default async function DashboardPage() {
     { label: p("nav.dashboard"), href: paths.dashboard, icon: Home, active: true },
     { label: p("nav.orders"), href: buyerOrdersHref, icon: ReceiptText },
     { label: p("nav.messages"), href: paths.messages, icon: MessageCircle, badge: unreadMessages },
+    { label: p("notifications"), href: `/${locale}/notifications`, icon: Bell, badge: notificationCount },
     { label: common("account"), href: `/${locale}/account`, icon: Settings },
     { label: common("cart"), href: paths.cart, icon: ShoppingCart },
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
