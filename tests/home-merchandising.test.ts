@@ -7,7 +7,7 @@ const page = readFileSync("app/page.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 
 test("home rails use linked headings with a localized view-all action", () => {
-  assert.match(home, /titleHref=\{`\/\$\{activeLocale\}#products`\}/);
+  assert.match(home, /titleHref=\{`\/\$\{activeLocale\}\?sort=newest#products`\}/);
   assert.match(home, /titleHref=\{`\/\$\{activeLocale\}\/best-sellers`\}/);
   assert.match(home, /<ProductRail[^>]+viewAll=\{h\("viewAll"\)\}/);
 });

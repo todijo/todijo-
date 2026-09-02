@@ -150,7 +150,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       orderBy: { category: "asc" },
       select: { category: true },
     }),
-    prisma.product.findMany({ where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 8, select: productSelect }),
+    prisma.product.findMany({ where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 10, select: productSelect }),
     prisma.orderItem.groupBy({
       by: ["productId"],
       where: { order: { status: { in: qualifyingOrderStatuses } }, product: { status: "PUBLISHED", ...publicProductAccess } },
