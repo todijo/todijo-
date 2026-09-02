@@ -16,13 +16,16 @@ test("Nouveautés uses at most ten real newest products and preserves product ca
 });
 
 test("Nouveautés is a controlled swipeable carousel with localized arrows", () => {
-  assert.match(home, /className="marketplaceRailArrows"/);
+  assert.doesNotMatch(home, /className="marketplaceRailArrows"/);
+  assert.match(home, /className="marketplaceCarouselArrow previous"/);
+  assert.match(home, /className="marketplaceCarouselArrow next"/);
   assert.match(home, /scrollBy\(\{ left: direction/);
   assert.match(home, /carousel previous=\{t\.previous\} next=\{t\.next\}/);
-  assert.match(styles, /\.marketplaceRailSection\.isCarousel \.marketplaceProductRail\{display:flex!important/);
+  assert.match(styles, /\.marketplaceRailSection\.isCarousel \.marketplaceProductRail\{display:grid!important/);
   assert.match(styles, /overflow-x:auto!important/);
   assert.match(styles, /scroll-snap-type:x mandatory/);
-  assert.match(styles, /\[dir=rtl\] \.marketplaceRailArrows svg/);
+  assert.match(styles, /grid-auto-columns:calc\(\(100% - 56px\)\/5\)/);
+  assert.match(styles, /\[dir=rtl\] \.marketplaceCarouselArrow svg/);
 });
 
 test("premium hero receives a wider, shorter responsive container without altering slider behavior", () => {
