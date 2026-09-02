@@ -15,6 +15,13 @@ test("desktop homepage rails present five complete cards without changing produc
   assert.match(home, /products\.map\(\(product\) => <MarketplaceProductCard/);
 });
 
+test("desktop homepage product and feature rows use the available viewport width", () => {
+  const css = read("app/globals.css");
+  assert.match(css, /@media\(min-width:861px\)\{\.buyerHomePage \.marketplaceDiscoverySections>\.marketplaceRailSection,\.buyerHomePage \.todijoTrustPrimary\{width:min\(1840px,calc\(100% - 48px\)\)\}\}/);
+  assert.match(css, /\.buyerHomePage \.marketplaceCarouselArrow\.previous\{inset-inline-start:-18px\}/);
+  assert.doesNotMatch(css, /\.buyerHomePage \.marketHeader[^}]*width:min\(1840px/);
+});
+
 test("five feature cards keep artwork and copy in separate zones", () => {
   const home = read("app/HomeClient.tsx");
   const css = read("app/globals.css");
