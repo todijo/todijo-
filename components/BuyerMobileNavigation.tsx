@@ -95,6 +95,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
       </section> : <><nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>
         <button className="buyerMobileCategoriesButton" type="button" onClick={() => setCategoriesOpen(true)} aria-expanded={categoriesOpen}><Grid2X2 size={20} aria-hidden="true"/>{common("categories")}<ChevronRight size={17} aria-hidden="true"/></button>
+        <a className="buyerMobileStoresLink" href={localizedPath(locale, "/store")} onClick={closeDrawer}><Store size={20} aria-hidden="true"/>{footer("stores")}</a>
         <a href={`${homeHref}?sort=newest#products`} onClick={closeDrawer}><Package size={20} aria-hidden="true"/>{header("newArrivals")}</a>
         <a href={`${homeHref}#best-sellers`} onClick={closeDrawer}><ShoppingCart size={20} aria-hidden="true"/>{header("bestSellers")}</a>
         <a href={ordersHref} onClick={closeDrawer} className={isNavigationActive(pathname, ordersHref, true) ? "active" : ""} aria-current={isNavigationActive(pathname, ordersHref, true) ? "page" : undefined}><Package size={20} aria-hidden="true"/>{header("orders")}</a>

@@ -15,6 +15,11 @@ test("mobile home is product-first while desktop merchandising remains rendered"
 test("Boutiques is a localized category peer leading to the existing store route",()=>{
   const navigation=source("components/BuyerMobileNavigation.tsx");
   assert.match(navigation,/className="buyerMobileBoutiquesLink"/);
+  assert.match(navigation,/className="buyerMobileStoresLink"/);
+  const hamburger=navigation.match(/categoriesOpen \? <section[\s\S]*? : <><nav[\s\S]*?<\/nav>/)?.[0]??"";
+  assert.match(hamburger,/buyerMobileStoresLink/);
+  assert.match(hamburger,/localizedPath\(locale, "\/store"\)/);
+  assert.match(hamburger,/footer\("stores"\)/);
   assert.match(navigation,/localizedPath\(locale, "\/store"\)/);
   assert.match(navigation,/footer\("stores"\)/);
   for(const locale of locales)assert.equal(typeof JSON.parse(source(`messages/home-footer/${locale}.json`)).stores,"string",locale);
