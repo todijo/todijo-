@@ -18,11 +18,13 @@ test("mobile home incrementally loads deduplicated product batches", () => {
   assert.match(home, /products\.filter\(\(product\) => !seen\.has\(product\.id\)\)/);
 });
 
-test("desktop keeps its forty-product server pagination while mobile starts from server-rendered products", () => {
+test("desktop keeps its hundred-product server pagination while mobile starts from server-rendered products", () => {
   const page = read("app/page.tsx");
+  const pagination = read("lib/buyer-marketplace-pagination.ts");
   const home = read("app/HomeClient.tsx");
   const css = read("app/globals.css");
-  assert.match(page, /const PAGE_SIZE = 40/);
+  assert.match(pagination, /BUYER_PRODUCT_PAGE_SIZE = 100/);
+  assert.match(page, /buyerProductPage\(requestedPage\)/);
   assert.match(page, /products=\{products\}/);
   assert.match(home, /setVisibleProducts\(mobile && page === 1 \? products\.slice\(0, MOBILE_BATCH_SIZE\) : products\)/);
   assert.match(css, /\.buyerHomePage \.pagination\{display:none\}/);

@@ -10,11 +10,10 @@ import { canonicalMarketplaceColor, countryAliasesForCode, marketplaceColorAlias
 import { getLocale } from "next-intl/server";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import{localizedSupplierContentSearch}from"@/lib/product-content-search";
+import { BUYER_PRODUCT_PAGE_SIZE, buyerProductPage, buyerProductPageCount } from "@/lib/buyer-marketplace-pagination";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const PAGE_SIZE = 40;
 
 const productSelect = {
   id: true, name: true, price: true, compareAtPrice: true, currency: true,
@@ -121,9 +120,10 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const orderBy: Prisma.ProductOrderByWithRelationInput[] = [primaryOrder, { id: "asc" }];
 
   async function productsForPage(requestedPage: number) {
+    const pagination = buyerProductPage(requestedPage);
     if (!isBestSelling) {
       return prisma.product.findMany({
-        where, orderBy, skip: (requestedPage - 1) * PAGE_SIZE, take: PAGE_SIZE, select: productSelect,
+        where, orderBy, ...pagination, select: productSelect,
       });
     }
     const sales = await prisma.orderItem.groupBy({
@@ -131,8 +131,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       where: { order: { status: { in: qualifyingOrderStatuses } }, product: where },
       _sum: { quantity: true },
       orderBy: [{ _sum: { quantity: "desc" } }, { productId: "asc" }],
-      skip: (requestedPage - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      ...pagination,
     });
     const ids = sales.map((sale) => sale.productId);
     if (!ids.length) return [];
@@ -170,7 +169,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       select: { colors: true, sizes: true, store: { select: { country: true } }, options: { where: { active: true }, select: { name: true, values: { where: { active: true }, select: { value: true } } } } },
     }),
   ]);
-  const availablePages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const availablePages = buyerProductPageCount(total);
   const normalizedPage = Math.min(page, availablePages);
   const rows = normalizedPage === page ? initialRows : await productsForPage(normalizedPage);
 
@@ -212,7 +211,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
       page={normalizedPage}
-      pageSize={PAGE_SIZE}
+      pageSize={BUYER_PRODUCT_PAGE_SIZE}
       initialFilters={filters}
       facets={facets}
       resultsOnly={resultsOnly}

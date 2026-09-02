@@ -1353,6 +1353,9 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 
 /* Homepage desktop density and feature-card composition. */
 @media(min-width:861px){.buyerHomePage .marketplaceDiscoverySections>.marketplaceRailSection,.buyerHomePage .todijoTrustPrimary{width:min(1840px,calc(100% - 48px))}}
+@media(min-width:861px){.buyerHomePage .discoveryLayout,.storeIndexPage .featuredStores{width:min(1840px,calc(100% - 48px))}}
+.storeIndexPage{overflow-x:clip}
+@media(min-width:1241px){.buyerHomePage .discoveryProductGrid,.storeIndexPage .featuredStoreGrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
 @media(min-width:1101px){.buyerHomePage .marketplaceCarouselArrow.previous{inset-inline-start:-18px}.buyerHomePage .marketplaceCarouselArrow.next{inset-inline-end:-18px}}
 @media(min-width:1101px){.marketplaceRailSection:not(.isCarousel) .marketplaceProductRail{grid-template-columns:repeat(5,minmax(0,1fr))}}
 .todijoTrustPrimary .todijoTrustGrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}

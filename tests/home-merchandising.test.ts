@@ -18,9 +18,11 @@ test("best sellers are placed before the store discovery area", () => {
   assert.ok(best >= 0 && stores >= 0 && best < stores);
 });
 
-test("desktop product discovery uses four columns and forty products per page", () => {
-  assert.match(page, /const PAGE_SIZE = 40/);
-  assert.match(css, /\.discoveryProductGrid\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+test("wide desktop product discovery uses five columns and one hundred products per page", () => {
+  const pagination = readFileSync("lib/buyer-marketplace-pagination.ts", "utf8");
+  assert.match(pagination, /BUYER_PRODUCT_PAGE_SIZE = 100/);
+  assert.match(page, /pageSize=\{BUYER_PRODUCT_PAGE_SIZE\}/);
+  assert.match(css, /@media\(min-width:1241px\)\{\.buyerHomePage \.discoveryProductGrid,\.storeIndexPage \.featuredStoreGrid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)\}\}/);
 });
 
 test("seller discovery routes through public seller information and store directory", () => {

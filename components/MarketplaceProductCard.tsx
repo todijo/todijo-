@@ -29,7 +29,7 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
 
   return <article className="discoveryCard">
     <a className="discoveryImageWrap" href={productPath(locale,product.id,product.name)} aria-label={product.name}>
-      {product.image ? <Image src={product.image} alt={product.name} fill sizes="(max-width: 700px) 50vw, (max-width: 1000px) 30vw, 240px" unoptimized/> : <div className="productImage"><Package size={42} aria-hidden="true"/></div>}
+      {product.image ? <Image src={product.image} alt={product.name} fill loading="lazy" sizes="(max-width: 700px) 50vw, (max-width: 1240px) 25vw, 20vw" unoptimized/> : <div className="productImage"><Package size={42} aria-hidden="true"/></div>}
       {discount > 0 && <span className="marketplaceDiscount">-{discount}%</span>}
       {!product.isGenerallyAvailable && <span className="soldOutOverlay">{soldOut}</span>}
     </a>
