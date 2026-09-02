@@ -1,5 +1,6 @@
 {
   "description": "Todijo is een marketplace met meerdere verkopers die kopers verbindt met onafhankelijke winkels en hun producten.",
+  "stores": "Winkels",
   "aboutTitle": "Over Todijo",
   "about": "Over ons",
   "howItWorks": "Hoe Todijo werkt",

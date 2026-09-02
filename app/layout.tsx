@@ -8,7 +8,6 @@ import { locales, rtlLocales, type Locale } from "@/i18n/config";
 import { ToastProvider } from "@/components/ToastProvider";
 import { WishlistProvider } from "@/components/WishlistProvider";
 import CookieConsent from "@/components/CookieConsent";
-import TodijoLaunchSplash from "@/components/TodijoLaunchSplash";
 import BuyerMarketProvider from "@/components/BuyerMarketProvider";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
@@ -28,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: "Todijo Marketplace", template: `%s · ${t("brand")}` },
     description: t("description"),
     metadataBase: new URL(base),
-    icons: { icon: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png" },
+    icons: { icon: [{ url: "/icon-192.png?v=2", type: "image/png", sizes: "192x192" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png?v=2" },
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Todijo" },
     manifest: "/manifest.webmanifest",
     openGraph: { title: t("title"), description: t("description"), type: "website", images: [{ url: "/images/brand/todijo-horizontal-dark.webp", width: 720, height: 400, alt: "Todijo" }] },
@@ -45,7 +44,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
-      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/><TodijoLaunchSplash/>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
+      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
     </html>
   );
 }

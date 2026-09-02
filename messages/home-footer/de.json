@@ -1,5 +1,6 @@
 {
   "description": "Todijo ist ein Multi-Vendor-Marktplatz, der Käufer mit unabhängigen Shops und ihren Produkten verbindet.",
+  "stores": "Shops",
   "aboutTitle": "Über Todijo",
   "about": "Über uns",
   "howItWorks": "So funktioniert Todijo",

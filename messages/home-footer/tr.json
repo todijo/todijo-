@@ -1,5 +1,6 @@
 {
   "description": "Todijo, alıcıları bağımsız mağazalar ve ürünleriyle buluşturan çok satıcılı bir pazar yeridir.",
+  "stores": "Mağazalar",
   "aboutTitle": "Todijo hakkında",
   "about": "Hakkımızda",
   "howItWorks": "Todijo nasıl çalışır",

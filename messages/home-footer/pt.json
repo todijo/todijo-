@@ -1,5 +1,6 @@
 {
   "description": "O Todijo é um marketplace com vários vendedores que liga compradores a lojas independentes e aos seus produtos.",
+  "stores": "Lojas",
   "aboutTitle": "Sobre o Todijo",
   "about": "Sobre nós",
   "howItWorks": "Como funciona o Todijo",

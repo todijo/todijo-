@@ -1,5 +1,6 @@
 {
   "description": "Todijo 是一个多卖家市场，连接买家、独立店铺及其商品。",
+  "stores": "店铺",
   "aboutTitle": "关于 Todijo",
   "about": "关于我们",
   "howItWorks": "Todijo 如何运作",

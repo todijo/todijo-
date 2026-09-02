@@ -18,18 +18,12 @@ test("minimum price uses only complete active in-stock purchasable variants",()=
   assert.equal(minimumPurchasableVariantPrice({basePrice:25,activeOptionCount:1,variants:[{active:false,stock:1,valueCount:1,priceOverride:10}]}),null);
 });
 
-test("cold mobile splash is session-scoped, reduced-motion aware and bounded",()=>{
-  const splash=source("components/TodijoLaunchSplash.tsx"),css=source("app/globals.css");
-  assert.match(splash,/todijo-mobile-splash-seen-v1/);
-  assert.match(splash,/matchMedia\("\(max-width: 860px\)"\)/);
-  assert.match(splash,/sessionStorage\.getItem/);assert.match(splash,/sessionStorage\.setItem/);
-  assert.match(splash,/prefers-reduced-motion: reduce/);
-  assert.match(splash,/useState\(true\)/);assert.match(splash,/reduced \? 120 : DISPLAY_MS/);assert.match(splash,/DISPLAY_MS = 650/);assert.match(splash,/FALLBACK_MS = 900/);
-  assert.match(splash,/aria-hidden="true"/);assert.match(css,/\.todijoLaunchSplash\{[^}]*pointer-events:none/);
-  const splashCss=css.slice(css.indexOf("/* Cold mobile launch branding"));
-  assert.match(css,/html \{[^}]*background:#16074c/);assert.match(splashCss,/background:radial-gradient\([^}]*#32108a[^}]*#16074c[^}]*#090529/);
-  assert.doesNotMatch(splashCss,/#0d1714|#063a2c|#07553e/);
-  assert.match(css,/\.todijoLaunchMark\{width:min\(82vw,380px\)/);assert.match(css,/todijo-canopy-open 1\.8s/);assert.match(css,/animation:todijo-splash-exit \.65s/);
+test("launch branding relies on the native PWA splash without a delayed JavaScript overlay",()=>{
+  const layout=source("app/layout.tsx"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
+  assert.doesNotMatch(layout,/TodijoLaunchSplash/);
+  assert.match(manifest,/background_color: "#100331"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=2/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v2"/);
 });
 
 test("umbrella identity, exact default title and install icons are wired",()=>{

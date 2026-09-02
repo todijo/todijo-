@@ -67,7 +67,7 @@ test("stage 6 push UI is conservative, route-allowlisted and never auto-prompts"
 test("PWA sensitive commerce paths remain network-only after the cache version update", () => {
   const worker = source("public/sw.js");
   for (const path of ["api", "checkout", "cart", "account", "orders?", "messages", "notifications", "favorites", "login"]) assert.match(worker, new RegExp(path.replace("?", "\\?")));
-  assert.match(worker, /phase9-stages2-6-v1/);
+  assert.match(worker, /mobile-brand-v2/);
   assert.match(worker, /request\.mode === "navigate"/);
 });
 
