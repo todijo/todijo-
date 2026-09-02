@@ -18,6 +18,7 @@ import MarketplaceFilterDock, { type MarketplaceFacets } from "@/components/Mark
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import {productPath} from "@/lib/product-seo";
 import PremiumHeroSlider from "@/components/PremiumHeroSlider";
+import { localizedCategoryTreeValue } from "@/lib/category-tree-localization";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -62,7 +63,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const d = useTranslations("HomeDiscovery");
   const dashboard = useTranslations("Dashboard");
   const categoryText = useTranslations("Categories");
-  const displayCategory = (value: string) => categoryLabel(value, (key) => categoryText(key));
+  const displayCategory = (value: string) => localizedCategoryTreeValue(activeLocale, value) ?? categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), best:h("bestSellers"), low:m("low"), high:m("high"), reviews:dashboard("reviews"), availability:c("available"), season:m("season"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const moreProductsLabel = activeLocale === "fr" ? "Voir plus de produits" : activeLocale === "ku" ? "کاڵای زیاتر ببینە" : "See more products";

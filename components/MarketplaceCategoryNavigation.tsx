@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref } from "@/lib/desktop-category-taxonomy";
+import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId } from "@/lib/desktop-category-taxonomy";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
+import { localizedCategoryGroupLabel, localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
 
 export default function MarketplaceCategoryNavigation({ className = "" }: { className?: string }) {
   const locale = useLocale();
@@ -56,7 +57,7 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
       </div>
       <div className="marketQuickMegaContent" ref={contentRef}>
         <header><div><strong>{activeLabel}</strong><small>{header("discoverCategories")}</small></div><Link href={categoryHref(active.label)} onClick={() => setOpen(false)}>{header("viewAll")}</Link></header>
-        <div className="marketQuickMegaColumns">{active.groups.map((group) => <section key={group.id}><h3>{group.label}</h3>{group.items.map((item) => <Link className="marketQuickMegaSubcategoryLink" key={item} href={categoryHref(item)} onClick={() => setOpen(false)}>{item}</Link>)}</section>)}</div>
+        <div className="marketQuickMegaColumns">{active.groups.map((group) => <section key={group.id}><h3>{localizedCategoryGroupLabel(locale, active.id, group.id, group.label)}</h3>{group.items.map((item) => <Link className="marketQuickMegaSubcategoryLink" key={item} href={categoryHref(subcategoryId(active.id, group.id, item))} onClick={() => setOpen(false)}>{localizedCategoryLeafLabel(locale, active.id, group.id, item)}</Link>)}</section>)}</div>
       </div>
     </section> : null}
   </div>;
