@@ -13,6 +13,7 @@ import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navi
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId, subcategoryImagePath } from "@/lib/desktop-category-taxonomy";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import Image from "next/image";
+import { localizedCategoryGroupLabel, localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
   const locale = useLocale();
@@ -88,7 +89,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
         </div>
         <div className="buyerMobileCategoryChildren" role="tabpanel">
           <a className="buyerMobileCategoryAll" href={categorySearchHref(locale, activeCategory.label)} onClick={closeDrawer}><strong>{categoryTitle(activeCategory.id)}</strong><span>{header("viewAll")} <ChevronRight size={15} aria-hidden="true"/></span></a>
-          {activeCategory.groups.map((group) => <section key={group.id} className="buyerMobileCategoryGroup"><h3>{group.label}</h3><div>{group.items.map((item) => <a key={subcategoryId(activeCategory.id, group.id, item)} href={categorySearchHref(locale, item)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={subcategoryImagePath(activeCategory.id, group.id, item)} alt="" width={84} height={84}/></span><span>{item}</span></a>)}</div></section>)}
+          {activeCategory.groups.map((group) => <section key={group.id} className="buyerMobileCategoryGroup"><h3>{localizedCategoryGroupLabel(locale, activeCategory.id, group.id, group.label)}</h3><div>{group.items.map((item) => { const id = subcategoryId(activeCategory.id, group.id, item); return <a key={id} href={categorySearchHref(locale, id)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={subcategoryImagePath(activeCategory.id, group.id, item)} alt="" width={84} height={84}/></span><span>{localizedCategoryLeafLabel(locale, activeCategory.id, group.id, item)}</span></a>; })}</div></section>)}
         </div>
       </section> : <><nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>
