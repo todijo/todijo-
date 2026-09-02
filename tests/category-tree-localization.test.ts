@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { locales } from "../i18n/config";
+import { CATEGORY_LABELS, categoryGroupTranslationKey, categoryLeafTranslationKey } from "../lib/category-locales";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId } from "../lib/desktop-category-taxonomy";
-import { localizedCategoryGroupLabel, localizedCategoryLeafLabel, localizedCategoryTreeValue } from "../lib/category-tree-localization";
+import {
+  categoryGroupTranslationSource,
+  categoryLeafTranslationSource,
+  localizedCategoryGroupLabel,
+  localizedCategoryLeafLabel,
+  localizedCategoryTreeValue,
+} from "../lib/category-tree-localization";
 
 const samples = [
   ["women", "outerwear", "Vêtements d'extérieur et Vestes", "Vestes matelassées pour femmes"],
@@ -46,4 +53,40 @@ test("every canonical leaf has a non-French English display label and shared val
     if (/[àâçéèêëîïôùûüœ]|\b(pour|femme|homme|vêtements|chaussures|bijoux|montres)\b/i.test(leaf)) assert.notEqual(display, leaf, `French leakage: ${category.id}/${group.id}/${leaf}`);
     assert.equal(localizedCategoryTreeValue("en", subcategoryId(category.id, group.id, leaf)), display);
   }
+});
+
+test("every non-French locale has an explicit label for all 75 groups and 447 leaves", () => {
+  const expectedKeys = new Set<string>();
+  for (const category of DESKTOP_CATEGORY_TAXONOMY) for (const group of category.groups) {
+    expectedKeys.add(categoryGroupTranslationKey(category.id, group.id));
+    for (const leaf of group.items) expectedKeys.add(categoryLeafTranslationKey(subcategoryId(category.id, group.id, leaf)));
+  }
+  assert.equal([...expectedKeys].filter((key) => key.startsWith("group:")).length, 75);
+  assert.equal([...expectedKeys].filter((key) => key.startsWith("leaf:")).length, 447);
+
+  for (const locale of locales.filter((item) => item !== "fr")) {
+    const corpus = CATEGORY_LABELS[locale];
+    assert.deepEqual(new Set(Object.keys(corpus)), expectedKeys, `${locale} corpus must exactly cover the canonical tree`);
+    for (const [key, label] of Object.entries(corpus)) assert.ok(label.trim(), `${locale}/${key} is empty`);
+  }
+});
+
+test("known category nodes never use a fallback in any supported locale", () => {
+  for (const locale of locales.filter((item) => item !== "fr")) {
+    for (const category of DESKTOP_CATEGORY_TAXONOMY) for (const group of category.groups) {
+      assert.equal(categoryGroupTranslationSource(locale, category.id, group.id), "explicit");
+      for (const leaf of group.items) {
+        assert.equal(categoryLeafTranslationSource(locale, category.id, group.id, leaf), "explicit");
+        const id = subcategoryId(category.id, group.id, leaf);
+        assert.equal(localizedCategoryTreeValue(locale, id), localizedCategoryLeafLabel(locale, category.id, group.id, leaf));
+        assert.equal(categorySearchHref(locale, id), `/${locale}/search?category=${encodeURIComponent(id)}`);
+      }
+    }
+  }
+});
+
+test("unknown nodes fail safely without changing their canonical identity", () => {
+  assert.equal(localizedCategoryGroupLabel("en", "future", "group", "Libellé futur"), "Libellé futur");
+  assert.equal(categoryGroupTranslationSource("en", "future", "group"), "unknown-node");
+  assert.equal(localizedCategoryLeafLabel("xx", "future", "group", "Libellé futur"), "Libellé futur");
 });
