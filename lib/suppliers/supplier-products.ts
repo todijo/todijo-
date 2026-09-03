@@ -47,7 +47,7 @@ async function uniqueSlug(db: Database, storeId: string, title: string) {
   return slug;
 }
 
-export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification}) {
+export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification;syncReviews?:boolean}) {
   if (!provider.isConfigured()) throw new Error("SUPPLIER_NOT_CONFIGURED");
   const manualPrice = input.sellingPrice == null ? null : Number(input.sellingPrice);
   if (manualPrice != null && (!Number.isFinite(manualPrice) || manualPrice <= 0)) throw new Error("SELLING_PRICE_INVALID");
@@ -87,7 +87,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     if (variantImageAssignments.length) await replaceProductVariantImages(tx,product.id,images,variantImageAssignments);
     return product;
   });
-  if(provider.getProductReviews){const link=await db.supplierProductLink.findUnique({where:{productId:product.id},select:{id:true}});if(link)await syncSupplierReviews(db,provider,{productId:product.id,supplierProductLinkId:link.id,supplierProductId:snapshot.supplierProductId});}
+  if(input.syncReviews!==false&&provider.getProductReviews){const link=await db.supplierProductLink.findUnique({where:{productId:product.id},select:{id:true}});if(link)await syncSupplierReviews(db,provider,{productId:product.id,supplierProductLinkId:link.id,supplierProductId:snapshot.supplierProductId});}
   return product;
 }
 
