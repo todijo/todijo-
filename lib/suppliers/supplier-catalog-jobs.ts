@@ -61,9 +61,8 @@ export async function createCatalogImportJob(db:PrismaClient,input:JobCategoryIn
 const jobSummarySelect={id:true,status:true,requestedCount:true,processedCount:true,importedCount:true,skippedCount:true,quarantinedCount:true,failedCount:true,batchLimit:true,destinationCountry:true,createdAt:true,startedAt:true,updatedAt:true,completedAt:true} as const;
 
 export async function listCatalogImportJobs(db:PrismaClient,adminId:string){
-  let jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},take:20,select:jobSummarySelect});
+  const jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},take:20,select:jobSummarySelect});
   if(!jobs.length)return[];
-  const recovered=await recoverStaleCatalogClaims(db,jobs.map(job=>job.id),new Date(),new Map(jobs.map(job=>[job.id,job.updatedAt])));if(recovered.length)jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},take:20,select:jobSummarySelect});
   const active=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobs.map(job=>job.id)},status:"IMPORTING"},_count:{_all:true}}),counts=new Map(active.map(row=>[row.jobId,row._count._all]));
   return jobs.map(job=>{const processingCount=counts.get(job.id)??0,remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING")};});
 }
