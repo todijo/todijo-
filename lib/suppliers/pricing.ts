@@ -111,28 +111,28 @@ export function calculateSupplierPrice(input: PricingInput): SupplierPriceCalcul
   };
 }
 
-export function calculateSupplierSnapshotPrices(snapshot: SupplierProductSnapshot, sellingCurrency: string, exchangeRates: Readonly<Record<string, Prisma.Decimal.Value>> = {}) {
+export function calculateSupplierSnapshotPrices(snapshot: SupplierProductSnapshot, sellingCurrency: string, exchangeRates: Readonly<Record<string, Prisma.Decimal.Value>> = {},targetMargin:Prisma.Decimal.Value=DEFAULT_SUPPLIER_TARGET_MARGIN) {
   const deferredShipping = { status:"DEFERRED", required:true } as const;
   const variants = snapshot.variants.filter((variant)=>{
     try{return variant.cost!=null&&new Prisma.Decimal(variant.cost).isFinite()&&new Prisma.Decimal(variant.cost).greaterThan(0);}catch{return false;}
   }).map((variant) => ({
     supplierVariantId:variant.supplierVariantId,
-    calculation:calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[variant.currency.trim().toUpperCase()]}),
+    calculation:calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[variant.currency.trim().toUpperCase()],targetMargin}),
   }));
   const product = snapshot.cost == null
     ? null
-    : calculateSupplierPrice({supplierCost:snapshot.cost,supplierCurrency:snapshot.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[snapshot.currency.trim().toUpperCase()]});
+    : calculateSupplierPrice({supplierCost:snapshot.cost,supplierCurrency:snapshot.currency,sellingCurrency,shipping:deferredShipping,exchangeRate:exchangeRates[snapshot.currency.trim().toUpperCase()],targetMargin});
   if (!product && !variants.length) throw new SupplierPricingError("PRICING_COST_INVALID");
   const basePrice = variants.length
     ? variants.reduce((minimum, variant) => Prisma.Decimal.min(minimum, variant.calculation.finalSellingPrice), new Prisma.Decimal(variants[0].calculation.finalSellingPrice))
     : new Prisma.Decimal(product!.finalSellingPrice);
-  return { product, variants, basePrice:basePrice.toFixed(2), targetMargin:DEFAULT_SUPPLIER_TARGET_MARGIN.toString(), shippingStatus:"DEFERRED" as const, marginGuaranteed:false };
+  return { product, variants, basePrice:basePrice.toFixed(2), targetMargin:new Prisma.Decimal(targetMargin).toString(), shippingStatus:"DEFERRED" as const, marginGuaranteed:false };
 }
 
-export function calculateSupplierVariantPriceWithFreight(snapshot:SupplierProductSnapshot,supplierVariantId:string,freight:{amount:Prisma.Decimal.Value;currency:string}){
+export function calculateSupplierVariantPriceWithFreight(snapshot:SupplierProductSnapshot,supplierVariantId:string,freight:{amount:Prisma.Decimal.Value;currency:string},targetMargin:Prisma.Decimal.Value=DEFAULT_SUPPLIER_TARGET_MARGIN){
   const variant=snapshot.variants.find((item)=>item.supplierVariantId===supplierVariantId);
   if(!variant)throw new SupplierPricingError("PRICING_COST_INVALID");
-  return calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency:variant.currency,shipping:{status:"KNOWN",amount:freight.amount,currency:freight.currency}});
+  return calculateSupplierPrice({supplierCost:variant.cost as Prisma.Decimal.Value,supplierCurrency:variant.currency,sellingCurrency:variant.currency,shipping:{status:"KNOWN",amount:freight.amount,currency:freight.currency},targetMargin});
 }
 
 export function convertSupplierPriceForBuyer(calculation:SupplierPriceCalculation,buyerCurrency:SupportedBuyerCurrency,fx:VerifiedFxRate){

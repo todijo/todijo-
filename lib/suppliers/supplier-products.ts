@@ -10,6 +10,7 @@ import { verifiedFxRate } from "../fx";
 import { classifyCjProduct, type CjClassification, validateTodijoClassification } from "./cj-classification";
 import type { SupplierProductSnapshot } from "./types";
 import { createImportedProductContent } from "../product-content";
+import {readGlobalDropshippingMargin} from "./global-margin";
 
 type Database = PrismaClient;
 export const SUPPLIER_MEDIA_IMPORT_CONCURRENCY=4;
@@ -47,7 +48,7 @@ async function uniqueSlug(db: Database, storeId: string, title: string) {
   return slug;
 }
 
-export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification;syncReviews?:boolean}) {
+export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification;syncReviews?:boolean;targetMargin?:Prisma.Decimal.Value}) {
   if (!provider.isConfigured()) throw new Error("SUPPLIER_NOT_CONFIGURED");
   const manualPrice = input.sellingPrice == null ? null : Number(input.sellingPrice);
   if (manualPrice != null && (!Number.isFinite(manualPrice) || manualPrice <= 0)) throw new Error("SELLING_PRICE_INVALID");
@@ -62,7 +63,8 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     const supplierCurrencies=new Set([snapshot.currency,...snapshot.variants.map((variant)=>variant.currency)].map((currency)=>currency.trim().toUpperCase()).filter((currency)=>currency!==sellingCurrency));
     for(const supplierCurrency of supplierCurrencies)exchangeRates[supplierCurrency]=(await verifiedFxRate(supplierCurrency,sellingCurrency)).rate;
   }
-  const automaticPricing = manualPrice == null ? calculateSupplierSnapshotPrices(snapshot,sellingCurrency,exchangeRates) : null;
+  const targetMargin=manualPrice==null?(input.targetMargin??await readGlobalDropshippingMargin(db)):undefined;
+  const automaticPricing = manualPrice == null ? calculateSupplierSnapshotPrices(snapshot,sellingCurrency,exchangeRates,targetMargin) : null;
   const sellingPrice = manualPrice == null ? automaticPricing!.basePrice : manualPrice.toFixed(2);
   const exists = await db.supplierProductLink.findUnique({where:{connectionId_supplierProductId:{connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId}},select:{productId:true}});
   if (exists) throw new Error("SUPPLIER_PRODUCT_ALREADY_IMPORTED");

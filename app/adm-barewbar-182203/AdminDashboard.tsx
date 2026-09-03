@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { BadgeCheck, CalendarPlus, PackagePlus, ShieldCheck, Store, Users } from "lucide-react";
+import GlobalDropshippingMarginForm from "@/components/GlobalDropshippingMarginForm";
 
 type AdminUser = { id: string; firstName: string; lastName: string; email: string; role: string; hasStore: boolean };
 type AdminStore = {
@@ -14,8 +15,8 @@ type AdminStore = {
   dropshippingEnabled: boolean;
 };
 
-export default function AdminDashboard({ adminId, locale, users, stores }: {
-  adminId: string; locale: string; users: AdminUser[]; stores: AdminStore[];
+export default function AdminDashboard({ adminId, locale, users, stores, globalDropshippingMarginPercent = "20" }: {
+  adminId: string; locale: string; users: AdminUser[]; stores: AdminStore[]; globalDropshippingMarginPercent?: string;
 }) {
   const t = useTranslations("Admin");
   const supplierText = useTranslations("Supplier");
@@ -89,6 +90,7 @@ export default function AdminDashboard({ adminId, locale, users, stores }: {
     </section>
 
     {message && <p className="adminFeedback" role="status">{message}</p>}
+    <GlobalDropshippingMarginForm initialPercent={globalDropshippingMarginPercent} />
 
     <div className="adminColumns">
       <section className="adminPanel adminAccessPanel">

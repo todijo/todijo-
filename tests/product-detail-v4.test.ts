@@ -56,6 +56,6 @@ test("normal and CJ lines retain existing line-aware checkout and embedded-shipp
   assert.match(payments, /cartShippingQuote\(groupLines\[0\]\.product\.store/);
   assert.match(payments, /convertMarketplacePrice\(source\.amount,groupLines\[0\]\.product\.currency,paymentCurrency,pricingDependencies\.marketplaceFx\)/);
   assert.match(pricing, /shippingIncluded=mode==="AUTOMATIC"/);
-  assert.match(pricing, /DEFAULT_SUPPLIER_TARGET_MARGIN/);
+  assert.match(pricing, /readGlobalDropshippingMargin/);
   assert.match(pricing, /verifiedFxRate/);
 });
