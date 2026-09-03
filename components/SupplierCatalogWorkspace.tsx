@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { DESKTOP_CATEGORY_TAXONOMY, resolveCanonicalLeafSelection, subcategoryId } from "@/lib/desktop-category-taxonomy";
 import SellerCategorySelector from "./SellerCategorySelector";
 import { canContinueCatalogJob, catalogJobProgress } from "@/lib/suppliers/catalog-job-progress";
+import { runCatalogJobBatches } from "@/lib/suppliers/catalog-job-auto-run";
 import { CatalogPreviewQueue, type CatalogPreviewState } from "@/lib/suppliers/catalog-preview-queue";
 
 type SearchItem={supplierProductId:string;sku:string|null;title:string;imageUrl:string|null;categoryReference:string|null;cost:number|null;currency:string};
@@ -53,7 +54,7 @@ export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobS
   async function resume(jobId:string,automatic=false){
     if(runningJobRef.current)return;runningJobRef.current=jobId;setRunningJobId(jobId);setMessage("");const poll=window.setInterval(()=>{void loadJob(jobId).catch(()=>undefined);},1000);
     try{
-      let job=await loadJob(jobId);do{const before=job;if(!canContinueCatalogJob(before))throw new Error("SUPPLIER_CATALOG_JOB_BUSY");const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}/resume`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({})}),data=await response.json() as {error?:string};if(!response.ok)throw new Error(data.error);job=await loadJob(jobId);if(job.processedCount<=before.processedCount&&job.processedCount<job.requestedCount)throw new Error("SUPPLIER_CATALOG_JOB_STALLED");}while(automatic&&canContinueCatalogJob(job));
+      const job=await runCatalogJobBatches(jobId,automatic,{loadJob,resumeBatch:async targetJobId=>{const response=await fetch(`/api/admin/supplier-products/bulk-import/${targetJobId}/resume`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({})}),data=await response.json() as {error?:string};if(!response.ok)throw new Error(data.error);}});
       setMessage(`${t("bulkComplete")}: ${job.processedCount}/${job.requestedCount} · ${elapsedLabel(job,Date.now(),t("durationUnavailable"))}`);
     }catch(error){setMessage(error instanceof Error&&error.message==="SUPPLIER_CATALOG_JOB_BUSY"?t("resumeBusy"):error instanceof Error?error.message:"SUPPLIER_CATALOG_JOB_FAILED");}finally{window.clearInterval(poll);runningJobRef.current=null;setRunningJobId(null);}
   }

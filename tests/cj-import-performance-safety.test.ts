@@ -52,8 +52,10 @@ test("large CJ jobs use one server batch per request and client continuation",()
   assert.doesNotMatch(workspace,/while\(job\.processedCount<job\.requestedCount/);
   assert.doesNotMatch(workspace,/maximumBatches/);
   assert.match(workspace,/disabled=\{Boolean\(runningJobId\)\|\|!canContinue\}/);
-  assert.match(workspace,/canContinueCatalogJob\(before\)/);
-  assert.match(workspace,/SUPPLIER_CATALOG_JOB_STALLED/);
+  const runner=read("lib/suppliers/catalog-job-auto-run.ts");
+  assert.match(runner,/reconciliationAttempts\?\?6/);
+  assert.match(runner,/await dependencies\.resumeBatch\(jobId\)/);
+  assert.match(runner,/SUPPLIER_CATALOG_JOB_STALLED/);
 });
 
 test("performance changes keep imports draft-only and fulfillment isolated",()=>{
