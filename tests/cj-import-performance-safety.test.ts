@@ -49,8 +49,10 @@ test("large CJ jobs use one server batch per request and client continuation",()
   const route=read("app/api/admin/supplier-products/bulk-import/[jobId]/resume/route.ts"),workspace=read("components/SupplierCatalogWorkspace.tsx");
   assert.match(route,/batches:1/);
   assert.doesNotMatch(route,/while\(job\.status/);
-  assert.match(workspace,/while\(job\.processedCount<job\.requestedCount/);
-  assert.match(workspace,/maximumBatches/);
+  assert.doesNotMatch(workspace,/while\(job\.processedCount<job\.requestedCount/);
+  assert.doesNotMatch(workspace,/maximumBatches/);
+  assert.match(workspace,/disabled=\{busy\|\|!canContinue\}/);
+  assert.match(workspace,/canContinueCatalogJob\(before\)/);
   assert.match(workspace,/SUPPLIER_CATALOG_JOB_STALLED/);
 });
 

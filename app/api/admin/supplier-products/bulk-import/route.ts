@@ -3,10 +3,10 @@ import { AdminAccessError } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
 import { MutationOriginError, assertAdminMutationRequest } from "@/lib/request-security";
 import { readSession } from "@/lib/session";
-import { createCatalogImportJob, MAX_CATALOG_JOB_ITEMS } from "@/lib/suppliers/supplier-catalog-jobs";
+import { createCatalogImportJob, listCatalogImportJobs, MAX_CATALOG_JOB_ITEMS } from "@/lib/suppliers/supplier-catalog-jobs";
 import { requirePlatformSupplierAdmin } from "@/lib/suppliers/supplier-access";
 
-export async function GET(){try{const admin=await requirePlatformSupplierAdmin(prisma,await readSession());const jobs=await prisma.supplierCatalogImportJob.findMany({where:{createdById:admin.id},orderBy:{createdAt:"desc"},take:20,select:{id:true,status:true,requestedCount:true,processedCount:true,importedCount:true,skippedCount:true,quarantinedCount:true,failedCount:true,batchLimit:true,destinationCountry:true,createdAt:true,startedAt:true,updatedAt:true,completedAt:true}});return NextResponse.json({ok:true,jobs});}catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});return NextResponse.json({error:"SUPPLIER_CATALOG_JOBS_FAILED"},{status:502});}}
+export async function GET(){try{const admin=await requirePlatformSupplierAdmin(prisma,await readSession());return NextResponse.json({ok:true,jobs:await listCatalogImportJobs(prisma,admin.id)});}catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});return NextResponse.json({error:"SUPPLIER_CATALOG_JOBS_FAILED"},{status:502});}}
 
 export async function POST(request:Request){
   try{

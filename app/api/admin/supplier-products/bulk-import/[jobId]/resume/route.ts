@@ -17,6 +17,6 @@ export async function POST(request:Request,{params}:{params:Promise<{jobId:strin
     if(error instanceof MutationOriginError)return NextResponse.json({error:error.message},{status:403});
     if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});
     const code=error instanceof Error?error.message:"SUPPLIER_CATALOG_JOB_FAILED";
-    return NextResponse.json({error:code},{status:code.includes("NOT_FOUND")?404:502});
+    return NextResponse.json({error:code},{status:code.includes("NOT_FOUND")?404:code==="SUPPLIER_CATALOG_JOB_BUSY"?409:502});
   }
 }
