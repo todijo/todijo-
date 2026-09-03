@@ -17,6 +17,7 @@ import {helpCenterMessages} from "./help-center";
 import {accountStatusMessages} from "./account-status";
 import {categoryNavigationMessages} from "./category-navigation";
 import { legalPhase5Messages } from "./legal-phase5";
+import {globalDropshippingMarginMessages} from "./global-dropshipping-margin";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -64,5 +65,6 @@ export default getRequestConfig(async () => {
     : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale],genericModel:genericModelMessages[locale],deliveryTo:locale==="fr"?"Livraison à :":"Delivery to:",changeAddress:locale==="fr"?"Modifier":"Change",addShippingAddress:buyerAddressMessages[locale].addAddress};
   const adminLocale = ["ar", "en", "fa", "fr", "hi", "ku", "pt", "ru", "zh"].includes(locale) ? locale : "en";
   messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
+  messages.GlobalDropshippingMargin=globalDropshippingMarginMessages[locale];
   return { locale, messages };
 });

@@ -11,6 +11,7 @@ import AdminDashboard from "./AdminDashboard";
 import { adminUserManagementMessages } from "@/i18n/admin-user-management";
 import { isLocale } from "@/i18n/config";
 import { siteContentMessages } from "@/i18n/site-content";
+import { readGlobalDropshippingMargin } from "@/lib/suppliers/global-margin";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -34,7 +35,7 @@ export default async function AdminPage() {
   }
 
   const now = new Date();
-  const [users, stores, pendingFinalRefundCount] = await Promise.all([
+  const [users, stores, pendingFinalRefundCount, globalDropshippingMargin] = await Promise.all([
     prisma.user.findMany({
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
       select: { id: true, firstName: true, lastName: true, email: true, role: true, store: { select: { id: true } } },
@@ -50,6 +51,7 @@ export default async function AdminPage() {
       },
     }),
     prisma.refundRequest.count({ where: { status: { in: ["SELLER_APPROVED", "SELLER_REJECTED"] } } }),
+    readGlobalDropshippingMargin(prisma),
   ]);
   const serializedStores = stores.map((store) => {
     const access = activeAccessSource(store, now);
@@ -74,6 +76,7 @@ export default async function AdminPage() {
         locale={locale}
         users={users.map((user) => ({ ...user, hasStore: Boolean(user.store), store: undefined }))}
         stores={serializedStores}
+        globalDropshippingMarginPercent={globalDropshippingMargin.mul(100).toString()}
       />
     </section>
     <MarketplaceFooter />

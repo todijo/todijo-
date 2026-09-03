@@ -1508,6 +1508,15 @@ model OrderItemSupplierPricingSnapshot {
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 }
 
+/// Singleton platform-controlled pricing policy for future/live dropshipping calculations.
+model PlatformDropshippingPricingSetting {
+  id           String   @id @default("GLOBAL") @db.VarChar(20)
+  targetMargin Decimal  @default(0.20) @db.Decimal(5, 4)
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 /// Private supplier-side fulfillment state. Never include this model in buyer payloads.
 model SupplierFulfillment {
   id                    String                    @id @default(cuid())

@@ -9,6 +9,7 @@ import { prepareSupplierFulfillments } from "./suppliers/supplier-fulfillment";
 import { defaultBuyerAddress } from "./buyer-addresses";
 import { resolveSellerMaturity } from "./seller-maturity";
 import {convertMarketplacePrice} from "./marketplace-presentment";
+import {readGlobalDropshippingMargin} from "./suppliers/global-margin";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -116,12 +117,13 @@ export async function createCheckout(
   }
   // Product/cart quotes are estimates. This single checkout resolution is the payment
   // authority and is reused unchanged by OrderItem evidence and Stripe.
+  const globalDropshippingMargin=classifiedLines.some(line=>line.eligibility.eligible)?await readGlobalDropshippingMargin(db):null;
   const pricedLines=[] as typeof baseLines;
   for(const line of baseLines){
     if(!line.eligibility.eligible){try{quoteShippingRule(effectiveShippingRule(line.product.store,line.product),destinationCountry,destinationPostalCode,line.sourceUnitPrice.mul(line.quantity));}catch(error){if(error instanceof ShippingError)throw new CheckoutError(error.message,409);throw error;}let presentment;try{presentment=await convertMarketplacePrice(line.sourceUnitPrice,line.product.currency,paymentCurrency,pricingDependencies.marketplaceFx);}catch{throw new CheckoutError("FX_UNAVAILABLE",409);}pricedLines.push({...line,unitPrice:new Prisma.Decimal(presentment.buyerAmount)});continue;}
     if(!line.variant)throw new CheckoutError("DROPSHIPPING_VARIANT_INVALID",409);
     let resolution:ResolvedDropshippingPricing;
-    try{resolution=await (pricingDependencies.resolveDropshipping??resolveDropshippingPricing)(db,{productId:line.product.id,variantId:line.variant.id,quantity:line.quantity,destinationCountry,buyerCurrency:paymentCurrency});}
+    try{resolution=await (pricingDependencies.resolveDropshipping??resolveDropshippingPricing)(db,{productId:line.product.id,variantId:line.variant.id,quantity:line.quantity,destinationCountry,buyerCurrency:paymentCurrency},{targetMargin:globalDropshippingMargin!});}
     catch{throw new CheckoutError("DROPSHIPPING_PRICING_UNAVAILABLE",409);}
     if(!resolution.buyer||!resolution.snapshot)throw new CheckoutError("DROPSHIPPING_PRICING_UNAVAILABLE",409);
     pricedLines.push({...line,unitPrice:new Prisma.Decimal(resolution.buyer.buyerUnitPrice),pricingSnapshot:resolution.snapshot});
