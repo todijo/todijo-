@@ -30,7 +30,7 @@ test("continuation is eligible only between bounded batches with remaining work"
   assert.equal(canContinueCatalogJob({...base,status:"PENDING",isProcessing:false}),true);
   assert.equal(canContinueCatalogJob({...base,status:"COMPLETED",processedCount:35,isProcessing:false}),false);
   const jobs=readFileSync("lib/suppliers/supplier-catalog-jobs.ts","utf8"),workspace=readFileSync("components/SupplierCatalogWorkspace.tsx","utf8"),resumeRoute=readFileSync("app/api/admin/supplier-products/bulk-import/[jobId]/resume/route.ts","utf8");
-  assert.match(jobs,/status:pending\?"PENDING"/);assert.match(jobs,/updatedAt:job\.updatedAt,status:\{in:\["PENDING","RUNNING"\]\}/);assert.match(jobs,/SUPPLIER_CATALOG_JOB_BUSY/);assert.match(workspace,/if\(busy\)return/);assert.match(workspace,/disabled=\{busy\|\|!canContinue\}/);assert.match(resumeRoute,/SUPPLIER_CATALOG_JOB_BUSY"\?409/);
+  assert.match(jobs,/status:pending\?"PENDING"/);assert.match(jobs,/updatedAt:job\.updatedAt,status:\{in:\["PENDING","RUNNING"\]\}/);assert.match(jobs,/SUPPLIER_CATALOG_JOB_BUSY/);assert.match(workspace,/if\(runningJobRef\.current\)return/);assert.match(workspace,/disabled=\{Boolean\(runningJobId\)\|\|!canContinue\}/);assert.match(resumeRoute,/SUPPLIER_CATALOG_JOB_BUSY"\?409/);
 });
 
 test("50 and 100 item jobs stay resumable through bounded server requests",()=>{

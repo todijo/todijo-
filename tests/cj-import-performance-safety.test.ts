@@ -51,7 +51,7 @@ test("large CJ jobs use one server batch per request and client continuation",()
   assert.doesNotMatch(route,/while\(job\.status/);
   assert.doesNotMatch(workspace,/while\(job\.processedCount<job\.requestedCount/);
   assert.doesNotMatch(workspace,/maximumBatches/);
-  assert.match(workspace,/disabled=\{busy\|\|!canContinue\}/);
+  assert.match(workspace,/disabled=\{Boolean\(runningJobId\)\|\|!canContinue\}/);
   assert.match(workspace,/canContinueCatalogJob\(before\)/);
   assert.match(workspace,/SUPPLIER_CATALOG_JOB_STALLED/);
 });
