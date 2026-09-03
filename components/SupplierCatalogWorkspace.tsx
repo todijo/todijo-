@@ -49,7 +49,19 @@ export default function SupplierCatalogWorkspace({initialJobs}:{initialJobs:JobS
   async function search(nextPage=1){setBusy(true);setMessage("");try{const response=await fetch(`/api/admin/supplier-products/catalog-search?q=${encodeURIComponent(query)}&page=${nextPage}&pageSize=20`,{cache:"no-store"}),data=await response.json() as {error?:string;items?:SearchItem[];hasMore?:boolean};if(!response.ok)throw new Error(data.error);setResults(current=>nextPage===1?(data.items??[]):[...current,...(data.items??[]).filter(item=>!current.some(existing=>existing.supplierProductId===item.supplierProductId))]);setPage(nextPage);setHasMore(Boolean(data.hasMore));}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_SEARCH_FAILED");}finally{setBusy(false);}}
   function toggle(identifier:string){setSelected(current=>{const next=new Set(current);if(next.has(identifier))next.delete(identifier);else next.add(identifier);return next;});}
   async function loadJob(jobId:string){const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}?take=100`,{cache:"no-store"}),data=await response.json() as {error?:string;job?:JobDetail};if(!response.ok||!data.job)throw new Error(data.error??"SUPPLIER_CATALOG_JOB_FAILED");setActive(data.job);setJobs(current=>[data.job!,...current.filter(job=>job.id!==jobId)]);return data.job;}
-  async function resume(jobId:string){setBusy(true);setMessage("");const poll=window.setInterval(()=>{void loadJob(jobId).catch(()=>undefined);},1000);try{const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}/resume`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({})}),data=await response.json() as {error?:string};if(!response.ok)throw new Error(data.error);const job=await loadJob(jobId);setMessage(`${t("bulkComplete")}: ${job.processedCount}/${job.requestedCount} · ${elapsedLabel(job)}`);}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_JOB_FAILED");}finally{window.clearInterval(poll);setBusy(false);}}
+  async function resume(jobId:string){
+    setBusy(true);setMessage("");const poll=window.setInterval(()=>{void loadJob(jobId).catch(()=>undefined);},1000);
+    try{
+      let job=await loadJob(jobId),batches=0;
+      while(job.processedCount<job.requestedCount&&(job.status==="PENDING"||job.status==="RUNNING")){
+        const before=job.processedCount,response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}/resume`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({})}),data=await response.json() as {error?:string;job?:JobSummary};if(!response.ok)throw new Error(data.error);
+        job=await loadJob(jobId);batches+=1;
+        if(job.processedCount<=before&&job.processedCount<job.requestedCount)throw new Error("SUPPLIER_CATALOG_JOB_STALLED");
+        const maximumBatches=Math.ceil(job.requestedCount/Math.max(1,job.batchLimit))+2;if(batches>maximumBatches)throw new Error("SUPPLIER_CATALOG_JOB_STALLED");
+      }
+      setMessage(`${t("bulkComplete")}: ${job.processedCount}/${job.requestedCount} · ${elapsedLabel(job)}`);
+    }catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_JOB_FAILED");}finally{window.clearInterval(poll);setBusy(false);}
+  }
 
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();if(importing||busy)return;const form=new FormData(event.currentTarget),pasted=String(form.get("identifiers")??"").split(/[\s,;]+/).filter(Boolean),identifiers=[...new Set([...selected,...pasted])];if(!identifiers.length)return;
