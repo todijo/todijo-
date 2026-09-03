@@ -55,7 +55,16 @@ export async function createCatalogImportJob(db:PrismaClient,input:JobCategoryIn
       categoryMappingSource:category.categoryId?category.source:null,
       categoryMappingReason:category.categoryId?category.reason:null,
     };
-  })}},select:{id:true,status:true,requestedCount:true,batchLimit:true,destinationCountry:true,createdAt:true}});
+  })}},select:jobSummarySelect});
+}
+
+const jobSummarySelect={id:true,status:true,requestedCount:true,processedCount:true,importedCount:true,skippedCount:true,quarantinedCount:true,failedCount:true,batchLimit:true,destinationCountry:true,createdAt:true,startedAt:true,updatedAt:true,completedAt:true} as const;
+
+export async function listCatalogImportJobs(db:PrismaClient,adminId:string){
+  const jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},take:20,select:jobSummarySelect});
+  if(!jobs.length)return[];
+  const active=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobs.map(job=>job.id)},status:"IMPORTING"},_count:{_all:true}}),counts=new Map(active.map(row=>[row.jobId,row._count._all]));
+  return jobs.map(job=>{const processingCount=counts.get(job.id)??0,remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING")};});
 }
 
 type CatalogPricingAttempt={supplierVariantId:string;origins:string[];status:"SELECTED"|"REJECTED";errorCode?:string;selectedOrigin?:string;freightAmount?:string;freightCurrency?:string;buyerPrice?:string};
@@ -91,15 +100,16 @@ function quarantineCode(code:string){return code.includes("PRICING")||code.start
 async function refreshJobCounts(db:PrismaClient,jobId:string){
   const groups=await db.supplierCatalogImportItem.groupBy({by:["status"],where:{jobId},_count:{_all:true}}),counts=new Map(groups.map((group)=>[group.status,group._count._all]));
   const pending=(counts.get("PENDING")??0)+(counts.get("IMPORTING")??0),failed=counts.get("FAILED")??0,quarantined=counts.get("QUARANTINED")??0;
-  return db.supplierCatalogImportJob.update({where:{id:jobId},data:{processedCount:{set:[...counts].filter(([status])=>status!=="PENDING"&&status!=="IMPORTING").reduce((sum,[,count])=>sum+count,0)},importedCount:{set:counts.get("IMPORTED")??0},skippedCount:{set:counts.get("SKIPPED")??0},quarantinedCount:{set:quarantined},failedCount:{set:failed},status:pending?"RUNNING":failed||quarantined?"COMPLETED_WITH_ERRORS":"COMPLETED",completedAt:pending?null:new Date()},select:{id:true,status:true,requestedCount:true,processedCount:true,importedCount:true,skippedCount:true,quarantinedCount:true,failedCount:true,batchLimit:true,destinationCountry:true,updatedAt:true,completedAt:true}});
+  return db.supplierCatalogImportJob.update({where:{id:jobId},data:{processedCount:{set:[...counts].filter(([status])=>status!=="PENDING"&&status!=="IMPORTING").reduce((sum,[,count])=>sum+count,0)},importedCount:{set:counts.get("IMPORTED")??0},skippedCount:{set:counts.get("SKIPPED")??0},quarantinedCount:{set:quarantined},failedCount:{set:failed},status:pending?"PENDING":failed||quarantined?"COMPLETED_WITH_ERRORS":"COMPLETED",completedAt:pending?null:new Date()},select:jobSummarySelect});
 }
 
 export async function processCatalogImportJob(db:PrismaClient,provider:SupplierCatalogProvider,jobId:string,input:{adminId:string;limit?:unknown},dependencies:{media?:ReturnType<typeof defaultSupplierMediaProvider>;importer?:typeof importSupplierProduct;timing?:((event:{jobId:string;itemId?:string;supplierProductId?:string;timing:ImportTiming|{totalMs:number;processed:number}})=>void)}={}){
   const jobStarted=performance.now();
-  const job=await db.supplierCatalogImportJob.findFirst({where:{id:jobId,createdById:input.adminId},select:{id:true,storeId:true,destinationCountry:true,batchLimit:true,store:{select:{currency:true}}}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");
+  const job=await db.supplierCatalogImportJob.findFirst({where:{id:jobId,createdById:input.adminId},select:{id:true,storeId:true,status:true,destinationCountry:true,batchLimit:true,startedAt:true,updatedAt:true,store:{select:{currency:true}}}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");
   if(!provider.isConfigured())throw new Error("SUPPLIER_NOT_CONFIGURED");
   await db.supplierCatalogImportItem.updateMany({where:{jobId,status:"IMPORTING",claimedAt:{lt:new Date(Date.now()-STALE_CLAIM_MS)}},data:{status:"PENDING",claimedAt:null,errorCode:"INTERRUPTED_ITEM_RESUMED",errorMessage:null}});
-  await db.supplierCatalogImportJob.update({where:{id:jobId},data:{status:"RUNNING",startedAt:new Date(),completedAt:null}});
+  const activeClaims=await db.supplierCatalogImportItem.count({where:{jobId,status:"IMPORTING"}});if(activeClaims>0)throw new Error("SUPPLIER_CATALOG_JOB_BUSY");
+  const claimTime=new Date(),claimed=await db.supplierCatalogImportJob.updateMany({where:{id:jobId,updatedAt:job.updatedAt,status:{in:["PENDING","RUNNING"]}},data:{status:"RUNNING",startedAt:job.startedAt??claimTime,updatedAt:claimTime,completedAt:null}});if(claimed.count!==1)throw new Error("SUPPLIER_CATALOG_JOB_BUSY");
   const limit=boundedInteger(input.limit,job.batchLimit,MAX_CATALOG_PROCESS_LIMIT),media=dependencies.media??defaultSupplierMediaProvider(),importer=dependencies.importer??importSupplierProduct;
   const candidates=await db.supplierCatalogImportItem.findMany({where:{jobId,status:"PENDING"},orderBy:{position:"asc"},take:limit,select:{id:true,requestedIdentifier:true,canonicalCategoryId:true}});
   await runCatalogWorkBounded(candidates,async candidate=>{
@@ -133,5 +143,5 @@ export async function retryCatalogImportItems(db:PrismaClient,input:{adminId:str
 
 export async function readCatalogImportJob(db:PrismaClient,input:{adminId:string;jobId:string;cursor?:unknown;take?:unknown}){
   const take=boundedInteger(input.take,50,100),cursor=typeof input.cursor==="string"&&input.cursor?input.cursor:undefined;
-  const job=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId},select:{id:true,status:true,requestedCount:true,processedCount:true,importedCount:true,skippedCount:true,quarantinedCount:true,failedCount:true,batchLimit:true,destinationCountry:true,createdAt:true,startedAt:true,updatedAt:true,completedAt:true,items:{orderBy:{position:"asc"},take,cursor:cursor?{id:cursor}:undefined,skip:cursor?1:0,select:{id:true,position:true,requestedIdentifier:true,canonicalSupplierId:true,supplierSku:true,status:true,canonicalCategoryId:true,categoryMappingSource:true,categoryMappingReason:true,classificationStatus:true,classificationConfidence:true,classificationEvidence:true,pricingStatus:true,stockStatus:true,complianceStatus:true,complianceReason:true,errorCode:true,productId:true,attemptCount:true,updatedAt:true}}}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");return{...job,nextCursor:job.items.length===take?job.items.at(-1)?.id:null};
+  const job=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId},select:{...jobSummarySelect,items:{orderBy:{position:"asc"},take,cursor:cursor?{id:cursor}:undefined,skip:cursor?1:0,select:{id:true,position:true,requestedIdentifier:true,canonicalSupplierId:true,supplierSku:true,status:true,canonicalCategoryId:true,categoryMappingSource:true,categoryMappingReason:true,classificationStatus:true,classificationConfidence:true,classificationEvidence:true,pricingStatus:true,stockStatus:true,complianceStatus:true,complianceReason:true,errorCode:true,productId:true,attemptCount:true,updatedAt:true}}}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");const processingCount=await db.supplierCatalogImportItem.count({where:{jobId:job.id,status:"IMPORTING"}}),remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING"),nextCursor:job.items.length===take?job.items.at(-1)?.id:null};
 }
