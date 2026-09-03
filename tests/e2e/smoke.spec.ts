@@ -80,7 +80,7 @@ test("public marketplace information page renders without live services", async 
 
   expect(response?.ok()).toBeTruthy();
   await expect(page).toHaveURL(/\/en\/info\/about$/);
-  await expect(page.getByRole("heading", { name: "About Todijo" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "A marketplace for buyers and independent sellers" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Todijo" }).first()).toBeVisible();
   assertNoRuntimeErrors();
 });

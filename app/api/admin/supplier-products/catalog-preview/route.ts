@@ -12,7 +12,7 @@ import { classifyCjProductByTaxonomyId } from "@/lib/suppliers/cj-taxonomy-class
 import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
 
 const PREVIEW_ITEM_LIMIT=100;
-export const PREVIEW_CONCURRENCY=4;
+const PREVIEW_CONCURRENCY=4;
 const CJ_BASE_URL="https://developers.cjdropshipping.com/api2.0/v1";
 const PREVIEW_TIMEOUT_MS=12_000;
 const TRANSIENT_RETRY_DELAYS_MS=[350,900] as const;

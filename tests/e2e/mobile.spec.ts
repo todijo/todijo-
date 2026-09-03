@@ -52,9 +52,10 @@ test("mobile menu opens, closes, restores scrolling, and navigates", async ({ pa
 
 test("mobile public information page and footer stay responsive", async ({ page }) => {
   const assertNoRuntimeErrors = collectRuntimeErrors(page);
-  await page.goto("/en/info/about");
+  const response = await page.goto("/en/info/about");
 
-  await expect(page.getByRole("heading", { name: "About Todijo" }).first()).toBeVisible();
+  expect(response?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { level: 1, name: "A marketplace for buyers and independent sellers" })).toBeVisible();
   const footer = page.locator("footer.marketplaceFooter");
   await footer.scrollIntoViewIfNeeded();
   await expect(footer).toBeVisible();
