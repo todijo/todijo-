@@ -13,9 +13,13 @@ for (const scenario of [
   test(`authenticated ${scenario.locale} mobile menu discovers localized Notifications`, async ({ page }) => {
     await page.setViewportSize({ width: scenario.width, height: 844 });
     await mockAuthenticatedSession(page);
-    await page.goto(`/${scenario.locale}/e2e-ux?view=home`, { waitUntil: "domcontentloaded" });
+    const sessionReady = page.waitForResponse((response) => response.url().includes("/api/auth/session") && response.status() === 200);
+    await Promise.all([sessionReady, page.goto(`/${scenario.locale}/e2e-ux?view=home`, { waitUntil: "domcontentloaded" })]);
+    await expect(page.locator(`nav.buyerMobileBottomNav a[href='/${scenario.locale}/dashboard']`)).toBeVisible();
     await page.getByRole("button", { name: scenario.menu }).click();
-    const link = page.getByRole("link", { name: scenario.label });
+    const dialog = page.locator("aside#buyer-mobile-drawer[role='dialog']");
+    await expect(dialog).toBeVisible();
+    const link = dialog.getByRole("link", { name: scenario.label });
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute("href", `/${scenario.locale}/notifications`);
     await expectNoDocumentOverflow(page);
@@ -26,7 +30,10 @@ for (const scenario of [
 test("unauthenticated mobile menu does not expose Notifications", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ authenticated: false }) }));
-  await page.goto("/en/e2e-ux?view=home", { waitUntil: "domcontentloaded" });
+  const sessionReady = page.waitForResponse((response) => response.url().includes("/api/auth/session") && response.status() === 200);
+  await Promise.all([sessionReady, page.goto("/en/e2e-ux?view=home", { waitUntil: "domcontentloaded" })]);
   await page.getByRole("button", { name: "Open menu" }).click();
-  await expect(page.getByRole("link", { name: "Notifications" })).toHaveCount(0);
+  const dialog = page.locator("aside#buyer-mobile-drawer[role='dialog']");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Notifications" })).toHaveCount(0);
 });
