@@ -11,15 +11,17 @@ import { classifyCjProductByTaxonomyId } from "./cj-taxonomy-classifier";
 import { resolveCjFreightAcrossOrigins } from "./cj-origin-freight";
 
 export const MAX_CATALOG_JOB_ITEMS=500;
-export const DEFAULT_CATALOG_PROCESS_LIMIT=3;
-export const MAX_CATALOG_PROCESS_LIMIT=10;
-export const CATALOG_IMPORT_CONCURRENCY=3;
+export const DEFAULT_CATALOG_PROCESS_LIMIT=10;
+export const MAX_CATALOG_PROCESS_LIMIT=25;
+export const CATALOG_IMPORT_CONCURRENCY=4;
+export const CATALOG_FREIGHT_CONCURRENCY=2;
 const STALE_CLAIM_MS=15*60_000;
 
 type JobCategoryInput = {adminId:string;storeId:string;identifiers:unknown;destinationCountry:unknown;canonicalCategoryId?:string|null;batchLimit?:unknown;canonicalCategoryByIdentifier?:Record<string,string>};
 
 function boundedInteger(value:unknown,fallback:number,maximum:number){const parsed=Number(value);return Number.isSafeInteger(parsed)&&parsed>0?Math.min(parsed,maximum):fallback;}
-export async function runCatalogWorkBounded<T>(items:readonly T[],worker:(item:T)=>Promise<void>,concurrency=CATALOG_IMPORT_CONCURRENCY){const ceiling=Math.max(1,Math.min(CATALOG_IMPORT_CONCURRENCY,Math.floor(concurrency)||1)),cursor={value:0};async function run(){for(;;){const index=cursor.value++;if(index>=items.length)return;await worker(items[index]);}}await Promise.all(Array.from({length:Math.min(ceiling,items.length)},()=>run()));}
+async function mapWorkBounded<T,R>(items:readonly T[],worker:(item:T)=>Promise<R>,concurrency:number,maximum:number){const ceiling=Math.max(1,Math.min(maximum,Math.floor(concurrency)||1)),cursor={value:0},results=new Array<R>(items.length);async function run(){for(;;){const index=cursor.value++;if(index>=items.length)return;results[index]=await worker(items[index]);}}await Promise.all(Array.from({length:Math.min(ceiling,items.length)},()=>run()));return results;}
+export async function runCatalogWorkBounded<T>(items:readonly T[],worker:(item:T)=>Promise<void>,concurrency=CATALOG_IMPORT_CONCURRENCY){await mapWorkBounded(items,worker,concurrency,CATALOG_IMPORT_CONCURRENCY);}
 type ImportTiming={productDetailMs:number;normalizationMs:number;databaseMs:number;freightPricingMs:number;mediaImportMs:number;totalMs:number};
 function elapsed(start:number){return Math.max(0,Math.round(performance.now()-start));}
 export function catalogIdentifiers(value:unknown){const values=(Array.isArray(value)?value:typeof value==="string"?value.split(/[\s,;]+/):[]).map((item)=>String(item).trim()).filter(Boolean);if(values.some((item)=>!/^[A-Za-z0-9-]{4,200}$/.test(item)))throw new Error("SUPPLIER_BULK_INPUT_INVALID");return[...new Set(values)];}
@@ -68,18 +70,19 @@ export async function verifiedCatalogPricing(provider:SupplierCatalogProvider,sn
   const variants=snapshot.variants.filter(validPurchasableVariant).sort((left,right)=>left.supplierVariantId.localeCompare(right.supplierVariantId));
   if(!variants.length)throw new CatalogPricingResolutionError("DROPSHIPPING_NO_PURCHASABLE_VARIANT",{variantsExamined:snapshot.variants.length,eligibleVariants:0,attempts:[],terminalErrorCode:"DROPSHIPPING_NO_PURCHASABLE_VARIANT"});
   let best:null|{variant:typeof variants[number];freight:Awaited<ReturnType<typeof resolveCjFreightAcrossOrigins>>;calculation:ReturnType<typeof calculateSupplierVariantPriceWithFreight>;presentment:ReturnType<typeof convertSupplierPriceForBuyer>;fx:Awaited<ReturnType<typeof verifiedFxRate>>}=null;
-  const attempts:CatalogPricingAttempt[]=[];
-  const freightProvider={calculateFreight:provider.calculateFreight.bind(provider)};
-  for(const variant of variants){
+  const freightProvider={calculateFreight:provider.calculateFreight.bind(provider)},fxProvider=dependencies.fx??verifiedFxRate,fxCache=new Map<string,ReturnType<typeof verifiedFxRate>>();
+  function resolveFx(baseCurrency:string,quoteCurrency:string){const key=`${baseCurrency.trim().toUpperCase()}->${quoteCurrency.trim().toUpperCase()}`;let pending=fxCache.get(key);if(!pending){pending=fxProvider(baseCurrency,quoteCurrency);fxCache.set(key,pending);}return pending;}
+  const outcomes=await mapWorkBounded(variants,async variant=>{
     const origins=[...new Set(variant.originCountryCodes.map(code=>code.trim().toUpperCase()).filter(code=>/^[A-Z]{2}$/.test(code)))].sort();
     try{
       const freight=await resolveCjFreightAcrossOrigins(freightProvider,{originCountryCodes:origins,destinationCountry,variantId:variant.supplierVariantId,quantity:1});
       const calculation=calculateSupplierVariantPriceWithFreight(snapshot,variant.supplierVariantId,{amount:freight.selected.amount,currency:freight.selected.currency});
-      const fx=await (dependencies.fx??verifiedFxRate)(calculation.sellingCurrency,sellingCurrency),presentment=convertSupplierPriceForBuyer(calculation,sellingCurrency as never,fx);
-      attempts.push({supplierVariantId:variant.supplierVariantId,origins,status:"SELECTED",selectedOrigin:freight.selected.originCountry,freightAmount:freight.selected.amount,freightCurrency:freight.selected.currency,buyerPrice:presentment.finalSellingPrice});
-      if(!best||new Prisma.Decimal(presentment.finalSellingPrice).lt(best.presentment.finalSellingPrice)||new Prisma.Decimal(presentment.finalSellingPrice).eq(best.presentment.finalSellingPrice)&&variant.supplierVariantId.localeCompare(best.variant.supplierVariantId)<0)best={variant,freight,calculation,presentment,fx};
-    }catch(error){attempts.push({supplierVariantId:variant.supplierVariantId,origins,status:"REJECTED",errorCode:safePricingCode(error)});}
-  }
+      const fx=await resolveFx(calculation.sellingCurrency,sellingCurrency),presentment=convertSupplierPriceForBuyer(calculation,sellingCurrency as never,fx);
+      return{attempt:{supplierVariantId:variant.supplierVariantId,origins,status:"SELECTED" as const,selectedOrigin:freight.selected.originCountry,freightAmount:freight.selected.amount,freightCurrency:freight.selected.currency,buyerPrice:presentment.finalSellingPrice},candidate:{variant,freight,calculation,presentment,fx}};
+    }catch(error){return{attempt:{supplierVariantId:variant.supplierVariantId,origins,status:"REJECTED" as const,errorCode:safePricingCode(error)},candidate:null};}
+  },CATALOG_FREIGHT_CONCURRENCY,CATALOG_FREIGHT_CONCURRENCY);
+  const attempts:CatalogPricingAttempt[]=outcomes.map(outcome=>outcome.attempt);
+  for(const outcome of outcomes){const candidate=outcome.candidate;if(!candidate)continue;if(!best||new Prisma.Decimal(candidate.presentment.finalSellingPrice).lt(best.presentment.finalSellingPrice)||new Prisma.Decimal(candidate.presentment.finalSellingPrice).eq(best.presentment.finalSellingPrice)&&candidate.variant.supplierVariantId.localeCompare(best.variant.supplierVariantId)<0)best=candidate;}
   if(!best){const codes=attempts.map(item=>item.errorCode),terminal=codes.includes("CJ_FREIGHT_RESPONSE_INVALID")?"CJ_FREIGHT_RESPONSE_INVALID":codes.includes("CJ_FREIGHT_TEMPORARY_FAILURE")?"CJ_FREIGHT_TEMPORARY_FAILURE":codes.every(code=>code==="CJ_FREIGHT_NO_METHODS")?"CJ_FREIGHT_NO_METHODS":"CJ_CATALOG_PRICING_UNAVAILABLE";throw new CatalogPricingResolutionError(terminal,{variantsExamined:snapshot.variants.length,eligibleVariants:variants.length,attempts,terminalErrorCode:terminal});}
   return{status:"VERIFIED_LIVE_FREIGHT",evidence:{variantsExamined:snapshot.variants.length,eligibleVariants:variants.length,attempts,supplierVariantId:best.variant.supplierVariantId,quantity:1,originCountry:best.freight.selected.originCountry,destinationCountry,freightMethod:best.freight.selected.name,freightAmount:best.freight.selected.amount,freightCurrency:best.freight.selected.currency,totalIncludedCost:best.calculation.totalIncludedCost,targetMargin:best.calculation.targetMargin,sellingCurrency,referenceSellingPrice:best.presentment.finalSellingPrice,fx:{provider:best.fx.provider,rate:best.fx.rate,effectiveAt:best.fx.effectiveAt},calculatedAt:new Date().toISOString(),source:"CJ_LIVE_FREIGHT_VERIFIED_FX"}};
 }
