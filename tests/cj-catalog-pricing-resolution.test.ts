@@ -25,9 +25,15 @@ test("catalog pricing tolerates one failed origin and chooses another valid orig
  assert.deepEqual(calls,["CN","US"]);assert.equal(result.evidence.originCountry,"US");
 });
 
-test("catalog pricing chooses the cheapest valid origin and cheapest complete variant price deterministically",async()=>{
- const product=snapshot([variant("CJ-A",10,["CN","DE"]),variant("CJ-B",5,["CN"])]),result=await verifiedCatalogPricing(provider(product,async input=>quote(input,input.variantId==="CJ-A"?(input.originCountry==="CN"?"8":"2"):"5")),product,"FR","USD",{fx:identityFx});
- assert.equal(result.evidence.supplierVariantId,"CJ-B");assert.equal(result.evidence.originCountry,"CN");assert.equal(Number(result.evidence.referenceSellingPrice),12.5);assert.equal(result.evidence.attempts.length,2);
+test("catalog reference pricing uses the first purchasable variant and its cheapest valid origin",async()=>{
+ const calls:string[]=[],product=snapshot([variant("CJ-A",10,["CN","DE"]),variant("CJ-B",5,["CN"])]),result=await verifiedCatalogPricing(provider(product,async input=>{calls.push(`${input.variantId}:${input.originCountry}`);return quote(input,input.variantId==="CJ-A"?(input.originCountry==="CN"?"8":"2"):"5");}),product,"FR","USD",{fx:identityFx});
+ assert.equal(result.evidence.supplierVariantId,"CJ-A");assert.equal(result.evidence.originCountry,"DE");assert.equal(Number(result.evidence.referenceSellingPrice),15);assert.equal(result.evidence.attempts.length,1);assert.equal(result.evidence.variantsProbed,1);assert.equal(result.evidence.referenceStrategy,"FIRST_PURCHASABLE_VARIANT_WITH_FREIGHT");assert.deepEqual(calls,["CJ-A:CN","CJ-A:DE"]);
+});
+
+test("catalog reference pricing stops probing variants after the first usable one",async()=>{
+ const product=snapshot([variant("CJ-A",10,["CN"]),variant("CJ-B",9,["CN"]),variant("CJ-C",8,["CN"]),variant("CJ-D",7,["CN"])]),calls:string[]=[];
+ const result=await verifiedCatalogPricing(provider(product,async input=>{calls.push(input.variantId);if(input.variantId==="CJ-A")throw new Error("CJ_FREIGHT_NO_METHODS");return quote(input,"5");}),product,"FR","USD",{fx:identityFx});
+ assert.equal(result.evidence.supplierVariantId,"CJ-B");assert.deepEqual(result.evidence.attempts.map(item=>item.supplierVariantId),["CJ-A","CJ-B"]);assert.deepEqual(calls,["CJ-A","CJ-B"]);assert.equal(result.evidence.variantsProbed,2);
 });
 
 test("catalog pricing fails closed with useful evidence when no variant or freight is usable",async()=>{

@@ -12,6 +12,7 @@ import { classifyCjProductByTaxonomyId } from "@/lib/suppliers/cj-taxonomy-class
 import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
 
 const PREVIEW_ITEM_LIMIT=100;
+export const PREVIEW_CONCURRENCY=4;
 const CJ_BASE_URL="https://developers.cjdropshipping.com/api2.0/v1";
 const PREVIEW_TIMEOUT_MS=12_000;
 const TRANSIENT_RETRY_DELAYS_MS=[350,900] as const;
@@ -21,6 +22,7 @@ function list(value:unknown){return Array.isArray(value)?value:[];}
 function normalized(value:unknown){return text(value).toUpperCase();}
 function sleep(ms:number){return new Promise(resolve=>setTimeout(resolve,ms));}
 function transientCode(code:string){return code==="CJ_API_REQUEST_FAILED"||code==="CJ_UNAVAILABLE"||code==="CJ_PREVIEW_TIMEOUT";}
+async function mapPreviewBounded<T,R>(items:readonly T[],worker:(item:T)=>Promise<R>){const results=new Array<R>(items.length),cursor={value:0},ceiling=Math.min(PREVIEW_CONCURRENCY,items.length);async function run(){for(;;){const index=cursor.value++;if(index>=items.length)return;results[index]=await worker(items[index]);}}await Promise.all(Array.from({length:ceiling},()=>run()));return results;}
 
 async function cjGetOnce(path:string){
   for(let authAttempt=0;authAttempt<2;authAttempt+=1){
@@ -63,14 +65,13 @@ export async function POST(request:Request){
     const body=await request.json().catch(()=>({})) as {identifiers?:unknown};const identifiers=catalogIdentifiers(body.identifiers);
     if(identifiers.length===0||identifiers.length>PREVIEW_ITEM_LIMIT)throw new Error("SUPPLIER_BULK_INPUT_INVALID");
     if(!cjAuth.isConfigured())return NextResponse.json({error:"SUPPLIER_NOT_CONFIGURED"},{status:503});
-    const previews=[];
-    for(const identifier of identifiers){
+    const previews=await mapPreviewBounded(identifiers,async identifier=>{
       try{
         const product=await resolvePreviewProduct(identifier),snapshot=normalizeCjProduct(product,[],[]);if(!snapshot.supplierProductId)throw new Error("CJ_PRODUCT_NOT_FOUND");
         const classification=await classifyCjProductByTaxonomyId(snapshot),suggested=classification.canonicalCategoryId,suggestedCanonicalCategoryLabel=suggested?classification.subcategoryLabel??canonicalLeafCategory(suggested)?.label??null:null,requiresReview=classification.status!=="SUGGESTED"||!suggested||!suggestedCanonicalCategoryLabel;
-        previews.push({supplierProductId:identifier,title:snapshot.title,classificationStatus:classification.status,classificationConfidence:classification.confidence,classificationEvidence:[...classification.evidence,"PREVIEW_SOURCE:CJ_PRODUCT_QUERY","AUTHORITATIVE_IMPORT_RECHECK_REQUIRED"],requiresReview,classificationRequiresReview:requiresReview,complianceRequiresReview:false,complianceStatus:"IMPORT_RECHECK_REQUIRED",suggestedCanonicalCategoryId:suggested,suggestedCanonicalCategoryLabel,errorCode:null,canonicalCategoryId:suggested});
-      }catch(error){const code=error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED";previews.push({supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:["PREVIEW_LOOKUP_FAILED",`ERROR:${code}`],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:"IMPORT_RECHECK_REQUIRED",errorCode:code,canonicalCategoryId:null});}
-    }
+        return{supplierProductId:identifier,title:snapshot.title,classificationStatus:classification.status,classificationConfidence:classification.confidence,classificationEvidence:[...classification.evidence,"PREVIEW_SOURCE:CJ_PRODUCT_QUERY","AUTHORITATIVE_IMPORT_RECHECK_REQUIRED"],requiresReview,classificationRequiresReview:requiresReview,complianceRequiresReview:false,complianceStatus:"IMPORT_RECHECK_REQUIRED",suggestedCanonicalCategoryId:suggested,suggestedCanonicalCategoryLabel,errorCode:null,canonicalCategoryId:suggested};
+      }catch(error){const code=error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED";return{supplierProductId:identifier,title:"",classificationStatus:"UNRESOLVED",classificationConfidence:0,classificationEvidence:["PREVIEW_LOOKUP_FAILED",`ERROR:${code}`],suggestedCanonicalCategoryId:null,suggestedCanonicalCategoryLabel:null,requiresReview:true,classificationRequiresReview:true,complianceRequiresReview:false,complianceStatus:"IMPORT_RECHECK_REQUIRED",errorCode:code,canonicalCategoryId:null};}
+    });
     return NextResponse.json({ok:true,previews});
   }catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});if(error instanceof MutationOriginError)return NextResponse.json({error:error.message},{status:403});const code=error instanceof Error?error.message:"CJ_CLASSIFICATION_FAILED",status=code.includes("INVALID")||code.includes("LIMIT")?400:500;return NextResponse.json({error:code},{status});}
 }

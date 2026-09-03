@@ -12,6 +12,7 @@ import type { SupplierProductSnapshot } from "./types";
 import { createImportedProductContent } from "../product-content";
 
 type Database = PrismaClient;
+export const SUPPLIER_MEDIA_IMPORT_CONCURRENCY=4;
 
 function slugify(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0,70) || "supplier-product"; }
 function centsSafe(value: number | null) { return value != null && Number.isFinite(value) && value >= 0 ? value.toFixed(2) : null; }
@@ -20,6 +21,8 @@ function semanticVariants(variants: Awaited<ReturnType<SupplierCatalogProvider["
   const names=variants[0].optionValues!.map((item)=>item.name);
   return names.length>0&&new Set(names).size===names.length&&variants.every((variant)=>variant.optionValues!.length===names.length&&variant.optionValues!.every((item,index)=>item.name===names[index]))?variants:null;
 }
+async function mapMediaBounded<T,R>(items:readonly T[],worker:(item:T)=>Promise<R>){const results=new Array<R>(items.length),cursor={value:0},ceiling=Math.min(SUPPLIER_MEDIA_IMPORT_CONCURRENCY,items.length);async function run(){for(;;){const index=cursor.value++;if(index>=items.length)return;results[index]=await worker(items[index]);}}await Promise.all(Array.from({length:ceiling},()=>run()));return results;}
+function importableMedia(media:SupplierProductSnapshot["media"]){const selected:SupplierProductSnapshot["media"]=[],counts={images:0,videos:0};for(const source of media){if(source.type==="VIDEO"){if(counts.videos>=1)continue;counts.videos++;}else{if(counts.images>=MAX_PRODUCT_IMAGES)continue;counts.images++;}selected.push(source);}return selected;}
 
 async function createVariantStructure(tx: Prisma.TransactionClient, input:{productId:string;variants:Awaited<ReturnType<SupplierCatalogProvider["getProduct"]>>["variants"];connectionId:string;provider:"CJ";automaticPricing:ReturnType<typeof calculateSupplierSnapshotPrices>|null;imageBySource:Map<string,string>}) {
   const semantic=semanticVariants(input.variants),valueIds=new Map<string,string>(),visualImages=new Map<string,string>();
@@ -44,7 +47,7 @@ async function uniqueSlug(db: Database, storeId: string, title: string) {
   return slug;
 }
 
-export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification}) {
+export async function importSupplierProduct(db: Database, provider: SupplierCatalogProvider, mediaProvider: ProductMediaProvider, input: {storeId:string;connectionId:string;ownerType:"PLATFORM"|"SELLER";supplierProductId:string;sellingPrice?:number|null;sellingCurrency?:string;category:string;quarantine?:boolean;snapshot?:SupplierProductSnapshot;classification?:CjClassification;syncReviews?:boolean}) {
   if (!provider.isConfigured()) throw new Error("SUPPLIER_NOT_CONFIGURED");
   const manualPrice = input.sellingPrice == null ? null : Number(input.sellingPrice);
   if (manualPrice != null && (!Number.isFinite(manualPrice) || manualPrice <= 0)) throw new Error("SELLING_PRICE_INVALID");
@@ -63,14 +66,10 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   const sellingPrice = manualPrice == null ? automaticPricing!.basePrice : manualPrice.toFixed(2);
   const exists = await db.supplierProductLink.findUnique({where:{connectionId_supplierProductId:{connectionId:input.connectionId,supplierProductId:snapshot.supplierProductId}},select:{productId:true}});
   if (exists) throw new Error("SUPPLIER_PRODUCT_ALREADY_IMPORTED");
-  const copied: StoredProductMedia[] = [];
-  const copiedSources: typeof snapshot.media = [];
+  const copiedSources=importableMedia(snapshot.media);
+  const copied:StoredProductMedia[]=await mapMediaBounded(copiedSources,source=>mediaProvider.copyRemote(source));
   const imageBySource=new Map<string,string>();
-  for (const source of snapshot.media) {
-    if (source.type === "VIDEO" && copied.some((item) => item.type === "VIDEO")) continue;
-    if (source.type === "IMAGE" && copied.filter((item) => item.type === "IMAGE").length >= MAX_PRODUCT_IMAGES) continue;
-    const stored=await mediaProvider.copyRemote(source);copied.push(stored);copiedSources.push(source);if(source.type==="IMAGE")imageBySource.set(source.url,stored.url);
-  }
+  for(const [index,source] of copiedSources.entries()){const stored=copied[index];if(source.type==="IMAGE")imageBySource.set(source.url,stored.url);}
   const images = copied.filter((item) => item.type === "IMAGE").map((item) => item.url);
   const content=createImportedProductContent({title:snapshot.title,description:snapshot.description,rawMetadata:snapshot.rawMetadata,sourceLocale:"en"});
   const slug = await uniqueSlug(db,input.storeId,content.title);
@@ -88,7 +87,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     if (variantImageAssignments.length) await replaceProductVariantImages(tx,product.id,images,variantImageAssignments);
     return product;
   });
-  if(provider.getProductReviews){const link=await db.supplierProductLink.findUnique({where:{productId:product.id},select:{id:true}});if(link)await syncSupplierReviews(db,provider,{productId:product.id,supplierProductLinkId:link.id,supplierProductId:snapshot.supplierProductId});}
+  if(input.syncReviews!==false&&provider.getProductReviews){const link=await db.supplierProductLink.findUnique({where:{productId:product.id},select:{id:true}});if(link)await syncSupplierReviews(db,provider,{productId:product.id,supplierProductLinkId:link.id,supplierProductId:snapshot.supplierProductId});}
   return product;
 }
 
