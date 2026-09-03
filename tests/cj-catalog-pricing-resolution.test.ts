@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {Prisma} from "@prisma/client";
 import {MARKETPLACE_CANONICAL_LEAF_CATEGORIES} from "../lib/marketplace-category-registry";
-import {CatalogPricingResolutionError,processCatalogImportJob,retryCatalogImportItems,verifiedCatalogPricing} from "../lib/suppliers/supplier-catalog-jobs";
+import {CATALOG_FREIGHT_CONCURRENCY,CatalogPricingResolutionError,processCatalogImportJob,retryCatalogImportItems,verifiedCatalogPricing} from "../lib/suppliers/supplier-catalog-jobs";
 import type {CjFreightQuote} from "../lib/suppliers/cj-freight";
 import {calculateSupplierSnapshotPrices} from "../lib/suppliers/pricing";
 import type {SupplierCatalogProvider,SupplierProductSnapshot,SupplierVariantSnapshot} from "../lib/suppliers/types";
@@ -28,6 +28,12 @@ test("catalog pricing tolerates one failed origin and chooses another valid orig
 test("catalog pricing chooses the cheapest valid origin and cheapest complete variant price deterministically",async()=>{
  const product=snapshot([variant("CJ-A",10,["CN","DE"]),variant("CJ-B",5,["CN"])]),result=await verifiedCatalogPricing(provider(product,async input=>quote(input,input.variantId==="CJ-A"?(input.originCountry==="CN"?"8":"2"):"5")),product,"FR","USD",{fx:identityFx});
  assert.equal(result.evidence.supplierVariantId,"CJ-B");assert.equal(result.evidence.originCountry,"CN");assert.equal(Number(result.evidence.referenceSellingPrice),12.5);assert.equal(result.evidence.attempts.length,2);
+});
+
+test("catalog pricing probes variants concurrently but remains bounded and deterministic",async()=>{
+ const product=snapshot([variant("CJ-A",10,["CN"]),variant("CJ-B",9,["CN"]),variant("CJ-C",8,["CN"]),variant("CJ-D",7,["CN"])]);let active=0,peak=0;
+ const result=await verifiedCatalogPricing(provider(product,async input=>{active++;peak=Math.max(peak,active);await new Promise(resolve=>setTimeout(resolve,30));active--;return quote(input,String(input.variantId==="CJ-D"?1:5));}),product,"FR","USD",{fx:identityFx});
+ assert.equal(CATALOG_FREIGHT_CONCURRENCY,2);assert.equal(peak,2);assert.equal(result.evidence.supplierVariantId,"CJ-D");assert.deepEqual(result.evidence.attempts.map(item=>item.supplierVariantId),["CJ-A","CJ-B","CJ-C","CJ-D"]);
 });
 
 test("catalog pricing fails closed with useful evidence when no variant or freight is usable",async()=>{
