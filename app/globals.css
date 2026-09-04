@@ -1343,7 +1343,7 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 @media(max-width:350px){.buyerHomePage .discoveryHero{padding-inline:6px}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex-basis:min(72vw,216px)!important}.marketplaceSectionHeading{align-items:center}.marketplaceSectionHeading>div{gap:7px}.marketplaceRailSection.isCarousel .marketplaceViewAll{font-size:9px;padding-inline:7px}.marketplaceCarouselArrow{width:38px;height:38px}}
 
 /* Strict homepage rhythm: empty/hidden regions collapse and visible sections keep one consistent gap. */
-.buyerHomePage:not(.searchResultsPage) .todijoTrustPrimary{margin:16px auto 18px;padding-block:18px}
+.buyerHomePage:not(.searchResultsPage) .todijoTrustPrimary{margin:16px auto 0;padding-block:18px 0}
 .buyerHomePage:not(.searchResultsPage) .categoryShowcase,
 .buyerHomePage:not(.searchResultsPage) .marketplaceRailSection,
 .buyerHomePage:not(.searchResultsPage) .featuredStores,
