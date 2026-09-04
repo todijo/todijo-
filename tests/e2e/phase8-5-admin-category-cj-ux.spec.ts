@@ -48,16 +48,30 @@ test("CJ import reports progress immediately and prevents duplicate submission",
   expect(createCalls).toBe(1);
 });
 
-test("homepage merchandising tiers and store threshold remain responsive", async ({ page }) => {
-  for (const width of [1440, 768, 390, 320]) {
+for (const width of [1440, 768, 390, 320]) {
+  test(`homepage hero merchandising and normal product grid remain responsive at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/en/e2e-ux?view=homepage-tiered", { waitUntil: "domcontentloaded" });
+    await page.goto("/en/e2e-ux?view=homepage-hero", { waitUntil: "domcontentloaded" });
     await dismissCookieConsent(page);
-    await expect(page.locator(".homepageProductTier-large .discoveryCard")).toHaveCount(6);
-    await expect(page.locator(".homepageProductTier-medium .discoveryCard")).toHaveCount(8);
-    await expect(page.locator(".homepageProductTier-small .discoveryCard")).toHaveCount(4);
+    await expect(page.locator(".heroProductCollage .heroProductCard")).toHaveCount(6);
+    await expect(page.locator(".heroProduct-large")).toHaveCount(1);
+    await expect(page.locator(".heroProduct-medium")).toHaveCount(1);
+    await expect(page.locator(".heroProduct-small")).toHaveCount(4);
+    await expect(page.locator(".discoveryProductGrid .discoveryCard")).toHaveCount(18);
+    await expect(page.locator(".homepageTieredProducts")).toHaveCount(0);
     await expect(page.locator(".featuredStores")).toHaveCount(1);
     if (width > 860) await expect(page.locator(".featuredStores")).toBeVisible();
     expect(await page.locator("html").evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
-  }
+  });
+}
+
+test("homepage below the store threshold has no store wrapper or reserved gap", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/en/e2e-ux?view=homepage-hero-no-stores", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".featuredStores")).toHaveCount(0);
+  const gap = await page.locator(".marketplaceDiscoverySections").evaluate((section) => {
+    const last = section.lastElementChild;
+    return last ? section.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom : 0;
+  });
+  expect(gap).toBeLessThan(40);
 });

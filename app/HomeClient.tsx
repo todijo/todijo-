@@ -19,7 +19,7 @@ import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import {productPath} from "@/lib/product-seo";
 import PremiumHeroSlider from "@/components/PremiumHeroSlider";
 import { localizedCategoryTreeValue } from "@/lib/category-tree-localization";
-import { homepageProductTiers, shouldShowHomepageStores } from "@/lib/homepage-product-tiers";
+import { selectDistinctHeroProducts, shouldShowHomepageStores } from "@/lib/homepage-merchandising";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -74,9 +74,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
 
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length, [filters]);
-  const featuredProducts = heroProducts.filter((product) => product.image).slice(0, 5);
+  const featuredProducts = selectDistinctHeroProducts(heroProducts.filter((product) => product.image));
   const featuredCategories = categories.slice(0, 4);
-  const productTiers = homepageProductTiers(visibleProducts);
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 860px)").matches;
     setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
@@ -138,7 +137,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
       <div id="categories" className="marketCategoryStickyBoundary"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters"/></div>
 
       <section className="discoveryHero"><div className="container premiumHeroContainer">
-        <PremiumHeroSlider previous={t.previous} next={t.next} productCollage={featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>{featuredProducts.slice(0,3).map((product, index) => <a href={productPath(activeLocale,product.id,product.name)} className={`heroProductCard heroProduct-${index + 1}`} key={product.id}><Image src={product.image!} alt={product.name} fill sizes="(max-width: 760px) 42vw, 220px" unoptimized/><span><strong>{product.name}</strong><b><BuyerProductPrice productId={product.id} sourcePrice={Number(product.price)} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice}/></b></span></a>)}</div> : <div className="heroCategoryHighlights"><div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>{featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><SemanticCategoryIcon category={category} size={18}/>{displayCategory(category)}</button>)}</div>}>
+        <PremiumHeroSlider previous={t.previous} next={t.next} productCollage={featuredProducts.length > 0 ? <div className={`heroProductCollage count-${featuredProducts.length}`}>{featuredProducts.map((product, index) => <a href={productPath(activeLocale,product.id,product.name)} className={`heroProductCard heroProduct-${index + 1} ${index === 0 ? "heroProduct-large" : index === 1 ? "heroProduct-medium" : "heroProduct-small"}`} key={product.id}><Image src={product.image!} alt={product.name} fill sizes={index === 0 ? "(max-width: 860px) 42vw, 16vw" : index === 1 ? "(max-width: 860px) 28vw, 11vw" : "(max-width: 860px) 22vw, 8vw"} unoptimized/><span><strong>{product.name}</strong><b><BuyerProductPrice productId={product.id} sourcePrice={Number(product.price)} sourceCurrency={product.currency} requiresAuthoritativePrice={product.requiresAuthoritativePrice}/></b></span></a>)}</div> : <div className="heroCategoryHighlights"><div><Store size={28} aria-hidden="true"/><span>{h("discoverCategories")}</span></div>{featuredCategories.map((category) => <button type="button" key={category} onClick={() => chooseCategory(category)}><SemanticCategoryIcon category={category} size={18}/>{displayCategory(category)}</button>)}</div>}>
           <div className="discoveryHeroContent">
             <span className="badge"><Sparkles size={15} aria-hidden="true"/>{h("heroEyebrow")}</span>
             <h1>{h("heroTitle")}</h1>
@@ -177,12 +176,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
             <div><h2 tabIndex={-1}>{filters.q ? `${t.products}: “${filters.q}”` : filters.category ? `${t.products}: ${displayCategory(filters.category)}` : t.products}</h2><span aria-live="polite">{total} {t.results}</span></div>
           </div>
 
-          {visibleProducts.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : resultsOnly || activeCount > 0 ? <div className="discoveryProductGrid">
+          {visibleProducts.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">
             {visibleProducts.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
-          </div> : <div className="homepageTieredProducts">
-            <div className="homepageProductTier homepageProductTier-large">{productTiers.large.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut} size="large"/>)}</div>
-            {productTiers.medium.length > 0 && <div className="homepageProductTier homepageProductTier-medium">{productTiers.medium.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>)}</div>}
-            {productTiers.small.length > 0 && <div className="homepageProductTier homepageProductTier-small">{productTiers.small.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut} size="small"/>)}</div>}
           </div>}
 
           <div ref={loadMoreRef} className="mobileInfiniteSentinel" aria-live="polite">{loadingMore ? <span>…</span> : null}</div>

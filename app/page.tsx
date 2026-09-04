@@ -2,6 +2,7 @@ import { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import HomeClient from "./HomeClient";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
+import { HOMEPAGE_HERO_PRODUCT_COUNT } from "@/lib/homepage-merchandising";
 import { buyerVisibleVariantWhere, productGenerallyAvailableWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
@@ -175,7 +176,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
 
   // The hero is merchandising, not a "latest products" rail: choose a fresh random window
   // on every server render while preserving all public-access rules.
-  const heroTake = Math.min(5, heroProductCount);
+  const heroTake = Math.min(HOMEPAGE_HERO_PRODUCT_COUNT, heroProductCount);
   const heroSkip = heroProductCount > heroTake ? Math.floor(Math.random() * (heroProductCount - heroTake + 1)) : 0;
   const heroRows = heroTake > 0 ? await prisma.product.findMany({
     where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } },
