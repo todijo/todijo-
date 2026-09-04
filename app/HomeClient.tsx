@@ -19,6 +19,7 @@ import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import {productPath} from "@/lib/product-seo";
 import PremiumHeroSlider from "@/components/PremiumHeroSlider";
 import { localizedCategoryTreeValue } from "@/lib/category-tree-localization";
+import { homepageProductTiers, shouldShowHomepageStores } from "@/lib/homepage-product-tiers";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -75,6 +76,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length, [filters]);
   const featuredProducts = heroProducts.filter((product) => product.image).slice(0, 5);
   const featuredCategories = categories.slice(0, 4);
+  const productTiers = homepageProductTiers(visibleProducts);
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 860px)").matches;
     setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
@@ -165,7 +167,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
         <ProductRail title={h("newArrivals")} titleHref={`/${activeLocale}?sort=newest#products`} products={newArrivals.slice(0,10)} soldOut={t.soldOut} viewAll={h("viewAll")} carousel previous={t.previous} next={t.next}/>
         <ProductRail id="best-sellers" title={h("bestSellers")} titleHref={`/${activeLocale}/best-sellers`} products={bestSellers} soldOut={t.soldOut} icon="shopping" viewAll={h("viewAll")}/>
         <aside className="container discoveryPromoBanner"><div><span>{d("discoverLabel")}</span><h2>{d("discoverTitle")}</h2><p>{d("discoverText")}</p></div><a href={`/${activeLocale}/store`}>{d("storesTitle")}<ArrowRight size={17} aria-hidden="true"/></a><ShoppingBag size={82} aria-hidden="true"/></aside>
-        {stores.length > 0 && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading marketplaceSectionHeading storeSectionHeading"><div><span className="marketplaceHeadingIcon"><Store size={20} aria-hidden="true"/></span><span><small>{d("storesLabel")}</small><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></span></div><a className="marketplaceViewAll" href={`/${activeLocale}/store`}>{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={58} height={58} unoptimized/> : <span><Store size={25} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="110px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
+        {shouldShowHomepageStores(stores.length) && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading marketplaceSectionHeading storeSectionHeading"><div><span className="marketplaceHeadingIcon"><Store size={20} aria-hidden="true"/></span><span><small>{d("storesLabel")}</small><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></span></div><a className="marketplaceViewAll" href={`/${activeLocale}/store`}>{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={58} height={58} unoptimized/> : <span><Store size={25} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="110px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
       </div>
 
       <section id="products" className="container discoveryLayout">
@@ -175,8 +177,12 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
             <div><h2 tabIndex={-1}>{filters.q ? `${t.products}: “${filters.q}”` : filters.category ? `${t.products}: ${displayCategory(filters.category)}` : t.products}</h2><span aria-live="polite">{total} {t.results}</span></div>
           </div>
 
-          {visibleProducts.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">
+          {visibleProducts.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : resultsOnly || activeCount > 0 ? <div className="discoveryProductGrid">
             {visibleProducts.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
+          </div> : <div className="homepageTieredProducts">
+            <div className="homepageProductTier homepageProductTier-large">{productTiers.large.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut} size="large"/>)}</div>
+            {productTiers.medium.length > 0 && <div className="homepageProductTier homepageProductTier-medium">{productTiers.medium.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>)}</div>}
+            {productTiers.small.length > 0 && <div className="homepageProductTier homepageProductTier-small">{productTiers.small.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut} size="small"/>)}</div>}
           </div>}
 
           <div ref={loadMoreRef} className="mobileInfiniteSentinel" aria-live="polite">{loadingMore ? <span>…</span> : null}</div>

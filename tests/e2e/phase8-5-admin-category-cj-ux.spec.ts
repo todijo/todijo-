@@ -47,3 +47,17 @@ test("CJ import reports progress immediately and prevents duplicate submission",
   await expect(page.locator(".supplierImportError")).toHaveAttribute("role", "alert");
   expect(createCalls).toBe(1);
 });
+
+test("homepage merchandising tiers and store threshold remain responsive", async ({ page }) => {
+  for (const width of [1440, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/en/e2e-ux?view=homepage-tiered", { waitUntil: "domcontentloaded" });
+    await dismissCookieConsent(page);
+    await expect(page.locator(".homepageProductTier-large .discoveryCard")).toHaveCount(6);
+    await expect(page.locator(".homepageProductTier-medium .discoveryCard")).toHaveCount(8);
+    await expect(page.locator(".homepageProductTier-small .discoveryCard")).toHaveCount(4);
+    await expect(page.locator(".featuredStores")).toHaveCount(1);
+    if (width > 860) await expect(page.locator(".featuredStores")).toBeVisible();
+    expect(await page.locator("html").evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  }
+});
