@@ -25,7 +25,7 @@ test("production service worker registration is scope-bound and bypasses HTTP ca
 });
 
 test("service worker versions caches and removes obsolete caches", () => {
-  assert.match(worker, /CACHE_VERSION = "mobile-brand-v2"/);
+  assert.match(worker, /CACHE_VERSION = "mobile-brand-v3"/);
   assert.match(worker, /key\.startsWith\(CACHE_PREFIX\)/);
   assert.match(worker, /caches\.delete\(key\)/);
   assert.doesNotMatch(worker, /skipWaiting/);

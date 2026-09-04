@@ -29,7 +29,7 @@ test("five feature cards keep artwork and copy in separate zones", () => {
   assert.match(home, /trustArtworkZone/);
   assert.match(home, /trustContentZone/);
   assert.equal((home.match(/loading="eager"/g) ?? []).length >= 1, true);
-  assert.match(home, /hero-shopping\.webp/);
+  assert.match(home, /images\/auth\/secure-login\.webp","confidence"/);
   assert.match(css, /\.todijoTrustPrimary \.todijoTrustGrid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(css, /article:after\{display:none\}/);
 });
