@@ -149,10 +149,10 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
       </div></section>
 
       <section className="container todijoTrust todijoTrustPrimary" aria-labelledby="todijo-trust-title"><div className="todijoTrustGrid">{[
-        ["/images/homepage/benefit-payment.webp","secure",LockKeyhole,d("secureTitle"),d("secureText")],
-        ["/images/homepage/benefit-delivery.webp","delivery",Truck,d("deliveryTitle"),d("deliveryText")],
-        ["/images/homepage/benefit-messages.webp","support",Headphones,d("messagesTitle"),d("messagesText")],
-        ["/images/homepage/benefit-sellers.webp","marketplace",Store,d("independentTitle"),d("independentText")],
+        ["/images/homepage/trust-payment-photo.webp","secure",LockKeyhole,d("secureTitle"),d("secureText")],
+        ["/images/homepage/trust-delivery-photo.webp","delivery",Truck,d("deliveryTitle"),d("deliveryText")],
+        ["/images/homepage/trust-messages-photo.webp","support",Headphones,d("messagesTitle"),d("messagesText")],
+        ["/images/homepage/trust-sellers-photo.webp","marketplace",Store,d("independentTitle"),d("independentText")],
         ["/images/auth/secure-login.webp","confidence",ShieldCheck,d("confidenceTitle"),d("confidenceText")],
       ].map(([image,kind,Icon,title,text],index)=><article key={String(image)}><div className="trustArtworkZone"><Image className="trustArtwork" src={String(image)} alt="" fill loading="eager" sizes="(max-width: 860px) 82vw, (max-width: 1240px) 46vw, 240px"/></div><div className="trustContentZone"><span className={`trustIcon ${kind}`}><Icon/></span><div><h2 id={index===0?"todijo-trust-title":undefined}>{String(title)}</h2><p>{String(text)}</p></div></div></article>)}</div></section>
 
