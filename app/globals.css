@@ -1314,7 +1314,7 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 @media(max-width:420px){.buyerHomePage .discoveryHeroGrid{padding:22px 14px 15px}.buyerHomePage .discoveryHero h1{font-size:31px}.buyerHomePage .discoveryHeroActions{display:grid;grid-template-columns:1fr}.buyerHomePage .discoveryHeroCta{width:100%;justify-content:center}.heroProductCollage{min-height:190px;height:190px}.todijoTrustPrimary .todijoTrustGrid article{flex-basis:86vw}.marketplaceSectionHeading h2{font-size:19px}.marketplaceSectionHeading small{font-size:9px}.marketplaceViewAll{font-size:10px}.featuredStoreCard{flex-basis:90vw}.marketplaceFooterCompact{display:flex}}
 
 /* Premium homepage and approved 3D Todijo identity */
-.todijoBrand{gap:8px}.todijoBrandMark{object-fit:cover;border-radius:12px;filter:drop-shadow(0 4px 9px rgba(93,25,207,.28))}.todijoWordmark{color:inherit}.todijoWordmark>span{color:#b967ff!important}
+.todijoBrand{gap:9px}.todijoBrandMark{object-fit:cover;border-radius:11px;filter:drop-shadow(0 4px 9px rgba(93,25,207,.32))}.todijoWordmark{color:inherit;font-weight:950;letter-spacing:-1.1px;text-shadow:0 1px 10px rgba(26,4,62,.22)}.todijoWordmark>span{color:#d59aff!important}
 .authLogo{min-height:58px;padding-inline-start:66px;display:flex;align-items:center;background:url('/images/brand/todijo-mark.png') left center/56px 56px no-repeat;color:#fff}.authLogo span{color:#ba68ff}[dir=rtl] .authLogo{padding-inline-start:0;padding-inline-end:66px;background-position:right center}
 .buyerHomePage .discoveryHero{padding:18px 0 10px;background:linear-gradient(180deg,#f9f5ff,#fff)}
 .premiumHeroSlider{position:relative;height:clamp(470px,42vw,610px);overflow:hidden;border-radius:30px;background:#100331;box-shadow:0 30px 75px rgba(75,17,145,.28);touch-action:pan-y;isolation:isolate}
@@ -1333,13 +1333,35 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 
 /* Final homepage polish: near-full-width hero and a single-row Nouveautés rail. */
 .buyerHomePage .premiumHeroContainer{width:min(1720px,calc(100% - 24px))}
-.buyerHomePage .premiumHeroSlider{height:clamp(410px,34vw,500px)}
+.buyerHomePage .premiumHeroSlider{height:clamp(250px,21vw,300px)}
+.buyerHomePage .premiumHeroCopy{padding:24px 52px}.buyerHomePage .premiumHeroCopy .badge{padding:5px 9px;font-size:10px}.buyerHomePage .premiumHeroCopy h1{margin:8px 0 6px;font-size:clamp(29px,3vw,43px);line-height:1}.buyerHomePage .premiumHeroCopy p{font-size:13px;line-height:1.4}.buyerHomePage .premiumHeroCopy .discoveryHeroActions{margin-top:12px}.buyerHomePage .premiumHeroCopy .discoveryHeroCta{min-height:40px;padding-inline:14px;font-size:12px}.buyerHomePage .premiumHeroCopy .discoveryHeroSignals{margin-top:10px;gap:10px}.premiumHeroProducts{inset:7% 4% 7% auto;width:39%;padding:8px;border-radius:19px}[dir=rtl] .premiumHeroProducts{inset:7% auto 7% 4%}.premiumHeroProducts .heroProductCollage{gap:6px}.premiumHeroProducts .heroProductCard{border-radius:11px}.premiumHeroProducts .heroProductCard>span{padding:18px 7px 6px}.premiumHeroProducts .heroProductCard strong{font-size:9px}.premiumHeroProducts .heroProductCard b{font-size:9px}
 .marketplaceCarouselFrame{position:relative}.marketplaceCarouselArrow{position:absolute;z-index:8;top:50%;width:54px;height:54px;padding:0;border:1px solid rgba(109,40,217,.2);border-radius:50%;background:linear-gradient(145deg,#7c3aed,#5b21b6);color:#fff;display:grid;place-items:center;transform:translateY(-50%);cursor:pointer;box-shadow:0 13px 30px rgba(70,29,112,.3)}.marketplaceCarouselArrow.previous{inset-inline-start:-27px}.marketplaceCarouselArrow.next{inset-inline-end:-27px}.marketplaceCarouselArrow:hover{background:linear-gradient(145deg,#8b4af0,#6421c7);transform:translateY(-50%) scale(1.06)}.marketplaceCarouselArrow:focus-visible{outline:4px solid rgba(124,58,237,.3);outline-offset:3px}.marketplaceCarouselArrow svg{width:24px;height:24px}[dir=rtl] .marketplaceCarouselArrow svg{transform:scaleX(-1)}
 .marketplaceRailSection.isCarousel .marketplaceProductRail{display:grid!important;grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:calc((100% - 56px)/5);gap:14px;overflow-x:auto!important;overflow-y:hidden;padding:4px 0 20px;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-inline:contain}.marketplaceRailSection.isCarousel .marketplaceProductRail::-webkit-scrollbar{display:none}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{display:flex!important;min-width:0;scroll-snap-align:start;scroll-snap-stop:normal}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryImageWrap{height:190px}
 @media(max-width:1100px) and (min-width:861px){.marketplaceRailSection.isCarousel .marketplaceProductRail{grid-auto-columns:calc((100% - 42px)/4)}.marketplaceCarouselArrow.previous{inset-inline-start:5px}.marketplaceCarouselArrow.next{inset-inline-end:5px}}
-@media(max-width:860px){.buyerHomePage .premiumHeroContainer{width:100%}.buyerHomePage .premiumHeroSlider{height:500px}.marketplaceRailSection.isCarousel .marketplaceProductRail{display:flex!important;gap:11px;padding:4px 3px 15px}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex:0 0 min(62vw,238px)!important}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryImageWrap{height:auto}.marketplaceCarouselArrow{width:44px;height:44px}.marketplaceCarouselArrow.previous{inset-inline-start:4px}.marketplaceCarouselArrow.next{inset-inline-end:4px}.marketplaceCarouselArrow svg{width:20px;height:20px}}
-@media(max-width:430px){.buyerHomePage .premiumHeroSlider{height:470px}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex-basis:min(68vw,224px)!important}.marketplaceCarouselArrow{width:40px;height:40px}.marketplaceCarouselArrow svg{width:18px;height:18px}.marketplaceRailSection.isCarousel .marketplaceViewAll{padding-inline:9px}}
-@media(max-width:350px){.buyerHomePage .discoveryHero{padding-inline:6px}.buyerHomePage .premiumHeroSlider{height:450px}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex-basis:min(72vw,216px)!important}.marketplaceSectionHeading{align-items:center}.marketplaceSectionHeading>div{gap:7px}.marketplaceRailSection.isCarousel .marketplaceViewAll{font-size:9px;padding-inline:7px}.marketplaceCarouselArrow{width:38px;height:38px}}
+@media(max-width:860px){.buyerHomePage .premiumHeroContainer{width:100%}.marketplaceRailSection.isCarousel .marketplaceProductRail{display:flex!important;gap:11px;padding:4px 3px 15px}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex:0 0 min(62vw,238px)!important}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryImageWrap{height:auto}.marketplaceCarouselArrow{width:44px;height:44px}.marketplaceCarouselArrow.previous{inset-inline-start:4px}.marketplaceCarouselArrow.next{inset-inline-end:4px}.marketplaceCarouselArrow svg{width:20px;height:20px}}
+@media(max-width:430px){.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex-basis:min(68vw,224px)!important}.marketplaceCarouselArrow{width:40px;height:40px}.marketplaceCarouselArrow svg{width:18px;height:18px}.marketplaceRailSection.isCarousel .marketplaceViewAll{padding-inline:9px}}
+@media(max-width:350px){.buyerHomePage .discoveryHero{padding-inline:6px}.marketplaceRailSection.isCarousel .marketplaceProductRail .discoveryCard{flex-basis:min(72vw,216px)!important}.marketplaceSectionHeading{align-items:center}.marketplaceSectionHeading>div{gap:7px}.marketplaceRailSection.isCarousel .marketplaceViewAll{font-size:9px;padding-inline:7px}.marketplaceCarouselArrow{width:38px;height:38px}}
+
+/* Strict homepage rhythm: empty/hidden regions collapse and visible sections keep one consistent gap. */
+.buyerHomePage:not(.searchResultsPage) .todijoTrustPrimary{margin:16px auto 18px;padding-block:18px}
+.buyerHomePage:not(.searchResultsPage) .categoryShowcase,
+.buyerHomePage:not(.searchResultsPage) .marketplaceRailSection,
+.buyerHomePage:not(.searchResultsPage) .featuredStores,
+.buyerHomePage:not(.searchResultsPage) .discoveryLayout{margin-top:20px}
+.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections{padding-block:0 8px}
+.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections:empty,
+.buyerHomePage:not(.searchResultsPage) .featuredStores:empty{display:none;margin:0;padding:0}
+@media(max-width:860px){
+  .buyerHomePage:not(.searchResultsPage) .discoveryHero,
+  .buyerHomePage:not(.searchResultsPage) .todijoTrustPrimary,
+  .buyerHomePage:not(.searchResultsPage) .discoveryPromoBanner,
+  .buyerHomePage:not(.searchResultsPage) .featuredStores,
+  .buyerHomePage:not(.searchResultsPage) .sellerGrowthCta,
+  .buyerHomePage:not(.searchResultsPage) .mobileAppPromotion{display:none!important;margin:0!important;padding:0!important;min-height:0!important}
+  .buyerHomePage:not(.searchResultsPage) .categoryShowcase,
+  .buyerHomePage:not(.searchResultsPage) .marketplaceRailSection,
+  .buyerHomePage:not(.searchResultsPage) .discoveryLayout{margin-top:0}
+}
 
 /* Phase 3 — one semantic, lightweight category identity system. */
 :root{--category-violet-bg:#f0e7ff;--category-violet-fg:#6d28d9;--category-pink-bg:#ffe8f3;--category-pink-fg:#c0266d;--category-orange-bg:#fff0dc;--category-orange-fg:#c26100;--category-blue-bg:#e7f2ff;--category-blue-fg:#1769c2;--category-turquoise-bg:#e2f8f3;--category-turquoise-fg:#087d69;--category-green-bg:#e7f6e9;--category-green-fg:#287a3e;--category-yellow-bg:#fff7d6;--category-yellow-fg:#986500;--category-coral-bg:#ffebe7;--category-coral-fg:#c34834}
@@ -1372,7 +1394,6 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 .todijoTrustPrimary p{font-size:11px;line-height:1.52}
 @media(max-width:1240px) and (min-width:861px){.todijoTrustPrimary .todijoTrustGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.todijoTrustPrimary .todijoTrustGrid article{min-height:286px}}
 @media(max-width:860px){.todijoTrustPrimary .todijoTrustGrid article{flex:0 0 min(82vw,310px);min-height:320px}.todijoTrustPrimary .trustArtworkZone{height:164px;flex-basis:164px}.todijoTrustPrimary .trustContentZone{padding:16px}.todijoTrustPrimary .todijoTrustGrid article>div{max-width:none}}
-@media(max-width:860px){.buyerHomePage .discoveryPromoBanner{display:flex!important}.buyerHomePage .mobileAppPromotion{display:block!important}}
 @media(max-width:340px){.buyerMobileCategoryBrowser{grid-template-columns:102px minmax(0,1fr)}.buyerMobileCategoryParents button{min-height:88px}.buyerMobileCategoryParents button>.buyerMobileCategoryParentIcon{width:44px;height:44px;flex-basis:44px}.buyerMobileCategoryParents button>span:last-child{max-width:92px;overflow-wrap:anywhere}.categoryShowcaseGrid>a{flex-basis:108px!important}}
 @media(prefers-reduced-motion:reduce){.marketCategoryNavigation .marketQuickCategory>.semanticCategoryIcon,.categoryShowcaseGrid>a{transition:none}.marketCategoryNavigation .marketQuickCategory:hover>.semanticCategoryIcon,.categoryShowcaseGrid>a:hover{transform:none}}
 
@@ -1385,9 +1406,9 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
   .buyerHomePage:not(.searchResultsPage) .featuredStores,
   .buyerHomePage:not(.searchResultsPage) .sellerGrowthCta,
   .buyerHomePage:not(.searchResultsPage) .mobileAppPromotion{display:none!important}
-  .buyerHomePage:not(.searchResultsPage) .categoryShowcase{margin-top:10px}
+  .buyerHomePage:not(.searchResultsPage) .categoryShowcase{margin-top:0}
   .buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections{padding-top:2px}
-  .buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.marketplaceRailSection:first-child{margin-top:8px}
+  .buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.marketplaceRailSection:first-child{margin-top:0}
   .buyerMobileCategoryChildren{min-width:0}
   .buyerMobileBoutiquesLink{min-height:54px;margin:0 0 10px;padding:0 12px!important;border:1px solid #d9c8ee;border-radius:14px;background:linear-gradient(135deg,#f4edff,#fff);color:#5b21b6!important;display:grid!important;grid-template-columns:28px minmax(0,1fr) 18px;align-items:center;gap:8px;font-weight:850}
   [dir=rtl] .buyerMobileBoutiquesLink>svg:last-child{transform:scaleX(-1)}
