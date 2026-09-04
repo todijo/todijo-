@@ -13,7 +13,7 @@ export default async function OfflinePage() {
   const text = copy[locale as keyof typeof copy] ?? copy.en;
   return <main className="offlinePage" dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
     <section className="offlineCard" aria-labelledby="offline-title">
-      <img src="/icon-192.png?v=2" width="72" height="72" alt=""/>
+      <img src="/icon-192.png?v=3" width="72" height="72" alt=""/>
       <p>{text.eyebrow}</p>
       <h1 id="offline-title">{text.title}</h1>
       <span>{text.body}</span>

@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: "Todijo Marketplace", template: `%s · ${t("brand")}` },
     description: t("description"),
     metadataBase: new URL(base),
-    icons: { icon: [{ url: "/icon-192.png?v=2", type: "image/png", sizes: "192x192" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png?v=2" },
+    icons: { icon: [{ url: "/icon-192.png?v=3", type: "image/png", sizes: "192x192" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png?v=3" },
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Todijo" },
     manifest: "/manifest.webmanifest",
     openGraph: { title: t("title"), description: t("description"), type: "website", images: [{ url: "/images/brand/todijo-horizontal-dark.webp", width: 720, height: 400, alt: "Todijo" }] },
