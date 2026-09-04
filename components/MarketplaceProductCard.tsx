@@ -17,9 +17,7 @@ export type MarketplaceCardProduct = {
   requiresAuthoritativePrice?: boolean;
 };
 
-export type MarketplaceProductCardSize = "large" | "medium" | "small";
-
-export default function MarketplaceProductCard({ product, soldOut, showCategory = false, size = "medium" }: { product: MarketplaceCardProduct; soldOut: string; showCategory?: boolean; size?: MarketplaceProductCardSize }) {
+export default function MarketplaceProductCard({ product, soldOut, showCategory = false }: { product: MarketplaceCardProduct; soldOut: string; showCategory?: boolean }) {
   const locale = useLocale();
   const categories = useTranslations("Categories");
   const oldPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null;
@@ -29,9 +27,9 @@ export default function MarketplaceProductCard({ product, soldOut, showCategory 
   const resolved=useCallback((value:{amount:string;currency:string})=>setPresentment({price:Number(value.amount),currency:value.currency}),[]);
   const pricingKind=product.requiresAuthoritativePrice?"estimatePrice":"productPrice";
 
-  return <article className={`discoveryCard discoveryCard-${size}`}>
+  return <article className="discoveryCard">
     <a className="discoveryImageWrap" href={productPath(locale,product.id,product.name)} aria-label={product.name}>
-      {product.image ? <Image src={product.image} alt={product.name} fill loading="lazy" sizes={size === "large" ? "(max-width: 700px) 50vw, (max-width: 1100px) 50vw, 33vw" : size === "small" ? "(max-width: 700px) 50vw, 25vw" : "(max-width: 700px) 50vw, (max-width: 1240px) 25vw, 20vw"} unoptimized/> : <div className="productImage"><Package size={42} aria-hidden="true"/></div>}
+      {product.image ? <Image src={product.image} alt={product.name} fill loading="lazy" sizes="(max-width: 700px) 50vw, (max-width: 1240px) 25vw, 20vw" unoptimized/> : <div className="productImage"><Package size={42} aria-hidden="true"/></div>}
       {discount > 0 && <span className="marketplaceDiscount">-{discount}%</span>}
       {!product.isGenerallyAvailable && <span className="soldOutOverlay">{soldOut}</span>}
     </a>
