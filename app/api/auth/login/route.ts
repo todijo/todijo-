@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
-    if (!allowAuthRequest(authRequestKey("login", email, request))) {
+    if (!await allowAuthRequest(authRequestKey("login", email, request))) {
       return NextResponse.json({ error: "Adresse e-mail ou mot de passe incorrect." }, { status: 401 });
     }
 

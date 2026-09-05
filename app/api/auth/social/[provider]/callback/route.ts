@@ -7,6 +7,7 @@ import { decideSocialIdentity } from "@/lib/social-auth";
 import { publicAppUrl } from "@/lib/email/config";
 import { safeLoginDestination } from "@/lib/auth-redirects";
 import { anonymizedEmailHash, isEffectiveBlock } from "@/lib/account-status";
+import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
 
 async function callback(request:Request,provider:string,values:URLSearchParams){
   const config=configuredSocialProvider(provider);if(!config)return NextResponse.json({error:"PROVIDER_NOT_CONFIGURED"},{status:503});
@@ -14,6 +15,7 @@ async function callback(request:Request,provider:string,values:URLSearchParams){
   cookieStore.delete(cookieName);const stateData=state===saved?readOauthState(saved,config.provider):null;
   const failure=(code:string)=>{const locale=stateData?.locale??"en",url=new URL(`/${locale}/login`,publicAppUrl());url.searchParams.set("social",code);if(stateData?.next)url.searchParams.set("next",stateData.next);return NextResponse.redirect(url,303)};
   if(!stateData)return failure("INVALID_STATE");
+  if(!await allowAuthRequest(authRequestKey("oauth-callback",provider,request)))return failure("RATE_LIMITED");
   if(values.get("error"))return failure("CANCELLED");
   const code=values.get("code");if(!code)return failure("INVALID_CALLBACK");
   try{

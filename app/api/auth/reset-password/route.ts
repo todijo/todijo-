@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const token = String(body?.token ?? "");
     const password = String(body?.password ?? "");
     const confirmPassword = String(body?.confirmPassword ?? "");
-    if (!validRawAuthToken(token) || !allowAuthRequest(authRequestKey("reset-password", token, request))) return NextResponse.json({ ok: false, code: "INVALID" }, { status: 400 });
+    if (!validRawAuthToken(token) || !await allowAuthRequest(authRequestKey("reset-password", token, request))) return NextResponse.json({ ok: false, code: "INVALID" }, { status: 400 });
     if (password.length < MIN_PASSWORD_LENGTH || !confirmPassword) return NextResponse.json({ ok: false, code: "INVALID_PASSWORD" }, { status: 400 });
     if (password !== confirmPassword) return NextResponse.json({ ok: false, code: "PASSWORD_MISMATCH" }, { status: 400 });
     const result = await consumePasswordResetToken(token, await hash(password, 12));

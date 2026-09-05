@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const user = session ? await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, email: true } }) : null;
   const input = validateSupportRequest(body, user?.email);
   if (!input) return NextResponse.json({ error: "INVALID_REQUEST" }, { status: 400 });
-  if (!allowAuthRequest(authRequestKey("support", user?.id ?? input.replyEmail, request))) return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
+  if (!await allowAuthRequest(authRequestKey("support", user?.id ?? input.replyEmail, request))) return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
   if (!user) {
     const verification = await verifyTurnstileTokenWith(String(body.turnstileToken ?? ""), process.env.TURNSTILE_SECRET_KEY, fetch);
     if (verification !== "success") return NextResponse.json({ error: "VERIFICATION_REQUIRED" }, { status: 400 });

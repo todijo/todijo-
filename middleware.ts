@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { defaultLocale, isLocale, localeCookie, type Locale } from "./i18n/config";
 import { canonicalizeNestedLocalePath } from "./lib/locale-routing";
+import { isTrustedMutationRequest } from "./lib/request-security";
 
 const countryLocales: Record<string, Locale> = { FR: "fr", BE: "fr", CA: "fr", DZ: "ar", MA: "ar", TN: "ar", EG: "ar", IQ: "ar", JO: "ar", SA: "ar", TR: "tr", DE: "de", AT: "de", CH: "de", ES: "es", MX: "es", IT: "it", NL: "nl", IR: "fa", IN: "hi", PT: "pt", BR: "pt", RU: "ru" };
 
@@ -17,6 +18,16 @@ function detectLocale(request: NextRequest): Locale {
 }
 
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    const unsafe = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+    const exempt = request.nextUrl.pathname === "/api/stripe/webhook"
+      || request.nextUrl.pathname.startsWith("/api/internal/")
+      || /^\/api\/auth\/social\/[^/]+\/callback$/.test(request.nextUrl.pathname);
+    if (unsafe && !exempt && !isTrustedMutationRequest(request)) {
+      return NextResponse.json({ error: "INVALID_MUTATION_ORIGIN" }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const pathLocale = segments[0];
   const localRewriteLocale = request.nextUrl.searchParams.get("__todijo_local_locale");
@@ -58,4 +69,4 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] };
+export const config = { matcher: ["/api/:path*", "/((?!api|_next|.*\\..*).*)"] };

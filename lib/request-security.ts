@@ -22,3 +22,13 @@ export function assertAdminMutationRequest(request:Request){
   const expected=expectedPublicOrigin(request);
   if(!expected||actual!==expected)throw new MutationOriginError();
 }
+
+export function isTrustedMutationRequest(request:Request){
+  const site=request.headers.get("sec-fetch-site");
+  if(site&&site!=="same-origin"&&site!=="none")return false;
+  const origin=request.headers.get("origin");
+  if(!origin)return site==="same-origin"||site==="none"||process.env.NODE_ENV!=="production";
+  let actual:string;
+  try{const parsed=new URL(origin);actual=`${parsed.protocol}//${normalizedHost(parsed.host)}`;}catch{return false;}
+  return actual===expectedPublicOrigin(request);
+}
