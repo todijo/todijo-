@@ -122,3 +122,37 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  container:
+    name: Container smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build production image
+        run: docker build --tag todijo-security-phase1 .
+
+      - name: Verify non-root runtime and health endpoint
+        run: |
+          docker run --detach --name todijo-runtime --publish 3000:3000 \
+            --env DATABASE_URL=postgresql://runtime:runtime@127.0.0.1:5432/runtime \
+            --env SESSION_SECRET=ci-only-placeholder-secret-at-least-32-characters \
+            todijo-security-phase1
+          test "$(docker exec todijo-runtime whoami)" = "nextjs"
+          test "$(docker exec todijo-runtime id -u)" != "0"
+          docker exec todijo-runtime sh -c 'command -v curl'
+          docker exec todijo-runtime test -x node_modules/.bin/prisma
+          for attempt in {1..30}; do
+            if docker exec todijo-runtime curl --fail --silent --show-error http://127.0.0.1:3000/api/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs todijo-runtime
+          exit 1
+
+      - name: Remove smoke-test container
+        if: always()
+        run: docker rm --force todijo-runtime || true
