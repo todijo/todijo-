@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = String(body?.email ?? "").trim().toLowerCase();
     const locale = isLocale(body?.locale) ? body.locale : defaultLocale;
-    if (!email || !allowAuthRequest(authRequestKey("forgot-password", email, request))) return NextResponse.json(neutral);
+    if (!email || !await allowAuthRequest(authRequestKey("forgot-password", email, request))) return NextResponse.json(neutral);
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, firstName: true } });
     if (!user) return NextResponse.json(neutral);
     const rawToken = await issuePasswordResetToken(user.id, new Date(), 60_000);

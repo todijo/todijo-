@@ -3,8 +3,10 @@ import { cookies } from "next/headers";
 import { configuredSocialProvider, createOauthState } from "@/lib/social-auth-server";
 import { isLocale } from "@/i18n/config";
 import { localeFromReferer } from "@/lib/auth-redirects";
+import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
 export async function GET(request:Request,{params}:{params:Promise<{provider:string}>}){
   const {provider}=await params;const config=configuredSocialProvider(provider);if(!config)return NextResponse.json({error:"PROVIDER_NOT_CONFIGURED"},{status:503});
+  if(!await allowAuthRequest(authRequestKey("oauth-start",provider,request)))return NextResponse.json({error:"RATE_LIMITED"},{status:429});
   const requestUrl=new URL(request.url),requestedLocale=requestUrl.searchParams.get("locale"),locale=isLocale(requestedLocale)?requestedLocale:localeFromReferer(request.headers.get("referer"));
   const state=createOauthState(config.provider,requestUrl.searchParams.get("next"),locale);
   (await cookies()).set(`todijo_oauth_${config.provider}`,state,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:config.provider==="apple"?"none":"lax",maxAge:600,path:"/api/auth/social"});

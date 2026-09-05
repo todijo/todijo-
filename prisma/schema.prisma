@@ -1820,3 +1820,12 @@ model ReviewReport {
   @@unique([reviewId, reporterId])
   @@index([status, createdAt])
 }
+
+model AuthRateLimitBucket {
+  key             String   @id @db.Char(64)
+  requestCount    Int
+  windowStartedAt DateTime
+  expiresAt       DateTime
+
+  @@index([expiresAt])
+}

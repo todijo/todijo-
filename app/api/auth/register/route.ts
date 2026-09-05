@@ -10,6 +10,7 @@ import { safeEmailError } from "@/lib/email/config";
 import { defaultLocale, isLocale } from "@/i18n/config";
 import { createBuyerAddress } from "@/lib/buyer-addresses";
 import { anonymizedEmailHash } from "@/lib/account-status";
+import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +29,9 @@ export async function POST(request: Request) {
     }
 
     const input = validation.value;
+    if (!await allowAuthRequest(authRequestKey("register", input.email, request))) {
+      return NextResponse.json({ error: "Veuillez réessayer plus tard.", code: "RATE_LIMITED" }, { status: 429 });
+    }
     const turnstile = await verifyTurnstileToken(input.turnstileToken);
     if (turnstile !== "success") {
       return NextResponse.json({ error: "La vérification humaine a échoué.", code: turnstile === "missing" ? "TURNSTILE_REQUIRED" : "TURNSTILE_FAILED" }, { status: 400 });

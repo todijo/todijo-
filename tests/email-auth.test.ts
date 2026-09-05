@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { compare, hash } from "bcryptjs";
-import { allowAuthRequest } from "../lib/auth-rate-limit";
+import { allowAuthRequest, createMemoryAuthRateLimitStore } from "../lib/auth-rate-limit";
 import { authTokenState, generateRawAuthToken, hashAuthToken, validRawAuthToken } from "../lib/auth-token-crypto";
 import { escapeEmailHtml, todijoEmailTemplate } from "../lib/email/template";
 import { locales } from "../i18n/config";
@@ -24,10 +24,12 @@ test("expired and already-used authentication tokens are rejected", () => {
   assert.equal(authTokenState({ usedAt: null, expiresAt: new Date(now.getTime() + 1) }, now), "success");
 });
 
-test("forgot-password and resend rate limits reject bursts without exposing account state", () => {
+test("forgot-password and resend rate limits reject bursts, expire, and do not expose account state", async () => {
   const key = `email-auth-test-${Date.now()}`;
-  for (let attempt = 0; attempt < 5; attempt += 1) assert.equal(allowAuthRequest(key, 1_000 + attempt), true);
-  assert.equal(allowAuthRequest(key, 1_010), false);
+  const sharedStore = createMemoryAuthRateLimitStore();
+  for (let attempt = 0; attempt < 5; attempt += 1) assert.equal(await allowAuthRequest(key, 1_000 + attempt, sharedStore), true);
+  assert.equal(await allowAuthRequest(key, 1_010, sharedStore), false);
+  assert.equal(await allowAuthRequest(key, 15 * 60 * 1000 + 1_011, sharedStore), true);
   for (const route of ["forgot-password", "resend-verification"]) {
     const source = readFileSync(`app/api/auth/${route}/route.ts`, "utf8");
     assert.match(source, /const neutral = \{ ok: true, code:/);
