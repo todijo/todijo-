@@ -24,6 +24,7 @@ function list(value: unknown) { return Array.isArray(value) ? value : []; }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === "object" ? value as Record<string, unknown> : {}; }
 function normalizedIdentifier(value: unknown) { return text(value).toUpperCase(); }
 function reviewText(value:unknown){return text(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,"").slice(0,2000);}
+function remoteUrl(value:unknown){const url=text(value);try{return new URL(url).protocol==="https:"?url:"";}catch{return "";}}
 
 function firstText(row:Record<string,unknown>,keys:string[]){for(const key of keys){const value=text(row[key]);if(value)return value;}return "";}
 
@@ -64,7 +65,7 @@ export function normalizeCjProductImages(productValue: unknown) {
   return [...unique];
 }
 
-export function normalizeCjProduct(productValue: unknown, variantValue: unknown, inventoryValue: unknown): SupplierProductSnapshot {
+export function normalizeCjProduct(productValue: unknown, variantValue: unknown, inventoryValue: unknown, videoValue?:unknown): SupplierProductSnapshot {
   const product = object(productValue);
   const categoryHierarchy=normalizeCjCategoryHierarchy(product);
   const variantsRaw = list(object(variantValue).list ?? variantValue);
@@ -83,7 +84,10 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
   const variants = semantic?.variants ?? parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,sku:variant.sku,title:variant.title,cost:variant.cost,currency:variant.currency,stock:variant.stock,available:variant.available,originCountryCodes:variant.originCountryCodes,imageUrl:variant.imageUrl}));
   const imageUrls = normalizeCjProductImages(product);
   for (const variant of variants) if (variant.imageUrl && isValidProductImageUrl(variant.imageUrl) && !imageUrls.includes(variant.imageUrl) && imageUrls.length < MAX_PRODUCT_IMAGES) imageUrls.push(variant.imageUrl);
-  const videoUrl = text(product.productVideo ?? product.videoUrl);
+  const directVideoUrl=remoteUrl(product.videoUrl)||list(product.productVideo).map(remoteUrl).find(Boolean)||remoteUrl(product.productVideo);
+  const videoRows=list(videoValue).map(object);
+  const selectedVideo=videoRows.find((row)=>text(row.videoState)==="ON_STATE"&&(text(row.isFree)==="1"||row.isBuy===true)&&remoteUrl(row.videoUrl));
+  const videoUrl=directVideoUrl||remoteUrl(selectedVideo?.videoUrl),posterUrl=remoteUrl(selectedVideo?.coverURL)||null;
   const stock = variants.length ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Math.max(0, number(product.inventory) ?? 0);
   const productId = text(product.pid ?? product.productId);
   const productCost = number(product.sellPrice ?? product.productPrice);
@@ -102,7 +106,7 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
     cost:summaryCost, currency:"USD", stock,
     available:text(product.saleStatus) !== "0" && (variants.length ? variants.some((variant) => variant.available) : stock > 0),
     weightGrams:number(product.productWeight), variants,
-    media:[...imageUrls.map((url) => ({type:"IMAGE" as const,url})), ...(videoUrl ? [{type:"VIDEO" as const,url:videoUrl}] : [])],
+    media:[...imageUrls.map((url) => ({type:"IMAGE" as const,url})), ...(videoUrl ? [{type:"VIDEO" as const,url:videoUrl,posterUrl}] : [])],
     rawMetadata:{...categoryHierarchy,localizedContent,cjSourceContent:{productName:product.productName??null,productNameEn:product.productNameEn??null,description:product.description??null},productType:product.productType??null,deliveryCycle:product.deliveryCycle??null,cjOptionNormalization:{version:1,status:semantic?"SEMANTIC":"AMBIGUOUS",reason:semantic?null:"AUTHORITATIVE_DIMENSIONS_OR_VARIANT_KEYS_INSUFFICIENT",source:semantic?.source??null,dimensions:semantic?.dimensions??null,productKeyEn:typeof product.productKeyEn==="string"?product.productKeyEn.slice(0,500):null,productKeySet:list(product.productKeySet).slice(0,20).map((value)=>{if(typeof value==="string")return value.slice(0,100);const row=object(value);return{keyEn:text(row.keyEn).slice(0,100)||null,nameEn:text(row.nameEn).slice(0,100)||null,key:text(row.key).slice(0,100)||null,name:text(row.name).slice(0,100)||null};}),variants:parsedVariants.map((variant)=>({supplierVariantId:variant.supplierVariantId,supplierSku:variant.sku,variantKey:variant.variantKey,variantName:variant.variantName,optionValues:semantic?.variants.find((item)=>item.supplierVariantId===variant.supplierVariantId)?.optionValues??null,imageUrl:variant.imageUrl})).slice(0,200)}},
   };
 }
@@ -200,11 +204,13 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const canonicalPid = text(object(product).pid ?? object(product).productId);
     if (!canonicalPid) throw new Error("CJ_PRODUCT_NOT_FOUND");
     const canonicalContext = {...context,canonicalPid};
-    const [variants,inventory] = await Promise.all([
+    const productRow=object(product),hasVideoReference=number(productRow.isVideo)===1||list(productRow.productVideo).length>0||list(productRow.videoList).length>0;
+    const [variants,inventory,videos] = await Promise.all([
       this.get("get-product-variants",`/product/variant/query?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext),
       this.get("get-product-inventory",`/product/stock/getInventoryByPid?pid=${encodeURIComponent(canonicalPid)}`,canonicalContext),
+      hasVideoReference?this.request("get-product-videos","/product/queryVideosByProductId",canonicalContext,{productId:canonicalPid}):Promise.resolve({data:[],meta:{}}),
     ]);
-    return normalizeCjProduct(product, variants.data, inventory.data);
+    return normalizeCjProduct(product, variants.data, inventory.data, videos.data);
   }
   async searchProducts(query:string,page=1,pageSize=20):Promise<SupplierCatalogSearchPage>{
     const keyWord=query.trim();
