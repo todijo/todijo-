@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       "connect-src 'self' https://api.stripe.com https://api.cloudinary.com https://challenges.cloudflare.com",
+      "media-src 'self' blob: https://res.cloudinary.com",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "manifest-src 'self'",
