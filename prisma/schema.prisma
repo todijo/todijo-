@@ -381,11 +381,29 @@ model User {
   adminActionsReceived AdminUserAction[] @relation("AdminUserActionTarget")
   adminActionsPerformed AdminUserAction[] @relation("AdminUserActionActor")
   siteContentRevisions SiteContentRevision[] @relation("SiteContentRevisionEditor")
+  newsArticles NewsArticle[] @relation("NewsArticleEditor")
   supplierCatalogJobs SupplierCatalogImportJob[] @relation("SupplierCatalogJobAdmin")
 
   @@index([blockedAt, blockExpiresAt])
   @@index([sellerSuspendedAt])
   @@index([deactivatedAt])
+}
+
+model NewsArticle {
+  id            String   @id @default(cuid())
+  locale        String   @db.VarChar(8)
+  title         String   @db.VarChar(180)
+  content       String   @db.Text
+  published     Boolean  @default(false)
+  publishedAt   DateTime?
+  editorAdminId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  editorAdmin User @relation("NewsArticleEditor", fields: [editorAdminId], references: [id], onDelete: Restrict)
+
+  @@index([locale, published, publishedAt])
+  @@index([editorAdminId, updatedAt])
 }
 
 model SiteContentPage {

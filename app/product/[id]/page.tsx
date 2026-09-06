@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -28,8 +27,9 @@ import ProductDescription from "@/components/ProductDescription";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 import {readCjProductCache} from "@/lib/suppliers/cj-client";
 import type {SupplierVariantSnapshot} from "@/lib/suppliers/types";
-import BuyerProductPrice from "@/components/BuyerProductPrice";
 import BuyerShippingPrice from "@/components/BuyerShippingPrice";
+import MarketplaceProductCard from "@/components/MarketplaceProductCard";
+import {newsMessages} from "@/i18n/news";
 import { requireAdmin } from "@/lib/admin-access";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 
@@ -90,8 +90,14 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const canonicalSlug=productSlug(buyerContent.title);
   if(!previewRequested&&slug!==canonicalSlug)permanentRedirect(productPath(locale,id,buyerContent.title));
   product.name=buyerContent.title;product.description=buyerContent.description;
-  const related = await prisma.product.findMany({ where:{status:"PUBLISHED",category:product.category,id:{not:product.id},...publicAccess},take:4,orderBy:{createdAt:"desc"},select:{id:true,name:true,price:true,currency:true,images:true,condition:true,supplierLink:{select:{sourceMetadata:true}}} });
-  for(const item of related)item.name=resolveBuyerProductContent({name:item.name,description:"",sourceMetadata:item.supplierLink?.sourceMetadata,locale}).title;
+  const mainCategory=product.category.split("--")[0],recommendationSelect={id:true,name:true,description:true,price:true,compareAtPrice:true,currency:true,category:true,stock:true,condition:true,images:true,options:{where:{active:true},select:{id:true}},variants:{where:buyerVisibleVariantWhere(),select:{active:true,stock:true,values:{select:{optionValueId:true}}}},supplierLink:{select:{sourceMetadata:true}},store:{select:{name:true,slug:true}}} as const;
+  const [similarRows,marketplaceRows]=await Promise.all([
+    prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},category:product.category.includes("--")?{startsWith:`${mainCategory}--`}:product.category,...publicAccess},take:8,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
+    prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},...publicAccess},take:32,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
+  ]);
+  const similarIds=new Set(similarRows.map(item=>item.id)),pool=marketplaceRows.filter(item=>!similarIds.has(item.id)),offset=pool.length?Array.from(product.id).reduce((sum,char)=>sum+char.charCodeAt(0),0)%pool.length:0,alsoRows=[...pool.slice(offset),...pool.slice(0,offset)].slice(0,12);
+  const recommendationCard=(item:(typeof similarRows)[number])=>{const content=resolveBuyerProductContent({name:item.name,description:item.description,sourceMetadata:item.supplierLink?.sourceMetadata,locale}),availability=resolveProductAvailability({stock:item.stock,activeOptionCount:item.options.length,variants:item.variants.map(variant=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length}))});return{id:item.id,name:content.title,price:item.price.toString(),compareAtPrice:item.compareAtPrice?.toString()??null,currency:item.currency,category:item.category,stock:availability.hasActiveVariants?null:item.stock,hasActiveVariants:availability.hasActiveVariants,isGenerallyAvailable:availability.isGenerallyAvailable,condition:item.condition,image:item.images[0]??null,storeName:item.store.name,storeSlug:item.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)}};
+  const similar=similarRows.map(recommendationCard),also=alsoRows.map(recommendationCard),recommendationText=newsMessages[locale as Locale];
   const persistedPrice=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const minimumVariantPrice=minimumPurchasableVariantPrice({basePrice:persistedPrice,activeOptionCount:product.options.length,variants:product.variants.map((variant)=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
   const price=minimumVariantPrice??persistedPrice;
@@ -121,7 +127,6 @@ export default async function ProductPage({ params, searchParams }: Props) {
       </article>
       <div className="productPurchaseColumn">
         <ProductPurchasePanel dropshippingEligible={dropshippingEligibility.eligible} requiresAuthoritativePrice={requiresAuthoritativePrice} availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={buyerVariants.options} variants={buyerVariants.variants} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug,shippingPrice:shippingRule.shippingPrice==null?null:Number(shippingRule.shippingPrice),shippingFreeThreshold:shippingRule.shippingFreeThreshold==null?null:Number(shippingRule.shippingFreeThreshold),shippingMethodName:shippingRule.shippingMethodName}}/>
-        <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
         {!usesDropshippingShipping&&shippingRule.shippingEnabled&&shippingRule.shippingMethodName&&shippingRule.shippingMinDays&&shippingRule.shippingMaxDays&&<aside className="productShippingSummary"><strong>{shippingText("productTitle")}</strong><span>{shippingRule.shippingMethodName}{shippingRule.shippingCarrier?` · ${shippingRule.shippingCarrier}`:""}</span><span>{shippingText("estimate",{min:shippingRule.shippingMinDays,max:shippingRule.shippingMaxDays})}</span><span>{shippingRule.shippingWorldwide?shippingText("worldwide"):shippingRule.shippingPostalCodes.length?shippingText("postalZones"):shippingText("selectedDestinations")}</span><b>{shippingRule.shippingFree?shippingText("freeLabel"):<BuyerShippingPrice productId={product.id} kind={shippingRule.shippingFreeThreshold?"freeThreshold":"shippingPrice"}/>}</b></aside>}
       </div>
     </div>
@@ -135,8 +140,10 @@ export default async function ProductPage({ params, searchParams }: Props) {
     <section className="productSellerInformationCard">
       <div className="productSellerInformationBody"><Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link><SellerTypeDisclosure sellerType={product.store.sellerType} notice/><p>{product.store.city}, {product.store.country}</p></div>
       <div className="productLowerActions">{product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}<ProductReportButton productId={product.id} loggedIn={Boolean(session)}/></div>
+      <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
     </section>
   </section>
-  {related.length>0&&<section className="relatedSection"><div className="sectionTitle"><div><h2>{market("products")}</h2></div></div><div className="relatedGrid">{related.map(item=><Link className="relatedCard" href={`/product/${item.id}`} key={item.id}><div style={{ position: "relative" }}>{item.images[0]?<Image src={item.images[0]} alt={item.name} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 280px" unoptimized/>:<span>📦</span>}</div><small>{item.condition.replaceAll("_"," ")}</small><h3>{item.name}</h3><strong><BuyerProductPrice productId={item.id} sourcePrice={Number(item.price)} sourceCurrency={item.currency} requiresAuthoritativePrice={requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)}/></strong></Link>)}</div></section>}
+  {similar.length>0&&<section className="relatedSection productRecommendationSection"><div className="sectionTitle"><h2>{recommendationText.similar}</h2></div><div className="premiumProductGrid productRecommendationGrid">{similar.map(item=><MarketplaceProductCard key={item.id} product={item} soldOut={common("soldOut")}/>)}</div></section>}
+  {also.length>0&&<section className="relatedSection productRecommendationSection"><div className="sectionTitle"><h2>{recommendationText.also}</h2></div><div className="premiumProductGrid productRecommendationGrid">{also.map(item=><MarketplaceProductCard key={item.id} product={item} soldOut={common("soldOut")}/>)}</div></section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }

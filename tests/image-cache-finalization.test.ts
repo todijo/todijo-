@@ -9,10 +9,12 @@ const read = (...parts: string[]) => fs.readFileSync(path.join(root, ...parts), 
 test("cart and related-product images reserve responsive layout without eager loading", () => {
   const cart = read("app", "cart", "page.tsx");
   const product = read("app", "product", "[id]", "page.tsx");
+  const productCard = read("components", "MarketplaceProductCard.tsx");
   assert.match(cart, /<Image src=\{item\.image\}[^>]+fill[^>]+sizes=/);
-  assert.match(product, /<Image src=\{item\.images\[0\]\}[^>]+fill[^>]+sizes=/);
+  assert.match(product, /<MarketplaceProductCard/);
+  assert.match(productCard, /<Image[^>]+fill[^>]+sizes=/);
   assert.doesNotMatch(cart, /priority/);
-  assert.doesNotMatch(product, /related\.map[\s\S]+priority/);
+  assert.doesNotMatch(productCard, /priority/);
 });
 
 test("only the public store directory is cached with a short TTL", () => {
