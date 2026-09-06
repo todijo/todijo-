@@ -159,7 +159,7 @@ test("durable worker and release routes are secret/admin guarded while CJ remain
   const transfers = readFileSync(join(process.cwd(), "lib/seller-transfers.ts"), "utf8");
   const fulfillment = readFileSync(join(process.cwd(), "lib/fulfillment.ts"), "utf8");
   const payments = readFileSync(join(process.cwd(), "lib/payments.ts"), "utf8");
-  assert.match(worker, /SELLER_TRANSFER_CRON_SECRET/); assert.match(worker, /timingSafeEqual/);
+  assert.match(worker, /SELLER_TRANSFER_CRON_SECRET/); assert.match(worker, /hasValidBearerSecret/);
   assert.match(release, /readSession/); assert.match(transfers, /requireAdmin/);
   assert.match(fulfillment, /markSellerGroupsShipmentVerified\(tx, order\.id, storeIds/);
   assert.doesNotMatch(payments, /processEligibleSellerTransfer|markSellerGroupsShipmentVerified/);

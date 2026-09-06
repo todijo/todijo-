@@ -1,15 +1,10 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { hasValidBearerSecret } from "@/lib/internal-request-auth";
 import { prisma } from "@/lib/prisma";
 import { processDueSellerTransfers } from "@/lib/seller-transfers";
 
 function authorized(request: Request) {
-  const secret = process.env.SELLER_TRANSFER_CRON_SECRET?.trim();
-  const header = request.headers.get("authorization") ?? "";
-  if (!secret || !header.startsWith("Bearer ")) return false;
-  const expected = Buffer.from(secret);
-  const supplied = Buffer.from(header.slice(7));
-  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
+  return hasValidBearerSecret(request, process.env.SELLER_TRANSFER_CRON_SECRET);
 }
 
 export async function POST(request: Request) {

@@ -1,16 +1,10 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { hasValidBearerSecret } from "@/lib/internal-request-auth";
 import { prisma } from "@/lib/prisma";
 import { syncStalePlatformCjProducts } from "@/lib/suppliers/automatic-sync";
 
 function authorized(request: Request) {
-  const secret = process.env.SUPPLIER_SYNC_CRON_SECRET?.trim();
-  const header = request.headers.get("authorization") ?? "";
-  if (!secret || !header.startsWith("Bearer ")) return false;
-  const supplied = header.slice(7);
-  const expectedBuffer = Buffer.from(secret);
-  const suppliedBuffer = Buffer.from(supplied);
-  return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
+  return hasValidBearerSecret(request, process.env.SUPPLIER_SYNC_CRON_SECRET);
 }
 
 export async function POST(request: Request) {
