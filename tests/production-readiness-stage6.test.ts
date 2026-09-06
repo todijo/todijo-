@@ -29,8 +29,9 @@ test("production test routes, Stripe mode, runner secrets, and CJ flag fail clos
   assert.match(stripe, /STRIPE_MODE must be explicitly configured/); assert.match(stripe, /STRIPE_SECRET_KEY does not match configured/);
   assert.match(cj, /CJ_AUTOMATIC_FULFILLMENT_ENABLED/);
   for (const [path, secret] of [["app/api/internal/supplier-sync/route.ts", "SUPPLIER_SYNC_CRON_SECRET"], ["app/api/internal/seller-transfers/route.ts", "SELLER_TRANSFER_CRON_SECRET"], ["app/api/internal/refund-financials/route.ts", "REFUND_FINANCIAL_CRON_SECRET"]]) {
-    const source = read(path); assert.match(source, new RegExp(secret)); assert.match(source, /timingSafeEqual/); assert.match(source, /status: 401/);
+    const source = read(path); assert.match(source, new RegExp(secret)); assert.match(source, /hasValidBearerSecret/); assert.match(source, /status: 401/);
   }
+  assert.match(read("lib/internal-request-auth.ts"), /timingSafeEqual/);
 });
 
 test("operations documentation prohibits silent repair and records the paid inventory race", () => {

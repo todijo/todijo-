@@ -51,8 +51,8 @@ test("payment, payout, refund, reversal, and restock duplicate barriers remain c
 
 test("internal financial runners are independently secret-protected and documented", () => {
   const seller = read("app/api/internal/seller-transfers/route.ts"), refund = read("app/api/internal/refund-financials/route.ts"), example = read(".env.example");
-  assert.match(seller, /SELLER_TRANSFER_CRON_SECRET/); assert.match(seller, /timingSafeEqual/);
-  assert.match(refund, /REFUND_FINANCIAL_CRON_SECRET/); assert.match(refund, /timingSafeEqual/);
+  assert.match(seller, /SELLER_TRANSFER_CRON_SECRET/); assert.match(seller, /hasValidBearerSecret/);
+  assert.match(refund, /REFUND_FINANCIAL_CRON_SECRET/); assert.match(refund, /hasValidBearerSecret/);
   assert.match(example, /^STRIPE_MODE="test"$/m);
   assert.match(example, /^SELLER_TRANSFER_CRON_SECRET=$/m);
   assert.match(example, /^REFUND_FINANCIAL_CRON_SECRET=$/m);

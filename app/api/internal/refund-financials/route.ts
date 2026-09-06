@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { hasValidBearerSecret } from "@/lib/internal-request-auth";
 import { prisma } from "@/lib/prisma";
 import { processDueRefundFinancials } from "@/lib/refund-lifecycle";
 import {processExpiredCheckouts} from "@/lib/checkout-expiration";
 
 function authorized(request: Request) {
-  const secret = process.env.REFUND_FINANCIAL_CRON_SECRET?.trim();
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (!secret || secret.length !== supplied.length) return false;
-  return timingSafeEqual(Buffer.from(secret), Buffer.from(supplied));
+  return hasValidBearerSecret(request, process.env.REFUND_FINANCIAL_CRON_SECRET, { flexibleSchemeWhitespace: true });
 }
 
 export async function POST(request: Request) {
