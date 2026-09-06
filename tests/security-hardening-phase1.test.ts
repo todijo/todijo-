@@ -52,10 +52,11 @@ test("cookie-authenticated mutations reject cross-site origins while webhooks an
 
 test("production headers define a bounded CSP and HSTS without unsafe eval", () => {
   const config = source("next.config.ts");
-  for (const directive of ["default-src", "script-src", "style-src", "img-src", "font-src", "connect-src", "frame-src", "form-action", "base-uri", "object-src", "frame-ancestors"]) {
+  for (const directive of ["default-src", "script-src", "style-src", "img-src", "font-src", "connect-src", "media-src", "frame-src", "form-action", "base-uri", "object-src", "frame-ancestors"]) {
     assert.match(config, new RegExp(directive));
   }
   assert.match(config, /connect-src 'self' https:\/\/api\.stripe\.com https:\/\/api\.cloudinary\.com https:\/\/challenges\.cloudflare\.com/);
+  assert.match(config, /media-src 'self' blob: https:\/\/res\.cloudinary\.com/);
   assert.match(config, /NODE_ENV === "production" \? "" : " 'unsafe-eval'"/);
   assert.match(config, /Strict-Transport-Security/);
   assert.match(config, /NODE_ENV === "production"/);
