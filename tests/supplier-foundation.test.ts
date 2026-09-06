@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync}from "node:fs";import{resolve}from "node:path";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "../lib/product-images";
 import { readProductVideo } from "../lib/product-media";
+import { CloudinaryProductMediaProvider } from "../lib/media-provider";
 import { supplierMessages } from "../i18n/supplier";
 import { productVideoMessages } from "../i18n/product-video";
 import { dropshippingAccessMessages } from "../i18n/dropshipping-access";
@@ -67,6 +68,12 @@ test("seller create and update routes share the 30-image validator",()=>{
 test("one controlled-storage product video is validated",()=>{
   assert.deepEqual(readProductVideo({url:"https://res.cloudinary.com/demo/video/upload/v1/test.mp4",publicId:"todijo/test",posterUrl:null}),{url:"https://res.cloudinary.com/demo/video/upload/v1/test.mp4",publicId:"todijo/test",posterUrl:null});
   assert.throws(()=>readProductVideo({url:"https://supplier.example/video.mp4",publicId:"external"}),/PRODUCT_VIDEO_INVALID/);
+});
+
+test("CJ video copy supplies the required download referer before controlled storage upload",async()=>{
+  const originalFetch=globalThis.fetch,calls:Array<{url:string;init?:RequestInit}>=[];
+  globalThis.fetch=async(input,init)=>{const url=String(input);calls.push({url,init});return url.includes("cjdropshipping")?new Response(new Blob(["video"],{type:"video/mp4"}),{status:200}):new Response(JSON.stringify({secure_url:"https://res.cloudinary.com/demo/video/upload/product.mp4",public_id:"todijo/product",duration:1}),{status:200});};
+  try{const stored=await new CloudinaryProductMediaProvider("demo","preset").copyRemote({type:"VIDEO",url:"https://download-only-api.cjdropshipping.com/video.mp4",posterUrl:null});assert.equal(stored.type,"VIDEO");assert.equal(calls.length,2);assert.equal(new Headers(calls[0].init?.headers).get("referer"),"https://developers.cjdropshipping.com/");assert.ok(calls[1].url.includes("/video/upload"));assert.ok(calls[1].init?.body instanceof FormData);}finally{globalThis.fetch=originalFetch;}
 });
 
 test("supplier and video UX have complete 14-locale parity",()=>{

@@ -9,7 +9,13 @@ export class CloudinaryProductMediaProvider implements ProductMediaProvider {
   constructor(private cloudName=process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, private uploadPreset=process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) {}
   async copyRemote(media: SupplierMediaSource): Promise<StoredProductMedia> {
     if (!this.cloudName || !this.uploadPreset) throw new Error("MEDIA_STORAGE_NOT_CONFIGURED");
-    const body = new FormData(); body.set("file", media.url); body.set("upload_preset", this.uploadPreset); body.set("folder", "todijo/supplier-products");
+    const body = new FormData();
+    if(media.type==="VIDEO"){
+      const source=await fetch(media.url,{headers:{Referer:"https://developers.cjdropshipping.com/"},signal:AbortSignal.timeout(30000)});
+      if(!source.ok)throw new Error("MEDIA_COPY_FAILED");
+      body.set("file",await source.blob(),"supplier-video.mp4");
+    }else body.set("file",media.url);
+    body.set("upload_preset", this.uploadPreset); body.set("folder", "todijo/supplier-products");
     const resourceType = media.type === "VIDEO" ? "video" : "image";
     const response = await fetch(`https://api.cloudinary.com/v1_1/${this.cloudName}/${resourceType}/upload`, {method:"POST",body,signal:AbortSignal.timeout(30000)});
     if (!response.ok) throw new Error("MEDIA_COPY_FAILED");

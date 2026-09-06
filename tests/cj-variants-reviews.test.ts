@@ -17,6 +17,19 @@ test("official CJ review response is normalized without leaking raw objects",asy
   assert.doesNotMatch(JSON.stringify(page),/privateField|javascript/);
 });
 
+test("CJ video IDs resolve to one eligible playable video with its poster",async()=>{
+  const requests:Array<{url:string;method:string;body:string|null}>=[];
+  const provider=new CjCatalogProvider({isConfigured:()=>true,getAccessToken:async()=>"secret",invalidateAccessToken:()=>{}},{minimumRequestIntervalMs:0,fetcher:async(input,init)=>{
+    const url=String(input),method=init?.method??"GET";requests.push({url,method,body:typeof init?.body==="string"?init.body:null});
+    const data=url.includes("/product/query?")?{pid:"PID-VIDEO",productNameEn:"Video product",productVideo:["video-id"],saleStatus:"3"}:url.includes("/variant/query")?{list:[]}:url.includes("getInventoryByPid")?{}:[{videoState:"DOWN_STATE",videoUrl:"https://videos.test/down.mp4",isFree:"1"},{videoState:"ON_STATE",videoUrl:"https://videos.test/product.mp4",coverURL:"https://images.test/poster.jpg",isFree:"1",isBuy:false}];
+    return new Response(JSON.stringify({success:true,code:0,data}));
+  }});
+  const snapshot=await provider.getProduct("PID-VIDEO");
+  assert.deepEqual(snapshot.media,[{type:"VIDEO",url:"https://videos.test/product.mp4",posterUrl:"https://images.test/poster.jpg"}]);
+  const videoRequest=requests.find((entry)=>entry.url.endsWith("/product/queryVideosByProductId"));
+  assert.deepEqual(videoRequest&&{method:videoRequest.method,body:JSON.parse(videoRequest.body??"null")},{method:"POST",body:{productId:"PID-VIDEO"}});
+});
+
 test("supplier review persistence is idempotent, update-safe, and product-isolated",async()=>{
   const rows=new Map<string,any>(),linkUpdates:any[]=[];let body="First";
   const db:any={supplierReview:{findUnique:async({where}:any)=>rows.get(where.provider_supplierReviewId.supplierReviewId)??null,upsert:async({where,create,update}:any)=>{const key=where.provider_supplierReviewId.supplierReviewId,old=rows.get(key);rows.set(key,old?{...old,...update}:{...create});}},supplierProductLink:{update:async({data}:any)=>{linkUpdates.push(data);}}};

@@ -36,9 +36,10 @@ test("catalog reference pricing stops after the first usable variant but live bu
   assert.match(checkout,/resolveDropshippingPricing/);
 });
 
-test("bulk import defers nonessential CJ review hydration without losing later review sync",()=>{
+test("bulk import hydrates CJ reviews inside the existing bounded workers",()=>{
   const jobs=read("lib/suppliers/supplier-catalog-jobs.ts"),products=read("lib/suppliers/supplier-products.ts");
-  assert.match(jobs,/syncReviews:false/);
+  assert.match(jobs,/syncReviews:true/);
+  assert.match(jobs,/CATALOG_IMPORT_CONCURRENCY=4/);
   assert.match(products,/syncReviews\?:boolean/);
   assert.match(products,/input\.syncReviews!==false&&provider\.getProductReviews/);
   const syncOnly=products.slice(products.indexOf("export async function syncSupplierProduct"));
