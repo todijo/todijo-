@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.stripe.com https://challenges.cloudflare.com",
+      "connect-src 'self' https://api.stripe.com https://api.cloudinary.com https://challenges.cloudflare.com",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
       "worker-src 'self' blob:",
       "manifest-src 'self'",
