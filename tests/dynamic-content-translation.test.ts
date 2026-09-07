@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {dynamicContentTargets,dynamicTranslationFailure,recordDynamicTranslationFailure} from "../lib/dynamic-content-translations";
+import {dynamicContentTargets,dynamicTranslationFailure,fairDynamicTranslationTasks,recordDynamicTranslationFailure} from "../lib/dynamic-content-translations";
 import {resolveBuyerProductContent} from "../lib/product-content";
 import {resolveNewsContent} from "../lib/news-localization";
 import {createSelfHostedTranslationProvider} from "../lib/self-hosted-translation";
@@ -25,3 +25,5 @@ test("Actualités resolves completed priority translations for listing and detai
 test("Actualités fallback is manual requested locale then automatic requested locale then English then source",()=>{const article={locale:"fr",title:"Source",content:"Source body",translations:[{locale:"en",title:"English",content:"English body",automatic:true},{locale:"ar",title:"Automatic Arabic",content:"Automatic body",automatic:true},{locale:"ar",title:"Manual Arabic",content:"Manual body",automatic:false},{locale:"ku",title:"Obsolete automatic Kurdish",content:"Old",automatic:true}]};assert.equal(resolveNewsContent(article,"ar").title,"Manual Arabic");assert.equal(resolveNewsContent(article,"ku").title,"English");assert.equal(resolveNewsContent({...article,translations:[]},"ku").title,"Source");});
 
 test("Todijo zh maps to the self-hosted provider zh-Hans code",async()=>{let payload:any;const fetcher=(async(_url:unknown,init?:RequestInit)=>{payload=JSON.parse(String(init?.body));return new Response(JSON.stringify({translatedText:["中文","正文"]}),{status:200,headers:{"content-type":"application/json"}});}) as typeof fetch,provider=createSelfHostedTranslationProvider({DYNAMIC_TRANSLATION_URL:"http://translate.local"} as unknown as NodeJS.ProcessEnv,fetcher);await provider.translate({sourceLocale:"fr",targetLocale:"zh",texts:["Titre","Contenu"]});assert.equal(payload.source,"fr");assert.equal(payload.target,"zh-Hans");});
+
+test("queued Actualités receives bounded opportunities behind a large Product backlog",()=>{const products=Array.from({length:100},(_,index)=>({id:`product-${index}`,entityType:"PRODUCT"})),news=Array.from({length:4},(_,index)=>({id:`news-${index}`,entityType:"NEWS_ARTICLE"})),selected=fairDynamicTranslationTasks(products,news,20);assert.equal(selected.length,20);assert.deepEqual(selected.filter(item=>item.entityType==="NEWS_ARTICLE").map(item=>item.id),["news-0","news-1","news-2","news-3"]);assert.equal(selected.filter(item=>item.entityType==="PRODUCT").length,16);});
