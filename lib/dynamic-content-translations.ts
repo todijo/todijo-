@@ -31,14 +31,17 @@ export function dynamicContentFingerprint(sourceLocale:string,title:string,conte
 function locale(value:string):Locale{return isLocale(value)?value:"en";}
 export function dynamicContentTargets(sourceLocale:string){const normalized=locale(sourceLocale);return DYNAMIC_TRANSLATION_LOCALES.filter(target=>target!==normalized);}
 function tasks(entityType:EntityType,entityId:string,sourceLocale:string,title:string,content:string){const normalized=locale(sourceLocale),sourceFingerprint=dynamicContentFingerprint(normalized,title,content),estimatedCharacters=[title,content].join("").length;return dynamicContentTargets(normalized).map(targetLocale=>({entityType,entityId,sourceLocale:normalized,targetLocale,sourceFingerprint,sourceTitle:title,sourceContent:content,estimatedCharacters}));}
+export function dynamicTranslationFieldsMatchTarget(targetLocale:string,title:string,content:string){const fields=[title,content].filter(value=>value.trim().length>0);if(targetLocale==="ar")return fields.every(value=>/\p{Script=Arabic}/u.test(value));if(targetLocale==="zh")return fields.every(value=>/\p{Script=Han}/u.test(value));return true;}
+export async function translateDynamicContentFields(task:Pick<Task,"sourceLocale"|"targetLocale"|"sourceTitle"|"sourceContent">,translate:Translator){const request={sourceLocale:locale(task.sourceLocale),targetLocale:locale(task.targetLocale)},title=await translate({...request,texts:[task.sourceTitle]}),content=await translate({...request,texts:[task.sourceContent]}),texts=[title.texts[0]?.trim(),content.texts[0]?.trim()];if(texts.some(value=>!value)||!dynamicTranslationFieldsMatchTarget(task.targetLocale,texts[0]??"",texts[1]??""))throw new TranslationProviderError("MALFORMED_RESPONSE","TRANSLATION_TARGET_LANGUAGE_MISMATCH",true);const characters=title.usage.characters===null||content.usage.characters===null?null:title.usage.characters+content.usage.characters;return{...title,texts:texts as[string,string],usage:{characters,billable:title.usage.billable||content.usage.billable,confirmed:title.usage.confirmed&&content.usage.confirmed}};}
 
 export async function discoverDynamicContentTranslationTasks(db:PrismaClient){
   const [products,articles]=await Promise.all([
     db.product.findMany({where:{removedAt:null},orderBy:{updatedAt:"desc"},take:DISCOVERY_LIMIT,select:{id:true,sourceLocale:true,name:true,description:true}}),
-    db.newsArticle.findMany({where:{published:true},orderBy:{updatedAt:"desc"},take:DISCOVERY_LIMIT,select:{id:true,locale:true,title:true,content:true}}),
+    db.newsArticle.findMany({where:{published:true},orderBy:{updatedAt:"desc"},take:DISCOVERY_LIMIT,select:{id:true,locale:true,title:true,content:true,translations:{select:{locale:true,title:true,content:true,automatic:true}}}}),
   ]);
   const data=[...products.flatMap(item=>tasks("PRODUCT",item.id,item.sourceLocale,item.name,item.description)),...articles.flatMap(item=>tasks("NEWS_ARTICLE",item.id,item.locale,item.title,item.content))];
   if(data.length)await db.dynamicContentTranslationTask.createMany({data,skipDuplicates:true});
+  for(const article of articles){const sourceFingerprint=dynamicContentFingerprint(locale(article.locale),article.title,article.content);for(const translation of article.translations){if(!translation.automatic||!DYNAMIC_TRANSLATION_LOCALES.includes(translation.locale as typeof DYNAMIC_TRANSLATION_LOCALES[number])||dynamicTranslationFieldsMatchTarget(translation.locale,translation.title,translation.content))continue;await db.dynamicContentTranslationTask.updateMany({where:{entityType:"NEWS_ARTICLE",entityId:article.id,targetLocale:translation.locale,sourceFingerprint,status:"COMPLETED"},data:{status:"RETRYABLE",attemptCount:0,nextAttemptAt:null,claimToken:null,leaseExpiresAt:null,completedAt:null,lastErrorCode:"AUTOMATIC_TRANSLATION_LANGUAGE_MISMATCH"}});}}
   return data.length;
 }
 
@@ -65,7 +68,7 @@ async function processTask(db:PrismaClient,task:Task,config:CatalogTranslationCo
   const claimToken=randomUUID(),claimed=await db.dynamicContentTranslationTask.updateMany({where:{id:task.id,status:{in:["QUEUED","RETRYABLE"]},attemptCount:{lt:config.maxAttempts}},data:{status:"PROCESSING",claimToken,leaseExpiresAt:new Date(now.getTime()+LEASE_MS),attemptCount:{increment:1}}});
   if(claimed.count!==1)return{taskId:task.id,outcome:"CLAIM_LOST"};
   try{
-    const periods=await reserveDynamicBudget(db,task,config,now),result=await translate({sourceLocale:locale(task.sourceLocale),targetLocale:locale(task.targetLocale),texts:[task.sourceTitle,task.sourceContent]});
+    const periods=await reserveDynamicBudget(db,task,config,now),result=task.entityType==="NEWS_ARTICLE"?await translateDynamicContentFields(task,translate):await translate({sourceLocale:locale(task.sourceLocale),targetLocale:locale(task.targetLocale),texts:[task.sourceTitle,task.sourceContent]});
     if(result.texts.length<2||result.texts.some(value=>!value.trim()))throw new TranslationProviderError("MALFORMED_RESPONSE","TRANSLATION_PROVIDER_RESPONSE_INVALID",false);
     const outcome=await persist(db,task,result,config,claimToken,now);await completeDynamicBudget(db,config,periods,task.estimatedCharacters);return{taskId:task.id,outcome};
   }catch(error){const failure=await recordDynamicTranslationFailure(db,task,claimToken,error,now);return{taskId:task.id,outcome:failure.status};}
