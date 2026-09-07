@@ -11,3 +11,13 @@ export function newsInput(input:Record<string,unknown>){
   if(/<\/?(?:script|style|iframe|object|embed|form|input|button|svg|math)\b|javascript\s*:|data\s*:/i.test(content))throw new NewsInputError("UNSAFE_CONTENT");
   return{locale,title,content};
 }
+
+export function newsTranslationInput(input:Record<string,unknown>){
+  const locale=text(input.translationLocale,8),title=text(input.translationTitle,180),content=text(input.translationContent,50000);
+  if(!locale&&!title&&!content)return null;
+  if(!isLocale(locale))throw new NewsInputError("INVALID_TRANSLATION_LOCALE");
+  if(title.length<2)throw new NewsInputError("TRANSLATION_TITLE_REQUIRED");
+  if(content.length<10)throw new NewsInputError("TRANSLATION_CONTENT_REQUIRED");
+  if(/<\/?(?:script|style|iframe|object|embed|form|input|button|svg|math)\b|javascript\s*:|data\s*:/i.test(content))throw new NewsInputError("UNSAFE_CONTENT");
+  return{locale,title,content};
+}
