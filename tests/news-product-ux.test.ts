@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=(path:string)=>readFileSync(path,"utf8");
 
-test("news CMS is additive, admin-only, same-origin guarded, and publishes by locale",()=>{
-  const schema=read("prisma/schema.prisma"),migration=read("prisma/migrations/20260907090000_add_news_articles/migration.sql"),create=read("app/api/admin/news/route.ts"),update=read("app/api/admin/news/[id]/route.ts"),listing=read("app/actualites/page.tsx"),article=read("app/actualites/[id]/page.tsx");
-  assert.match(schema,/model NewsArticle/);assert.match(migration,/CREATE TABLE "NewsArticle"/);assert.doesNotMatch(migration,/\b(?:DROP|TRUNCATE|DELETE FROM)\b/i);
+test("news CMS is additive, admin-only, same-origin guarded, and publishes canonical articles with locale fallback",()=>{
+  const schema=read("prisma/schema.prisma"),migration=read("prisma/migrations/20260907090000_add_news_articles/migration.sql"),translationMigration=read("prisma/migrations/20260907120000_add_news_article_translations/migration.sql"),create=read("app/api/admin/news/route.ts"),update=read("app/api/admin/news/[id]/route.ts"),listing=read("app/actualites/page.tsx"),article=read("app/actualites/[id]/page.tsx");
+  assert.match(schema,/model NewsArticleTranslation/);assert.match(migration,/CREATE TABLE "NewsArticle"/);assert.match(translationMigration,/CREATE TABLE "NewsArticleTranslation"/);assert.doesNotMatch(translationMigration,/\b(?:DROP|TRUNCATE|DELETE FROM|UPDATE "NewsArticle")\b/i);
   for(const route of [create,update]){assert.match(route,/assertAdminMutationRequest/);assert.match(route,/requireAdmin/)}
   assert.match(update,/newsArticle\.delete/);assert.match(listing,/published:true,publishedAt:\{lte:new Date\(\)\}/);assert.match(article,/published:true,publishedAt:\{lte:new Date\(\)\}/);
+  assert.doesNotMatch(listing,/where:\{locale,published/);assert.doesNotMatch(article,/where:\{id,locale,published/);assert.match(listing,/translations:\{where:\{locale\}/);assert.match(article,/translations:\{where:\{locale\}/);
+  assert.match(listing,/translations\[0\]\?\.title\?\?article\.title/);assert.match(article,/article\.translations\[0\]\?\?article/);assert.match(update,/upsert:/);
   assert.match(listing,/target="_blank" rel="noopener noreferrer"/);assert.match(article,/SafeSiteContent/);
 });
 
