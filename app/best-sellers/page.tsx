@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const LIMIT = 40;
 const productSelect = {
-  id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true,
+  id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
   stock: true, condition: true, images: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
@@ -30,7 +30,7 @@ function serializeProduct(product: ProductRow,locale:string) {
   });
   return {
     id: product.id,
-    name: resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale}).title,
+    name: resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title,
     price: product.price.toString(),
     compareAtPrice: product.compareAtPrice?.toString() ?? null,
     currency: product.currency,

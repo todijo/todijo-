@@ -10,6 +10,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { concise, localizedAlternates, localizedPath } from "@/lib/seo";
 import { type Locale } from "@/i18n/config";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
+import {resolveBuyerProductContent} from "@/lib/product-content";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export default async function StorePage({ params, searchParams }: Props) {
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true,
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
       _count: { select: { products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } } },
-      products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, skip: (page - 1) * STORE_PAGE_SIZE, take: STORE_PAGE_SIZE, select: { id: true, name: true, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
+      products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, skip: (page - 1) * STORE_PAGE_SIZE, take: STORE_PAGE_SIZE, select: { id: true, name: true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
     },
   });
 
@@ -78,7 +79,7 @@ export default async function StorePage({ params, searchParams }: Props) {
     productCount: store._count.products,
     page,
     pages,
-    products: store.products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }); return { id: product.id, name: product.name, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, images: product.images, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: product.condition, category: product.category,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) }; }),
+    products: store.products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }),content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}); return { id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, images: product.images, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: product.condition, category: product.category,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) }; }),
   };
 
   return (

@@ -413,6 +413,10 @@ model NewsArticleTranslation {
   locale    String   @db.VarChar(8)
   title     String   @db.VarChar(180)
   content   String   @db.Text
+  automatic Boolean  @default(false)
+  sourceFingerprint String? @db.Char(64)
+  provider String? @db.VarChar(40)
+  providerVersion String? @db.VarChar(80)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -420,6 +424,31 @@ model NewsArticleTranslation {
 
   @@unique([articleId, locale])
   @@index([locale, articleId])
+}
+
+model DynamicContentTranslationTask {
+  id                String   @id @default(cuid())
+  entityType        String   @db.VarChar(20)
+  entityId          String
+  sourceLocale      String   @db.VarChar(8)
+  targetLocale      String   @db.VarChar(8)
+  sourceFingerprint String   @db.Char(64)
+  sourceTitle       String   @db.Text
+  sourceContent     String   @db.Text
+  status            String   @default("QUEUED") @db.VarChar(30)
+  attemptCount      Int      @default(0)
+  nextAttemptAt     DateTime?
+  claimToken        String?  @db.VarChar(64)
+  leaseExpiresAt    DateTime?
+  estimatedCharacters Int
+  lastErrorCode     String?  @db.VarChar(100)
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([entityType, entityId, sourceFingerprint, targetLocale])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, leaseExpiresAt])
 }
 
 model SiteContentPage {
@@ -768,6 +797,7 @@ model Product {
   name               String
   slug               String
   description        String
+  sourceLocale       String                    @default("en") @db.VarChar(8)
   price              Decimal                   @db.Decimal(12, 2)
   compareAtPrice     Decimal?                  @db.Decimal(12, 2)
   colors             String[]                  @default([])
@@ -823,12 +853,32 @@ model Product {
   supplierLink  SupplierProductLink?
   media         ProductMedia[]
   catalogTranslationItems CatalogTranslationItem[]
+  translations ProductTranslation[]
 
   @@unique([storeId, slug])
   @@index([storeId, status])
   @@index([dataClass, status, removedAt])
   @@index([removedAt])
   @@index([category])
+}
+
+model ProductTranslation {
+  id                String   @id @default(cuid())
+  productId         String
+  locale            String   @db.VarChar(8)
+  title             String
+  description       String   @db.Text
+  automatic         Boolean  @default(false)
+  sourceFingerprint String?  @db.Char(64)
+  provider          String?  @db.VarChar(40)
+  providerVersion   String?  @db.VarChar(80)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locale])
+  @@index([locale, productId])
 }
 
 model SupplierProductLink {

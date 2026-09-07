@@ -12,7 +12,7 @@ import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 
 const PAGE_SIZE = 24;
 const productSelect = {
-  id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true,
+  id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
   stock: true, condition: true, images: true, createdAt: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
@@ -23,7 +23,7 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 function serializeProduct(product: ProductRow,locale:string) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   return {
     id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null,
     currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock,
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     ...(!invalidPriceRange && filters.maxPrice ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } } : {}),
     ...(country ? { store: { ...publicStoreAccess, OR: countryAliasesForCode(country).map((alias) => ({ country: { equals: alias, mode: "insensitive" as const } })) } } : {}),
     ...(q ? { OR: [
-      { name: { contains: q, mode: "insensitive" } },...localizedSupplierContentSearch(q,locale), { description: { contains: q, mode: "insensitive" } },
+      { name: { contains: q, mode: "insensitive" } },{translations:{some:{locale,OR:[{title:{contains:q,mode:"insensitive"}},{description:{contains:q,mode:"insensitive"}}]}}},...localizedSupplierContentSearch(q,locale), { description: { contains: q, mode: "insensitive" } },
       { category: { contains: q, mode: "insensitive" } }, { condition: { contains: q, mode: "insensitive" } },
       { store: { name: { contains: q, mode: "insensitive" } } }, { store: { city: { contains: q, mode: "insensitive" } } },
       { store: { country: { contains: q, mode: "insensitive" } } },

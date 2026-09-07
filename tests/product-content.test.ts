@@ -59,7 +59,7 @@ test("CJ import stays draft, preserves source, and leaves pricing architecture u
 test("seller-authored titles remain authoritative and Phase 1 quality validation remains",()=>{
   const create=readFileSync("app/api/products/route.ts","utf8"),edit=readFileSync("app/api/products/[id]/route.ts","utf8");
   assert.match(create,/const name = String\(body\.name/);assert.match(create,/assertCatalogNameQuality\(name\)/);assert.doesNotMatch(create,/normalizeSupplierTitle/);
-  assert.match(edit,/name, description, category/);assert.match(edit,/assertCatalogNameQuality\(name\)/);assert.doesNotMatch(edit,/normalizeSupplierTitle/);
+  assert.match(edit,/sourceLocale:name!==product\.name\|\|description!==product\.description\?contentSourceLocale\(request\):product\.sourceLocale/);assert.match(edit,/assertCatalogNameQuality\(name\)/);assert.doesNotMatch(edit,/normalizeSupplierTitle/);
 });
 
 test("cards, detail and SEO share localized buyer-content resolution",()=>{

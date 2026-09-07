@@ -8,7 +8,7 @@ import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-pric
 import {resolveBuyerProductContent} from "@/lib/product-content";
 
 const recommendationSelect = {
-  id: true, name: true, price: true, compareAtPrice: true, currency: true, category: true,
+  id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
   stock: true, condition: true, images: true, createdAt: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
@@ -20,7 +20,7 @@ type RecommendationRow = Prisma.ProductGetPayload<{ select: typeof recommendatio
 
 function serializeProduct(product: RecommendationRow,locale:string) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   return { id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency,
     category: product.category, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
     condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name, storeSlug: product.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) };
