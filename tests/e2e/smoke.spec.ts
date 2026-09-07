@@ -24,11 +24,21 @@ test.beforeAll(async () => {
     ('buyer-a','Buyer','A','buyer-a@e2e.todijo.test','CUSTOMER',0,NOW(),NOW()),
     ('buyer-b','Buyer','B','buyer-b@e2e.todijo.test','CUSTOMER',0,NOW(),NOW())
     ON CONFLICT ("id") DO UPDATE SET "role"='CUSTOMER', "authVersion"=0, "updatedAt"=NOW();`);
+  executeFixtureSql(`INSERT INTO "NewsArticle" ("id","locale","title","content","published","publishedAt","editorAdminId","createdAt","updatedAt") VALUES
+    ('news-localization-e2e','fr','Titre source','Contenu source',true,NOW(),'header-buyer',NOW(),NOW())
+    ON CONFLICT ("id") DO UPDATE SET "published"=true, "publishedAt"=NOW(), "updatedAt"=NOW();
+    INSERT INTO "NewsArticleTranslation" ("id","articleId","locale","title","content","automatic","createdAt","updatedAt") VALUES
+    ('news-en-e2e','news-localization-e2e','en','English translated news','English translated body',true,NOW(),NOW()),
+    ('news-ar-e2e','news-localization-e2e','ar','خبر مترجم','محتوى مترجم',true,NOW(),NOW())
+    ON CONFLICT ("articleId","locale") DO UPDATE SET "title"=EXCLUDED."title", "content"=EXCLUDED."content", "automatic"=true, "updatedAt"=NOW();`);
 });
 
 test.afterAll(async () => {
+  executeFixtureSql(`DELETE FROM "NewsArticle" WHERE "id"='news-localization-e2e';`);
   executeFixtureSql(`DELETE FROM "User" WHERE "id" IN (${databaseUsers.map((user) => `'${user.id}'`).join(",")});`);
 });
+
+test("completed Actualités translations render in listing and detail",async({page})=>{for(const [locale,title,body] of [["en","English translated news","English translated body"],["ar","خبر مترجم","محتوى مترجم"]]){await page.goto(`/${locale}/actualites`);await expect(page.getByRole("link",{name:title})).toBeVisible();await page.goto(`/${locale}/actualites/news-localization-e2e`);await expect(page.getByRole("heading",{name:title})).toBeVisible();await expect(page.getByText(body)).toBeVisible();}await expect(page.locator("html")).toHaveAttribute("dir","rtl");});
 
 async function authenticate(page: import("@playwright/test").Page, userId: string) {
   const token = await new SignJWT({ userId, role: "CUSTOMER", authVersion: 0 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
