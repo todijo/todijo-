@@ -91,13 +91,18 @@ export function readProductContentMetadata(sourceMetadata: unknown): ProductCont
   return { version: 1, source: { title: sourceTitle, description: text(source.description, 50000), locale: text(source.locale, 20) || null }, normalized: { title: normalizedTitle, description: text(normalized.description, 5000), locale: text(normalized.locale, 20) || "en", generated: normalized.generated !== false }, localized: localizedRecord(content.localized) };
 }
 
-export function resolveBuyerProductContent(input: { name: string; description: string; sourceMetadata?: unknown; locale: string }) {
+export function resolveBuyerProductContent(input: { name: string; description: string; sourceMetadata?: unknown; locale: string;sourceLocale?:string;translations?:readonly {locale:string;title:string;description:string;automatic?:boolean}[] }) {
   const metadata=readProductContentMetadata(input.sourceMetadata),requested=localeCandidates(input.locale)[0]??"en";
+  const records=new Map((input.translations??[]).map(item=>[item.locale,item]));
+  const recordFor=(value:string,automatic:boolean)=>localeCandidates(value).map(item=>records.get(item)).find(item=>item?.automatic===automatic),supplierFor=(value:string)=>localeCandidates(value).map(item=>metadata?.localized[item]).map(buyerVisible).find(Boolean),source=input.sourceLocale??metadata?.normalized.locale??"";
   const stored=localeCandidates(input.locale).map(locale=>metadata?.localized[locale]).find(Boolean),exact=buyerVisible(stored);
   const defaultManual=metadata?.normalized.generated===false;
+  const manualRequested=recordFor(requested,false)??(exact&&(exact.source==="MANUAL"||exact.generated===false)?exact:undefined);
+  const sourceIsRequested=localeCandidates(source)[0]===requested,canonicalSource=sourceIsRequested?{title:input.name,description:input.description}:undefined;
+  const translated=defaultManual?manualRequested:manualRequested??supplierFor(requested)??recordFor(requested,true)??canonicalSource??recordFor("en",false)??supplierFor("en")??recordFor("en",true)??recordFor(source,false)??supplierFor(source)??recordFor(source,true);
   const localizedAllowed=defaultManual&&exact?.source!=="MANUAL"&&exact?.generated!==false?null:exact;
-  const title=(localizedAllowed?.title||(input.name||metadata?.normalized.title)||metadata?.source.title||"Product").trim()||"Product";
-  const description=localizedAllowed?.description||input.description||metadata?.normalized.description||metadata?.source.description||"";
+  const title=(translated?.title||localizedAllowed?.title||(input.name||metadata?.normalized.title)||metadata?.source.title||"Product").trim()||"Product";
+  const description=translated?.description||localizedAllowed?.description||input.description||metadata?.normalized.description||metadata?.source.description||"";
   const localeStatus=localizedAllowed?(localizedAllowed.source==="SUPPLIER"?"LOCALIZED_SUPPLIER" as const:"LOCALIZED_MANUAL" as const):defaultManual?"MANUAL_DEFAULT" as const:metadata?"NORMALIZED_DEFAULT" as const:"PRODUCT_DEFAULT" as const;
   return {title,description,localeStatus,sourceTitle:metadata?.source.title??null,generated:localizedAllowed?localizedAllowed.generated!==false:metadata?.normalized.generated??false,locale:localizedAllowed?requested:metadata?.normalized.locale??null};
 }

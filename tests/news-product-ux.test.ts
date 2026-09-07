@@ -8,8 +8,8 @@ test("news CMS is additive, admin-only, same-origin guarded, and publishes canon
   assert.match(schema,/model NewsArticleTranslation/);assert.match(migration,/CREATE TABLE "NewsArticle"/);assert.match(translationMigration,/CREATE TABLE "NewsArticleTranslation"/);assert.doesNotMatch(translationMigration,/\b(?:DROP|TRUNCATE|DELETE FROM|UPDATE "NewsArticle")\b/i);
   for(const route of [create,update]){assert.match(route,/assertAdminMutationRequest/);assert.match(route,/requireAdmin/)}
   assert.match(update,/newsArticle\.delete/);assert.match(listing,/published:true,publishedAt:\{lte:new Date\(\)\}/);assert.match(article,/published:true,publishedAt:\{lte:new Date\(\)\}/);
-  assert.doesNotMatch(listing,/where:\{locale,published/);assert.doesNotMatch(article,/where:\{id,locale,published/);assert.match(listing,/translations:\{where:\{locale\}/);assert.match(article,/translations:\{where:\{locale\}/);
-  assert.match(listing,/translations\[0\]\?\.title\?\?article\.title/);assert.match(article,/article\.translations\[0\]\?\?article/);assert.match(update,/upsert:/);
+  assert.doesNotMatch(listing,/where:\{locale,published/);assert.doesNotMatch(article,/where:\{id,locale,published/);assert.match(listing,/translations:\{select:\{locale:true,title:true,content:true/);assert.match(article,/translations:\{select:\{locale:true,title:true,content:true/);
+  assert.match(listing,/resolveNewsContent\(article,locale\)\.title/);assert.match(article,/resolveNewsContent\(article,locale\)/);assert.match(update,/upsert:/);
   assert.match(listing,/target="_blank" rel="noopener noreferrer"/);assert.match(article,/SafeSiteContent/);
 });
 

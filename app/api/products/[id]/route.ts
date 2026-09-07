@@ -17,6 +17,7 @@ import { productRemovalErrorResponse, removeProductListing } from "@/lib/product
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
 import { Prisma } from "@prisma/client";
 import { readProductContentMetadata } from "@/lib/product-content";
+import {contentSourceLocale} from "@/lib/content-source-locale";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -33,7 +34,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const product = await prisma.product.findFirst({
       where: { id, removedAt:null, store: { ownerId: session.userId } },
       select: {
-        id: true, complianceDeclaredAt: true, deactivationReason: true,
+        id: true,name:true,description:true,sourceLocale:true, complianceDeclaredAt: true, deactivationReason: true,
         supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
         variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierAvailable: true } },
       },
@@ -72,7 +73,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     await prisma.$transaction(async (tx) => {
       await tx.product.update({ where: { id }, data: {
-        name, description, category, condition, status,
+        name, description, sourceLocale:name!==product.name||description!==product.description?contentSourceLocale(request):product.sourceLocale, category, condition, status,
         deactivationReason: status === "PUBLISHED" ? "NONE" : "SELLER",
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,

@@ -40,14 +40,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
   const product = await prisma.product.findFirst({
     where: { id, status: "PUBLISHED", ...publicProductAccessWhere() },
-    select: { name: true, description: true, images: true, supplierLink:{select:{sourceMetadata:true}}, store: { select: { name: true } } },
+    select: { name: true, description: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}}, store: { select: { name: true } } },
   });
   if (!product) return { title: metadataText("title"), robots: { index: false, follow: false } };
-  const content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  const content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   const description = concise(`${content.description} ${product.store.name}`);
   const pathname = `product/${id}/${productSlug(content.title)}`;
   const canonical = localizedPath(locale, pathname);
-  const languages=Object.fromEntries(locales.map(item=>{const localized=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale:item});return[item,productPath(item,id,localized.title)];}));
+  const languages=Object.fromEntries(locales.map(item=>{const localized=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale:item,sourceLocale:product.sourceLocale,translations:product.translations});return[item,productPath(item,id,localized.title)];}));
   return {
     title: content.title,
     description,
@@ -70,7 +70,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const product = await prisma.product.findFirst({
     where: { id, ...(previewRequested?{}:{status:"PUBLISHED" as const}), ...publicAccess },
     select: {
-      id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true,
+      id: true, name: true, description: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
       condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
       media: { orderBy: { position: "asc" }, select: { type: true, url: true, posterUrl: true } },
       options: { where: { active: true }, orderBy: { position: "asc" }, select: {
@@ -86,17 +86,17 @@ export default async function ProductPage({ params, searchParams }: Props) {
     },
   });
   if (!product) notFound();
-  const buyerContent=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale});
+  const buyerContent=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   const canonicalSlug=productSlug(buyerContent.title);
   if(!previewRequested&&slug!==canonicalSlug)permanentRedirect(productPath(locale,id,buyerContent.title));
   product.name=buyerContent.title;product.description=buyerContent.description;
-  const mainCategory=product.category.split("--")[0],recommendationSelect={id:true,name:true,description:true,price:true,compareAtPrice:true,currency:true,category:true,stock:true,condition:true,images:true,options:{where:{active:true},select:{id:true}},variants:{where:buyerVisibleVariantWhere(),select:{active:true,stock:true,values:{select:{optionValueId:true}}}},supplierLink:{select:{sourceMetadata:true}},store:{select:{name:true,slug:true}}} as const;
+  const mainCategory=product.category.split("--")[0],recommendationSelect={id:true,name:true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}},price:true,compareAtPrice:true,currency:true,category:true,stock:true,condition:true,images:true,options:{where:{active:true},select:{id:true}},variants:{where:buyerVisibleVariantWhere(),select:{active:true,stock:true,values:{select:{optionValueId:true}}}},supplierLink:{select:{sourceMetadata:true}},store:{select:{name:true,slug:true}}} as const;
   const [similarRows,marketplaceRows]=await Promise.all([
     prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},category:product.category.includes("--")?{startsWith:`${mainCategory}--`}:product.category,...publicAccess},take:8,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
     prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},...publicAccess},take:32,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
   ]);
   const similarIds=new Set(similarRows.map(item=>item.id)),pool=marketplaceRows.filter(item=>!similarIds.has(item.id)),offset=pool.length?Array.from(product.id).reduce((sum,char)=>sum+char.charCodeAt(0),0)%pool.length:0,alsoRows=[...pool.slice(offset),...pool.slice(0,offset)].slice(0,12);
-  const recommendationCard=(item:(typeof similarRows)[number])=>{const content=resolveBuyerProductContent({name:item.name,description:item.description,sourceMetadata:item.supplierLink?.sourceMetadata,locale}),availability=resolveProductAvailability({stock:item.stock,activeOptionCount:item.options.length,variants:item.variants.map(variant=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length}))});return{id:item.id,name:content.title,price:item.price.toString(),compareAtPrice:item.compareAtPrice?.toString()??null,currency:item.currency,category:item.category,stock:availability.hasActiveVariants?null:item.stock,hasActiveVariants:availability.hasActiveVariants,isGenerallyAvailable:availability.isGenerallyAvailable,condition:item.condition,image:item.images[0]??null,storeName:item.store.name,storeSlug:item.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)}};
+  const recommendationCard=(item:(typeof similarRows)[number])=>{const content=resolveBuyerProductContent({name:item.name,description:item.description,sourceMetadata:item.supplierLink?.sourceMetadata,locale,sourceLocale:item.sourceLocale,translations:item.translations}),availability=resolveProductAvailability({stock:item.stock,activeOptionCount:item.options.length,variants:item.variants.map(variant=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length}))});return{id:item.id,name:content.title,price:item.price.toString(),compareAtPrice:item.compareAtPrice?.toString()??null,currency:item.currency,category:item.category,stock:availability.hasActiveVariants?null:item.stock,hasActiveVariants:availability.hasActiveVariants,isGenerallyAvailable:availability.isGenerallyAvailable,condition:item.condition,image:item.images[0]??null,storeName:item.store.name,storeSlug:item.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)}};
   const similar=similarRows.map(recommendationCard),also=alsoRows.map(recommendationCard),recommendationText=newsMessages[locale as Locale];
   const persistedPrice=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const minimumVariantPrice=minimumPurchasableVariantPrice({basePrice:persistedPrice,activeOptionCount:product.options.length,variants:product.variants.map((variant)=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});

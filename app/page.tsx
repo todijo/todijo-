@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const productSelect = {
-  id: true, name: true, price: true, compareAtPrice: true, currency: true,
+  id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true,
   category: true, stock: true, condition: true, images: true, createdAt: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
@@ -29,7 +29,7 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 function serializeProduct(p: ProductRow, locale: string) {
   const availability = resolveProductAvailability({ stock: p.stock, activeOptionCount: p.options.length, variants: p.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  const content=resolveBuyerProductContent({name:p.name,description:"",sourceMetadata:p.supplierLink?.sourceMetadata,locale});
+  const content=resolveBuyerProductContent({name:p.name,description:"",sourceMetadata:p.supplierLink?.sourceMetadata,locale,sourceLocale:p.sourceLocale,translations:p.translations});
   return { id: p.id, name: content.title, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
     currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
     storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString(),requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(p.supplierLink?.sourceMetadata) };
@@ -82,6 +82,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       ? {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
+            {translations:{some:{locale,OR:[{title:{contains:q,mode:"insensitive"}},{description:{contains:q,mode:"insensitive"}}]}}},
             ...localizedSupplierContentSearch(q,locale),
             { description: { contains: q, mode: "insensitive" } },
             { category: { contains: q, mode: "insensitive" } },
@@ -161,7 +162,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       orderBy: { updatedAt: "desc" },
       take: 4,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
-        products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
+        products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
     prisma.product.findMany({
@@ -208,7 +209,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       heroProducts={heroRows.map(product=>serializeProduct(product,locale))}
       newArrivals={newArrivalRows.map(product=>serializeProduct(product,locale))}
       bestSellers={bestSellers}
-      stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale}).title, image: product.images[0] ?? null })) }))}
+      stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
       page={normalizedPage}
