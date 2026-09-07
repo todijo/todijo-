@@ -1,4 +1,5 @@
 type JsonObject = Record<string, unknown>;
+import {isAutomaticDynamicTranslationLocale} from "./dynamic-translation-locales";
 
 export type ProductTranslationMetadata = { sourceFingerprint: string; provider: string; providerVersion: string; translatedAt: string; qualityScore?: number };
 export type LocalizedProductContent = { title?: string; description?: string; generated?: boolean; approved?: boolean; source?: "SUPPLIER"|"GENERATED"|"MANUAL"; translation?: ProductTranslationMetadata };
@@ -94,7 +95,7 @@ export function readProductContentMetadata(sourceMetadata: unknown): ProductCont
 export function resolveBuyerProductContent(input: { name: string; description: string; sourceMetadata?: unknown; locale: string;sourceLocale?:string;translations?:readonly {locale:string;title:string;description:string;automatic?:boolean}[] }) {
   const metadata=readProductContentMetadata(input.sourceMetadata),requested=localeCandidates(input.locale)[0]??"en";
   const records=new Map((input.translations??[]).map(item=>[item.locale,item]));
-  const recordFor=(value:string,automatic:boolean)=>localeCandidates(value).map(item=>records.get(item)).find(item=>item?.automatic===automatic),supplierFor=(value:string)=>localeCandidates(value).map(item=>metadata?.localized[item]).map(buyerVisible).find(Boolean),source=input.sourceLocale??metadata?.normalized.locale??"";
+  const recordFor=(value:string,automatic:boolean)=>localeCandidates(value).map(item=>records.get(item)).find(item=>item?.automatic===automatic&&(!automatic||isAutomaticDynamicTranslationLocale(item.locale))),supplierFor=(value:string)=>localeCandidates(value).map(item=>metadata?.localized[item]).map(buyerVisible).find(Boolean),source=input.sourceLocale??metadata?.normalized.locale??"";
   const stored=localeCandidates(input.locale).map(locale=>metadata?.localized[locale]).find(Boolean),exact=buyerVisible(stored);
   const defaultManual=metadata?.normalized.generated===false;
   const manualRequested=recordFor(requested,false)??(exact&&(exact.source==="MANUAL"||exact.generated===false)?exact:undefined);
