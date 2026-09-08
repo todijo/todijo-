@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {enqueueNewCjFrenchProductTranslation,newCjFrenchProductTranslationTask} from "../lib/dynamic-content-translations";
+import {resolveBuyerProductContent} from "../lib/product-content";
+
+test("new CJ source content enqueues one separate French localization without changing the source",async()=>{const writes:any[]=[];const source={productId:"new-cj-product",sourceLocale:"en",title:"Brand X Model A 500 ml Bottle",description:"Technical product description"},db={dynamicContentTranslationTask:{createMany:async(args:any)=>{writes.push(args);return{count:1};}}};assert.equal(await enqueueNewCjFrenchProductTranslation(db as any,source),1);assert.equal(writes.length,1);assert.deepEqual(writes[0].data,[newCjFrenchProductTranslationTask(source)]);assert.equal(writes[0].data[0].targetLocale,"fr");assert.equal(writes[0].data[0].sourceTitle,source.title);assert.equal(source.title,"Brand X Model A 500 ml Bottle");});
+
+test("French buyers resolve the localized title while failed work leaves canonical CJ content intact",()=>{const source={name:"Brand X Model A 500 ml Bottle",description:"Original description",sourceLocale:"en",sourceMetadata:undefined};assert.equal(resolveBuyerProductContent({...source,locale:"fr",translations:[{locale:"fr",title:"Bouteille Brand X modèle A de 500 ml",description:"Description française",automatic:true}]}).title,"Bouteille Brand X modèle A de 500 ml");assert.equal(resolveBuyerProductContent({...source,locale:"fr",translations:[]}).title,source.name);assert.equal(source.name,"Brand X Model A 500 ml Bottle");});
+
+test("CJ French localization is new-import-only and preserves bounded import safety",()=>{const importer=readFileSync("lib/suppliers/supplier-products.ts","utf8"),jobs=readFileSync("lib/suppliers/supplier-catalog-jobs.ts","utf8");assert.match(importer,/if \(exists\) throw new Error\("SUPPLIER_PRODUCT_ALREADY_IMPORTED"\)[\s\S]*enqueueNewCjFrenchProductTranslation/);assert.match(importer,/status:"DRAFT"/);assert.match(importer,/french_localization_enqueue_failed/);assert.match(jobs,/CATALOG_IMPORT_CONCURRENCY=4/);assert.doesNotMatch(importer,/productTranslation\.(?:update|upsert)|status:"PUBLISHED"/);});
