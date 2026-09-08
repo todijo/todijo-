@@ -11,6 +11,7 @@ import { classifyCjProduct, type CjClassification, validateTodijoClassification 
 import type { SupplierProductSnapshot } from "./types";
 import { createImportedProductContent } from "../product-content";
 import {readGlobalDropshippingMargin} from "./global-margin";
+import {enqueueNewCjFrenchProductTranslation} from "../dynamic-content-translations";
 
 type Database = PrismaClient;
 export const SUPPLIER_MEDIA_IMPORT_CONCURRENCY=4;
@@ -89,6 +90,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     if (variantImageAssignments.length) await replaceProductVariantImages(tx,product.id,images,variantImageAssignments);
     return product;
   });
+  try{await enqueueNewCjFrenchProductTranslation(db,{productId:product.id,sourceLocale:"en",title:content.title,description:content.description});}catch(error){console.warn("[supplier-import]",JSON.stringify({event:"french_localization_enqueue_failed",provider:provider.id,productId:product.id,errorCode:error instanceof Error?error.message.slice(0,100):"TRANSLATION_ENQUEUE_FAILED"}));}
   if(input.syncReviews!==false&&provider.getProductReviews){const link=await db.supplierProductLink.findUnique({where:{productId:product.id},select:{id:true}});if(link)await syncSupplierReviews(db,provider,{productId:product.id,supplierProductLinkId:link.id,supplierProductId:snapshot.supplierProductId});}
   return product;
 }
