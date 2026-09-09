@@ -1,0 +1,1 @@
+ALTER TYPE "SupplierCatalogJobStatus" ADD VALUE IF NOT EXISTS 'CANCELLED';

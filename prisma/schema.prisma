@@ -109,6 +109,7 @@ enum SupplierCatalogJobStatus {
   RUNNING
   COMPLETED
   COMPLETED_WITH_ERRORS
+  CANCELLED
 }
 
 enum SupplierCatalogItemStatus {
