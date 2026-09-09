@@ -64,8 +64,8 @@ const jobSummarySelect={id:true,status:true,requestedCount:true,processedCount:t
 export async function listCatalogImportJobs(db:PrismaClient,adminId:string){
   const jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},take:20,select:jobSummarySelect});
   if(!jobs.length)return[];
-  const active=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobs.map(job=>job.id)},status:"IMPORTING"},_count:{_all:true}}),counts=new Map(active.map(row=>[row.jobId,row._count._all]));
-  return jobs.map(job=>{const processingCount=counts.get(job.id)??0,remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING")};});
+  const jobIds=jobs.map(job=>job.id),active=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobIds},status:"IMPORTING"},_count:{_all:true}}),stale=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobIds},status:"IMPORTING",claimedAt:{lt:new Date(Date.now()-STALE_CLAIM_MS)}},_count:{_all:true}}),counts=new Map(active.map(row=>[row.jobId,row._count._all])),staleCounts=new Map(stale.map(row=>[row.jobId,row._count._all]));
+  return jobs.map(job=>{const processingCount=job.status==="CANCELLED"?0:counts.get(job.id)??0,isStale=processingCount>0&&processingCount===staleCounts.get(job.id),remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0&&!isStale,isStale,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING")};});
 }
 
 type CatalogPricingAttempt={supplierVariantId:string;origins:string[];status:"SELECTED"|"REJECTED";errorCode?:string;selectedOrigin?:string;freightAmount?:string;freightCurrency?:string;buyerPrice?:string};
@@ -101,7 +101,9 @@ function quarantineCode(code:string){return code.includes("PRICING")||code.start
 async function refreshJobCounts(db:PrismaClient,jobId:string,preserveUpdatedAt?:Date){
   const groups=await db.supplierCatalogImportItem.groupBy({by:["status"],where:{jobId},_count:{_all:true}}),counts=new Map(groups.map((group)=>[group.status,group._count._all]));
   const pending=(counts.get("PENDING")??0)+(counts.get("IMPORTING")??0),failed=counts.get("FAILED")??0,quarantined=counts.get("QUARANTINED")??0;
-  return db.supplierCatalogImportJob.update({where:{id:jobId},data:{processedCount:{set:[...counts].filter(([status])=>status!=="PENDING"&&status!=="IMPORTING").reduce((sum,[,count])=>sum+count,0)},importedCount:{set:counts.get("IMPORTED")??0},skippedCount:{set:counts.get("SKIPPED")??0},quarantinedCount:{set:quarantined},failedCount:{set:failed},status:pending?"PENDING":failed||quarantined?"COMPLETED_WITH_ERRORS":"COMPLETED",completedAt:pending?null:new Date(),...(preserveUpdatedAt?{updatedAt:preserveUpdatedAt}:{})},select:jobSummarySelect});
+  const data={processedCount:{set:[...counts].filter(([status])=>status!=="PENDING"&&status!=="IMPORTING").reduce((sum,[,count])=>sum+count,0)},importedCount:{set:counts.get("IMPORTED")??0},skippedCount:{set:counts.get("SKIPPED")??0},quarantinedCount:{set:quarantined},failedCount:{set:failed},status:pending?"PENDING" as const:failed||quarantined?"COMPLETED_WITH_ERRORS" as const:"COMPLETED" as const,completedAt:pending?null:new Date(),...(preserveUpdatedAt?{updatedAt:preserveUpdatedAt}:{})};
+  await db.supplierCatalogImportJob.updateMany({where:{id:jobId,status:{not:"CANCELLED"}},data});
+  return db.supplierCatalogImportJob.findUniqueOrThrow({where:{id:jobId},select:jobSummarySelect});
 }
 
 export async function recoverStaleCatalogClaims(db:PrismaClient,jobIds:string[],now=new Date(),executionBoundaries=new Map<string,Date>()){
@@ -123,7 +125,7 @@ export async function processCatalogImportJob(db:PrismaClient,provider:SupplierC
   const candidates=await db.supplierCatalogImportItem.findMany({where:{jobId,status:"PENDING"},orderBy:{position:"asc"},take:limit,select:{id:true,requestedIdentifier:true,canonicalCategoryId:true}});
   await runCatalogWorkBounded(candidates,async candidate=>{
     const started=performance.now(),timing:ImportTiming={productDetailMs:0,normalizationMs:0,databaseMs:0,freightPricingMs:0,mediaImportMs:0,totalMs:0};
-    const claim=await db.supplierCatalogImportItem.updateMany({where:{id:candidate.id,status:"PENDING"},data:{status:"IMPORTING",claimedAt:new Date(),attemptCount:{increment:1},errorCode:null,errorMessage:null}});if(claim.count!==1)return;
+    const claim=await db.supplierCatalogImportItem.updateMany({where:{id:candidate.id,status:"PENDING",job:{status:{in:["PENDING","RUNNING"]}}},data:{status:"IMPORTING",claimedAt:new Date(),attemptCount:{increment:1},errorCode:null,errorMessage:null}});if(claim.count!==1)return;
     let canonicalSupplierId:string|undefined;
     try{
       let stage=performance.now();const snapshot=await provider.getProduct(candidate.requestedIdentifier);canonicalSupplierId=snapshot.supplierProductId;timing.productDetailMs=elapsed(stage);
@@ -143,7 +145,7 @@ export async function processCatalogImportJob(db:PrismaClient,provider:SupplierC
 }
 
 export async function retryCatalogImportItems(db:PrismaClient,input:{adminId:string;jobId:string;itemIds?:unknown;canonicalCategoryId?:unknown}){
-  const job=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId},select:{id:true}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");
+  const job=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId,status:{not:"CANCELLED"}},select:{id:true}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");
   const itemIds=Array.isArray(input.itemIds)?[...new Set(input.itemIds.map(String).filter((id)=>id.length>=4&&id.length<=100))]:[];
   const category=typeof input.canonicalCategoryId==="string"?resolveCatalogCategory({categoryReference:null,title:""},input.canonicalCategoryId):null;if(category&&!category.categoryId)throw new Error("CANONICAL_CATEGORY_INVALID");
   const updated=await db.supplierCatalogImportItem.updateMany({where:{jobId:job.id,status:{in:["FAILED","QUARANTINED"]},...(itemIds.length?{id:{in:itemIds}}:{})},data:{status:"PENDING",claimedAt:null,completedAt:null,errorCode:null,errorMessage:null,pricingStatus:null,pricingEvidence:Prisma.DbNull,...(category?.categoryId?{canonicalCategoryId:category.categoryId,categoryMappingSource:"ADMIN",categoryMappingReason:category.reason}:{})}});
@@ -152,5 +154,15 @@ export async function retryCatalogImportItems(db:PrismaClient,input:{adminId:str
 
 export async function readCatalogImportJob(db:PrismaClient,input:{adminId:string;jobId:string;cursor?:unknown;take?:unknown}){
   const take=boundedInteger(input.take,50,100),cursor=typeof input.cursor==="string"&&input.cursor?input.cursor:undefined;
-  const job=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId},select:{...jobSummarySelect,items:{orderBy:{position:"asc"},take,cursor:cursor?{id:cursor}:undefined,skip:cursor?1:0,select:{id:true,position:true,requestedIdentifier:true,canonicalSupplierId:true,supplierSku:true,status:true,canonicalCategoryId:true,categoryMappingSource:true,categoryMappingReason:true,classificationStatus:true,classificationConfidence:true,classificationEvidence:true,pricingStatus:true,stockStatus:true,complianceStatus:true,complianceReason:true,errorCode:true,productId:true,attemptCount:true,updatedAt:true}}}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");const processingCount=await db.supplierCatalogImportItem.count({where:{jobId:job.id,status:"IMPORTING"}}),remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING"),nextCursor:job.items.length===take?job.items.at(-1)?.id:null};
+  const job=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId},select:{...jobSummarySelect,items:{orderBy:{position:"asc"},take,cursor:cursor?{id:cursor}:undefined,skip:cursor?1:0,select:{id:true,position:true,requestedIdentifier:true,canonicalSupplierId:true,supplierSku:true,status:true,canonicalCategoryId:true,categoryMappingSource:true,categoryMappingReason:true,classificationStatus:true,classificationConfidence:true,classificationEvidence:true,pricingStatus:true,stockStatus:true,complianceStatus:true,complianceReason:true,errorCode:true,productId:true,attemptCount:true,updatedAt:true}}}});if(!job)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");
+  const processingCount=job.status==="CANCELLED"?0:await db.supplierCatalogImportItem.count({where:{jobId:job.id,status:"IMPORTING"}}),staleCount=processingCount?await db.supplierCatalogImportItem.count({where:{jobId:job.id,status:"IMPORTING",claimedAt:{lt:new Date(Date.now()-STALE_CLAIM_MS)}}}):0,isStale=processingCount>0&&processingCount===staleCount,remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0&&!isStale,isStale,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING"),nextCursor:job.items.length===take?job.items.at(-1)?.id:null};
+}
+
+export async function cancelCatalogImportJob(db:PrismaClient,input:{adminId:string;jobId:string},now=new Date()){
+  const owned=await db.supplierCatalogImportJob.findFirst({where:{id:input.jobId,createdById:input.adminId},select:{id:true,status:true}});if(!owned)throw new Error("SUPPLIER_CATALOG_JOB_NOT_FOUND");
+  if(owned.status!=="CANCELLED"){
+    const cancelled=await db.supplierCatalogImportJob.updateMany({where:{id:owned.id,createdById:input.adminId,status:{in:["PENDING","RUNNING"]}},data:{status:"CANCELLED",lastErrorCode:"SUPPLIER_CATALOG_JOB_CANCELLED",completedAt:now}});
+    if(cancelled.count!==1)throw new Error("SUPPLIER_CATALOG_JOB_NOT_CANCELLABLE");
+  }
+  return db.supplierCatalogImportJob.findUniqueOrThrow({where:{id:owned.id},select:jobSummarySelect});
 }
