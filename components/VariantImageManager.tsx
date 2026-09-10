@@ -7,9 +7,12 @@ import Image from "next/image";
 export type VariantImageAssignment = { optionValueId?: string; optionName?: string; value?: string; imageUrls: string[]; primaryUrl: string | null };
 type Option = { id?: string; name: unknown; values: Array<{ id?: string; value: unknown }> };
 
-export default function VariantImageManager({ images, options, initialAssignments = [], onChange }: { images: string[]; options: Option[]; initialAssignments?: VariantImageAssignment[]; onChange: (value: VariantImageAssignment[]) => void }) {
+export default function VariantImageManager({ images, options, initialAssignments = [], onChange, primaryOptionOnly = false }: { images: string[]; options: Option[]; initialAssignments?: VariantImageAssignment[]; onChange: (value: VariantImageAssignment[]) => void; primaryOptionOnly?: boolean }) {
   const t = useTranslations("SellerControl");
-  const values = useMemo(() => options.flatMap((option) => option.values.map((value) => ({ optionValueId: value.id, optionName: String(option.name), value: String(value.value), key: value.id ?? `${String(option.name).toLocaleLowerCase()}\0${String(value.value).toLocaleLowerCase()}` }))), [options]);
+  const values = useMemo(() => {
+    const visibleOptions = primaryOptionOnly ? [options.find((option)=>["color","couleur"].includes(String(option.name).toLocaleLowerCase()))??options[0]].filter(Boolean) as Option[] : options;
+    return visibleOptions.flatMap((option) => option.values.map((value) => ({ optionValueId: value.id, optionName: String(option.name), value: String(value.value), key: value.id ?? `${String(option.name).toLocaleLowerCase()}\0${String(value.value).toLocaleLowerCase()}` })));
+  }, [options, primaryOptionOnly]);
   const [assignments, setAssignments] = useState<Record<string, VariantImageAssignment>>(() => Object.fromEntries(initialAssignments.map((entry) => [entry.optionValueId ?? `${entry.optionName?.toLocaleLowerCase()}\0${entry.value?.toLocaleLowerCase()}`, entry])));
   useEffect(() => {
     const visible = new Set(values.map(({ key }) => key));

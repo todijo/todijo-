@@ -11,7 +11,7 @@ test("add product exposes the six French seller steps", () => {
 });
 
 test("wizard navigation never submits", () => {
-  assert.match(form, /type="button" onClick=\{\(\)=>goToStep\(step\+1\)\}>Continuer/);
+  assert.match(form, /type="button" onClick=\{continueStep\}>Continuer/);
   assert.match(form, /type="button" onClick=\{\(\)=>goToStep\(step-1\)\}>Retour/);
 });
 
@@ -49,7 +49,7 @@ test("shipping makes inheritance primary and override explicit", () => {
 });
 
 test("verification displays missing required information and owns final actions", () => {
-  assert.match(form, /querySelectorAll\(":invalid"\)/);
+  assert.match(form, /querySelectorAll<[^>]+>\(":invalid"\)/);
   assert.match(form, /Toutes les informations obligatoires sont renseignées/);
   assert.ok(form.indexOf('data-wizard-step="5"') < form.indexOf('value="DRAFT"'));
   assert.ok(form.indexOf('data-wizard-step="5"') < form.indexOf('value="PUBLISHED"'));
