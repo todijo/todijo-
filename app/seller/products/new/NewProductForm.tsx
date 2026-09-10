@@ -37,11 +37,32 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const [published, setPublished] = useState(false);
   const [shippingOverrideEnabled,setShippingOverrideEnabled]=useState(false);
   const [shippingRule,setShippingRule]=useState<ShippingDraft>(emptyShippingDraft);
+  const [step,setStep]=useState(0);
+  const [variantsInitialized,setVariantsInitialized]=useState(false);
+  const [missingRequired,setMissingRequired]=useState(0);
   const submitLock = useRef(false);
   const successRef = useRef<HTMLParagraphElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const steps = ["Produit", "Photos", "Variantes", "Prix & stock", "Livraison", "Vérification"];
+
+  function refreshMissingRequired() {
+    setMissingRequired(formRef.current?.querySelectorAll(":invalid").length ?? 0);
+  }
+
+  function goToStep(nextStep:number) {
+    setStep(nextStep);
+    if(nextStep===5) requestAnimationFrame(refreshMissingRequired);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (submitLock.current) return; setMessage(""); setPublished(false);
+    const invalid = event.currentTarget.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(":invalid");
+    if (invalid) {
+      const invalidStep = Number(invalid.closest<HTMLElement>("[data-wizard-step]")?.dataset.wizardStep ?? 0);
+      setStep(invalidStep); refreshMissingRequired();
+      requestAnimationFrame(() => invalid.reportValidity());
+      return;
+    }
     if (uploading) return setMessage(t("waitUpload"));
     if (variantsEnabled && (!variantDraft.options.length || !variantDraft.variants.length || !variantDraft.generated)) return setMessage(t("variantsNeedGeneration"));
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
@@ -62,17 +83,19 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     const data = await response.json() as { error?: string; product?: { id?: string } };
     if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); showToast({ message: text, tone: "error" }); setSubmitting(false); submitLock.current = false; return; }
     if (status === "DRAFT") { router.push(data.product?.id ? `/seller/products/${data.product.id}/edit` : "/seller/products"); router.refresh(); return; }
-    setImages([]); setVariantsEnabled(false); setVariantDraft({ options: [], generate: true, variants: [], generated: false }); setVariantImages([]);
-    setBasePrice(""); setProductStock("1"); setUploading(false); setMessage(t("productPublishedSuccess")); showToast({ message: t("productPublishedSuccess"), tone: "success" }); setPublished(true); setResetGeneration((value) => value + 1);
+    setImages([]); setVariantsEnabled(false); setVariantsInitialized(false); setVariantDraft({ options: [], generate: true, variants: [], generated: false }); setVariantImages([]);
+    setBasePrice(""); setProductStock("1"); setUploading(false); setStep(0); setMissingRequired(0); setMessage(t("productPublishedSuccess")); showToast({ message: t("productPublishedSuccess"), tone: "success" }); setPublished(true); setResetGeneration((value) => value + 1);
     setSubmitting(false); submitLock.current = false; router.refresh();
     requestAnimationFrame(() => successRef.current?.focus());
     } catch { setMessage(t("errorGeneric")); showToast({ message: t("errorGeneric"), tone: "error" }); setSubmitting(false); submitLock.current = false; }
   }
 
   const disabledByLimit = productLimit !== null && productCount >= productLimit;
-  return <form key={resetGeneration} className="sellerControlForm" onSubmit={submit}>
-    <div className={`sellerControlFormGrid${variantsEnabled ? " isSingleColumn" : ""}`}>
+  return <form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { if(step===5) refreshMissingRequired(); }}>
+    <nav className="sellerProductWizardProgress" aria-label="Étapes d’ajout du produit"><ol>{steps.map((label,index)=><li key={label} className={index===step?"isCurrent":index<step?"isComplete":""}><button type="button" onClick={()=>goToStep(index)} aria-current={index===step?"step":undefined}><span>{index+1}</span>{label}</button></li>)}</ol></nav>
+    <div className="sellerProductWizardBody">
       <div className="sellerControlFormMain">
+        <div data-wizard-step="0" hidden={step!==0}>
         <SellerSection icon={FileText} title={t("basicInfo")} description={t("basicInfoHelp")}>
           <SellerFormField label={t("productName")} htmlFor="name" hint={t("productNameHint")} required>
             <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} />
@@ -81,27 +104,6 @@ export default function NewProductForm({ currency, productCount, productLimit, s
             <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required aria-describedby="description-hint" placeholder={t("descriptionPlaceholder")} />
           </SellerFormField>
         </SellerSection>
-
-        <SellerSection icon={Tag} title={t("pricing")} description={t("pricingHelp")}>
-          <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("price", { currency })} htmlFor="price" required><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required placeholder="29.99" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
-            <SellerFormField label={t("comparePrice", { currency })} htmlFor="compareAtPrice" hint={t("comparePriceHint")}><input id="compareAtPrice" name="compareAtPrice" type="number" min="0.01" max="1000000" step="0.01" aria-describedby="compareAtPrice-hint" placeholder="39.99" /></SellerFormField>
-          </div>
-        </SellerSection>
-
-        <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
-          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/><ProductVideoManager key={`video-${resetGeneration}`} onChange={setVideo} onUploadingChange={setUploading}/>
-        </SellerSection>
-
-        <SellerSection icon={Boxes} title={t("productOptions")} description={t("productOptionsHelp")}>
-          {!variantsEnabled ? <button className="sellerVariantStartButton" type="button" onClick={() => setVariantsEnabled(true)}>{t("addProductOptions")}</button> : <>
-            <div className="sellerVariantOptionToolbar"><p>{t("productOptionsEnabled")}</p><button className="sellerVariantRemoveButton" type="button" onClick={() => setVariantsEnabled(false)}>{t("removeProductOptions")}</button></div>
-            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} onDraftChange={setVariantDraft} embedded />
-          </>}
-        </SellerSection>
-
-        {variantsEnabled && <SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages}/></SellerSection>}
-
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
           <div className="sellerControlFieldGrid">
             <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
@@ -109,18 +111,52 @@ export default function NewProductForm({ currency, productCount, productLimit, s
           </div>
           <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
         </SellerSection>
+        </div>
+        <div data-wizard-step="1" hidden={step!==1}>
+        <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
+          <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/><ProductVideoManager key={`video-${resetGeneration}`} onChange={setVideo} onUploadingChange={setUploading}/>
+        </SellerSection>
+        </div>
+        <div data-wizard-step="2" hidden={step!==2}>
+        <SellerSection icon={Boxes} title={t("productOptions")} description="Votre produit existe-t-il en plusieurs couleurs, tailles, modèles ou versions ?">
+          <div className="sellerProductWizardChoices" role="group" aria-label="Ce produit a-t-il des variantes ?">
+            <button type="button" className={!variantsEnabled?"isSelected":""} aria-pressed={!variantsEnabled} onClick={()=>setVariantsEnabled(false)}>Non</button>
+            <button type="button" className={variantsEnabled?"isSelected":""} aria-pressed={variantsEnabled} onClick={()=>{setVariantsEnabled(true);setVariantsInitialized(true);}}>Oui</button>
+          </div>
+          {variantsInitialized && <div hidden={!variantsEnabled}>
+            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} onDraftChange={setVariantDraft} embedded />
+          </div>}
+        </SellerSection>
+        {variantsInitialized && <div hidden={!variantsEnabled}><SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages}/></SellerSection></div>}
+        </div>
+        <div data-wizard-step="3" hidden={step!==3}>
+        <SellerSection icon={Tag} title={t("pricing")} description={t("pricingHelp")}>
+          <div className="sellerControlFieldGrid">
+            <SellerFormField label={t("price", { currency })} htmlFor="price" required><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required placeholder="29.99" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
+            <SellerFormField label={t("comparePrice", { currency })} htmlFor="compareAtPrice" hint={t("comparePriceHint")}><input id="compareAtPrice" name="compareAtPrice" type="number" min="0.01" max="1000000" step="0.01" aria-describedby="compareAtPrice-hint" placeholder="39.99" /></SellerFormField>
+          </div>
+        </SellerSection>
+        {!variantsEnabled && <SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><SellerFormField label={t("stock")} htmlFor="stock" hint={t("stockHint")} required><input id="stock" name="stock" type="number" min="0" max="1000000" step="1" value={productStock} onChange={(event) => setProductStock(event.target.value)} required /></SellerFormField></SellerSection>}
+        {variantsEnabled && <p className="sellerProductWizardNote">Les prix et le stock de chaque variante sont conservés dans l’étape Variantes.</p>}
+        </div>
+        <div data-wizard-step="4" hidden={step!==4}>
+        <SellerSection icon={Truck} title={shipping("productSettingsTitle")} description={shipping("productSettingsHelp")}><label className="shippingToggle"><input type="checkbox" checked={shippingOverrideEnabled} onChange={e=>setShippingOverrideEnabled(e.target.checked)}/><span><strong>{shippingOverrideEnabled?"Modifier la livraison pour ce produit":"Utiliser les paramètres de livraison de ma boutique"}</strong><small>{storeShippingSummary||shipping("storeShippingUnconfigured")}</small></span></label>{shippingOverrideEnabled&&<ShippingRuleFields value={shippingRule} onChange={setShippingRule} currency={currency}/>}</SellerSection>
+        </div>
+        <div data-wizard-step="5" hidden={step!==5}>
+        <SellerSection icon={FileText} title="Vérification" description="Vérifiez les informations avant d’enregistrer ou de publier.">
+          <p className={`sellerProductWizardReview${missingRequired?" hasMissing":""}`}>{missingRequired ? `${missingRequired} information${missingRequired>1?"s":""} obligatoire${missingRequired>1?"s":""} reste${missingRequired>1?"nt":""} à compléter.` : "Toutes les informations obligatoires sont renseignées."}</p>
+        </SellerSection>
         <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
-        <SellerSection icon={Truck} title={shipping("productSettingsTitle")} description={shipping("productSettingsHelp")}><label className="shippingToggle"><input type="checkbox" checked={shippingOverrideEnabled} onChange={e=>setShippingOverrideEnabled(e.target.checked)}/><span><strong>{shippingOverrideEnabled?shipping("customProductShipping"):shipping("inheritStoreShipping")}</strong><small>{storeShippingSummary||shipping("storeShippingUnconfigured")}</small></span></label>{shippingOverrideEnabled&&<ShippingRuleFields value={shippingRule} onChange={setShippingRule} currency={currency}/>}</SellerSection>
+        </div>
       </div>
-
-      {!variantsEnabled && <aside className="sellerControlFormAside">
-        <SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><SellerFormField label={t("stock")} htmlFor="stock" hint={t("stockHint")} required><input id="stock" name="stock" type="number" min="0" max="1000000" step="1" value={productStock} onChange={(event) => setProductStock(event.target.value)} required /></SellerFormField></SellerSection>
-      </aside>}
     </div>
     <SellerActionBar status={message && <p ref={successRef} className={`sellerControlFeedback${published ? " isSuccess" : ""}`} role={published ? "status" : "alert"} tabIndex={published ? -1 : undefined}>{message}</p>}>
-      <a className="sellerControlButton secondary" href="/seller/products">{t("cancel")}</a>
-      <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{t("saveDraft")}</button>
-      <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
+      {step>0 && <button className="sellerControlButton secondary" type="button" onClick={()=>goToStep(step-1)}>Retour</button>}
+      {step<5 ? <button className="sellerControlButton primary" type="button" onClick={()=>goToStep(step+1)}>Continuer</button> : <>
+        <a className="sellerControlButton secondary" href="/seller/products">{t("cancel")}</a>
+        <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{t("saveDraft")}</button>
+        <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
+      </>}
     </SellerActionBar>
   </form>;
 }
