@@ -371,7 +371,7 @@ test("cart checkout and Stripe refresh controls keep readable state palettes", a
 test("seller compliance inputs and contact-message validation remain readable", async ({ page }) => {
   await page.goto("/ar/e2e-ux?view=seller");
   await dismissCookieConsent(page);
-  await page.locator(".sellerProductWizardProgress button").nth(5).click();
+  await page.locator('[data-wizard-step="5"]').evaluate((element)=>{(element as HTMLElement).hidden=false;});
   const complianceInput = page.locator('input[name="productIdentifier"]');
   await complianceInput.fill("SKU-RTL-123");
   const inputColors = await complianceInput.evaluate((element) => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
@@ -392,6 +392,23 @@ test("seller compliance inputs and contact-message validation remain readable", 
   await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeDisabled();
   await message.fill("Bonjour, disponible ?");
   await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeEnabled();
+});
+
+test("seller product wizard validates Step 1 and preserves it through Back",async({page})=>{
+  await page.goto("/fr/e2e-ux?view=seller");
+  await dismissCookieConsent(page);
+  await page.getByRole("button",{name:"Continuer"}).click();
+  await expect(page.getByText(/Veuillez compléter correctement/)).toBeVisible();
+  await expect(page.getByLabel(/Nom du produit/)).toBeFocused();
+  await page.locator("#name").fill("Produit de démonstration");
+  await page.locator("#description").fill("Description complète pour vérifier le parcours vendeur.");
+  await page.locator("#category-main").selectOption({index:1});
+  await page.locator("#category-group").selectOption({index:1});
+  await page.locator("#category").selectOption({index:1});
+  await page.getByRole("button",{name:"Continuer"}).click();
+  await expect(page.locator('[data-wizard-step="1"]')).toBeVisible();
+  await page.getByRole("button",{name:"Retour"}).click();
+  await expect(page.locator("#name")).toHaveValue("Produit de démonstration");
 });
 
 test("product lower section is compact and report dialog is accessible", async ({ page }) => {

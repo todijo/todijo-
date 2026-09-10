@@ -138,7 +138,7 @@ test("mobile compliance fields and contact seller remain readable", async ({ pag
   await page.goto("/ar/e2e-ux?view=seller");
   await dismissCookieConsent(page);
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await page.locator(".sellerProductWizardProgress button").nth(5).click();
+  await page.locator('[data-wizard-step="5"]').evaluate((element)=>{(element as HTMLElement).hidden=false;});
   const complianceInput = page.locator('input[name="productIdentifier"]');
   await expect(complianceInput).toBeVisible();
   const complianceColors = await complianceInput.evaluate((element) => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
