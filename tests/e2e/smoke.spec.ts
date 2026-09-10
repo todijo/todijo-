@@ -371,6 +371,7 @@ test("cart checkout and Stripe refresh controls keep readable state palettes", a
 test("seller compliance inputs and contact-message validation remain readable", async ({ page }) => {
   await page.goto("/ar/e2e-ux?view=seller");
   await dismissCookieConsent(page);
+  await page.locator(".sellerProductWizardProgress button").nth(5).click();
   const complianceInput = page.locator('input[name="productIdentifier"]');
   await complianceInput.fill("SKU-RTL-123");
   const inputColors = await complianceInput.evaluate((element) => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
