@@ -125,7 +125,7 @@ export async function processCatalogImportJob(db:PrismaClient,provider:SupplierC
   const candidates=await db.supplierCatalogImportItem.findMany({where:{jobId,status:"PENDING"},orderBy:{position:"asc"},take:limit,select:{id:true,requestedIdentifier:true,canonicalCategoryId:true}});
   await runCatalogWorkBounded(candidates,async candidate=>{
     const started=performance.now(),timing:ImportTiming={productDetailMs:0,normalizationMs:0,databaseMs:0,freightPricingMs:0,mediaImportMs:0,totalMs:0};
-    const claim=await db.supplierCatalogImportItem.updateMany({where:{id:candidate.id,status:"PENDING",job:{status:{in:["PENDING","RUNNING"]}}},data:{status:"IMPORTING",claimedAt:new Date(),attemptCount:{increment:1},errorCode:null,errorMessage:null}});if(claim.count!==1)return;
+    const claim=await db.supplierCatalogImportItem.updateMany({where:{id:candidate.id,status:"PENDING"},data:{status:"IMPORTING",claimedAt:new Date(),attemptCount:{increment:1},errorCode:null,errorMessage:null}});if(claim.count!==1)return;
     let canonicalSupplierId:string|undefined;
     try{
       let stage=performance.now();const snapshot=await provider.getProduct(candidate.requestedIdentifier);canonicalSupplierId=snapshot.supplierProductId;timing.productDetailMs=elapsed(stage);
