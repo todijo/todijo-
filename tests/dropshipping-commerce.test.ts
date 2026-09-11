@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {buyerSafeDropshippingResult,DropshippingCommerceError,resolveDropshippingEligibility,resolveDropshippingPricing} from "../lib/suppliers/commerce-pricing";
-import type {SupplierProductSnapshot} from "../lib/suppliers/types";
+import {buyerSafeDropshippingResult,DropshippingCommerceError,resolveCanonicalSupplierVariant,resolveDropshippingEligibility,resolveDropshippingPricing} from "../lib/suppliers/commerce-pricing";
+import type {SupplierVariantDetailSnapshot} from "../lib/suppliers/types";
 
-const snapshot:SupplierProductSnapshot={provider:"CJ",supplierProductId:"CJ-PID",sku:"CJ-SKU",title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:8.24,currency:"USD",stock:10,available:true,weightGrams:100,media:[],rawMetadata:{},variants:[{supplierVariantId:"CJ-VID",sku:"CJ-VSKU",title:"Black",cost:8.24,currency:"USD",stock:10,available:true,originCountryCodes:["CN"]}]};
+const snapshot:SupplierVariantDetailSnapshot={supplierProductId:"CJ-PID",supplierVariantId:"CJ-VID",sku:"CJ-VSKU",title:"Black",cost:8.24,currency:"USD",stock:10,available:true,originCountryCodes:["CN"]};
 function db(overrides:Record<string,unknown>={}){const product={id:"product-1",price:{toString:()=>"20.00"},currency:"EUR",supplierLink:{provider:"CJ",ownerType:"PLATFORM",connectionId:"connection-1",supplierProductId:"CJ-PID",sourceMetadata:{pricing:{mode:"AUTOMATIC"}},connection:{status:"CONNECTED",store:null}},variants:[{id:"variant-1",priceOverride:null,supplierVariantId:"CJ-VID",supplierConnectionId:"connection-1"}],...overrides};return{product:{findFirst:async()=>product}} as never;}
-function dependencies(custom:Partial<SupplierProductSnapshot>={}){return{provider:{getProduct:async()=>({...snapshot,...custom}),calculateFreight:async(input:{variantId:string;quantity:number})=>({selected:{id:"yun",name:"YunExpress Clothing Line",amount:"4.75",currency:"USD" as const,estimatedDelivery:"8-15 days",originCountry:"CN",destinationCountry:"FR"},methods:[],variantId:input.variantId,quantity:input.quantity,calculatedAt:new Date().toISOString(),cached:false})},fx:async(base:unknown,quote:unknown)=>({provider:"OPEN_EXCHANGE_RATES" as const,baseCurrency:base as "USD",quoteCurrency:quote as "EUR",rate:"0.866341",fetchedAt:new Date().toISOString(),effectiveAt:new Date().toISOString()})};}
+function dependencies(custom:Partial<SupplierVariantDetailSnapshot>={}){return{provider:{getVariant:async(id:string)=>{void id;return{...snapshot,...custom};},calculateFreight:async(input:{variantId:string;quantity:number})=>({selected:{id:"yun",name:"YunExpress Clothing Line",amount:"4.75",currency:"USD" as const,estimatedDelivery:"8-15 days",originCountry:"CN",destinationCountry:"FR"},methods:[],variantId:input.variantId,quantity:input.quantity,calculatedAt:new Date().toISOString(),cached:false})},fx:async(base:unknown,quote:unknown)=>({provider:"OPEN_EXCHANGE_RATES" as const,baseCurrency:base as "USD",quoteCurrency:quote as "EUR",rate:"0.866341",fetchedAt:new Date().toISOString(),effectiveAt:new Date().toISOString()})};}
 
 test("eligibility is explicit for platform, approved seller, unauthorized seller and normal products",()=>{
  assert.equal(resolveDropshippingEligibility({hasSupplierLink:true,provider:"CJ",ownerType:"PLATFORM",connectionStatus:"CONNECTED"}).eligible,true);
@@ -28,9 +28,8 @@ test("quantity is line scoped and included in the freight request and line total
 });
 
 test("exact variants may price differently while each keeps the true twenty percent margin",async()=>{
- const variants=[{supplierVariantId:"CJ-A",sku:null,title:"A",cost:8,currency:"USD",stock:5,available:true,originCountryCodes:["CN"]},{supplierVariantId:"CJ-B",sku:null,title:"B",cost:12,currency:"USD",stock:5,available:true,originCountryCodes:["CN"]}];
  const makeDb=(id:string,supplierVariantId:string)=>db({variants:[{id,priceOverride:null,supplierVariantId,supplierConnectionId:"connection-1"}]});
- const deps=dependencies({variants}); deps.fx=async(base:unknown,quote:unknown)=>({provider:"OPEN_EXCHANGE_RATES" as const,baseCurrency:base as "USD",quoteCurrency:quote as "EUR",rate:"1",fetchedAt:new Date().toISOString(),effectiveAt:new Date().toISOString()});
+ const deps=dependencies();deps.provider.getVariant=async(id)=>({...snapshot,supplierVariantId:id,cost:id==="CJ-A"?8:12}); deps.fx=async(base:unknown,quote:unknown)=>({provider:"OPEN_EXCHANGE_RATES" as const,baseCurrency:base as "USD",quoteCurrency:quote as "EUR",rate:"1",fetchedAt:new Date().toISOString(),effectiveAt:new Date().toISOString()});
  const a=await resolveDropshippingPricing(makeDb("variant-a","CJ-A"),{productId:"product-1",variantId:"variant-a",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps);
  const b=await resolveDropshippingPricing(makeDb("variant-b","CJ-B"),{productId:"product-1",variantId:"variant-b",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps);
  assert.notEqual(a.buyer?.buyerUnitPrice,b.buyer?.buyerUnitPrice);
@@ -38,8 +37,23 @@ test("exact variants may price differently while each keeps the true twenty perc
 });
 
 test("invalid or cross-product variants fail before any supplier call",async()=>{
- let called=false;const deps=dependencies();deps.provider.getProduct=async()=>{called=true;return snapshot;};
+ let called=false;const deps=dependencies();deps.provider.getVariant=async()=>{called=true;return snapshot;};
  await assert.rejects(()=>resolveDropshippingPricing(db({variants:[]}),{productId:"product-1",variantId:"foreign",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps),(error:unknown)=>error instanceof DropshippingCommerceError&&error.code==="DROPSHIPPING_VARIANT_INVALID");assert.equal(called,false);
+});
+
+test("canonical resolver maps only the persisted Todijo variant and supplier connection",()=>{
+ assert.deepEqual(resolveCanonicalSupplierVariant({supplierProductId:"CJ-PID",connectionId:"connection-1",variant:{supplierVariantId:"CJ-VID",supplierConnectionId:"connection-1"}}),{supplierProductId:"CJ-PID",supplierVariantId:"CJ-VID"});
+ assert.throws(()=>resolveCanonicalSupplierVariant({supplierProductId:"CJ-PID",connectionId:"connection-1",variant:{supplierVariantId:"CJ-VID",supplierConnectionId:"other"}}),/DROPSHIPPING_VARIANT_INVALID/);
+});
+
+test("PDP pricing uses the canonical supplier VID without full product discovery and rejects mismatched CJ identity",async()=>{
+ let requested="",fullDiscoveryCalled=false;const deps=dependencies();
+ deps.provider.getVariant=async(id:string)=>{requested=id;return snapshot;};
+ Object.assign(deps.provider,{getProduct:async()=>{fullDiscoveryCalled=true;throw new Error("FULL_DISCOVERY_MUST_NOT_RUN");}});
+ await resolveDropshippingPricing(db(),{productId:"product-1",variantId:"variant-1",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps);
+ assert.equal(requested,"CJ-VID");assert.equal(fullDiscoveryCalled,false);
+ deps.provider.getVariant=async()=>({...snapshot,supplierProductId:"OTHER-PID"});
+ await assert.rejects(()=>resolveDropshippingPricing(db(),{productId:"product-1",variantId:"variant-1",quantity:1,destinationCountry:"FR",buyerCurrency:"EUR"},deps),(error:unknown)=>error instanceof DropshippingCommerceError&&error.code==="DROPSHIPPING_VARIANT_INVALID");
 });
 
 test("freight and FX failures fail closed without substituting browser money",async()=>{

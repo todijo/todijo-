@@ -43,6 +43,10 @@ export type SupplierMediaSource = {
   posterUrl?: string | null;
 };
 
+export type SupplierVariantDetailSnapshot = SupplierVariantSnapshot & {
+  supplierProductId: string;
+};
+
 export type SupplierCategoryHierarchy = {
   categoryId: string | null;
   categoryName: string | null;
@@ -94,6 +98,7 @@ export interface SupplierCatalogProvider {
   readonly id: SupplierProviderId;
   isConfigured(): boolean;
   getProduct(supplierProductId: string): Promise<SupplierProductSnapshot>;
+  getVariant?(supplierVariantId: string): Promise<SupplierVariantDetailSnapshot>;
   searchProducts?(query: string, page?: number, pageSize?: number): Promise<SupplierCatalogSearchPage>;
   calculateFreight?(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<CjFreightQuote>;
   getProductReviews?(supplierProductId: string, page?: number, pageSize?: number): Promise<SupplierProductReviewsPage>;
