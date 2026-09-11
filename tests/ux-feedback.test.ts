@@ -27,6 +27,8 @@ test("route skeletons cover marketplace, product, order, message, cart, and sell
   const feedback = readFileSync("components/FeedbackState.tsx", "utf8");
   assert.match(feedback, /role="status"/);
   assert.match(feedback, /aria-busy="true"/);
+  assert.match(feedback, /className="pageSkeletonBrand"/);
+  assert.match(feedback, /<strong>Todijo<\/strong><small>\{label\}<\/small>/);
 });
 
 test("important actions expose progress and friendly inline or toast feedback", () => {
