@@ -121,7 +121,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const disabledByLimit = productLimit !== null && productCount >= productLimit;
   const draftBlockers=blockers;
   const publishBlockers=blockers;
-  return <form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { if(step===5) requestAnimationFrame(collectBlockers); }}>
+  return <form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { requestAnimationFrame(() => { const panel=formRef.current?.querySelector<HTMLElement>(`[data-wizard-step="${step}"]`); if(stepValidation?.step===step&&!panel?.querySelector(":invalid"))setStepValidation(null); if(step===5)collectBlockers(); }); }}>
     <nav className="sellerProductWizardProgress" aria-label="Étapes d’ajout du produit"><ol>{steps.map((label,index)=><li key={label} className={index===step?"isCurrent":index<step?"isComplete":""}><button type="button" disabled={index>step} onClick={()=>goToStep(index)} aria-current={index===step?"step":undefined}><span>{index+1}</span>{label}</button></li>)}</ol></nav>
     <div className="sellerProductWizardBody">
       <div className="sellerControlFormMain">

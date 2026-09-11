@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
+import { requireProductCreationAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
 import { ProductVariantImageError } from "@/lib/product-variant-images";
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }
 
-    const store = await requirePublishingAccess(prisma, session.userId);
+    const store = await requireProductCreationAccess(prisma, session.userId);
 
     const body = await request.json();
     const name = String(body.name ?? "").trim();
