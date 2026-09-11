@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { sellerPlans } from "@/lib/seller-plans";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
 import NewProductForm from "./NewProductForm";
-import { canPublish } from "@/lib/seller-subscription";
+import { canPublish, sellerProductQuota } from "@/lib/seller-subscription";
+import { isLocale } from "@/i18n/config";
+import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function NewProductPage() {
   const common = await getTranslations("Common");
   const dashboardText = await getTranslations("SellerDashboard");
   const locale = await getLocale();
+  const entitlementCopy=sellerEntitlementSubscriptionMessages[isLocale(locale)?locale:"en"];
   const countryNames=new Intl.DisplayNames([locale],{type:"region"});
   const session = await readSession();
   if (!session) redirect("/login");
@@ -24,7 +26,7 @@ export default async function NewProductPage() {
     where: { ownerId: session.userId },
     select: {
       name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true, shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,
-      owner: { select: { firstName: true, lastName: true } },
+      owner: { select: { firstName: true, lastName: true, role: true } },
       subscription: { select: { status: true, plan: true } },
       accessGrants: { select: { source: true, startsAt: true, endsAt: true } },
       _count: { select: { products: true } },
@@ -35,8 +37,8 @@ export default async function NewProductPage() {
   if (store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") redirect("/seller/store-settings");
   if (!canPublish(store)) redirect("/seller/subscription");
 
-  const plan = sellerPlans().find((item) => item.id === store.subscription?.plan);
-  const productLimit = plan?.productLimit ?? null;
+  const quota = sellerProductQuota({ role: store.owner.role, plan: store.subscription?.plan, productCount: store._count.products });
+  const productLimit = quota.productLimit;
   const labels = {
     dashboard: p("nav.dashboard"), products: p("nav.products"), orders: p("nav.orders"), messages: p("nav.messages"),
     statistics: p("nav.statistics"), revenue: p("nav.revenue"), reviews: p("nav.reviews"), store: p("nav.store"),
@@ -55,7 +57,7 @@ export default async function NewProductPage() {
         <SellerStatusBadge tone="accent">{store.name}</SellerStatusBadge>
         <SellerStatusBadge>{t("currencyBadge", { currency: store.currency })}</SellerStatusBadge>
         <SellerStatusBadge tone={productLimit && store._count.products >= productLimit ? "warning" : "success"}>
-          {productLimit ? t("planUsage", { count: store._count.products, limit: productLimit }) : t("unlimitedPlan")}
+          {store.owner.role === "ADMIN" ? entitlementCopy.adminUnlimitedUsage(store._count.products) : productLimit ? t("planUsage", { count: store._count.products, limit: productLimit }) : t("unlimitedPlan")}
         </SellerStatusBadge>
       </>}
     />

@@ -12,3 +12,8 @@ export function configuredSellerPlan(id: unknown) {
   if (!plan || !/^price_[A-Za-z0-9]+$/.test(plan.priceId)) return null;
   return plan;
 }
+
+export function canonicalActiveSellerPlanId(subscription: { status: string; plan: string } | null | undefined) {
+  if (!subscription || !["ACTIVE", "TRIALING"].includes(subscription.status)) return null;
+  return sellerPlans().some((plan) => plan.id === subscription.plan) ? subscription.plan : null;
+}
