@@ -1,4 +1,4 @@
-import type { SupplierCatalogProvider, SupplierCatalogSearchPage, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot, SupplierCategoryHierarchy } from "./types";
+import type { SupplierCatalogProvider, SupplierCatalogSearchPage, SupplierProductReviewsPage, SupplierProductSnapshot, SupplierVariantSnapshot, SupplierVariantDetailSnapshot, SupplierCategoryHierarchy } from "./types";
 import { mapCjSemanticVariants } from "./cj-variant-mapping";
 import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
@@ -111,6 +111,14 @@ export function normalizeCjProduct(productValue: unknown, variantValue: unknown,
   };
 }
 
+export function normalizeCjVariantDetail(value:unknown):SupplierVariantDetailSnapshot{
+  const row=object(value),supplierProductId=text(row.pid??row.productId),supplierVariantId=text(row.vid??row.variantId);
+  const inventories=list(row.inventories??row.inventory),stock=inventories.reduce((sum,item)=>sum+Math.max(0,number(object(item).totalInventory??object(item).inventory)??0),0);
+  const originCountryCodes=[...new Set(inventories.filter((item)=>(number(object(item).totalInventory??object(item).inventory)??0)>0).map((item)=>text(object(item).countryCode).toUpperCase()).filter((code)=>/^[A-Z]{2}$/.test(code)))];
+  if(!supplierProductId||!supplierVariantId)throw new Error("CJ_VARIANT_NOT_FOUND");
+  return{supplierProductId,supplierVariantId,sku:text(row.variantSku??row.sku)||null,title:text(row.variantKey??row.variantNameEn??row.variantName)||"CJ variant",cost:number(row.variantSellPrice??row.sellPrice),currency:"USD",stock,available:stock>0,originCountryCodes,imageUrl:text(row.variantImage??row.variantImageUrl??row.image)||null};
+}
+
 export class CjCatalogProvider implements SupplierCatalogProvider {
   readonly id = "CJ" as const;
   private nextRequestAt = 0;
@@ -170,6 +178,14 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
     const request=this.loadProduct(identifier).then(value=>{productCache.set(key,{expiresAt:Date.now()+PRODUCT_CACHE_TTL_MS,value});return value;}).finally(()=>pendingProducts.delete(key));pendingProducts.set(key,request);return request;
     }
     return this.loadProduct(identifier);
+  }
+  async getVariant(supplierVariantId:string):Promise<SupplierVariantDetailSnapshot>{
+    const vid=supplierVariantId.trim();
+    if(!/^[A-Za-z0-9-]{4,200}$/.test(vid))throw new Error("CJ_VARIANT_ID_INVALID");
+    const result=await this.get("get-product-variant",`/product/variant/queryByVid?vid=${encodeURIComponent(vid)}&features=enable_inventory`,{supplierVariantId:vid});
+    const variant=normalizeCjVariantDetail(result.data);
+    if(normalizedIdentifier(variant.supplierVariantId)!==normalizedIdentifier(vid))throw new Error("CJ_VARIANT_IDENTITY_MISMATCH");
+    return variant;
   }
   private async loadProduct(identifier:string):Promise<SupplierProductSnapshot> {
     const isSku = /^CJ[A-Za-z0-9-]+$/i.test(identifier);

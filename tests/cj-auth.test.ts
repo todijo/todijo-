@@ -229,3 +229,11 @@ test("CJ connectivity is read-only and credentials stay server-only", () => {
   assert.match(status, /requirePlatformSupplierAdmin/);
   assert.doesNotMatch(status, /CJ_API_KEY|CJ_ACCESS_TOKEN|accessToken|apiKey/);
 });
+
+test("CJ variant pricing lookup uses one focused VID request with inventory",async()=>{
+ const urls:string[]=[];
+ const provider=new CjCatalogProvider({isConfigured:()=>true,getAccessToken:async()=>"secret",invalidateAccessToken:()=>{}},{minimumRequestIntervalMs:0,fetcher:async(input)=>{urls.push(String(input));return new Response(JSON.stringify({code:200,result:true,data:{pid:"CJ-PID",vid:"CJ-VID",variantSku:"SKU",variantSellPrice:"8.24",inventories:[{countryCode:"CN",totalInventory:7},{countryCode:"US",totalInventory:0}]}}));}});
+ const variant=await provider.getVariant("CJ-VID");
+ assert.equal(urls.length,1);assert.match(urls[0],/\/product\/variant\/queryByVid\?vid=CJ-VID&features=enable_inventory$/);
+ assert.deepEqual({pid:variant.supplierProductId,vid:variant.supplierVariantId,cost:variant.cost,stock:variant.stock,origins:variant.originCountryCodes},{pid:"CJ-PID",vid:"CJ-VID",cost:8.24,stock:7,origins:["CN"]});
+});
