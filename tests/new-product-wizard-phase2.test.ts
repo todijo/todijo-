@@ -30,7 +30,8 @@ test("seller-first variants use compact option and value chips",()=>{
 });
 
 test("seller-first combinations reconcile automatically within the existing maximum",()=>{
-  assert.match(variants,/if \(!sellerFirst \|\| productId \|\| !combinationLabels\.length \|\| combinationLabels\.length > MAX_PRODUCT_VARIANTS/);
+  assert.match(variants,/if \(!sellerFirst \|\| productId\) return/);
+  assert.match(variants,/if \(combinationLabels\.length > MAX_PRODUCT_VARIANTS\) return/);
   assert.match(variants,/setVariants\(\(current\) =>/);
   assert.match(variants,/previous\.get\(key\) \?\?/);
 });
@@ -64,7 +65,7 @@ test("seller-first image assignment targets color or the first meaningful option
 });
 
 test("verification enumerates every blocker with a correction action",()=>{
-  assert.match(form,/blockers\.map\(blocker=>/);
+  assert.match(form,/publishBlockers\.map\(blocker=>/);
   assert.match(form,/>Corriger<\/button>/);
   assert.match(form,/focusBlocker\(blocker\)/);
 });
@@ -76,7 +77,7 @@ test("Corriger navigates and focuses the blocker field",()=>{
 });
 
 test("Publish remains disabled until blocker collection is ready and empty",()=>{
-  assert.match(form,/value="PUBLISHED" disabled=\{submitting \|\| uploading \|\| disabledByLimit \|\| !blockersReady \|\| blockers\.length>0\}/);
+  assert.match(form,/value="PUBLISHED" disabled=\{submitting \|\| !blockersReady \|\| publishBlockers\.length>0\}/);
 });
 
 test("DRAFT and PUBLISHED retain the established API payload semantics",()=>{

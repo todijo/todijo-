@@ -9,7 +9,7 @@ test("new product publish stays on the form and resets all state only after succ
   assert.ok(source.indexOf('if (status === "DRAFT")') < source.indexOf("setImages([])"));
   for (const reset of ["setImages([])", "setVariantsEnabled(false)", "setVariantDraft(", "setVariantImages([])", "setBasePrice(\"\")", "setProductStock(\"1\")", "setResetGeneration("]) assert.ok(source.includes(reset), `missing reset: ${reset}`);
   assert.ok(source.includes('submitter?.value === "DRAFT"'));
-  assert.match(source, /disabled=\{submitting \|\| uploading \|\| disabledByLimit\}/);
+  assert.match(source, /value="DRAFT" disabled=\{submitting \|\| !blockersReady \|\| draftBlockers\.length>0\}/);
 });
 
 test("edit product preserves status by default and exposes an explicit draft publication action", async () => {

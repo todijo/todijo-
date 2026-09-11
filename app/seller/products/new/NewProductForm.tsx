@@ -16,7 +16,7 @@ import { useToast } from "@/components/ToastProvider";
 import ProductComplianceFields from "@/components/ProductComplianceFields";
 import SellerCategorySelector from "@/components/SellerCategorySelector";
 import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type ShippingDraft} from "@/components/ShippingRuleFields";
-type PublicationBlocker={key:string;label:string;step:number;fieldId?:string};
+type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
@@ -58,6 +58,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     const fields=Array.from(formRef.current?.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>(":invalid")??[]);
     const next=fields.map(blockerForField);
     if(variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)) next.push({key:"variants",label:"Variantes — ajoutez au moins une option et une valeur",step:2});
+    if(disabledByLimit&&productLimit!==null) next.push({key:"productLimit",label:`Votre forfait autorise ${productLimit} produits et votre boutique en contient déjà ${productCount}.`,step:5,href:"/seller/subscription",actionLabel:"Voir mon forfait"});
     const unique=next.filter((item,index)=>next.findIndex(candidate=>candidate.key===item.key)===index);
     setBlockers(unique); setBlockersReady(true); return unique;
   }
@@ -118,6 +119,8 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   }
 
   const disabledByLimit = productLimit !== null && productCount >= productLimit;
+  const draftBlockers=blockers;
+  const publishBlockers=blockers;
   return <form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { if(step===5) requestAnimationFrame(collectBlockers); }}>
     <nav className="sellerProductWizardProgress" aria-label="Étapes d’ajout du produit"><ol>{steps.map((label,index)=><li key={label} className={index===step?"isCurrent":index<step?"isComplete":""}><button type="button" disabled={index>step} onClick={()=>goToStep(index)} aria-current={index===step?"step":undefined}><span>{index+1}</span>{label}</button></li>)}</ol></nav>
     <div className="sellerProductWizardBody">
@@ -177,7 +180,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         <div data-wizard-step="5" hidden={step!==5}>
         {stepValidation?.step===5&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={FileText} title="Vérification" description="Vérifiez les informations avant d’enregistrer ou de publier.">
-          {blockers.length?<div className="sellerProductWizardBlockers"><strong>{blockers.length} information{blockers.length>1?"s":""} à compléter avant publication</strong><ul>{blockers.map(blocker=><li key={blocker.key}><span>{blocker.label}</span><button type="button" onClick={()=>focusBlocker(blocker)}>Corriger</button></li>)}</ul></div>:<p className="sellerProductWizardReview">Toutes les informations obligatoires sont renseignées.</p>}
+          {!blockersReady?<p className="sellerProductWizardReview">Vérification des informations…</p>:publishBlockers.length?<div className="sellerProductWizardBlockers"><strong>{publishBlockers.length} information{publishBlockers.length>1?"s":""} à corriger avant enregistrement ou publication</strong><ul>{publishBlockers.map(blocker=><li key={blocker.key}><span>{blocker.label}</span>{blocker.href?<a className="sellerProductWizardBlockerLink" href={blocker.href}>{blocker.actionLabel}</a>:<button type="button" onClick={()=>focusBlocker(blocker)}>Corriger</button>}</li>)}</ul></div>:<p className="sellerProductWizardReview">Toutes les informations obligatoires sont renseignées.</p>}
         </SellerSection>
         <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
         </div>
@@ -187,8 +190,8 @@ export default function NewProductForm({ currency, productCount, productLimit, s
       {step>0 && <button className="sellerControlButton secondary" type="button" onClick={()=>goToStep(step-1)}>Retour</button>}
       {step<5 ? <button className="sellerControlButton primary" type="button" onClick={continueStep}>Continuer</button> : <>
         <a className="sellerControlButton secondary" href="/seller/products">{t("cancel")}</a>
-        <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || uploading || disabledByLimit} aria-busy={submitting}>{t("saveDraft")}</button>
-        <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || uploading || disabledByLimit || !blockersReady || blockers.length>0} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
+        <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || !blockersReady || draftBlockers.length>0} aria-busy={submitting}>{t("saveDraft")}</button>
+        <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || !blockersReady || publishBlockers.length>0} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
       </>}
     </SellerActionBar>
   </form>;
