@@ -48,8 +48,9 @@ test("variant price and stock use a compact matrix with bulk helpers",()=>{
   assert.match(variants,/stock:Number\(bulkStock\)/);
 });
 
-test("base product price remains the variant fallback",()=>{
-  assert.match(variants,/placeholder=\{basePrice\|\|undefined\}/);
+test("variant products require their own prices and derive the canonical product price",()=>{
+  assert.match(form,/resolveProductPriceInput\(\{variantsEnabled:true,basePrice,variants:variantDraft\.variants\}\)/);
+  assert.match(form,/required=\{!variantsEnabled\}/);
   assert.match(form,/productStockForForm\(variantsEnabled, productStock\)/);
 });
 

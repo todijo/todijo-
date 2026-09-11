@@ -64,7 +64,7 @@ test("only the canonical active paid plan is active", () => {
 });
 
 test("valid whole and decimal prices use native positive decimal validation and clear stale errors", () => {
-  assert.match(newProductForm, /name="price" type="number" min="0\.01" max="1000000" step="0\.01" required/);
+  assert.match(newProductForm, /name="price" type="number" min="0\.01" max="1000000" step="0\.01" required=\{!variantsEnabled\}/);
   for (const validPrice of ["12", "12.00", "12.34"]) {
     const price = Number(validPrice);
     assert.equal(Number.isFinite(price) && price > 0 && price <= 1_000_000, true);
