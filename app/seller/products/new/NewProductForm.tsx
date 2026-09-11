@@ -16,6 +16,7 @@ import { useToast } from "@/components/ToastProvider";
 import ProductComplianceFields from "@/components/ProductComplianceFields";
 import SellerCategorySelector from "@/components/SellerCategorySelector";
 import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type ShippingDraft} from "@/components/ShippingRuleFields";
+import {resolveProductPriceInput} from "@/lib/product-price-input";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string }) {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     const fields=Array.from(formRef.current?.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>(":invalid")??[]);
     const next=fields.map(blockerForField);
     if(variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)) next.push({key:"variants",label:"Variantes — ajoutez au moins une option et une valeur",step:2});
+    const pricing=resolveProductPriceInput({variantsEnabled,basePrice,variants:variantDraft.variants});if(variantsEnabled&&variantDraft.generated&&!pricing.ok)for(const missing of pricing.missing)next.push({key:`variantPrice-${missing}`,label:`Prix requis pour la variante ${missing}`,step:2});
     if(disabledByLimit&&productLimit!==null) next.push({key:"productLimit",label:`Votre forfait autorise ${productLimit} produits et votre boutique en contient déjà ${productCount}.`,step:5,href:"/seller/subscription",actionLabel:"Voir mon forfait"});
     const unique=next.filter((item,index)=>next.findIndex(candidate=>candidate.key===item.key)===index);
     setBlockers(unique); setBlockersReady(true); return unique;
@@ -79,6 +81,10 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     if(invalid){const blocker=blockerForField(invalid);setStepValidation({step,message:`Veuillez compléter correctement : ${blocker.label}.`});invalid.scrollIntoView({behavior:"smooth",block:"center"});invalid.focus();invalid.reportValidity();return;}
     if(step===1&&uploading){setStepValidation({step,message:t("waitUpload")});return;}
     if(step===2&&variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)){setStepValidation({step,message:"Ajoutez au moins une option et une valeur pour créer les variantes."});return;}
+    if(step===2&&variantsEnabled){
+      const pricing=resolveProductPriceInput({variantsEnabled:true,basePrice,variants:variantDraft.variants});
+      if(!pricing.ok){setStepValidation({step,message:`Renseignez un prix valide pour chaque variante active : ${pricing.missing.join(", ")}.`});return;}
+    }
     goToStep(step+1);
   }
 
@@ -166,7 +172,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         {stepValidation?.step===3&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={Tag} title={t("pricing")} description={t("pricingHelp")}>
           <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("price", { currency })} htmlFor="price" required><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required placeholder="29.99" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
+            <SellerFormField label={t("price", { currency })} htmlFor="price" required={!variantsEnabled}><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required={!variantsEnabled} placeholder={variantsEnabled?"Calculé depuis les variantes":"29.99"} value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
             <SellerFormField label={t("comparePrice", { currency })} htmlFor="compareAtPrice" hint={t("comparePriceHint")}><input id="compareAtPrice" name="compareAtPrice" type="number" min="0.01" max="1000000" step="0.01" aria-describedby="compareAtPrice-hint" placeholder="39.99" /></SellerFormField>
           </div>
         </SellerSection>

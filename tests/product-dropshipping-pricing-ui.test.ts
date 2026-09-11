@@ -43,6 +43,10 @@ test("late requests are aborted and stale pricing cannot become active for a new
  const ui=source("components/DropshippingProductPricing.tsx"),panel=source("components/ProductPurchasePanel.tsx");assert.match(ui,/AbortController/);assert.match(ui,/controller\.abort\(\)/);assert.match(ui,/requestKey\.current===key/);assert.match(panel,/verifiedPricing&&verifiedPricing\.variantId===selectedVariant\?\.id&&verifiedPricing\.quantity===quantity/);
 });
 
+test("live PDP pricing has a bounded failure state and explicit retry",()=>{
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/PRICING_REQUEST_TIMEOUT_MS=12_000/);assert.match(ui,/window\.setTimeout\(abort,PRICING_REQUEST_TIMEOUT_MS\)/);assert.match(ui,/signal:controller\.signal/);assert.match(ui,/verificationFailed/);assert.match(ui,/role="alert"/);assert.match(ui,/setRetry\(value=>value\+1\)/);
+});
+
 test("only exact successful authoritative quotes are cached and variant prefetch is sequential",()=>{
  const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/authoritativeQuoteCache=new Map/);assert.match(ui,/validQuote\(data,input\)/);assert.match(ui,/authoritativeQuoteCache\.set\(`\$\{dropshippingPricingRequestKey\(input\)\}:\$\{input\.buyerCurrency\}`/);
  assert.match(ui,/productId,variantId:id,quantity,destinationCountry:country,buyerCurrency:market\.currency/);assert.match(ui,/for\(const id of prefetchIds\)/);assert.match(ui,/await requestQuote/);assert.match(ui,/PREFETCH_DELAY_MS=900/);assert.doesNotMatch(ui,/Promise\.all\(prefetchIds/);

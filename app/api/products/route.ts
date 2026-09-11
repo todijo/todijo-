@@ -17,6 +17,7 @@ import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
 import {resolveBuyerProductContent} from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
+import {resolveProductPriceInput} from "@/lib/product-price-input";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -57,7 +58,6 @@ export async function POST(request: Request) {
     const compliance = readProductCompliance(body);
     const productShipping = parseProductShipping(body);
     if (status === "PUBLISHED" && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
-    const price = Number(body.price);
     const stock = Number(body.stock);
     const compareAtPrice = body.compareAtPrice ? Number(body.compareAtPrice) : null;
     const variantsEnabled = body.variantsEnabled === true;
@@ -65,6 +65,9 @@ export async function POST(request: Request) {
     if (variantsEnabled && (!variantInput || !Array.isArray(variantInput.options) || variantInput.options.length === 0)) {
       return NextResponse.json({ error: "Configure at least one product option." }, { status: 400 });
     }
+    const resolvedPrice=resolveProductPriceInput({variantsEnabled,basePrice:body.price,variants:variantInput?.variants});
+    if(!resolvedPrice.ok)return NextResponse.json({error:resolvedPrice.missing[0]==="base"?"Le prix est invalide.":`Prix de variante requis : ${resolvedPrice.missing.join(", ")}.`},{status:400});
+    const price=Number(resolvedPrice.price);
     const colors = variantsEnabled ? [] : Array.isArray(body.colors) ? body.colors.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,20) : [];
     const sizes = variantsEnabled ? [] : Array.isArray(body.sizes) ? body.sizes.map(String).map((v:string)=>v.trim()).filter(Boolean).slice(0,30) : [];
     const imageValidation = validateProductImages(body.images);
@@ -81,9 +84,6 @@ export async function POST(request: Request) {
     }
     if (!category || category.length > 160 || !isCanonicalLeafCategoryId(category)) {
       return NextResponse.json({ error: "Choisissez une catégorie valide." }, { status: 400 });
-    }
-    if (!Number.isFinite(price) || price <= 0 || price > 1000000) {
-      return NextResponse.json({ error: "Le prix est invalide." }, { status: 400 });
     }
     if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) {
       return NextResponse.json({ error: "Le stock est invalide." }, { status: 400 });

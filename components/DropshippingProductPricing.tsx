@@ -12,17 +12,26 @@ const authoritativeQuoteCache=new Map<string,BuyerDropshippingPricingResponse>()
 const completedPrefetches=new Set<string>();
 const activePrefetches=new Set<string>();
 const PREFETCH_DELAY_MS=900;
+export const PRICING_REQUEST_TIMEOUT_MS=12_000;
 
 function validQuote(data:BuyerDropshippingPricingResponse,input:{productId:string;variantId:string;quantity:number}){
  return data.eligible===true&&data.productId===input.productId&&data.variantId===input.variantId&&data.quantity===input.quantity;
 }
 async function requestQuote(input:{productId:string;variantId:string;quantity:number;destinationCountry:string;buyerCurrency:string},signal?:AbortSignal){
  const adminPreview=typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("adminPreview")==="1";
- const response=await fetch(`/api/products/${encodeURIComponent(input.productId)}/dropshipping-pricing${adminPreview?"?adminPreview=1":""}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variantId:input.variantId,quantity:input.quantity,destinationCountry:input.destinationCountry,buyerCurrency:input.buyerCurrency}),signal,cache:"no-store"});
- const data=await response.json() as BuyerDropshippingPricingResponse;
- if(!response.ok||!validQuote(data,input))throw new Error("DROPSHIPPING_PRICING_UNAVAILABLE");
- authoritativeQuoteCache.set(`${dropshippingPricingRequestKey(input)}:${input.buyerCurrency}`,data);
- return data;
+ const controller=new AbortController(),abort=()=>controller.abort();
+ signal?.addEventListener("abort",abort,{once:true});
+ const timeout=window.setTimeout(abort,PRICING_REQUEST_TIMEOUT_MS);
+ try{
+  const response=await fetch(`/api/products/${encodeURIComponent(input.productId)}/dropshipping-pricing${adminPreview?"?adminPreview=1":""}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({variantId:input.variantId,quantity:input.quantity,destinationCountry:input.destinationCountry,buyerCurrency:input.buyerCurrency}),signal:controller.signal,cache:"no-store"});
+  const data=await response.json() as BuyerDropshippingPricingResponse;
+  if(!response.ok||!validQuote(data,input))throw new Error("DROPSHIPPING_PRICING_UNAVAILABLE");
+  authoritativeQuoteCache.set(`${dropshippingPricingRequestKey(input)}:${input.buyerCurrency}`,data);
+  return data;
+ }finally{
+  window.clearTimeout(timeout);
+  signal?.removeEventListener("abort",abort);
+ }
 }
 
 export default function DropshippingProductPricing({productId,variantId,availableVariantIds,quantity,enabled,prefetchEnabled,onChange}:{productId:string;variantId:string|null;availableVariantIds:string[];quantity:number;enabled:boolean;prefetchEnabled:boolean;onChange:(pricing:BuyerDropshippingPricingResponse|null,pending:boolean)=>void}){
@@ -48,5 +57,5 @@ export default function DropshippingProductPricing({productId,variantId,availabl
  },[country,market.currency,prefetchEnabled,prefetchIdentity,prefetchIds,productId,quantity,state.status]);
 
  if(!enabled)return null;
- return <section className="dropshippingBuyerPricing" aria-live="polite">{country&&!variantId&&<p>{t("chooseCombination")}</p>}{state.status==="loading"&&<p className="isLoading">{productPriceUi[locale].updating}</p>}{state.status==="error"&&<div className="pricingRetry"><button type="button" onClick={()=>setRetry(value=>value+1)}>{productPriceUi[locale].retry}</button></div>} {state.status==="ready"&&<div className="dropshippingVerifiedPrice"><strong>{formatCurrency(Number(state.data.buyerUnitPrice),state.data.buyerCurrency,locale)}</strong>{state.data.freeShipping&&<b>{shipping("freeLabel")}</b>}{state.data.deliveryMinDays!=null&&state.data.deliveryMaxDays!=null&&<span>{shipping("estimate",{min:state.data.deliveryMinDays,max:state.data.deliveryMaxDays})}</span>}</div>}</section>;
+ return <section className="dropshippingBuyerPricing" aria-live="polite">{country&&!variantId&&<p>{t("chooseCombination")}</p>}{state.status==="loading"&&<p className="isLoading">{productPriceUi[locale].updating}</p>}{state.status==="error"&&<div className="pricingRetry"><p role="alert">{productPriceUi[locale].verificationFailed}</p><button type="button" onClick={()=>setRetry(value=>value+1)}>{productPriceUi[locale].retry}</button></div>} {state.status==="ready"&&<div className="dropshippingVerifiedPrice"><strong>{formatCurrency(Number(state.data.buyerUnitPrice),state.data.buyerCurrency,locale)}</strong>{state.data.freeShipping&&<b>{shipping("freeLabel")}</b>}{state.data.deliveryMinDays!=null&&state.data.deliveryMaxDays!=null&&<span>{shipping("estimate",{min:state.data.deliveryMinDays,max:state.data.deliveryMaxDays})}</span>}</div>}</section>;
 }
