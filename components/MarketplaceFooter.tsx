@@ -60,7 +60,7 @@ export default function MarketplaceFooter() {
   return <footer className="marketplaceFooter">
     <div className="marketplaceFooterCompact">
       <TodijoLogo href={`/${locale}`} inverse/>
-      <nav aria-label={t("helpTitle")}><a href={info("help")} target="_blank" rel="noopener noreferrer">{t("helpCenter")}</a><a href={info("privacy")} target="_blank" rel="noopener noreferrer">{t("privacy")}</a></nav>
+      <nav aria-label={t("helpTitle")}><a href={info("help")}>{t("helpCenter")}</a><a href={info("privacy")}>{t("privacy")}</a></nav>
       <small>© {new Date().getFullYear()} Todijo</small>
     </div>
     <div className="marketplaceFooterTrust">
@@ -73,7 +73,7 @@ export default function MarketplaceFooter() {
       <a className="marketplaceFooterNews" href={`/${locale}/actualites`}>{news.title}</a>
       {groups.map((group) => <details key={group.title} className="marketplaceFooterAccordion">
         <summary><span>{group.title}</span><ChevronDown size={18} aria-hidden="true"/></summary>
-        <nav aria-label={group.title}>{group.links.map((link) => <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a>)}</nav>
+        <nav aria-label={group.title}>{group.links.map((link) => <a key={link.href} href={link.href}>{link.label}</a>)}</nav>
       </details>)}
     </div>
     <div className="marketplaceFooterMain">
@@ -84,7 +84,7 @@ export default function MarketplaceFooter() {
       </section>
       {groups.map((group) => <section className="marketplaceFooterGroup" key={group.title}>
         <h2>{group.title}</h2>
-        <nav aria-label={group.title}>{group.links.map((link) => <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a>)}</nav>
+        <nav aria-label={group.title}>{group.links.map((link) => <a key={link.href} href={link.href}>{link.label}</a>)}</nav>
       </section>)}
     </div>
     <div className="marketplaceFooterBottom">

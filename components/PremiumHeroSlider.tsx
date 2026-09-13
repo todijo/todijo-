@@ -4,7 +4,7 @@ import Image from "next/image";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-export default function PremiumHeroSlider({ children, productCollage, previous, next }: { children: React.ReactNode; productCollage: React.ReactNode; previous: string; next: string }) {
+export default function PremiumHeroSlider({ children, productCollage, previous, next, slogan, bagMessage, pedestalMessage }: { children: React.ReactNode; productCollage: React.ReactNode; previous: string; next: string; slogan?: string; bagMessage: string; pedestalMessage: string }) {
   const [slide, setSlide] = useState(0);
   const [paused, setPaused] = useState(false);
   const touchStart = useRef<number | null>(null);
@@ -17,12 +17,12 @@ export default function PremiumHeroSlider({ children, productCollage, previous, 
   return <section className="premiumHeroSlider" aria-roledescription="carousel" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocusCapture={() => setPaused(true)} onBlurCapture={() => setPaused(false)} onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }} onTouchEnd={(event) => { if (touchStart.current === null) return; const delta = event.changedTouches[0].clientX - touchStart.current; if (Math.abs(delta) > 45) select(slide + (delta < 0 ? 1 : -1)); touchStart.current = null; }}>
     <div className={`premiumHeroTrack slide-${slide}`}>
       <article className="premiumHeroSlide lifestyleSlide" aria-hidden={slide !== 0}>
-        <Image src="/images/homepage/hero-shopping.webp" alt="" fill priority sizes="100vw" className="premiumHeroArtwork"/>
-        <div className="premiumHeroShade"/><div className="premiumHeroCopy">{children}</div>
+        <Image src="/images/homepage/hero-approved-v3-carton-logo-polished.png" alt="" fill priority sizes="100vw" className="premiumHeroArtwork"/>
+        <div className="premiumHeroShade"/><div className="premiumHeroCopy">{children}</div>{slogan&&<span className="premiumHeroSlogan">{slogan}</span>}<span className="premiumHeroBagMessage">{bagMessage}</span><span className="premiumHeroPedestalMessage">{pedestalMessage}</span>
       </article>
       <article className="premiumHeroSlide productsSlide" aria-hidden={slide !== 1}>
-        <Image src="/images/homepage/hero-shopping.webp" alt="" fill sizes="100vw" className="premiumHeroArtwork"/>
-        <div className="premiumHeroShade"/><div className="premiumHeroCopy">{children}</div><div className="premiumHeroProducts">{productCollage}</div>
+        <Image src="/images/homepage/hero-approved-v3-carton-logo-polished.png" alt="" fill sizes="100vw" className="premiumHeroArtwork"/>
+        <div className="premiumHeroShade"/><div className="premiumHeroCopy">{children}</div>{slogan&&<span className="premiumHeroSlogan">{slogan}</span>}<span className="premiumHeroBagMessage">{bagMessage}</span><span className="premiumHeroPedestalMessage">{pedestalMessage}</span><div className="premiumHeroProducts">{productCollage}</div>
       </article>
     </div>
     <button className="premiumHeroArrow previous" type="button" onClick={() => select(slide - 1)} aria-label={previous}><ArrowLeft/></button>

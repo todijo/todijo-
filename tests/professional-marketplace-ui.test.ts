@@ -24,7 +24,7 @@ test("professional hero and accurate delivery copy have complete locale parity",
     assert.deepEqual(Object.keys(JSON.parse(source(`messages/home-header/${locale}.json`))).sort(), headerKeys);
     assert.deepEqual(Object.keys(JSON.parse(source(`messages/home-discovery/${locale}.json`))).sort(), discoveryKeys);
   }
-  assert.equal(JSON.parse(source("messages/home-header/fr.json")).heroTitle, "Vos envies, à petits prix !");
+  assert.equal(JSON.parse(source("messages/home-header/fr.json")).heroTitle, "Un monde de choix sous le même toit");
   assert.doesNotMatch(JSON.parse(source("messages/home-discovery/fr.json")).deliveryText, /gratuite partout/i);
 });
 

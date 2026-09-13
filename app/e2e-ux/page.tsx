@@ -14,6 +14,7 @@ import{getLocale}from"next-intl/server";
 import{createImportedProductContent,resolveBuyerProductContent}from"@/lib/product-content";
 import AdminDashboard from "@/app/adm-barewbar-182203/AdminDashboard";
 import SupplierCatalogWorkspace from "@/components/SupplierCatalogWorkspace";
+import { DashboardVisualPreview, ProductDetailVisualPreview } from "./UnseenAreaPreviews";
 
 const products = [
   { id: "e2e-product-x", name: "Buyer A favorite", price: "29.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test", city: "Paris", country: "France", createdAt: new Date(0).toISOString() },
@@ -22,8 +23,16 @@ const products = [
 const stores = [
   { id: "e2e-store", name: "Atelier Todijo", slug: "atelier-todijo", description: "Une sélection indépendante pour la maison et le quotidien.", logo: null, city: "Paris", country: "France", products: products.map(({ id, name }) => ({ id, name, image: null })) },
 ];
-const merchandisingImages = ["/images/homepage/benefit-payment.webp", "/images/homepage/benefit-delivery.webp", "/images/homepage/benefit-messages.webp", "/images/homepage/benefit-sellers.webp", "/images/homepage/hero-shopping.webp", "/images/homepage/benefit-payment.webp"];
-const merchandisingProducts = Array.from({ length: 18 }, (_, index) => ({ ...products[index % products.length], id: `e2e-merchandising-${index}`, name: `Merchandising product ${index + 1}`, image: merchandisingImages[index % merchandisingImages.length] }));
+const merchandisingImages = [
+  "/images/mobile-subcategories/electronics--portable-av--ecouteurs.webp",
+  "/images/mobile-subcategories/electronics--smart--bracelets.webp",
+  "/images/mobile-subcategories/bags-shoes--women-shoes--chaussures-plates.webp",
+  "/images/mobile-subcategories/home--storage--meubles.webp",
+  "/images/mobile-subcategories/bags-shoes--women-bags--sac-a-main.webp",
+  "/images/mobile-subcategories/beauty--tools--miroirs.webp",
+];
+const merchandisingNames = ["Casque Bluetooth Premium", "Montre connectée élégante", "Baskets confort unisexes", "Fauteuil design contemporain", "Sac à main raffiné", "Miroir beauté lumineux"];
+const merchandisingProducts = merchandisingNames.map((name, index) => ({ ...products[index % products.length], id: `e2e-merchandising-${index}`, name, price: String([59.99,49.99,39.99,89.99,34.99,24.99][index]), compareAtPrice: String([79.99,69.99,59.99,129.99,49.99,34.99][index]), currency: "USD", image: merchandisingImages[index] }));
 const merchandisingStores = Array.from({ length: 4 }, (_, index) => ({ ...stores[0], id: `e2e-store-${index}`, name: `Eligible store ${index + 1}`, slug: `eligible-store-${index}` }));
 const galleryImage = (label: string, color: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900"><rect width="900" height="900" fill="${color}"/><text x="450" y="470" text-anchor="middle" font-family="Arial" font-size="72" fill="white">${label}</text></svg>`)}`;
 const galleryImages = [galleryImage("Image 1", "#087653"), galleryImage("Image 2", "#315f50")];
@@ -32,9 +41,12 @@ export default async function UxVerificationPage({ searchParams }: { searchParam
   if (process.env.NODE_ENV === "production") notFound();
   const { view } = await searchParams;
   const activeLocale=await getLocale(),locale=isLocale(activeLocale)?activeLocale:"en";
+  if(view==="premium-product-detail")return <ProductDetailVisualPreview/>;
+  if(view==="premium-buyer-dashboard")return <DashboardVisualPreview locale={locale} seller={false}/>;
+  if(view==="premium-seller-dashboard")return <DashboardVisualPreview locale={locale} seller/>;
   const localizedFixture=createImportedProductContent({title:"HOT SALE Portable Pet Bottle Bottle FREE SHIPPING",description:"A portable 500 ml bottle for pets.",rawMetadata:{localizedContent:{fr:{title:"Gourde portable pour animaux",description:"Gourde portable de 500 ml pour animaux."},ar:{title:"قارورة ماء محمولة للحيوانات",description:"قارورة محمولة سعة 500 مل للحيوانات."},ku:{title:"بوتڵی ئاوی گەڕۆک بۆ ئاژەڵ",description:"بوتڵی گەڕۆکی 500 مل بۆ ئاژەڵ."}}}}),localizedContent=resolveBuyerProductContent({name:localizedFixture.title,description:localizedFixture.description,sourceMetadata:{productContent:localizedFixture.metadata},locale});
   if(view==="localized-catalog")return <main className="catalogLocalizationQa"><section className="catalogLocalizationHero"><small>Catalog</small><h1 data-testid="hero-localized-title">{localizedContent.title}</h1></section><article className="catalogLocalizationCard"><h2 data-testid="card-localized-title">{localizedContent.title}</h2><p data-testid="localized-description">{localizedContent.description}</p></article></main>;
-  if(view==="homepage-hero")return <HomeClient products={merchandisingProducts} heroProducts={merchandisingProducts.slice(0,6)} newArrivals={merchandisingProducts.slice(0,10)} bestSellers={[]} stores={merchandisingStores} categories={["electronics"]} total={18} page={1} pageSize={24} initialFilters={{ q: "", category: "", minPrice: "", maxPrice: "", condition: "", country: "", rating: "", availability: "", sort: "newest", color: "", size: "", season: "" }} facets={{ countries:["France"], colors:[], sizes:[], seasons:[] }}/>;
+  if(view==="homepage-hero")return <HomeClient products={merchandisingProducts} heroProducts={merchandisingProducts} newArrivals={merchandisingProducts.slice(0,2)} bestSellers={[]} stores={merchandisingStores} categories={["electronics","home","beauty","sports","children","auto","fashion","books"]} total={6} page={1} pageSize={24} initialFilters={{ q: "", category: "", minPrice: "", maxPrice: "", condition: "", country: "", rating: "", availability: "", sort: "newest", color: "", size: "", season: "" }} facets={{ countries:["FR","DE","IT","ES"], colors:["black","white","red","blue","green"], sizes:["S","M","L"], seasons:[] }}/>;
   if(view==="homepage-hero-no-stores")return <HomeClient products={merchandisingProducts} heroProducts={merchandisingProducts.slice(0,6)} newArrivals={merchandisingProducts.slice(0,10)} bestSellers={[]} stores={merchandisingStores.slice(0,3)} categories={["electronics"]} total={18} page={1} pageSize={24} initialFilters={{ q: "", category: "", minPrice: "", maxPrice: "", condition: "", country: "", rating: "", availability: "", sort: "newest", color: "", size: "", season: "" }} facets={{ countries:["France"], colors:[], sizes:[], seasons:[] }}/>;
   if(view==="phase8-5-admin")return <main className="adminPage"><section className="adminShell"><header className="adminHero"><div><span>ADMIN</span><h1>Admin UX</h1><p>Responsive action navigation</p></div><nav className="adminHeroActions"><a href="#products">Products</a><a href="#catalog">Catalog</a><a href="#connect">Stripe Connect readiness</a><a href="#support">Support</a></nav></header><AdminDashboard adminId="admin" locale={locale} users={[]} stores={[{id:"store",name:"Long independent seller store",slug:"seller-store",status:"ACTIVE",productCount:4,owner:{id:"seller",firstName:"Amina",lastName:"Seller",email:"amina.seller@example.com",role:"SELLER"},accessSource:"ADMIN_GRANTED",expiresAt:new Date(Date.now()+86400000).toISOString(),stripeStatus:null,dropshippingEnabled:false}]}/></section></main>;
   if(view==="phase8-5-cj")return <main className="premiumDashboard"><section className="premiumDashboardMain"><div className="premiumDashboardContent"><SupplierCatalogWorkspace initialJobs={[]}/></div></section></main>;

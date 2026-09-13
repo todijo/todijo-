@@ -6,7 +6,8 @@ test("country and currency preferences persist independently from locale and fit
   await page.route("**/api/geo/country",route=>route.fulfill({json:{country:"FR"}}));
   await page.goto("/en/e2e-ux?view=home",{waitUntil:"domcontentloaded"});
   const trigger=page.locator(".marketHeader .buyerMarketTrigger");
-  await expect(trigger).toContainText("FR");
+  await expect(trigger).toContainText("France");
+  await expect(trigger).toContainText("EUR");
   await trigger.click();
   const dialog=page.getByRole("dialog",{name:"Shopping preferences"});
   await dialog.getByLabel("Display currency").selectOption("GBP");

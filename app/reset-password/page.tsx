@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { localizedHome } from "@/lib/auth-redirects";
+import TodijoLogo from "@/components/TodijoLogo";
 
 export default function ResetPasswordPage() {
   const locale = useLocale();
@@ -36,5 +37,5 @@ export default function ResetPasswordPage() {
     }
   }
 
-  return <main className="authPage"><section className="authBrand"><a className="authLogo" href={localizedHome(locale)}>Todijo<span>.</span></a><div className="authPitch"><h1>{t("resetTitle")}</h1><p>{t("resetIntro")}</p></div><small>© 2026 Todijo</small></section><section className="authPanel"><div className="authBox"><a className="authBack" href={`${localizedHome(locale)}/login`}>← {t("backToLogin")}</a><h2>{t("resetTitle")}</h2><p className="authIntro">{t("resetIntro")}</p><form className="authForm" onSubmit={submit}><div className="formField"><label htmlFor="password">{t("newPassword")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={10} required/></div><div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={10} required/></div>{message && <p className="authMessage" role="alert">{message}</p>}<button className="authSubmit" type="submit" disabled={loading || !params?.get("token")}>{loading ? t("resetting") : t("resetSubmit")}</button></form></div></section></main>;
+  return <main className="authPage"><section className="authBrand"><TodijoLogo href={localizedHome(locale)}/><div className="authPitch"><h1>{t("resetTitle")}</h1><p>{t("resetIntro")}</p></div><small>© 2026 Todijo</small></section><section className="authPanel"><div className="authBox"><a className="authBack" href={`${localizedHome(locale)}/login`}>← {t("backToLogin")}</a><h2>{t("resetTitle")}</h2><p className="authIntro">{t("resetIntro")}</p><form className="authForm" onSubmit={submit}><div className="formField"><label htmlFor="password">{t("newPassword")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={10} required/></div><div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={10} required/></div>{message && <p className="authMessage" role="alert">{message}</p>}<button className="authSubmit" type="submit" disabled={loading || !params?.get("token")}>{loading ? t("resetting") : t("resetSubmit")}</button></form></div></section></main>;
 }

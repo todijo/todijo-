@@ -13,10 +13,10 @@ test("news CMS is additive, admin-only, same-origin guarded, and publishes canon
   assert.match(listing,/target="_blank" rel="noopener noreferrer"/);assert.match(article,/SafeSiteContent/);
 });
 
-test("footer links open safely while Todijo News keeps locale-aware navigation",()=>{
+test("footer links use normal full-page navigation while Todijo News stays locale-aware",()=>{
   const footer=read("components/MarketplaceFooter.tsx");
   assert.match(footer,/newsMessages/);assert.match(footer,/`\/\$\{locale\}\/actualites`/);
-  assert.equal((footer.match(/group\.links\.map/g)??[]).length,2);assert.equal((footer.match(/target="_blank" rel="noopener noreferrer"/g)??[]).length,4);
+  assert.equal((footer.match(/group\.links\.map/g)??[]).length,2);assert.doesNotMatch(footer,/target="_blank"/);
 });
 
 test("product recommendations are bounded, category-aware, deduplicated and reuse marketplace cards",()=>{

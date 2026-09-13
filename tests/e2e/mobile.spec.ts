@@ -180,8 +180,8 @@ test("mobile RTL shipping settings stay readable and contained", async ({ page }
   const box = await section.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  await expect(page.locator("#shippingMethodName")).toHaveCSS("color", "rgb(23, 59, 48)");
-  await expect(page.locator("#shippingMethodName")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator("#shippingMethodName")).toHaveCSS("color", "rgb(23, 37, 31)");
+  await expect(page.locator("#shippingMethodName")).toHaveCSS("background-color", "rgb(255, 253, 248)");
 });
 
 test("mobile RTL supplier management stays readable and contained", async ({ page }) => {

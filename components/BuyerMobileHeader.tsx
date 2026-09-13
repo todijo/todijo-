@@ -64,7 +64,7 @@ export default function BuyerMobileHeader({ accountName: initialAccountName }: {
         {showBack ? <button className="buyerMobileBackButton" type="button" onClick={goBack} aria-label={common("back")}><ArrowLeft size={22} aria-hidden="true"/></button> : null}
         <BuyerMobileNavigation accountName={accountName}/>
       </div>
-      <TodijoLogo href={homeHref} inverse/>
+      <TodijoLogo href={homeHref}/>
       <CartLink label={common("cart")} className="buyerMobileShellCart"/>
     </div>
     <form className="buyerMobileShellSearch" role="search" onSubmit={submit}>

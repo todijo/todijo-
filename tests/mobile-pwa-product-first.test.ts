@@ -7,7 +7,7 @@ const locales=["en","fr","ar","ku","tr","de","es","it","nl","zh","fa","hi","pt",
 
 test("mobile home is product-first while desktop merchandising remains rendered",()=>{
   const home=source("app/HomeClient.tsx"),css=source("app/globals.css");
-  for(const marker of ["discoveryHero","discoveryPromoBanner","featuredStores","sellerGrowthCta","MobileAppPromotion"])assert.match(home,new RegExp(marker));
+  for(const marker of ["discoveryHero","homepagePromoGrid","featuredStores","sellerGrowthCta","MobileAppPromotion"])assert.match(home,new RegExp(marker));
   assert.match(css,/@media\(max-width:860px\)[\s\S]*?\.buyerHomePage:not\(\.searchResultsPage\) \.discoveryHero,[\s\S]*?\.featuredStores,[\s\S]*?\.mobileAppPromotion\{display:none!important\}/);
   assert.match(css,/\.premiumHeroSlider\{position:relative/);
 });

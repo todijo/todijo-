@@ -160,7 +160,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     prisma.store.findMany({
       where: { ...publicStoreAccess, products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } },
       orderBy: { updatedAt: "desc" },
-      take: 4,
+      take: 5,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
         products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
     }),

@@ -36,7 +36,8 @@ test("main products use the established grid and shared card behavior", () => {
   const home = source("app/HomeClient.tsx");
   const card = source("components/MarketplaceProductCard.tsx");
   const css = source("app/globals.css");
-  assert.match(home, /<div className="discoveryProductGrid">[\s\S]*visibleProducts\.map/);
+  assert.match(home, /<div className="discoveryProductGrid">[\s\S]*distinctVisibleProducts\.map/);
+  assert.match(home, /distinctVisibleProducts = useMemo\(\(\) => resultsOnly \? visibleProducts : visibleProducts\.filter\(\(product\) => !featuredRailIds\.has\(product\.id\)\)/);
   assert.doesNotMatch(home, /homepageTieredProducts|homepageProductTier|productTiers/);
   assert.doesNotMatch(css, /homepageTieredProducts|homepageProductTier/);
   assert.match(card, /ProductCardWishlist/);
@@ -44,15 +45,15 @@ test("main products use the established grid and shared card behavior", () => {
   assert.match(card, /productPath/);
 });
 
-test("store section renders only at the authoritative four-store threshold", () => {
+test("store section renders only at the authoritative five-store threshold", () => {
   const home = source("app/HomeClient.tsx");
   const page = source("app/page.tsx");
-  for (const count of [0, 1, 2, 3]) assert.equal(shouldShowHomepageStores(count), false);
-  assert.equal(shouldShowHomepageStores(4), true);
+  for (const count of [0, 1, 2, 3, 4]) assert.equal(shouldShowHomepageStores(count), false);
+  assert.equal(shouldShowHomepageStores(5), true);
   assert.match(home, /shouldShowHomepageStores\(stores\.length\) && <section className="container featuredStores"/);
   assert.doesNotMatch(home, /featuredStoresPlaceholder|emptyStores/);
   assert.match(page, /where: \{ \.\.\.publicStoreAccess, products: \{ some: \{ status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null \} \} \}/);
-  assert.match(page, /take: 4/);
+  assert.match(page, /take: 5/);
   assert.deepEqual(publicStoreAccessWhere(new Date("2026-09-04T00:00:00Z")), {
     dataClass: "PRODUCTION", status: "ACTIVE", owner: { sellerSuspendedAt: null, deactivatedAt: null },
     OR: [

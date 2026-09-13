@@ -1311,7 +1311,7 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 .resultsToolbar{padding-bottom:12px;border-bottom:1px solid var(--market-line)}.marketplaceFooter{margin-top:72px;border-radius:34px 34px 0 0}
 @media(max-width:1240px){.buyerHomePage .discoveryHeroGrid{grid-template-columns:minmax(0,1fr) minmax(380px,.86fr)}.todijoTrustPrimary .todijoTrustGrid,.featuredStoreGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.marketDesktopActions{gap:1px}.marketHeaderIconAction{padding-inline:5px}.marketHeader .buyerMarketTrigger span{max-width:76px}.marketHeaderInner{grid-template-columns:auto minmax(350px,1fr) auto}}
 @media(max-width:860px){.buyerHomePage .discoveryHero,.buyerHomePage .marketplaceDiscoverySections,.buyerHomePage .todijoTrust,.buyerHomePage>.marketplaceFooter{display:block!important}.buyerHomePage .sellerGrowthCta,.buyerHomePage .mobileAppPromotion,.buyerHomePage .discoveryPromoBanner{display:none!important}.buyerHomePage .discoveryHero{padding:14px 10px 8px}.buyerHomePage .discoveryHeroGrid{width:100%;min-height:0;padding:24px 18px 18px;grid-template-columns:1fr;gap:18px;border-radius:24px}.buyerHomePage .discoveryHero h1{font-size:clamp(31px,10vw,44px);letter-spacing:-1.5px}.buyerHomePage .discoveryHero p{font-size:14px}.buyerHomePage .discoveryHeroVisual{min-height:230px;padding:9px}.heroProductCollage{min-height:210px;height:210px}.discoveryHeroSignals{margin-top:18px}.todijoTrustPrimary{width:100%;margin:10px 0 22px;padding:0 10px;overflow:hidden}.todijoTrustPrimary .todijoTrustGrid{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}.todijoTrustPrimary .todijoTrustGrid article{flex:0 0 min(82vw,310px);min-height:108px;scroll-snap-align:start}.marketplaceRailSection,.featuredStores{width:100%;margin-top:24px;padding-inline:10px}.marketplaceSectionHeading{margin:0 2px 12px}.marketplaceHeadingIcon{width:38px;height:38px;border-radius:12px}.marketplaceViewAll{min-height:36px;padding-inline:11px}.marketplaceProductRail{gap:7px}.marketplaceProductRail .marketplaceStore{font-size:10px}.featuredStoreGrid{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}.featuredStoreCard{flex:0 0 min(86vw,340px);padding:16px;scroll-snap-align:start}.buyerHomePage .discoveryLayout{margin-top:26px}.buyerHomePage .discoveryCardBody{padding:7px 6px 9px}.buyerHomePage .marketplaceStore{margin-bottom:5px;font-size:9px}.marketplaceFooter{margin-top:34px;border-radius:24px 24px 0 0}.buyerHomePage.searchResultsPage .discoveryHero,.buyerHomePage.searchResultsPage .marketplaceDiscoverySections,.buyerHomePage.searchResultsPage .todijoTrust,.buyerHomePage.searchResultsPage>.marketplaceFooter{display:none!important}}
-@media(max-width:420px){.buyerHomePage .discoveryHeroGrid{padding:22px 14px 15px}.buyerHomePage .discoveryHero h1{font-size:31px}.buyerHomePage .discoveryHeroActions{display:grid;grid-template-columns:1fr}.buyerHomePage .discoveryHeroCta{width:100%;justify-content:center}.heroProductCollage{min-height:190px;height:190px}.todijoTrustPrimary .todijoTrustGrid article{flex-basis:86vw}.marketplaceSectionHeading h2{font-size:19px}.marketplaceSectionHeading small{font-size:9px}.marketplaceViewAll{font-size:10px}.featuredStoreCard{flex-basis:90vw}.marketplaceFooterCompact{display:flex}}
+@media(max-width:420px){.buyerHomePage .discoveryHeroGrid{padding:22px 14px 15px}.buyerHomePage .discoveryHero h1{font-size:31px}.buyerHomePage .discoveryHeroActions{display:grid;grid-template-columns:1fr}.buyerHomePage .discoveryHeroCta{width:100%;justify-content:center}.heroProductCollage{min-height:190px;height:190px}.todijoTrustPrimary .todijoTrustGrid article{flex-basis:86vw}.marketplaceSectionHeading h2{font-size:19px}.marketplaceSectionHeading small{font-size:9px}.marketplaceViewAll{font-size:10px}.featuredStoreCard{flex-basis:90vw}.productDetailPage>.marketplaceFooter>.marketplaceFooterCompact{display:flex}}
 
 /* Premium homepage and approved 3D Todijo identity */
 .todijoBrand{gap:9px}.todijoBrandMark{object-fit:cover;border-radius:11px;filter:drop-shadow(0 4px 9px rgba(93,25,207,.32))}.todijoWordmark{color:inherit;font-weight:950;letter-spacing:-1.1px;text-shadow:0 1px 10px rgba(26,4,62,.22)}.todijoWordmark>span{color:#d59aff!important}
@@ -1460,3 +1460,614 @@ body.todijoRootBody:has(.todijoLaunchSplash){background:#16074c}
 .sellerProductWizardBlockerLink{display:inline-flex;align-items:center;min-height:38px;padding:0 12px;border:1px solid #d79b38;border-radius:9px;background:#fff;color:#754b07;font:inherit;font-weight:850;text-decoration:none}.sellerVariantEmptyState{margin:0;padding:13px 14px;border:1px dashed var(--dash-border);border-radius:11px;background:#f8fcfa;color:var(--dash-muted);font-size:13px}.sellerVariantPresetTabs{display:flex!important;flex-wrap:wrap;gap:7px}.sellerVariantPresetTabs button{min-height:38px}
 .marketplaceFooterNews{display:inline-flex;width:max-content;margin-top:12px;padding:9px 14px;border:1px solid rgba(255,255,255,.3);border-radius:999px;color:#fff;font-weight:800}.newsShell,.newsArticleShell{width:min(1040px,calc(100% - 32px));margin:34px auto 64px}.newsShell>header{padding:28px;border-radius:24px;background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff}.newsShell>header h1{margin:6px 0 0;color:#fff}.newsHeadlineList{display:grid;gap:12px;margin-top:22px}.newsHeadlineList article{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:#fff}.newsHeadlineList a{color:var(--ink);font-size:18px;font-weight:850}.newsHeadlineList time,.newsArticleShell>time{color:var(--muted);font-size:13px}.newsArticleShell>a{display:inline-block;margin-bottom:16px;color:var(--purple);font-weight:800}.newsArticleShell>time{display:block;margin-bottom:8px}.productRecommendationSection{width:min(1480px,calc(100% - 40px));margin:32px auto}.productRecommendationGrid{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:900px){.productRecommendationGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.newsHeadlineList article{align-items:flex-start;flex-direction:column;gap:6px}.productRecommendationSection{width:min(100% - 20px,1480px)}}
 .sellerProductWizard .sellerVariantImages{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));align-items:start}.sellerProductWizard .sellerVariantImages fieldset{min-width:0}.sellerProductWizard .sellerVariantImages legend{max-width:100%;flex-wrap:wrap}.sellerProductWizard .sellerVariantImages fieldset>div{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:900px){.sellerProductWizard .sellerVariantImages{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.sellerProductWizard .sellerVariantImages{grid-template-columns:1fr}}
+
+/* Approved homepage mockup alignment. Presentation only. */
+.marketUtilityBar{height:32px;background:#063c2e;color:#fff;font-size:11px}
+.marketUtilityInner{width:min(1160px,calc(100% - 36px));height:100%;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.marketUtilityInner span{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.marketPrimaryHeader{background:#fffdf8!important;border-bottom:1px solid #eadfca!important}
+.marketHeader .todijoBrand,.marketHeaderIconAction,.marketAccountAction,.homeCartLink{color:#102b23!important}
+.marketHeader .todijoBrand{min-width:175px}.marketHeader .todijoWordmark,.marketHeader .todijoWordmark>span{color:#a87908!important;text-shadow:none!important}
+.marketTopSearch{border:1px solid #c89a29!important;border-radius:9px!important;box-shadow:0 4px 14px rgba(111,79,12,.09)!important}
+.marketTopSearch button{min-width:58px;background:linear-gradient(180deg,#d5aa35,#a97605)!important;color:#fff!important}
+.marketDesktopActions{gap:7px}.marketHeaderIconAction,.marketAccountAction,.homeCartLink{border-color:transparent!important;background:transparent!important}
+
+.homepagePromoGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.homepagePromoCard{position:relative;min-height:180px;overflow:hidden;border:1px solid #ded1b7;border-radius:10px;background-position:center;background-size:cover;box-shadow:0 10px 25px rgba(8,43,34,.08)}
+.homepagePromoCard>div{position:relative;z-index:1;width:54%;height:100%;padding:24px;display:flex;align-items:flex-start;flex-direction:column;justify-content:center}
+.homepagePromoCard span{color:#d7ac3a;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.11em}
+.homepagePromoCard h2{margin:5px 0 4px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(24px,2.3vw,34px);line-height:1;color:inherit}
+.homepagePromoCard p{margin:0 0 14px;font-size:12px}.homepagePromoCard a{min-height:38px;padding:0 16px;border-radius:999px;background:linear-gradient(180deg,#d6ad3b,#9d7005);color:#fff;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:850}
+.homepagePromoSale{background-image:linear-gradient(90deg,rgba(3,43,31,.18),rgba(3,43,31,0)),url('/images/homepage/promo-sale-v2.png');color:#fff}
+.homepagePromoHome{background-image:url('/images/homepage/promo-home-v2.png');color:#092f25}.homepagePromoHome span{color:#8f6808}
+
+@media(min-width:861px){
+  .buyerHomePage:not(.searchResultsPage){display:grid;grid-template-columns:250px minmax(0,1fr);grid-auto-flow:row;align-items:start}
+  .buyerHomePage:not(.searchResultsPage)>.marketHeader,.buyerHomePage:not(.searchResultsPage)>.marketCategoryStickyBoundary{grid-column:1/-1}
+  .buyerHomePage:not(.searchResultsPage)>.marketFilterDock{grid-column:1;grid-row:3/span 12;position:sticky;top:0;z-index:12;width:250px;height:auto;max-height:900px;margin:0;border-width:0 1px 0 0;border-radius:0;overflow:auto;box-shadow:5px 0 20px rgba(8,43,34,.06)}
+  .buyerHomePage:not(.searchResultsPage)>.marketCategoryStickyBoundary{grid-row:2}
+  .buyerHomePage:not(.searchResultsPage)>.discoveryHero{grid-column:2;grid-row:3}
+  .buyerHomePage:not(.searchResultsPage)>.todijoTrustPrimary{grid-column:2;grid-row:4}
+  .buyerHomePage:not(.searchResultsPage)>.categoryShowcase{grid-column:2;grid-row:5}
+  .buyerHomePage:not(.searchResultsPage)>.marketplaceDiscoverySections{grid-column:2;grid-row:6}
+  .buyerHomePage:not(.searchResultsPage)>.discoveryLayout{grid-column:2;grid-row:7}
+  .buyerHomePage:not(.searchResultsPage)>.sellerGrowthCta{grid-column:2;grid-row:8}
+  .buyerHomePage:not(.searchResultsPage)>.mobileAppPromotion{grid-column:2;grid-row:9}
+  .buyerHomePage:not(.searchResultsPage)>.marketplaceFooter{grid-column:1/-1;grid-row:10}
+  .buyerHomePage:not(.searchResultsPage) .marketFilterDockInnerV3{padding:17px 15px;display:flex;align-items:stretch;flex-direction:column;gap:9px;overflow:visible}
+  .buyerHomePage:not(.searchResultsPage) .marketFilterIdentity{min-height:44px;justify-content:flex-start;border-bottom:1px solid #e6dcc6;border-radius:0;font-size:16px}
+  .buyerHomePage:not(.searchResultsPage) .marketFacetMenu,.buyerHomePage:not(.searchResultsPage) .marketAvailabilityToggle{width:100%}
+  .buyerHomePage:not(.searchResultsPage) .marketFacetMenu>summary,.buyerHomePage:not(.searchResultsPage) .marketAvailabilityToggle{min-height:42px;width:100%;justify-content:space-between;border-width:0 0 1px;border-radius:0;background:transparent}
+  .buyerHomePage:not(.searchResultsPage) .marketFacetPopover{position:static;width:100%;max-height:210px;margin-top:2px;border-radius:8px;box-shadow:none}
+  .buyerHomePage:not(.searchResultsPage) .marketFilterPriceGroup{grid-template-columns:1fr 1fr;width:100%}
+  .buyerHomePage:not(.searchResultsPage) .marketFilterApply{width:100%;min-height:44px}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroContainer,.buyerHomePage:not(.searchResultsPage) .categoryShowcase,.buyerHomePage:not(.searchResultsPage) .homepagePromoGrid,.buyerHomePage:not(.searchResultsPage) .marketplaceRailSection,.buyerHomePage:not(.searchResultsPage) .discoveryLayout{width:min(1180px,calc(100% - 28px))}
+  .buyerHomePage:not(.searchResultsPage) .discoveryHero{padding-top:0}.buyerHomePage:not(.searchResultsPage) .premiumHeroSlider{height:365px;border-radius:0;box-shadow:none;background:#fff7e8}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroTrack{transform:none!important}.buyerHomePage:not(.searchResultsPage) .premiumHeroSlide{flex-basis:100%}.buyerHomePage:not(.searchResultsPage) .productsSlide,.buyerHomePage:not(.searchResultsPage) .premiumHeroArrow,.buyerHomePage:not(.searchResultsPage) .premiumHeroDots{display:none}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroArtwork{object-fit:cover;object-position:center}.buyerHomePage:not(.searchResultsPage) .premiumHeroShade{background:linear-gradient(90deg,rgba(255,249,234,.99) 0%,rgba(255,249,234,.94) 38%,rgba(255,249,234,0) 64%)!important;transform:none!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy{width:50%;padding:42px 40px;color:#092f25}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(43px,4.2vw,65px);line-height:.98;color:#082f25;letter-spacing:-.045em}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy p{max-width:480px;color:#263f36;font-size:15px}.buyerHomePage:not(.searchResultsPage) .discoveryHero .badge{border:0;background:transparent;color:#9b7009;padding:0}
+  .buyerHomePage:not(.searchResultsPage) .discoveryHeroCta{background:linear-gradient(180deg,#d5aa35,#9c6d04);color:#fff}.buyerHomePage:not(.searchResultsPage) .discoveryHeroSellerCta{border-color:#b88a19;background:#fff8e7;color:#174235}
+  .buyerHomePage:not(.searchResultsPage) .discoveryHeroSignals span{border:1px solid #dfc881;background:rgba(255,255,255,.72);color:#164033}
+  .buyerHomePage:not(.searchResultsPage) .todijoTrustPrimary{display:none}
+  .buyerHomePage:not(.searchResultsPage)>.mobileAppPromotion{display:none!important}
+  .buyerHomePage:not(.searchResultsPage) .categoryShowcase{margin-top:12px}.buyerHomePage:not(.searchResultsPage) .categoryShowcase>.marketplaceRailHeading{display:none}.buyerHomePage:not(.searchResultsPage) .categoryShowcaseGrid{display:flex;justify-content:space-between;gap:8px;overflow-x:auto}
+  .buyerHomePage:not(.searchResultsPage) .categoryShowcaseGrid>a{min-width:92px;min-height:106px;padding:9px 5px;display:flex;flex-direction:column;text-align:center;gap:6px;border:0;background:transparent;box-shadow:none}.buyerHomePage:not(.searchResultsPage) .categoryShowcaseGrid>a>.categoryShowcaseSemanticIcon{width:54px;height:54px;flex-basis:54px;border-radius:50%;background:#fbf0d4;color:#916607}.buyerHomePage:not(.searchResultsPage) .categoryShowcaseGrid>a>svg:last-child{display:none}
+  .buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections{padding-top:0}.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.marketplaceRailSection{margin-top:18px}
+  .buyerHomePage:not(.searchResultsPage) .discoveryCard{border-radius:7px}.buyerHomePage:not(.searchResultsPage) .discoveryImageWrap{height:170px}.buyerHomePage:not(.searchResultsPage) .cardCartButton{background:linear-gradient(180deg,#d5aa35,#9c6d04)!important;color:#fff!important}
+}
+@media(max-width:860px){
+  .marketUtilityBar{display:none}.homepagePromoGrid{display:none!important}
+  .marketPrimaryHeader{background:#fffdf8!important}.buyerHomePage .premiumHeroArtwork{object-position:67% center}
+}
+
+/* Premium utility controls and compact mobile brand story. */
+.marketUtilityInner{width:min(1320px,calc(100% - 32px))}.marketUtilityPromises,.marketUtilityControls{min-width:0;display:flex;align-items:center;gap:16px}.marketUtilityPromises>span+span{padding-inline-start:16px;border-inline-start:1px solid rgba(255,255,255,.24)}.marketUtilityPromises>span:last-child{max-width:480px;overflow:hidden;text-overflow:ellipsis}.marketUtilityControls{gap:7px}.marketUtilityControls>a{padding-inline:9px;color:#fff;font-weight:750}.marketUtilityLanguage,.marketUtilityCurrency{height:25px;padding:0 7px;border:1px solid rgba(224,182,61,.42);border-radius:6px;background:rgba(255,255,255,.06);color:#fff;display:flex;align-items:center;gap:4px}.marketUtilityLanguage select,.marketUtilityCurrency select{height:23px;padding:0 18px 0 2px;border:0;background:transparent;color:#fff;font:inherit;font-size:10px;font-weight:750;cursor:pointer}.marketUtilityLanguage option,.marketUtilityCurrency option{background:#fffdf8;color:#123f32}.marketUtilityCurrency:focus-within,.marketUtilityLanguage:focus-within{border-color:#e4bc4c;box-shadow:0 0 0 2px rgba(228,188,76,.18)}
+@media(min-width:861px){.buyerHomePage:not(.searchResultsPage) .premiumHeroArtwork{object-fit:contain!important;object-position:right center!important}.buyerHomePage:not(.searchResultsPage) .premiumHeroSlider{background:#fff8e9}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy h1{max-width:570px}.marketHeaderLanguage .buyerMarketTrigger{min-height:40px;max-width:170px;border-color:#dfd0aa;background:#fffaf0;color:#173f33}.marketHeaderLanguage .buyerMarketTrigger>span small,.marketHeaderLanguage .buyerMarketTrigger>span strong{color:#173f33}.marketHeaderLanguage .buyerMarketTrigger>span{display:flex;align-items:center;gap:5px}.marketHeaderLanguage .buyerMarketTrigger>span strong{display:block;max-width:95px}}
+@media(max-width:860px){
+  .buyerHomePage:not(.searchResultsPage) .discoveryHero{display:block!important;margin:0!important;padding:8px 8px 4px!important;min-height:0!important;background:#fbf7ec!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroContainer{width:100%}.buyerHomePage:not(.searchResultsPage) .premiumHeroSlider{height:190px;border:1px solid #e3d2a4;border-radius:16px;background:#fff8e8;box-shadow:0 10px 26px rgba(8,43,34,.09)}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroTrack{transform:none!important}.buyerHomePage:not(.searchResultsPage) .premiumHeroSlide{flex-basis:100%}.buyerHomePage:not(.searchResultsPage) .productsSlide,.buyerHomePage:not(.searchResultsPage) .premiumHeroArrow,.buyerHomePage:not(.searchResultsPage) .premiumHeroDots{display:none!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroArtwork{object-fit:cover!important;object-position:64% center!important}.buyerHomePage:not(.searchResultsPage) .premiumHeroShade{background:linear-gradient(90deg,rgba(255,249,233,.99) 0%,rgba(255,249,233,.96) 48%,rgba(255,249,233,.15) 78%)!important;transform:none!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy{width:69%;padding:17px 13px;color:#0b3b2e}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .badge,.buyerHomePage:not(.searchResultsPage) .premiumHeroSellerCta,.buyerHomePage:not(.searchResultsPage) .discoveryHeroSignals{display:none!important}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy h1{margin:0 0 5px;font-family:Georgia,"Times New Roman",serif;font-size:25px;line-height:1;color:#09382b;letter-spacing:-.04em}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy p{max-width:230px;margin:0;color:#3f5149;font-size:10px;line-height:1.35}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroActions{margin-top:9px}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroCta{min-height:34px;padding:0 11px;border-radius:999px;background:linear-gradient(180deg,#d1a534,#966705);color:#fff;font-size:10px}
+  .buyerMobileDrawerLanguage select{border-color:#d6c28a!important;background:#fffaf0!important;color:#174235!important}.buyerMobileDrawerMarket .buyerMarketTrigger{border-color:#d6c28a!important;background:#fffaf0!important;color:#174235!important}.buyerMobileDrawerMarket .buyerMarketTrigger>span small,.buyerMobileDrawerMarket .buyerMarketTrigger>span strong,.buyerMobileDrawerMarket .buyerMarketTrigger>b{color:#174235!important}
+}
+
+/* Approved umbrella brand and final responsive marketplace palette. */
+.todijoUmbrellaMark{overflow:visible;filter:drop-shadow(0 4px 8px rgba(8,43,34,.12))!important}
+.todijoBrand{gap:8px}.todijoWordmark{font-family:Georgia,"Times New Roman",serif!important;font-weight:700!important;color:#a87508!important;letter-spacing:-.045em!important}
+.marketHeader .todijoBrandMark{width:54px;height:54px}.marketHeader .todijoWordmark{font-size:34px!important}
+.discoveryCardBody{padding:11px 12px 12px}.discoveryCardBody h3{min-height:38px;margin:2px 0 5px;color:#152b23;font-size:14px;line-height:1.28}.marketplaceStore{margin-bottom:7px;color:#68756e;font-size:10px}.cardBottom{align-items:center;padding-top:8px;border-top:1px solid #eee5d2}.cardBottom strong{font-size:18px}.cardCartButton.cardCartIconOnly{width:auto!important;min-width:112px!important;min-height:37px!important;height:auto!important;padding:0 12px!important;border:0!important;border-radius:6px!important;background:linear-gradient(180deg,#d3a82f,#9c6b03)!important;color:#fff!important;gap:6px}.cardCartButton .cardActionLabel{display:inline;font-size:10px;font-weight:850;white-space:nowrap}.marketplaceDiscount{top:9px;left:9px;padding:5px 8px;border-radius:5px;background:#a87807;color:#fff}.cardWishlist{top:8px;right:8px;width:34px;height:34px;color:#9a7008}
+@media(min-width:861px){
+  .buyerHomePage:not(.searchResultsPage){grid-template-columns:262px minmax(0,1fr)}
+  .buyerHomePage:not(.searchResultsPage)>.marketFilterDock{width:262px;background:#fffcf4}
+  .buyerHomePage:not(.searchResultsPage) .marketFilterDockInnerV3{padding:15px 17px;gap:4px}
+  .buyerHomePage:not(.searchResultsPage) .marketFilterIdentity{margin-bottom:5px;color:#0b3b2e}
+  .buyerHomePage:not(.searchResultsPage) .marketFacetMenu>summary,.buyerHomePage:not(.searchResultsPage) .marketAvailabilityToggle{min-height:47px;padding-inline:5px;color:#173f33;font-size:12px;font-weight:750}
+  .buyerHomePage:not(.searchResultsPage) .marketFacetMenu>summary b{color:#966b07}.buyerHomePage:not(.searchResultsPage) .marketFilterPriceGroup{margin:9px 0}.buyerHomePage:not(.searchResultsPage) .marketFilterPriceGroup input{border-color:#dbc994;background:#fffdf8}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroSlider{height:390px}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy{padding:42px 44px}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy h1{max-width:520px;font-size:clamp(48px,4.5vw,68px)}
+  .buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.categoryShowcase{margin-top:4px;padding-top:8px;border-top:1px solid #eee2c9}.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.categoryShowcase>.marketplaceRailHeading{display:none}.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.categoryShowcase .categoryShowcaseGrid{display:flex;justify-content:space-between;gap:8px;overflow-x:auto}.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.categoryShowcase .categoryShowcaseGrid>a{min-width:104px;min-height:106px;padding:9px 5px;display:flex;flex-direction:column;text-align:center;gap:6px;border:0;background:transparent;box-shadow:none}.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.categoryShowcase .categoryShowcaseGrid>a>.categoryShowcaseSemanticIcon{width:54px;height:54px;flex-basis:54px;border-radius:50%;background:#fbf0d4;color:#916607}.buyerHomePage:not(.searchResultsPage) .marketplaceDiscoverySections>.categoryShowcase .categoryShowcaseGrid>a>svg:last-child{display:none}
+  .homepagePromoCard{min-height:190px}.buyerHomePage:not(.searchResultsPage) .marketplaceProductRail{gap:12px}.buyerHomePage:not(.searchResultsPage) .marketplaceRailSection.isCarousel .marketplaceProductRail{grid-auto-columns:calc((100% - 48px)/5)}
+}
+@media(max-width:860px){
+  .buyerMobileShellHeader{background:linear-gradient(112deg,#073a2c,#0d513e)!important;border-bottom:2px solid #b98409!important;box-shadow:0 8px 22px rgba(8,43,34,.2)!important}
+  .buyerMobileShellTop .todijoBrand{color:#a87508!important}.buyerMobileShellTop .todijoBrandMark{width:35px;height:35px;flex-basis:35px}.buyerMobileShellTop .todijoWordmark{font-family:Georgia,"Times New Roman",serif!important;font-size:23px!important;color:#e0b63d!important}
+  .buyerMobileBackButton,.buyerMobileMenuButton{border-color:rgba(224,182,61,.4)!important;background:rgba(255,255,255,.07)!important;color:#fff!important}
+  .buyerMobileShellCart{color:#f4cf68!important}.buyerMobileShellCart .cartLinkBadge{border-color:#0b4938!important;background:#d5aa35!important;color:#183528!important}
+  .buyerMobileShellSearch{border:1px solid #d1a534!important;border-radius:9px!important}.buyerMobileShellSearch button{background:linear-gradient(180deg,#d1a534,#a06f05)!important;color:#fff!important}.buyerMobileShellSearch:focus-within{box-shadow:0 0 0 3px rgba(209,165,52,.28)!important}
+  .marketFilterDock,.marketFilterDockV3{border-color:#e6dbc2!important;background:#fffdf8!important;box-shadow:0 5px 16px rgba(8,43,34,.07)!important}.marketFacetMenu>summary,.marketAvailabilityToggle{border-color:#dfd2b3!important;background:#fffaf0!important;color:#174235!important}.marketFacetMenu>summary b{color:#956b09!important}
+  .buyerHomePage{background:#fbf7ec!important}.buyerHomePage .marketplaceRailHeading h2,.buyerHomePage .resultsToolbar h2{color:#0b3b2e!important}.marketplaceHeadingIcon{background:#f3e4b5!important;color:#946a07!important}.marketplaceViewAll{border-color:#ddc681!important;background:#fff9e8!important;color:#174235!important}
+  .buyerHomePage .discoveryCard{border:1px solid #e8dfca!important;border-radius:10px!important;background:#fffdf8!important;box-shadow:0 7px 18px rgba(8,43,34,.07)!important}.buyerHomePage .discoveryCardBody{padding:8px!important}.buyerHomePage .discoveryCardBody h3{color:#152b23!important}.buyerHomePage .cardBottom{display:grid!important;grid-template-columns:minmax(0,1fr)!important;align-items:stretch!important;gap:7px}.buyerHomePage .cardCartButton.cardCartIconOnly{width:100%!important;min-width:0!important;border-radius:7px!important}.buyerHomePage .cardCartButton .cardActionLabel{display:inline!important}
+  .marketplaceCarouselArrow{border-color:#d2a72f!important;background:linear-gradient(180deg,#d1a534,#9c6b03)!important;color:#fff!important;box-shadow:0 8px 18px rgba(111,77,4,.2)!important}
+  .buyerMobileBottomNav{border-color:#ded2b6!important;background:rgba(255,253,248,.98)!important;box-shadow:0 -8px 24px rgba(8,43,34,.09)!important}.buyerMobileBottomNav a,.buyerMobileBottomNav button{color:#62736b!important}.buyerMobileBottomNav a.active,.buyerMobileBottomNav button.active{background:#eef4eb!important;color:#0b513d!important}.buyerMobileBottomNav strong{background:#b98409!important;color:#fff!important}
+  .buyerMobileCategoriesButton{border-color:#ddc98d!important;background:#fff9e8!important;color:#174235!important}.buyerMobileCategoryList a:hover,.buyerMobileCategoryList a.active{background:#f3ead0!important;color:#0b513d!important}
+}
+/* Final premium identity: presentation-only overrides. */
+:root{
+  --green:#123f32;
+  --green-dark:#082b22;
+  --soft:#fbf7eb;
+  --ink:#17251f;
+  --muted:#66736d;
+  --line:#e4dcc7;
+  --todijo-forest:#123f32;
+  --todijo-forest-deep:#082b22;
+  --todijo-cream:#fbf7eb;
+  --todijo-ivory:#fffdf7;
+  --todijo-gold:#c59618;
+  --todijo-gold-dark:#9a7008;
+  --todijo-gold-soft:#f5e8bd;
+  --todijo-shadow:0 18px 50px rgba(8,43,34,.11);
+  --dash-background:#f7f2e5;
+  --dash-surface:#fffdf8;
+  --dash-surface-elevated:#fff;
+  --dash-text:#17251f;
+  --dash-muted:#68766f;
+  --dash-primary:#123f32;
+  --dash-emerald:#082b22;
+  --dash-mint:#edf4ec;
+  --dash-border:#ded7c5;
+  --dash-success:#257052;
+}
+
+html{background:var(--todijo-forest-deep)}
+body{background:var(--todijo-ivory);color:var(--ink);font-family:Inter,"Segoe UI",Arial,sans-serif}
+h1,h2,h3,.todijoWordmark{letter-spacing:-.025em}
+button,a,input,select,textarea{transition:border-color .2s ease,background-color .2s ease,color .2s ease,box-shadow .2s ease,transform .2s ease}
+:where(a,button,input,select,textarea,summary):focus-visible{outline:3px solid var(--todijo-gold)!important;outline-offset:3px}
+.primary,.filterApply,.marketFilterApply,.sellerGrowthPrimary,.premiumPrimaryButton,.adminForm button,.adminGrantForm button,.adminOwnStoreAction button{background:var(--todijo-gold)!important;color:#172114!important;border-color:var(--todijo-gold)!important;box-shadow:0 8px 20px rgba(154,112,8,.2)}
+.primary:hover,.filterApply:hover,.marketFilterApply:hover,.sellerGrowthPrimary:hover,.premiumPrimaryButton:hover,.adminForm button:hover,.adminGrantForm button:hover{background:var(--todijo-gold-dark)!important;color:#fff!important;transform:translateY(-1px)}
+.secondary,.sellerGrowthSecondary{border-color:var(--todijo-forest);background:transparent;color:var(--todijo-forest)}
+
+/* Marketplace chrome */
+.marketPrimaryHeader{background:linear-gradient(110deg,var(--todijo-forest-deep),var(--todijo-forest) 72%,#1b5745);border-bottom:1px solid rgba(197,150,24,.34)}
+.marketHeader{background:var(--todijo-ivory);color:var(--ink);box-shadow:0 7px 24px rgba(8,43,34,.1)}
+.marketHeader .todijoBrand,.marketHeaderIconAction,.marketAccountAction,.homeCartLink{color:#fff}
+.todijoWordmark,.marketHeader .todijoWordmark>span{color:#e6be4c!important;text-shadow:0 2px 14px rgba(197,150,24,.18)}
+.todijoBrandMark{filter:drop-shadow(0 4px 10px rgba(0,0,0,.2))}
+.marketTopSearch{border:2px solid rgba(197,150,24,.58);background:#fffdf7;box-shadow:0 10px 28px rgba(0,0,0,.2)}
+.marketTopSearch button{background:var(--todijo-gold)!important;color:#172114!important}
+.marketTopSearch button:hover{background:#dfb63b!important}
+.marketHeaderIconAction:hover,.marketAccountAction:hover,.homeCartLink:hover{border-color:rgba(230,190,76,.5);background:rgba(255,255,255,.1)}
+.marketCategoryNavigation,.marketCategoryNavigationBelowFilters{border-color:var(--line);background:#fffdf8;color:var(--todijo-forest)}
+.marketFilterDock,.marketFilterDockV3{border-color:var(--line);background:rgba(255,253,247,.97);box-shadow:0 6px 20px rgba(8,43,34,.07)}
+.marketFilterIdentity,.marketFilterAll,.marketFilterPill,.marketFacetMenu>summary,.marketAvailabilityToggle,.marketFilterPriceGroup label,.marketFilterReset{border-color:#ddd3ba;background:#fffdf8;color:var(--todijo-forest)}
+.marketFilterIdentity span,.marketFilterAll b{background:var(--todijo-forest);color:#fff}
+.marketFilterReset{color:var(--todijo-forest)}
+.marketFacetPopover{border-color:#ddd3ba;background:#fffdf8;box-shadow:var(--todijo-shadow)}
+.marketFacetPopover input{accent-color:var(--todijo-gold-dark)}
+
+/* Homepage hierarchy */
+.buyerHomePage{background:linear-gradient(180deg,#fffdf8 0,#f8f2e5 48%,#fffdf8 100%)}
+.buyerHomePage .discoveryHero{background:transparent;padding-top:24px}
+.buyerHomePage .premiumHeroSlider{background:var(--todijo-forest-deep);box-shadow:0 28px 68px rgba(8,43,34,.24)}
+.premiumHeroShade{background:linear-gradient(90deg,rgba(4,29,23,.97) 0%,rgba(11,59,46,.86) 42%,rgba(11,59,46,.12) 76%)}
+[dir=rtl] .premiumHeroShade{background:linear-gradient(90deg,rgba(4,29,23,.97) 0%,rgba(11,59,46,.86) 42%,rgba(11,59,46,.12) 76%);transform:scaleX(-1)}
+.buyerHomePage .discoveryHero .badge{border-color:rgba(230,190,76,.48);background:rgba(197,150,24,.17);color:#f6d879}
+.buyerHomePage .discoveryHeroCta{background:var(--todijo-gold);color:#172114;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+.buyerHomePage .discoveryHeroCta:hover{background:#dfb63b;transform:translateY(-2px)}
+.buyerHomePage .discoveryHeroSellerCta{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);color:#fff;box-shadow:none}
+.premiumHeroProducts{border-color:rgba(230,190,76,.35);background:rgba(5,35,27,.42)}
+.premiumHeroArrow{border-color:rgba(230,190,76,.45);background:rgba(4,29,23,.7)}
+.premiumHeroArrow:hover{background:var(--todijo-gold);color:#172114}
+.premiumHeroDots button.active{background:var(--todijo-gold)}
+.categoryShowcase,.marketplaceRailSection,.featuredStores,.discoveryLayout,.todijoTrustPrimary{scroll-margin-top:210px}
+.categoryShowcaseGrid a,.todijoTrustGrid article,.featuredStoreCard,.discoveryCard,.premiumDashboardSection,.premiumStatCard,.adminPanel{border-color:var(--line);background:#fffdf8;box-shadow:0 10px 32px rgba(8,43,34,.07)}
+.categoryShowcaseGrid a:hover,.featuredStoreCard:hover,.discoveryCard:hover{border-color:rgba(197,150,24,.75);box-shadow:var(--todijo-shadow)}
+.categoryShowcaseSemanticIcon,.marketplaceHeadingIcon{background:linear-gradient(145deg,#f8edc8,#ecdda8);color:var(--todijo-gold-dark)}
+.marketplaceSectionHeading small,.marketplaceRailHeading>div>span{color:var(--todijo-gold-dark)}
+.marketplaceSectionHeading h2,.marketplaceRailHeading h2,.resultsToolbar h2{color:var(--todijo-forest-deep)}
+.marketplaceViewAll,.featuredStoreLink,.marketplaceStore{color:var(--todijo-forest)}
+.marketplaceViewAll{border-color:#d8c999;background:#fffaf0}
+.marketplaceViewAll:hover{border-color:var(--todijo-gold);background:var(--todijo-gold-soft)}
+.discoveryImageWrap{background:linear-gradient(145deg,#fff,#f3eddd)}
+.cardBottom strong{color:var(--todijo-forest-deep)}
+.cardCartButton.cardCartIconOnly{border-color:#d9c78f;background:#fff8df;color:var(--todijo-forest)}
+.marketplaceDiscount{background:#9f2d35;color:#fff}
+.discoveryPromoBanner,.sellerGrowthCta{background:linear-gradient(118deg,var(--todijo-forest-deep),var(--todijo-forest));color:#fff;border-color:rgba(197,150,24,.35);box-shadow:var(--todijo-shadow)}
+.discoveryPromoBanner>span,.sellerGrowthCta>div>span{color:#f0ca62}
+.discoveryPromoBanner>a{background:var(--todijo-gold);color:#172114}
+.activeFilterChips a{border-color:#d8c999;background:#fff8df;color:var(--todijo-forest)}
+.pagination a{border-color:#d8c999;background:#fffdf8;color:var(--todijo-forest)}
+
+/* Product detail */
+.productDetailPage{background:linear-gradient(180deg,#f8f2e5,#fffdf8 42%)}
+.productDetailShell{border-color:var(--line);background:#fffdf8;box-shadow:var(--todijo-shadow)}
+.productDetailInfo h1{color:var(--todijo-forest-deep)}
+.productDetailPrice,.productPriceRow strong{color:var(--todijo-forest)}
+.productTrustRow span{color:var(--todijo-gold-dark)}
+.productGallery,.productPurchaseColumn>*{border-color:var(--line);background:#fff}
+.productDetailSections{border-color:#d9cfb5;background:#f9f1dc}
+.productDetailSections a{color:var(--todijo-forest)}
+.productDetailDescriptionSection,.productCompliancePublic,.productSellerInformationCard{border-color:var(--line);background:#fffdf8;box-shadow:0 10px 30px rgba(8,43,34,.06)}
+.productSellerLink,.productQuickActions button{color:var(--todijo-forest)}
+.productPurchaseColumn button:not(:disabled),.productAskSeller .askSellerButton{background:var(--todijo-gold)!important;border-color:var(--todijo-gold)!important;color:#172114!important}
+.productPurchaseColumn button:not(:disabled):hover,.productAskSeller .askSellerButton:hover{background:var(--todijo-gold-dark)!important;color:#fff!important}
+.buyerProtection{border-color:#cbdccf;background:#eff6ef;color:#244d3e}
+
+/* Buyer, seller, and admin workspaces */
+.premiumDashboard,.adminPage,.sellerControlPage{background:var(--dash-background);color:var(--dash-text)}
+.premiumDashboardSidebar,.premiumDashboardSidebar.isSeller{background:linear-gradient(180deg,var(--todijo-forest-deep),var(--todijo-forest));border-color:rgba(230,190,76,.2);color:#fff}
+.premiumDashboardSidebar nav a:hover,.premiumDashboardSidebar nav a.isActive,.premiumDashboardSidebar.isSeller nav a:hover,.premiumDashboardSidebar.isSeller nav a.isActive{background:rgba(230,190,76,.16);color:#f6d879;box-shadow:inset 3px 0 var(--todijo-gold)}
+.premiumDashboardHeader{border-color:var(--dash-border);background:rgba(255,253,248,.96);box-shadow:0 8px 24px rgba(8,43,34,.07)}
+.premiumWelcomeHero,.premiumWelcomeHero.isSeller,.sellerControlHero,.adminHero,.premiumDiscoveryBanner,.sellerBillingCard{background:radial-gradient(circle at 88% 12%,rgba(197,150,24,.22),transparent 28%),linear-gradient(125deg,var(--todijo-forest-deep),var(--todijo-forest))!important;color:#fff;box-shadow:0 20px 55px rgba(8,43,34,.18)}
+.premiumWelcomeHero.isSeller>div>span,.sellerControlHeroBody>div:first-child>span,.adminHero span,.premiumDiscoveryBanner span{color:#f0ca62}
+.premiumWelcomeHero.isSeller>a,.premiumDiscoveryBanner>a,.sellerBillingCard a,.adminHero a{background:var(--todijo-gold);color:#172114}
+.premiumQuickAction,.sellerControlCard,.adminStats article,.adminPanel,.adminTableWrap,.sellerControlForm section{border-color:var(--dash-border);background:var(--dash-surface)}
+.premiumQuickAction>span,.premiumStatIcon,.adminStats svg,.adminPanelHeading>svg,.adminTablePanel td a{color:var(--todijo-forest)}
+.premiumStatusBadge{border:1px solid currentColor}
+.sellerControlButton:not(.danger):not(.light),.adminDropshippingAction{border-color:#d1bc76;background:#fff5d2;color:var(--todijo-forest)}
+.sellerControlForm input,.sellerControlForm textarea,.sellerControlForm select,.adminForm input,.adminForm textarea,.adminForm select,.adminGrantForm select{border-color:#d8d0bd;background:#fff;color:var(--ink)}
+.sellerControlForm input:focus-visible,.sellerControlForm textarea:focus-visible,.sellerControlForm select:focus-visible,.adminForm input:focus-visible,.adminForm textarea:focus-visible,.adminForm select:focus-visible{border-color:var(--todijo-gold);box-shadow:0 0 0 4px rgba(197,150,24,.16)}
+.premiumDashboardMobileNav.isSeller,.premiumDashboardMobileNav{border-color:rgba(197,150,24,.3);background:var(--todijo-forest-deep)}
+.premiumDashboardMobileNav a{color:#e9eee9}.premiumDashboardMobileNav a.isActive{color:#f2ca61}
+
+/* Footer and full information pages */
+.marketplaceFooter{background:#083b2e;border-top:4px solid var(--todijo-gold)}
+.marketplaceFooterTrust{border-color:rgba(230,190,76,.24);background:transparent}
+.marketplaceFooterGroup h2,.marketplaceFooterAccordion summary,.marketplaceNewsletter strong,.marketplacePaymentTrust strong{color:#f0ca62}
+.marketplaceFooterGroup a:hover,.marketplaceFooterNews:hover,.footerCookieButton:hover{color:#f6d879}
+.marketplaceFooterNews{border-color:rgba(230,190,76,.45);color:#f5d77c}
+.paymentBadges span{border-color:rgba(230,190,76,.38);background:#fffdf8;color:var(--todijo-forest-deep)}
+.marketInfoPage{min-height:100vh;background:linear-gradient(180deg,#f7f0df 0,#fffdf8 40%)!important;color:var(--ink)!important}
+.marketInfoLayout,.marketInfoLayout:has(.infoGuide){width:min(1120px,calc(100% - 36px));margin:36px auto 72px;padding-top:0;background:transparent;border:0;box-shadow:none}
+.marketInfoHero{padding:clamp(28px,5vw,58px);border:1px solid rgba(197,150,24,.38);border-radius:28px;background:radial-gradient(circle at 90% 10%,rgba(197,150,24,.22),transparent 28%),linear-gradient(125deg,var(--todijo-forest-deep),var(--todijo-forest));color:#fff;box-shadow:var(--todijo-shadow)}
+.marketInfoHero h1{color:#fff}.marketInfoHero p,.marketInfoHero span{color:#f4e8c3}
+.marketInfoContent,.marketInfoArticle,.legalPolicy,.privacyDocument{max-width:78ch;margin:28px auto 0;padding:clamp(24px,4vw,48px);border:1px solid var(--line)!important;border-radius:24px;background:#fffdf8!important;box-shadow:0 12px 36px rgba(8,43,34,.07)!important}
+.marketInfoContent p{color:var(--muted)!important}.marketInfoContent h1,.marketInfoContent h2,.marketInfoArticle h2,.legalPolicy h2,.privacyDocument h1,.privacyDocument h2{color:var(--todijo-forest)!important}
+.marketInfoContent>a,.infoGuideEmail,.privacyPrimary,.legalPolicyContact{background:var(--todijo-gold)!important;color:#172114!important}
+.marketInfoLegalNav{border-color:var(--line)!important;background:#fffdf8!important;box-shadow:0 12px 36px rgba(8,43,34,.07)!important}
+.marketInfoLegalNav a:hover,.marketInfoLegalNav a.isActive{background:var(--todijo-gold-soft)!important;color:var(--todijo-forest-deep)!important}
+
+@media(max-width:860px){
+  .marketPrimaryHeader{background:var(--todijo-forest-deep)}
+  .buyerHomePage .discoveryHero{padding-top:10px}
+  .premiumHeroShade{background:linear-gradient(180deg,rgba(4,29,23,.12) 5%,rgba(7,38,30,.5) 48%,rgba(4,29,23,.98) 80%)}
+  .marketFilterDock,.marketFilterDockV3{background:#fffdf8}
+  .categoryShowcaseGrid a,.discoveryCard,.featuredStoreCard{border-radius:16px}
+  .productDetailShell{background:transparent;box-shadow:none}
+  .productDetailTop>*{background:#fffdf8}
+  .premiumDashboardContent,.sellerControlContent{background:var(--dash-background)}
+  .marketInfoLayout,.marketInfoLayout:has(.infoGuide){width:min(100% - 20px,1120px);margin-top:16px}
+  .marketInfoHero{padding:28px 20px;border-radius:22px}
+  .marketInfoContent,.marketInfoArticle,.legalPolicy,.privacyDocument{padding:22px 18px;border-radius:18px}
+}
+
+@media(prefers-reduced-motion:reduce){button,a,input,select,textarea{transition:none!important}}
+
+/* Final approved header + hero composition (reference 70a034f6). */
+.homepagePromoGrid.withoutStoreDiscovery{grid-template-columns:1fr}
+.homepagePromoGrid.withoutStoreDiscovery .homepagePromoHome{min-height:220px}
+.marketplaceFooter .marketFooterLanguage,.marketplaceFooter .marketFooterLanguage select{border-color:rgba(202,157,41,.58)!important;background:#0b4939!important;color:#fff6dc!important;box-shadow:none!important}
+@media(max-width:860px){body:has(.buyerHomePage){background:#063d2d}}
+.marketCategoryStickyBoundary{position:relative}.homepageNavTrust{position:absolute;z-index:5;inset-inline-end:26px;top:50%;transform:translateY(-50%);padding:7px 12px;border-inline-start:1px solid #e3d5b8;background:#fffdf8;color:#9a7008;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;white-space:nowrap}
+.premiumHeroSlogan{position:absolute;z-index:3;inset-inline-end:3.5%;top:21%;width:170px;color:#9b6705;font:italic 30px/1.03 "Segoe Script","Bradley Hand",cursive;transform:rotate(-7deg);text-align:center;text-shadow:0 1px #fff}
+@media(min-width:861px){
+  .marketHeaderLanguage .buyerMarketTrigger>span small{display:none}.marketHeaderLanguage .buyerMarketTrigger>span strong{max-width:112px}.marketHeaderLanguage .buyerMarketTrigger{gap:6px;padding-inline:9px}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroSlider{height:375px!important;background:#fff7e8!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroArtwork{object-fit:contain!important;object-position:75% center!important;-webkit-mask-image:linear-gradient(to right,#000 0%,#000 82%,transparent 92%);mask-image:linear-gradient(to right,#000 0%,#000 82%,transparent 92%)}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroShade{background:linear-gradient(90deg,rgba(255,248,232,.995) 0%,rgba(255,248,232,.98) 35%,rgba(255,248,232,.35) 47%,rgba(255,248,232,0) 58%)!important;transform:none!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy{width:48%!important;padding:31px 42px 24px!important;align-items:flex-start!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroContent{display:flex;height:100%;flex-direction:column;justify-content:center}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy h1{max-width:510px!important;margin:7px 0 8px!important;font-size:49px!important;line-height:.98!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy p{max-width:455px!important;margin-bottom:0;font-size:13px!important;line-height:1.42!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroActions{margin-top:14px!important}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroCta{min-height:40px!important;padding-inline:19px!important;border-radius:999px!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroSellerCta{display:none!important}
+  .buyerHomePage:not(.searchResultsPage) .discoveryHeroSignals{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px!important;margin-top:17px!important}
+  .buyerHomePage:not(.searchResultsPage) .discoveryHeroSignals span{min-width:0;padding:7px 4px!important;border:0!important;background:transparent!important;color:#174235!important;display:flex;align-items:center;flex-direction:column;gap:4px;text-align:center;font-size:9px;line-height:1.15}.buyerHomePage:not(.searchResultsPage) .discoveryHeroSignals svg{width:28px;height:28px;padding:6px;border:1px solid #c89a29;border-radius:50%;color:#9a7008}
+}
+@media(max-width:1180px) and (min-width:861px){.homepageNavTrust{display:none}.premiumHeroSlogan{display:none}.buyerHomePage:not(.searchResultsPage) .premiumHeroCopy h1{font-size:43px!important}}
+@media(max-width:860px){
+  .homepageNavTrust{display:none}.premiumHeroSlogan{display:none}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroArtwork{object-fit:cover!important;object-position:57% center!important}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroShade{background:linear-gradient(90deg,rgba(255,248,232,.995) 0%,rgba(255,248,232,.95) 53%,rgba(255,248,232,.15) 82%)!important}
+}
+
+/* Homepage structure polish: full-width content, expandable filters and compact navigation. */
+.marketHeaderFilterButton{min-height:43px;padding:0 13px;border:1px solid #c99e38;border-radius:9px;background:#fff8e8;color:#174235;display:inline-flex;align-items:center;justify-content:center;gap:7px;font:inherit;font-size:12px;font-weight:850;white-space:nowrap;cursor:pointer}
+.marketHeaderFilterButton[aria-expanded="true"]{background:#123f31;color:#fff;border-color:#123f31}
+.marketHeaderCurrency{height:40px;padding:0 8px;border:1px solid #dfd0aa;border-radius:9px;background:#fffaf0;color:#173f33;display:inline-flex;align-items:center;gap:4px}
+.marketHeaderCurrency select{max-width:64px;border:0;background:transparent;color:#173f33;font:inherit;font-size:11px;font-weight:850;cursor:pointer}
+.marketHeaderCurrency option{background:#fffdf8;color:#173f33}
+.marketCategoryStickyBoundary{background:#fffdf8}
+.marketHomepageNav{width:min(1440px,calc(100% - 34px));min-height:43px;margin:auto;display:flex;align-items:center;gap:3px;overflow-x:auto;scrollbar-width:none}
+.marketHomepageNav::-webkit-scrollbar{display:none}
+.marketHomepageNav>a,.marketHomepageNav>button{min-height:42px;padding:0 13px;border:0;background:transparent;color:#17372d;display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:12px;font-weight:800;white-space:nowrap;text-decoration:none;cursor:pointer}
+.marketHomepageNav>a:hover,.marketHomepageNav>button:hover,.marketHomepageNav>button[aria-expanded="true"]{background:#f7edda;color:#9a6906}
+.marketHomepageAllCategories{border-inline-end:1px solid #e5d9be!important;padding-inline-start:2px!important;margin-inline-end:6px}
+.marketCategoryStickyBoundary .marketQuickMegaMenu{border-color:#dfd0aa;background:#fffdf8;box-shadow:0 22px 45px rgba(8,43,34,.17)}
+.marketCategoryStickyBoundary .marketQuickMegaSidebar{border-color:#e5d9be;background:#f8f2e6}
+.marketCategoryStickyBoundary .marketQuickMegaSidebar button{color:#315244}
+.marketCategoryStickyBoundary .marketQuickMegaSidebar button.active{background:#e9dec5;color:#104130;box-shadow:inset 4px 0 #b48212}
+.marketCategoryStickyBoundary .marketQuickMegaSidebar button>.semanticCategoryIcon{background:#f6ebd2;color:#9a7008}
+.marketCategoryStickyBoundary .marketQuickMegaContent>header{border-color:#e5d9be}
+.marketCategoryStickyBoundary .marketQuickMegaContent>header strong,.marketCategoryStickyBoundary .marketQuickMegaColumns h3{color:#103b2d}
+.marketCategoryStickyBoundary .marketQuickMegaContent>header small,.marketCategoryStickyBoundary .marketQuickMegaColumns a{color:#476254}
+.marketCategoryStickyBoundary .marketQuickMegaContent>header>a{border-color:#cda953;color:#815a09}
+.marketCategoryStickyBoundary .marketQuickMegaColumns a.marketQuickMegaSubcategoryLink{border-color:#e5d9be;background:#fffaf0;color:#315244}
+.marketCategoryStickyBoundary .marketQuickMegaColumns a.marketQuickMegaSubcategoryLink:hover,.marketCategoryStickyBoundary .marketQuickMegaColumns a.marketQuickMegaSubcategoryLink:focus-visible{border-color:#bf942e;background:#f8edcf;color:#775005;outline-color:#cda953}
+.homepageFilterPanel{display:none;background:#fffaf0}
+.homepageFilterPanel.isOpen{display:block}
+.searchResultsPage>.homepageFilterPanel{display:block}
+.searchResultsPage .homepageFilterClose{display:none}
+.homepageFilterClose{display:flex;align-items:center;gap:6px;margin:0 22px 0 auto;padding:9px 4px;border:0;background:transparent;color:#174235;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.premiumHeroBagMessage,.premiumHeroPedestalMessage{position:absolute;z-index:3;display:block;color:#493708;text-align:center;text-shadow:none;mix-blend-mode:multiply;letter-spacing:-.015em;pointer-events:none;text-wrap:balance}
+.mobileHeroBrandMessages{display:none}
+.premiumHeroBagMessage{left:63.3%;top:64%;width:10%;font:700 clamp(11px,.64vw,11.5px)/1.1 Georgia,"Times New Roman",serif;white-space:pre-line}
+.premiumHeroPedestalMessage{left:calc(75% - 211px);top:82.4%;width:180px;font:650 clamp(12px,.76vw,13px)/1.13 Georgia,"Times New Roman",serif}
+@media(min-width:861px){
+  .marketHeaderLanguage .buyerMarketTrigger{display:grid;grid-template-columns:17px minmax(0,1fr) 15px;grid-template-rows:auto auto;column-gap:8px;row-gap:1px;min-width:130px;min-height:44px;padding:5px 9px}
+  .marketHeaderLanguage .buyerMarketTrigger>svg:first-child{grid-column:1;grid-row:1/3}
+  .marketHeaderLanguage .buyerMarketTrigger>span{grid-column:2;grid-row:1;display:flex;align-items:center;gap:5px}
+  .marketHeaderLanguage .buyerMarketTrigger>span small{display:inline;font-size:13px;line-height:1}
+  .marketHeaderLanguage .buyerMarketTrigger>span strong{font-size:11px;line-height:1.1}
+  .marketHeaderLanguage .buyerMarketTrigger>b{grid-column:2;grid-row:2;justify-self:start;padding:0;border-radius:0;background:transparent;color:#587268;font-size:10px;line-height:1.1}
+  .marketHeaderLanguage .buyerMarketTrigger>svg:last-child{grid-column:3;grid-row:1/3}
+  .marketHeader .marketHeaderLanguage .buyerMarketTrigger>span,.marketHeader .marketHeaderLanguage .buyerMarketTrigger>span strong,.marketHeader .marketHeaderLanguage .buyerMarketTrigger>svg{color:#173f33!important}
+  .marketHeader .marketHeaderLanguage .buyerMarketTrigger>b{color:#587268!important}
+}
+@media(min-width:861px){
+  .buyerHomePage:not(.searchResultsPage){display:block!important}
+  .buyerHomePage:not(.searchResultsPage)>.marketHeader{top:-32px!important}
+  .buyerHomePage:not(.searchResultsPage)>.homepageFilterPanel{position:relative;z-index:121}
+  .buyerHomePage:not(.searchResultsPage)>.homepageFilterPanel.isOpen{position:sticky;top:78px}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFilterDock{position:relative;top:auto;z-index:1;width:100%;border-width:0 0 1px;border-radius:0;box-shadow:0 7px 18px rgba(8,43,34,.07)!important}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFilterDockInnerV3{width:min(1440px,calc(100% - 34px));min-height:64px;padding:0 0 14px;display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFilterIdentity{width:auto;min-height:42px;margin:0;padding-inline-end:14px;border:0;font-size:13px}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFacetMenu,.buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketAvailabilityToggle{width:auto}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFacetMenu>summary,.buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketAvailabilityToggle{width:auto;min-height:40px;padding-inline:13px;border:1px solid #dfd2b3!important;border-radius:999px;background:#fffdf8!important;gap:8px}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFacetPopover{position:absolute;z-index:130;width:max(210px,100%);max-height:260px;margin-top:7px;border:1px solid #dfd2b3;border-radius:12px;background:#fffdf8;box-shadow:0 14px 28px rgba(8,43,34,.14)}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFilterPriceGroup{width:auto;grid-template-columns:repeat(2,90px);margin:0}
+  .buyerHomePage:not(.searchResultsPage) .homepageFilterPanel .marketFilterApply{width:auto;min-height:40px;padding-inline:16px}
+  .buyerHomePage:not(.searchResultsPage)>.marketCategoryStickyBoundary{position:sticky;top:78px;z-index:119;border-bottom:1px solid #e7ddc8;background:#fffdf8;box-shadow:0 4px 12px rgba(8,43,34,.05)}
+  .buyerHomePage.filtersExpanded:not(.searchResultsPage)>.marketCategoryStickyBoundary{top:178px}
+  .buyerHomePage:not(.searchResultsPage) #homepage-promotions,.buyerHomePage:not(.searchResultsPage) #new-arrivals,.buyerHomePage:not(.searchResultsPage) #best-sellers,.buyerHomePage:not(.searchResultsPage) #products{scroll-margin-top:138px}
+  .buyerHomePage:not(.searchResultsPage)>.marketCategoryStickyBoundary>.marketCategoryNavigationBelowFilters{position:relative;top:auto;z-index:1;background:#fffdf8}
+  .buyerHomePage:not(.searchResultsPage) .premiumHeroContainer,.buyerHomePage:not(.searchResultsPage) .categoryShowcase,.buyerHomePage:not(.searchResultsPage) .homepagePromoGrid,.buyerHomePage:not(.searchResultsPage) .marketplaceRailSection,.buyerHomePage:not(.searchResultsPage) .discoveryLayout{width:min(1440px,calc(100% - 34px))}
+  .marketHeaderInner{grid-template-columns:auto minmax(220px,1fr) auto auto;gap:12px}
+  .homepagePromoGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .homepagePromoCard{min-height:185px}
+}
+@media(max-width:860px){
+  .marketHeaderFilterButton,.marketHeaderCurrency,.homepageFilterClose{display:none!important}
+  .homepageFilterPanel,.homepageFilterPanel.isOpen{display:block}
+  .homepageFilterPanel .marketFilterDock{position:sticky;top:103px}
+  .premiumHeroBagMessage,.premiumHeroPedestalMessage{display:none}
+  .mobileHeroBrandMessages{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:5px 3px 0;padding:7px 9px;border:1px solid #e5d5ac;border-radius:10px;background:#fff9ec;color:#795414;text-align:center;font:600 10px/1.2 Georgia,"Times New Roman",serif}
+}
+
+/* Restrained metallic-gold finish for the marketplace's primary actions. */
+.marketTopSearch button,
+.buyerHomePage .discoveryHeroCta:not(.discoveryHeroSellerCta),
+.buyerHomePage .homepagePromoCard a,
+.buyerHomePage .sellerGrowthPrimary,
+.buyerHomePage .marketFilterApply,
+.buyerHomePage .cardCartButton:not(:disabled){
+  border-color:#805000!important;
+  background:linear-gradient(180deg,#d7bb69 0%,#a16c10 19%,#855202 55%,#946008 78%,#663e00 100%)!important;
+  color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,248,211,.65),inset 0 -1px 0 rgba(66,39,0,.45),0 7px 15px rgba(76,48,8,.18)!important;
+  text-shadow:0 1px 1px rgba(51,29,0,.23);
+  transition:filter .18s ease,transform .18s ease,box-shadow .18s ease;
+}
+.marketTopSearch button:hover,
+.buyerHomePage .discoveryHeroCta:not(.discoveryHeroSellerCta):hover,
+.buyerHomePage .homepagePromoCard a:hover,
+.buyerHomePage .sellerGrowthPrimary:hover,
+.buyerHomePage .marketFilterApply:hover,
+.buyerHomePage .cardCartButton:not(:disabled):hover{
+  filter:brightness(1.07);
+  box-shadow:inset 0 1px 0 rgba(255,248,211,.75),inset 0 -1px 0 rgba(66,39,0,.45),0 9px 18px rgba(76,48,8,.22)!important;
+}
+.marketTopSearch button:focus-visible,
+.buyerHomePage .discoveryHeroCta:focus-visible,
+.buyerHomePage .homepagePromoCard a:focus-visible,
+.buyerHomePage .sellerGrowthPrimary:focus-visible,
+.buyerHomePage .marketFilterApply:focus-visible,
+.buyerHomePage .cardCartButton:focus-visible{outline:3px solid #1a694f;outline-offset:3px}
+
+/* Keep RTL copy in the artwork's clear area without changing its approved crop. */
+@media(min-width:861px){
+  [dir="rtl"] .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy{position:absolute;inset-inline:auto;left:0;right:auto;width:44%!important;direction:rtl;text-align:right}
+  [dir="rtl"] .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy .discoveryHeroActions{justify-content:flex-start}
+  [dir="rtl"] .buyerHomePage:not(.searchResultsPage) .premiumHeroShade{background:linear-gradient(90deg,rgba(255,248,232,.995) 0%,rgba(255,248,232,.98) 35%,rgba(255,248,232,.35) 47%,rgba(255,248,232,0) 58%)!important;transform:none!important}
+  [dir="rtl"] .premiumHeroSlogan{display:block;inset-inline-end:auto;left:auto;right:2%;top:16%;width:120px;font:600 20px/1.25 "Noto Naskh Arabic","Segoe UI",serif;transform:none;direction:rtl}
+  [dir="rtl"] .homepagePromoCard>div{margin-left:0;margin-right:auto;align-items:flex-end;text-align:right}
+  [dir="rtl"] .premiumHeroBagMessage,[dir="rtl"] .premiumHeroPedestalMessage{direction:rtl;overflow-wrap:anywhere}
+}
+@media(max-width:860px){
+  [dir="rtl"] .buyerHomePage:not(.searchResultsPage) .premiumHeroArtwork{transform:scaleX(-1)}
+  [dir="rtl"] .buyerHomePage:not(.searchResultsPage) .premiumHeroShade{background:linear-gradient(270deg,rgba(255,248,232,.995) 0%,rgba(255,248,232,.96) 54%,rgba(255,248,232,.08) 91%)!important;transform:none!important}
+  [dir="rtl"] .buyerHomePage:not(.searchResultsPage) .premiumHeroCopy{direction:rtl;text-align:right}
+  .productDetailPage>.marketplaceFooter{background:#083b2e}
+  .marketplaceFooterCompact nav a,.marketplaceFooterCompact small{color:#e5e9dc}
+  .buyerMobileBoutiquesLink{border-color:#d8c58d;background:#fff9eb;color:#174235!important}
+}
+
+/* Carry the approved public identity into news, seller entry, and footer controls. */
+.newsShell>header{background:radial-gradient(circle at 92% 0%,rgba(196,151,36,.22),transparent 32%),linear-gradient(120deg,#083b2e,#145340);border:1px solid #a77a18;box-shadow:0 14px 34px rgba(8,43,34,.13)}
+.newsShell>header>span{color:#f0cf78}
+.newsHeadlineList article{border-color:#e5dac0;background:#fffdf8}
+.newsArticleShell>a{color:#176044}
+.sellerStartActions .primary{border:1px solid #805000!important;background:linear-gradient(180deg,#d7bb69 0%,#a16c10 19%,#855202 55%,#946008 78%,#663e00 100%)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,248,211,.65),inset 0 -1px 0 rgba(66,39,0,.45),0 7px 15px rgba(76,48,8,.18)!important}
+.sellerStartActions .primary:hover{filter:brightness(1.07)}
+.sellerStartActions .primary:focus-visible,.marketplaceFooter a:focus-visible,.marketplaceFooter select:focus-visible,.marketplaceFooterAccordion summary:focus-visible{outline:3px solid #d5aa35;outline-offset:3px}
+
+/* The public loading state should not flash the legacy purple palette. */
+@media(prefers-color-scheme:dark){
+  .pageSkeleton{background:#082e24}
+  .pageSkeleton article{border-color:#315849;background:#103c30}
+  .pageSkeleton i{background:linear-gradient(100deg,#315849 20%,#4e705e 38%,#315849 56%);background-size:220% 100%}
+}
+.productDetailLoadingSkeleton .pageSkeleton{background:#f7f2e6}
+.productDetailLoadingSkeleton .pageSkeleton article{border-color:#e8dcc0;background:#fffdf8}
+.productDetailLoadingSkeleton .pageSkeleton i{background:linear-gradient(100deg,#e8dfca 20%,#f8f2e6 38%,#e8dfca 56%);background-size:220% 100%}
+
+/* Premium consistency beyond the approved homepage; visual presentation only. */
+.siteHeader{border-color:var(--line);background:rgba(255,253,247,.97);box-shadow:0 7px 24px rgba(8,43,34,.08)}
+.siteSearch{border-color:#d8c797;background:#fffdf8}
+.siteSearch button{background:linear-gradient(180deg,#d7bb69,#98650c 55%,#704500);color:#fff}
+.siteNav a:hover{color:var(--todijo-gold-dark)}
+.marketCategoryNavigationShell{box-sizing:border-box}
+.marketCategoryNavigation .marketQuickCategory{color:var(--todijo-forest)}
+.marketCategoryNavigation .marketQuickCategory:hover,.marketCategoryNavigation .marketQuickCategory.active{border-bottom-color:var(--todijo-gold);background:#fbf5e5;color:var(--todijo-forest-deep)}
+.marketCategoryNavigation .marketQuickCategory>.semanticCategoryIcon{background:#f6ecd1!important;color:#936a10!important}
+.marketQuickMore{border-color:#e2d3ab!important;background:#fffaf0!important;color:var(--todijo-forest)!important}
+.marketCategoryScrollButton{border-color:#d9c89b;background:#fffdf8;color:var(--todijo-forest)}
+.marketCategoryScrollButton:hover{border-color:var(--todijo-gold);background:#f8efda}
+.bestSellerPage,.sellerStartPage,.scopedPublicPage{background:linear-gradient(180deg,#fbf7eb,#fffdf8 42%);color:var(--ink)}
+.bestSellerHero span,.sellerStartEyebrow{color:var(--todijo-gold-dark)}
+.bestSellerHero h1,.sellerStartHero h1{color:var(--todijo-forest-deep)}
+.bestSellerHero p,.bestSellerEmpty,.sellerStartHero p{color:var(--muted)}
+.sellerStartEyebrow,.sellerStartPromise b{background:#f7edcf}
+.sellerStartPromise,.publicSellerPlan,.newsHeadlineList article{border-color:var(--line);background:#fffdf8;box-shadow:0 10px 32px rgba(8,43,34,.06)}
+.sellerStartPromise b{color:var(--todijo-gold-dark)}
+.publicSellerPlan.isFeatured{border-color:var(--todijo-gold)}
+.publicSellerPlan a{background:linear-gradient(180deg,#d7bb69,#98650c 55%,#704500);color:#fff}
+.newsShell,.newsArticleShell{color:var(--ink)}
+.newsHeadlineList a{color:var(--todijo-forest-deep)}
+.newsHeadlineList a:hover{color:var(--todijo-gold-dark)}
+.newsArticleShell>time,.newsHeadlineList time{color:var(--muted)}
+.productMainImageButton,.productDetailInfo,.productGallery,.productPurchaseColumn>*{border-color:var(--line)}
+.productIconButton,.optionGroup button,.productThumbButton{border-color:#ded4b9;background:#fffdf8;color:var(--todijo-forest)}
+.optionGroup button.selected,.productThumbButton.isActive{border-color:var(--todijo-gold);box-shadow:0 0 0 3px rgba(197,150,24,.16)}
+.reviewForm,.reviewList,.relatedCard{border-color:var(--line);background:#fffdf8}
+.premiumStatIcon,.premiumQuickAction>span{background:#f6ecd1;color:var(--todijo-forest)}
+.premiumStatIcon.tone-blue,.premiumStatIcon.tone-mint,.premiumStatIcon.tone-amber{background:#f6ecd1;color:var(--todijo-forest)}
+.premiumDashboardContent,.sellerControlContent{background:var(--dash-background)}
+.premiumDashboardSection,.premiumStatCard,.premiumQuickAction,.sellerControlCard,.adminPanel,.adminStats article{border-color:var(--dash-border);background:var(--dash-surface);color:var(--dash-text)}
+.premiumDashboardSection h2,.sellerControlCard h2,.adminPanel h2{color:var(--todijo-forest-deep)}
+.premiumDashboardContent :is(input,select,textarea):not([type="checkbox"]):not([type="radio"]),.adminPage :is(input,select,textarea):not([type="checkbox"]):not([type="radio"]){border-color:#d8d0bd;background:#fffdf8;color:var(--ink)}
+.premiumDashboardContent :is(input,select,textarea):focus-visible,.adminPage :is(input,select,textarea):focus-visible{border-color:var(--todijo-gold)}
+.adminStoreList>label.isSelected{border-color:var(--todijo-gold);background:#fff7df;box-shadow:inset 3px 0 var(--todijo-gold)}
+[dir="rtl"] .adminStoreList>label.isSelected{box-shadow:inset -3px 0 var(--todijo-gold)}
+.adminStoreList input[type="checkbox"],.shippingToggle input,.shippingChoiceRow input,.countryPicker input{accent-color:var(--todijo-forest)}
+.adminBadge:not(.source-stripe):not(.source-none){background:#f5ecd2;color:var(--todijo-forest)}
+.adminDropshippingAction,.countryPickerToolbar button,.countryChips button,.countryChips>span,.postalAddRule{border-color:#dcc994;background:#fff8e6;color:var(--todijo-forest)}
+.supplierImportProgress{border-color:#d7c793;background:#fff8e6;color:var(--todijo-forest)}
+.supplierImportProgress>span{border-color:#ddcca0;border-top-color:var(--todijo-forest)}
+.sellerSettingsInfo,.supplierAutomaticPricing,.supplierBulkImport{background:#fff8e6!important;color:var(--todijo-forest)!important}
+.premiumRevenueChart>div>span{background:linear-gradient(180deg,#d5b65e,#8f650b)}
+.premiumMobileDrawer{border-color:#d9c99b;background:#fffdf8;color:var(--todijo-forest)}
+.premiumMobileDrawer nav a:hover,.premiumMobileDrawer nav a.isActive{background:#f8edcf;color:var(--todijo-forest-deep)}
+.sellerSettingsTabs a:hover,.sellerSettingsTabs a.isActive{border-color:var(--todijo-gold);background:#fff5dc;color:var(--todijo-forest)}
+.storeAboutContent>div{background:#fff8e6!important;color:var(--todijo-forest)!important}
+.storeAboutContent svg{color:var(--todijo-gold-dark)!important}
+.shippingToggle,.countryPicker,.postalRuleEditor{border-color:#decfa7;background:#fffaf0}
+.supplierManager{--dash-primary:#123f32;--dash-border:#ded7c5}
+.adminOwnStoreAction{border-color:#decfa7;background:#fffaf0}
+.adminOwnStoreAction p,.adminGrantForm label{color:var(--muted)}
+.adminStoreList>label{border-color:var(--dash-border)}
+.adminTablePanel th,.adminTablePanel td{border-bottom-color:var(--dash-border)}
+.marketInfoPage .marketInfoContent>svg,.marketInfoPage .marketInfoIcon{color:var(--todijo-gold-dark)!important}
+.marketInfoPage>.marketHeader{width:100%;margin:0}
+.marketInfoPage .marketInfoHero>span{background:rgba(197,150,24,.2)!important;color:#f6dc91!important}
+.marketInfoPage .marketInfoContent p{color:var(--muted)!important}
+@media(max-width:860px){
+  .siteHeaderInner{min-width:0}
+  .premiumDashboardHeader>.todijoBrand{display:flex}
+  .premiumDashboardHeader .todijoWordmark{font-size:clamp(19px,5vw,25px)}
+  .marketCategoryNavigationShell{width:100%}
+}
+
+/* Account entry keeps its existing forms and photography, with the shared brand. */
+.authPage{background:#fffdf8;color:var(--ink)}
+.authBrand{background:radial-gradient(circle at 80% 15%,rgba(197,150,24,.16),transparent 28%),linear-gradient(140deg,#082b22,#174a39)}
+.authBrandWithArtwork{background:#082b22}
+.authBrandWithArtwork:before{background:linear-gradient(180deg,rgba(6,37,29,.55),rgba(6,37,29,.83) 58%,rgba(6,37,29,.96))}
+.authBrandWithArtwork .authArtwork{filter:saturate(.64) sepia(.13)}
+.authBrand .todijoBrand{position:relative;z-index:2;width:max-content;max-width:100%;color:#e6be4c;text-shadow:0 2px 14px rgba(0,0,0,.24)}
+.authBrand .todijoBrandMark{flex:none}
+.authBrand .todijoWordmark{color:#e6be4c!important;font-family:Georgia,"Times New Roman",serif}
+.authBrand .todijoWordmark span{color:#e6be4c!important}
+.authBrand .authPitch,.authBrand>small{position:relative;z-index:2}
+.authPanel{background:#fffdf8}
+.authBox h2{color:var(--todijo-forest-deep)}
+.authBack,.authSwitch a,.passwordLine a{color:var(--todijo-forest)}
+.authSubmit{background:linear-gradient(180deg,#d7bb69,#98650c 55%,#704500);color:#fff;box-shadow:inset 0 1px 0 rgba(255,248,211,.6),0 8px 20px rgba(89,56,5,.18)}
+.authSubmit:hover{background:linear-gradient(180deg,#e0c779,#a97613 55%,#805407)}
+.socialLoginButton,.roleCard{border-color:var(--line);background:#fffdf8;color:var(--ink)}
+.socialLoginButton:disabled{background:#f7f2e6;color:#6b716b}
+.socialLoginButton:hover,.socialLoginButton:focus-visible,.roleCard:hover{border-color:var(--todijo-gold);box-shadow:0 0 0 3px rgba(197,150,24,.13)}
+.authForm input,.authForm select{border-color:#d8d0bd;background:#fff;color:var(--ink)}
+@media(max-width:850px){.authBrandWithArtwork:before{background:linear-gradient(90deg,rgba(6,37,29,.91),rgba(6,37,29,.64))}}
+
+/* Authenticated account and seller forms: keep workflows, replace legacy violet. */
+.accountSettingsPage,.addressPage,.sellerOnboardingPage,.storeSetupPage,.dashboardPage{background:linear-gradient(180deg,#f7f0df,#fffdf8 42%);color:var(--ink)}
+.accountSettingsShell>header h1,.addressPageHeader h1,.sellerOnboardingCard header h1,.storeSetupCard h1,.dashboardCard h1{color:var(--todijo-forest-deep)}
+.accountSettingsCard,.addressPanel,.sellerOnboardingCard,.storeSetupCard,.dashboardCard{border-color:var(--line);background:#fffdf8;box-shadow:0 14px 38px rgba(8,43,34,.07)}
+.accountSettingsNavigation a,.addressBackButton,.addressEditButton,.addressCancelButton{border-color:#d8c99f;background:#fffdf8;color:var(--todijo-forest)}
+.accountSettingsNavigation a:hover,.addressBackButton:hover,.addressEditButton:hover,.addressCancelButton:hover{border-color:var(--todijo-gold);background:#fff7e2}
+.addressPageHeader .dashboardBadge,.addressPanelHeader>b,.addressPin,.addressEmptyState{background:#f7edcf;color:var(--todijo-forest)}
+.addressPanelHeader span,.addressFormPanel>header>span{color:var(--todijo-gold-dark)}
+.addressPanelHeader h2,.addressFormPanel h2,.addressCardHeading strong,.addressEmptyState strong{color:var(--todijo-forest-deep)}
+.addressCard{border-color:var(--line);background:#fffdf8}
+.addressCard:hover{border-color:var(--todijo-gold);box-shadow:0 10px 26px rgba(8,43,34,.08)}
+.addressCard address{padding-left:0;padding-inline-start:49px;color:var(--muted)}
+.addressField,.addressFormRow>label{color:var(--todijo-forest-deep)}
+.addressForm input,.addressForm select,.sellerOnboardingCard select,.storeForm textarea{border-color:#d8c99f;background:#fff;color:var(--ink)}
+.addressForm input:hover,.addressForm select:hover{border-color:var(--todijo-gold)}
+.addressForm input:focus,.addressForm select:focus,.storeForm textarea:focus,.slugField:focus-within{border-color:var(--todijo-gold);box-shadow:0 0 0 4px rgba(197,150,24,.16)}
+.addressUseButton,.addressSaveButton,.dashboardLink.primary{border-color:#805000;background:linear-gradient(180deg,#d7bb69,#98650c 55%,#704500);color:#fff}
+.addressEmptyState{border-color:#d8c99f}
+.addressDeleteButton{margin-left:0;margin-inline-start:auto}
+.sellerOnboardingCard fieldset,.slugField{border-color:var(--line);background:#fffdf8}
+.sellerControlButton.light{color:var(--todijo-forest)}
+.sellerProductDropzone{border-color:#d6c48e;background:#fffaf0}
+.sellerPublishChoices input:checked+span{border-color:var(--todijo-gold);background:#fff7df;box-shadow:0 0 0 3px rgba(197,150,24,.15)}
+.source-stripe{background:#f5ecd2;color:#75540d}
+.storeSetupIntro,.addressPageHeader>p:last-child{color:var(--muted)}
+@media(max-width:600px){.addressCard address{padding-inline-start:0}.addressDeleteButton{margin-inline-start:0}}
+
+/* Support and category flyouts were the last public violet surfaces. */
+.marketCategoryMegaMenu{border-color:#dfd1ae!important;background:#fffdf8!important;color:var(--todijo-forest-deep)!important;box-shadow:0 24px 60px rgba(8,43,34,.16)!important}
+.marketCategoryList{border-color:var(--line)!important;background:#f9f2e3!important}
+.marketCategoryList button{color:var(--todijo-forest)!important}
+.marketCategoryList button.active{background:#f4e8c4!important;color:var(--todijo-forest-deep)!important;box-shadow:inset 3px 0 var(--todijo-gold)!important}
+[dir="rtl"] .marketCategoryList button.active{box-shadow:inset -3px 0 var(--todijo-gold)!important}
+.marketCategoryDetail,.marketCategoryContent{background:#fffdf8!important}
+.marketCategoryDetail>header,.marketCategoryDetail>.marketCategoryDetailHeader{border-color:var(--line)!important}
+.marketCategoryDetail>header p,.marketCategoryColumns h3{color:var(--todijo-forest-deep)!important}
+.marketCategoryDetail>header>a,.marketCategoryColumns a:hover,.marketCategoryEmpty a{border-color:#d8c99f!important;color:var(--todijo-forest)!important}
+.marketCategoryColumns a,.marketCategoryEmpty p{color:var(--muted)!important}
+.marketCategoryEmpty{border-color:var(--line)!important;background:#fffaf0!important}
+.buyerMobileCategoryBack{background:#f7edcf!important;color:var(--todijo-forest)!important}
+.buyerMobileCategoryParents{background:#f7f1e3}
+.buyerMobileCategoryParents button{color:var(--todijo-forest)}
+.buyerMobileCategoryParents button.active{border-inline-start-color:var(--todijo-gold);background:#f3e7c8;color:var(--todijo-forest-deep);box-shadow:inset 0 0 0 1px #dfcca0}
+.helpContactCard,.helpContactSuccess{border-color:var(--line);background:#fffdf8;box-shadow:0 16px 42px rgba(8,43,34,.08)}
+.helpContactCard header>span,.helpContactSuccess strong{background:#f6ebc9;color:var(--todijo-forest)}
+.helpContactCard header h1,.helpContactSuccess h1{color:var(--todijo-forest-deep)}
+.helpContactCard header p,.helpContactSuccess p,.helpContactCard small,.helpAttachmentNotice{color:var(--muted)}
+.helpContactCard label{color:var(--todijo-forest-deep)}
+.helpContactCard input,.helpContactCard select,.helpContactCard textarea{border-color:#d8c99f;background:#fff;color:var(--ink)}
+.helpContactCard input:focus-visible,.helpContactCard select:focus-visible,.helpContactCard textarea:focus-visible{border-color:var(--todijo-gold)}
+.helpProductContext{background:#fff7df;color:var(--todijo-forest)!important}
+.helpContactSuccess>svg{color:var(--todijo-forest)}
+.buyerMobileDrawerMarket .buyerMarketTrigger>b{background:#f2e5bd;color:var(--todijo-forest)!important}
+.buyerMarketPopover{border-color:#dfd0aa;background:#fffdf8;color:var(--todijo-forest-deep);box-shadow:0 20px 50px rgba(8,43,34,.18)}
+.buyerMarketPopover>header small,.buyerMarketOptions small{color:var(--muted)}
+.buyerMarketPopover>label{border-color:#ddcfab;background:#fff}
+.buyerMarketPopover input,.buyerMarketOptions button{color:var(--todijo-forest-deep)}
+.buyerMarketCurrency select{border-inline-start-color:#ddcfab;background:#fff8e6;color:var(--todijo-forest-deep)}
+.buyerMarketOptions button:hover,.buyerMarketOptions button:focus-visible,.buyerMarketOptions button[aria-selected=true]{background:#f5e9ca}
+
+/* The authenticated seller dashboard retained a separate violet theme. */
+.premiumSellerDashboard{--dash-background:#f8f2e6;--dash-surface:#fffdf8;--dash-surface-elevated:#fbf6eb;--dash-text:#123f32;--dash-muted:#586b62;--dash-border:#ded1b5;--dash-mint:#f5e9ca;--dash-primary:#95690d;--dash-emerald:#123f32;background:var(--dash-background);color:var(--dash-text)}
+.premiumSellerDashboard .premiumDashboardMain{background:var(--dash-background);color:var(--dash-text)}
+.premiumSellerDashboard .premiumDashboardHeader{border-color:var(--dash-border);background:#fffdf8;color:var(--dash-text)}
+.premiumSellerDashboard .premiumDashboardHeader span,.premiumSellerDashboard .premiumStatCard>span,.premiumSellerDashboard .premiumStatCard>small,.premiumSellerDashboard .premiumDashboardSection>header p,.premiumSellerDashboard .premiumRecentProduct span{color:var(--dash-muted)}
+.premiumSellerDashboard .premiumNotificationButton{border-color:var(--dash-border);background:#fffdf8;color:var(--todijo-forest)}
+.premiumSellerDashboard .premiumAvatar{background:linear-gradient(145deg,var(--todijo-forest),var(--todijo-forest-deep));color:#fff}
+.premiumSellerDashboard .sellerOverviewHero{background:radial-gradient(circle at 86% 14%,rgba(232,190,76,.14),transparent 28%),linear-gradient(120deg,var(--todijo-forest-deep),var(--todijo-forest))!important}
+.premiumSellerDashboard .sellerOverviewIntro>span{color:#f2d475}
+.premiumSellerDashboard .premiumStatCard,.premiumSellerDashboard .premiumDashboardSection,.premiumSellerDashboard .sellerOrdersSearch,.premiumSellerDashboard .stripeConnectSection,.premiumSellerDashboard .sellerChartCard,.premiumSellerDashboard .sellerControlSection,.premiumSellerDashboard .storeSettingsSection,.premiumSellerDashboard .sellerProductSummary article,.premiumSellerDashboard .sellerProductCard{border-color:var(--dash-border);background:var(--dash-surface);color:var(--dash-text);box-shadow:0 10px 30px rgba(8,43,34,.06)}
+.premiumSellerDashboard .premiumQuickAction{border-color:var(--dash-border);background:#fffdf8;color:var(--dash-text)}
+.premiumSellerDashboard .premiumQuickAction:hover{border-color:#c29c45;background:#fff8e8}
+.premiumSellerDashboard .premiumQuickAction>span{background:#f6ecd1;color:var(--todijo-forest)}
+.premiumSellerDashboard .premiumQuickAction.isPrimary{border-color:var(--todijo-forest);background:var(--todijo-forest);color:#fff}
+.premiumSellerDashboard .premiumQuickAction.isPrimary>span{background:rgba(255,255,255,.15);color:#fff}
+.premiumSellerDashboard .premiumRecentOrder{border-color:var(--dash-border)}
+.premiumSellerDashboard .premiumTextLink,.premiumSellerDashboard .storeSettingsSectionTitle,.premiumSellerDashboard .storeFieldIcon{color:var(--todijo-forest)}
+.premiumSellerDashboard .sellerControlSection>header{border-color:var(--dash-border)}
+.premiumSellerDashboard .sellerControlSection>header>span,.premiumSellerDashboard .storeFieldIcon,.premiumSellerDashboard .mediaReadyBadge{background:#f6ecd1;color:var(--todijo-forest)}
+.premiumSellerDashboard .sellerControlField input,.premiumSellerDashboard .sellerControlField select,.premiumSellerDashboard .sellerControlField textarea,.premiumSellerDashboard .productComplianceFields input,.premiumSellerDashboard .productComplianceFields textarea,.premiumSellerDashboard .storeSettingsForm input,.premiumSellerDashboard .storeSettingsForm select,.premiumSellerDashboard .storeSettingsForm textarea{border-color:#d8c9a5;background:#fffdf8;color:var(--dash-text);caret-color:var(--todijo-forest)}
+.premiumSellerDashboard .sellerControlField input:focus-visible,.premiumSellerDashboard .sellerControlField select:focus-visible,.premiumSellerDashboard .sellerControlField textarea:focus-visible,.premiumSellerDashboard .productComplianceFields input:focus-visible,.premiumSellerDashboard .productComplianceFields textarea:focus-visible,.premiumSellerDashboard .storeSettingsForm input:focus-visible,.premiumSellerDashboard .storeSettingsForm select:focus-visible,.premiumSellerDashboard .storeSettingsForm textarea:focus-visible{border-color:var(--todijo-gold);box-shadow:0 0 0 4px rgba(194,156,69,.18)}
+.premiumSellerDashboard .sellerProductDropzone,.premiumSellerDashboard .sellerVariantEditor,.premiumSellerDashboard .sellerVariantOption,.premiumSellerDashboard .sellerVariantRow,.premiumSellerDashboard .shippingToggle,.premiumSellerDashboard .countryPicker,.premiumSellerDashboard .postalRuleEditor{border-color:#decda5;background:#fff8e8;color:var(--dash-text)}
+.premiumSellerDashboard .sellerControlActionBar,.premiumSellerDashboard .sellerSettingsTabs{border-color:var(--dash-border);background:#fffdf8;color:var(--dash-text)}
+.premiumSellerDashboard .sellerControlButton.primary,.premiumSellerDashboard .storeUploadButton{border-color:var(--todijo-gold);background:var(--todijo-gold);color:#172114}
+.premiumSellerDashboard .sellerSettingsTabs a:hover,.premiumSellerDashboard .sellerSettingsTabs a:focus-visible,.premiumSellerDashboard .storeSettingsMessage{border-color:#decda5;background:#f6ecd1;color:var(--todijo-forest)}
+.premiumSellerDashboard .sellerTypeChoices label.isSelected{border-color:var(--todijo-gold);background:#fff8e8;box-shadow:0 0 0 3px rgba(194,156,69,.15)}
+.premiumSellerDashboard .sellerTypeChoices input,.premiumSellerDashboard .sellerVatChoice input{accent-color:var(--todijo-forest)}
+.premiumBuyerDashboard .premiumWelcomeHero>div>span{color:#f2d475}
+.premiumBuyerDashboard .premiumWelcomeHero p{color:#f2eee3}
+.premiumBuyerDashboard .premiumWelcomeHero>a{border:1px solid #d5ae4c;background:linear-gradient(170deg,#edd17b 0%,#c79620 48%,#8d620d 100%);color:#172114;box-shadow:0 8px 20px rgba(5,28,21,.18)}
+.productDetailPage .purchaseOptionsScroll{scrollbar-color:#c8a85b transparent}
+.productDetailPage .purchaseActionFooter{border-color:var(--line);background:#fffdf8}
+.todijoWordmark>span{color:#e6be4c!important}
+.marketFacetMenu summary b,.marketFacetMenu label{color:var(--todijo-forest)}
+.e2eDashboardPreviewFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:24px}
+.e2eDashboardPreviewFields label{display:grid;gap:8px;color:var(--todijo-forest-deep);font-weight:750}
+.e2eDashboardPreviewFields input{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--dash-border);border-radius:10px;background:#fffdf8;color:var(--todijo-forest)}
+@media(max-width:620px){.e2eDashboardPreviewFields{grid-template-columns:1fr}}
+.adminPage .adminForm label,.adminPage .adminPanel label{color:var(--todijo-forest-deep)}
