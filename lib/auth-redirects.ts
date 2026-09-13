@@ -5,7 +5,7 @@ export function localizedHome(locale: string | null | undefined) {
 }
 
 export function adminEntryPath(locale: Locale) {
-  return `/${locale}/admin`;
+  return `/${locale}/adm-barewbar-182203`;
 }
 
 export function safeLoginDestination(next: string | null, locale: Locale) {

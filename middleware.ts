@@ -30,6 +30,8 @@ export function middleware(request: NextRequest) {
   }
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const pathLocale = segments[0];
+  const routeSegments = isLocale(pathLocale) ? segments.slice(1) : segments;
+  if (routeSegments[0] === "admin") return new NextResponse("Not Found", { status: 404 });
   const localRewriteLocale = request.nextUrl.searchParams.get("__todijo_local_locale");
   if (process.env.NODE_ENV !== "production" && isLocale(localRewriteLocale)) {
     const requestHeaders = new Headers(request.headers);
