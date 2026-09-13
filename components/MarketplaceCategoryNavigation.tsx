@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId } from "@/lib/desktop-category-taxonomy";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import { localizedCategoryGroupLabel, localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
+import { newsMessages } from "@/i18n/news";
+import { isLocale } from "@/i18n/config";
 
-export default function MarketplaceCategoryNavigation({ className = "" }: { className?: string }) {
+export default function MarketplaceCategoryNavigation({ className = "", compactHomepage = false, showStores = true }: { className?: string; compactHomepage?: boolean; showStores?: boolean }) {
   const locale = useLocale();
   const common = useTranslations("Common");
   const header = useTranslations("HomeHeader");
   const categoryTitle = useTranslations("CategoryNavigation");
+  const footer = useTranslations("HomeFooter");
   const [activeCategory, setActiveCategory] = useState(DESKTOP_CATEGORY_TAXONOMY[0].id);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -33,7 +36,14 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
   const toggleCategory = (categoryId: string) => { setActiveCategory(categoryId); setOpen((current) => categoryId === activeCategory ? !current : true); };
 
   return <div ref={rootRef} className={`marketCategoryNavigation ${className}`.trim()} onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); (event.target as HTMLElement).focus(); } }}>
-    <div className="marketCategoryNavigationShell">
+    {compactHomepage ? <nav className="marketHomepageNav" aria-label={header("categoryNavigation")}>
+      <button type="button" className="marketHomepageAllCategories" aria-expanded={open} aria-controls="market-category-mega-menu" onClick={() => setOpen((value) => !value)}><Menu size={17} aria-hidden="true"/>{header("allCategories")}<ChevronRight size={15} aria-hidden="true"/></button>
+      <a href={`/${locale}#homepage-promotions`}>{header("deals")}</a>
+      <a href={`/${locale}#new-arrivals`}>{header("newArrivals")}</a>
+      <a href={`/${locale}/best-sellers`}>{header("bestSellers")}</a>
+      {showStores && <a href={`/${locale}/store`}>{footer("stores")}</a>}
+      <a href={`/${locale}/actualites`}>{newsMessages[isLocale(locale) ? locale : "en"].title}</a>
+    </nav> : <div className="marketCategoryNavigationShell">
       <button className="marketCategoryScrollButton previous" type="button" onClick={() => scrollCategories(-1)} aria-label={`${common("categories")} ←`}><ChevronLeft size={18} aria-hidden="true"/></button>
       <div ref={railRef} className="marketCategoryNavigationInner" role="navigation" aria-label={common("categories")}>
       {DESKTOP_CATEGORY_TAXONOMY.map((category) => {
@@ -50,7 +60,7 @@ export default function MarketplaceCategoryNavigation({ className = "" }: { clas
       <button className="marketQuickCategory marketQuickMore" type="button" aria-haspopup="true" aria-expanded={open} aria-controls="market-category-mega-menu" onClick={() => setOpen((value) => !value)}><span>{common("categories")}</span><ChevronDown size={13} aria-hidden="true"/></button>
       </div>
       <button className="marketCategoryScrollButton next" type="button" onClick={() => scrollCategories(1)} aria-label={`${common("categories")} →`}><ChevronRight size={18} aria-hidden="true"/></button>
-    </div>
+    </div>}
     {open ? <section id="market-category-mega-menu" className="marketQuickMegaMenu" aria-label={activeLabel}>
       <div className="marketQuickMegaSidebar">
         {DESKTOP_CATEGORY_TAXONOMY.map((category) => <button key={category.id} type="button" aria-pressed={active.id === category.id} className={active.id === category.id ? "active" : ""} onClick={() => setActiveCategory(category.id)}><SemanticCategoryIcon category={category.id} size={20}/><span>{categoryTitle(category.id)}</span><ChevronRight size={14} aria-hidden="true"/></button>)}

@@ -1,5 +1,5 @@
 export const HOMEPAGE_HERO_PRODUCT_COUNT = 6;
-export const HOMEPAGE_STORE_THRESHOLD = 4;
+export const HOMEPAGE_STORE_THRESHOLD = 5;
 
 export function shouldShowHomepageStores(eligibleStoreCount: number) {
   return eligibleStoreCount >= HOMEPAGE_STORE_THRESHOLD;

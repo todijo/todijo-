@@ -15,7 +15,8 @@ const css = read("app/globals.css");
 
 test("buyer routes share one mobile header with menu, logo, cart, and search", () => {
   assert.match(header, /<BuyerMobileNavigation accountName=\{accountName\}/);
-  assert.match(header, /<TodijoLogo href=\{homeHref\} inverse/);
+  assert.match(header, /<TodijoLogo href=\{homeHref\}/);
+  assert.doesNotMatch(header, /<TodijoLogo href=\{homeHref\} inverse/);
   assert.match(header, /<CartLink label=\{common\("cart"\)\} className="buyerMobileShellCart"/);
   assert.match(header, /className="buyerMobileShellSearch" role="search"/);
   assert.match(marketplaceHeader, /<BuyerMobileHeader accountName=\{accountName\}\/>/);

@@ -11,7 +11,7 @@
   "orders": "Commandes",
   "searchCategory": "Catégorie de recherche",
   "allCategories": "Toutes les catégories",
-  "deals": "Bonnes affaires",
+  "deals": "Bons plans",
   "newArrivals": "Nouveautés",
   "bestSellers": "Meilleures ventes",
   "exploreProducts": "Explorer les produits",
@@ -20,6 +20,12 @@
   "marketplaceVisual": "Découvrez les produits de boutiques indépendantes Todijo",
   "discoverCategories": "Explorer les catégories",
   "heroEyebrow": "Bienvenue sur Todijo",
-  "heroTitle": "Vos envies, à petits prix !",
-  "heroText": "Des milliers de produits, des vendeurs de confiance et une expérience d’achat simple et sécurisée."
+  "heroTitle": "Un monde de choix sous le même toit",
+  "heroText": "Des milliers de produits, des vendeurs de confiance et une expérience d’achat simple et sécurisée.",
+  "heroSlogan": "Shopping sans limites",
+  "heroBagMessage": "Plus qu’un\nshopping,\nun meilleur\ndemain",
+  "heroPedestalMessage": "Tout ce dont vous avez besoin, au même endroit",
+  "homePromoText": "Un intérieur qui vous ressemble",
+  "utilityDelivery": "Livraison selon votre destination",
+  "utilityPromise": "Des trouvailles pour chaque envie"
 }

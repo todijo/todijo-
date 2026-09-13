@@ -16,14 +16,14 @@ export type CategoryKey = (typeof PRODUCT_CATEGORIES)[number]["key"];
 const aliases: Record<string, CategoryKey> = {
   mode: "fashion", fashion: "fashion", clothing: "fashion",
   electronique: "electronics", electronics: "electronics",
-  maison: "home", home: "home",
+  maison: "home", home: "home", "home garden": "home",
   beaute: "beauty", beauty: "beauty",
   sports: "sports", sport: "sports",
   livres: "books", livre: "books", books: "books",
-  enfants: "children", enfant: "children", children: "children", kids: "children",
+  enfants: "children", enfant: "children", children: "children", kids: "children", toys: "children",
   auto: "auto", automotive: "auto", automobile: "auto", vehicles: "auto", vehicules: "auto",
   artisanat: "crafts", crafts: "crafts", craft: "crafts",
-  autre: "other", other: "other",
+  autre: "other", other: "other", health: "other", pets: "other",
 };
 
 function normalizedCategory(value: string) {

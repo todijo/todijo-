@@ -11,7 +11,8 @@ const slider = readFileSync(join(root, "components", "PremiumHeroSlider.tsx"), "
 
 test("Nouveautés uses at most ten real newest products and preserves product card behavior", () => {
   assert.match(page, /orderBy: \{ createdAt: "desc" \}, take: 10, select: productSelect/);
-  assert.match(home, /products=\{newArrivals\.slice\(0,10\)\}/);
+  assert.match(home, /products=\{distinctNewArrivals\.slice\(0,10\)\}/);
+  assert.match(home, /uniqueProductsById\(newArrivals\)\.filter\(\(product\) => !bestSellerIds\.has\(product\.id\)\)/);
   assert.match(home, /MarketplaceProductCard key=\{product\.id\} product=\{product\} soldOut=\{soldOut\}/);
   assert.match(home, /titleHref=\{`\/\$\{activeLocale\}\?sort=newest#products`\}/);
 });

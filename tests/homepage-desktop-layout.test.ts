@@ -11,7 +11,7 @@ test("desktop homepage rails present five complete cards without changing produc
   const css = read("app/globals.css");
   assert.match(css, /grid-auto-columns:calc\(\(100% - 56px\)\/5\)/);
   assert.match(css, /marketplaceRailSection:not\(\.isCarousel\) \.marketplaceProductRail\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)\}/);
-  assert.match(home, /newArrivals\.slice\(0,10\)/);
+  assert.match(home, /distinctNewArrivals\.slice\(0,10\)/);
   assert.match(home, /products\.map\(\(product\) => <MarketplaceProductCard/);
 });
 
@@ -37,7 +37,9 @@ test("five feature cards keep artwork and copy in separate zones", () => {
 test("promotional homepage sections are rendered exactly once", () => {
   const home = read("app/HomeClient.tsx");
   const appPromo = read("components/MobileAppPromotion.tsx");
-  assert.equal((home.match(/className="container discoveryPromoBanner"/g) ?? []).length, 1);
+  assert.equal((home.match(/className="container homepagePromoGrid"/g) ?? []).length, 1);
+  assert.equal((home.match(/className="homepagePromoCard homepagePromoSale"/g) ?? []).length, 1);
+  assert.equal((home.match(/className="homepagePromoCard homepagePromoHome"/g) ?? []).length, 1);
   assert.equal((home.match(/<MobileAppPromotion\/>/g) ?? []).length, 1);
   assert.equal((appPromo.match(/className="mobileAppPromotion"/g) ?? []).length, 1);
 });

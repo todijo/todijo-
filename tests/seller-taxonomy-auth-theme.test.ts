@@ -33,16 +33,18 @@ test("product write routes reject client-controlled non-canonical categories",()
   for(const file of["app/seller/products/new/NewProductForm.tsx","app/seller/products/[id]/edit/EditProductForm.tsx"]){const form=source(file);assert.match(form,/SellerCategorySelector/);assert.doesNotMatch(form,/PRODUCT_CATEGORIES/)}
 });
 
-test("seller workspace finishes on light surfaces with plum navigation and semantic green only",()=>{
+test("seller workspace finishes on cream surfaces with forest navigation and gold accents",()=>{
   const css=source("app/globals.css");
-  const final=css.slice(css.indexOf("/* Seller workspace: plum navigation"));
-  assert.match(final,/--dash-background:#f6f4f8/);
-  assert.match(final,/--dash-surface:#fff/);
+  const final=css.slice(css.indexOf("/* The authenticated seller dashboard retained a separate violet theme. */"));
+  assert.match(final,/--dash-background:#f8f2e6/);
+  assert.match(final,/--dash-surface:#fffdf8/);
+  assert.match(final,/--dash-primary:#95690d/);
   assert.match(final,/\.premiumSellerDashboard \.premiumDashboardMain\{background:var\(--dash-background\)/);
-  assert.match(final,/\.premiumSellerDashboard \.sellerControlSection[^}]*background:#fff/);
-  assert.match(final,/\.premiumSellerDashboard \.sellerControlField input[^}]*background:#faf9fb[^}]*color:#241a30/);
-  assert.match(final,/\.premiumDashboardSidebar\.isSeller\{background:linear-gradient\(180deg,#2b0d52,#4c1d95\)/);
-  assert.doesNotMatch(final,/#063d2d|#052f24|#087756|#20162a|#171021/);
+  assert.match(final,/\.premiumSellerDashboard \.sellerControlSection[^}]*background:var\(--dash-surface\)/);
+  assert.match(final,/\.premiumSellerDashboard \.sellerControlField input[^}]*background:#fffdf8[^}]*color:var\(--dash-text\)/);
+  assert.match(final,/\.premiumSellerDashboard \.sellerOverviewHero\{background:[^}]*var\(--todijo-forest-deep\)/);
+  assert.match(css,/\.premiumDashboardSidebar,\.premiumDashboardSidebar\.isSeller\{background:linear-gradient\(180deg,var\(--todijo-forest-deep\),var\(--todijo-forest\)\)/);
+  assert.doesNotMatch(final,/#6d28d9|#7c3aed|#4c1d95|#f0e9ff/);
 });
 
 test("three original optimized authentication artworks are integrated without changing auth contracts",()=>{

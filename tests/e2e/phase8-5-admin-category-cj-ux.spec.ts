@@ -4,7 +4,7 @@ import { dismissCookieConsent } from "./helpers";
 test("desktop categories open only on click and close outside or with Escape", async ({ page }) => {
   await page.goto("/fr/e2e-ux?view=home", { waitUntil: "domcontentloaded" });
   await dismissCookieConsent(page);
-  const category = page.locator(".marketQuickCategory").first();
+  const category = page.locator(".marketHomepageAllCategories");
   await category.hover();
   await expect(page.locator("#market-category-mega-menu")).toHaveCount(0);
   await expect(category).toHaveAttribute("aria-expanded", "false");
@@ -57,10 +57,11 @@ for (const width of [1440, 768, 390, 320]) {
     await expect(page.locator(".heroProduct-large")).toHaveCount(1);
     await expect(page.locator(".heroProduct-medium")).toHaveCount(1);
     await expect(page.locator(".heroProduct-small")).toHaveCount(4);
-    await expect(page.locator(".discoveryProductGrid .discoveryCard")).toHaveCount(18);
+    await expect(page.locator(".discoveryProductGrid .discoveryCard")).toHaveCount(4);
+    const ids = await page.locator(".discoveryProductGrid .discoveryCard").evaluateAll(cards => cards.map(card => card.querySelector("a[href*='/product/']")?.getAttribute("href")));
+    expect(new Set(ids).size).toBe(ids.length);
     await expect(page.locator(".homepageTieredProducts")).toHaveCount(0);
-    await expect(page.locator(".featuredStores")).toHaveCount(1);
-    if (width > 860) await expect(page.locator(".featuredStores")).toBeVisible();
+    await expect(page.locator(".featuredStores")).toHaveCount(0);
     expect(await page.locator("html").evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   });
 }

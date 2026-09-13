@@ -3,6 +3,7 @@ import { collectRuntimeErrors, dismissCookieConsent } from "./helpers";
 import { SignJWT } from "jose";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { PrismaClient } from "@prisma/client";
 import { DESKTOP_CATEGORY_TAXONOMY, subcategoryId } from "../../lib/desktop-category-taxonomy";
 import { localizedCategoryLeafLabel } from "../../lib/category-tree-localization";
 import { categoryNavigationMessages } from "../../i18n/category-navigation";
@@ -31,6 +32,14 @@ test.beforeAll(async () => {
     ('news-en-e2e','news-localization-e2e','en','English translated news','English translated body',true,NOW(),NOW()),
     ('news-ar-e2e','news-localization-e2e','ar','خبر مترجم','محتوى مترجم',true,NOW(),NOW())
     ON CONFLICT ("articleId","locale") DO UPDATE SET "title"=EXCLUDED."title", "content"=EXCLUDED."content", "automatic"=true, "updatedAt"=NOW();`);
+  const db = new PrismaClient();
+  try {
+    const fixture = await db.newsArticle.findFirst({ where: { id: "news-localization-e2e", published: true, publishedAt: { lte: new Date() } }, include: { translations: true } });
+    expect(fixture?.published).toBe(true);
+    expect(fixture?.translations).toHaveLength(2);
+  } finally {
+    await db.$disconnect();
+  }
 });
 
 test.afterAll(async () => {
@@ -176,11 +185,12 @@ test("canonical filter dock opens facets, preserves selection, and updates the U
   expect(searchUrl.searchParams.get("availability")).toBe("in-stock");
 });
 
-test("homepage presents the localized stores CTA to the public directory", async ({ page }) => {
+test("homepage hides public store discovery below the eligible-store threshold", async ({ page }) => {
   await page.goto("/en/e2e-ux?view=home");
-  const storesCta = page.getByRole("link", { name: "Stores to discover" }).last();
-  await expect(storesCta).toBeVisible();
-  await expect(storesCta).toHaveAttribute("href", "/en/store");
+  await expect(page.getByRole("link", { name: "Stores to discover" })).toHaveCount(0);
+  const sellerCta = page.getByRole("region", { name: "Open your store and grow your business" });
+  await expect(sellerCta.getByRole("link", { name: "Start selling" })).toHaveAttribute("href", "/en/sell");
+  await expect(sellerCta.getByRole("link", { name: "Explore the seller space" })).toHaveCount(0);
 });
 
 test("marketplace routes render one shared header with core navigation", async ({ page }) => {
@@ -190,10 +200,11 @@ test("marketplace routes render one shared header with core navigation", async (
   const homeHeader = page.locator("header[data-marketplace-header]");
   await expect(homeHeader).toBeVisible();
   await expect(homeHeader.getByRole("link", { name: "Todijo" })).toBeVisible();
-  await expect(homeHeader.getByRole("link", { name: "Messages" })).toBeVisible();
   await expect(homeHeader.getByRole("link", { name: "My favorites" })).toBeVisible();
-  await expect(homeHeader.getByRole("link", { name: "Cart" })).toBeVisible();
-  await expect(homeHeader.getByRole("combobox")).toBeVisible();
+  await expect(homeHeader.getByRole("link", { name: /Cart/ })).toBeVisible();
+  await expect(homeHeader.getByRole("link", { name: /Header Buyer/ })).toHaveAttribute("href", "/en/dashboard");
+  await expect(homeHeader.getByRole("combobox", { name: "Language" })).toBeVisible();
+  await expect(homeHeader.getByRole("button", { name: /Change country and currency/ })).toBeVisible();
 
   await page.goto("/en/cart");
   await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
@@ -201,7 +212,7 @@ test("marketplace routes render one shared header with core navigation", async (
   await expect(page.locator("header[data-marketplace-header]")).toBeVisible();
 });
 
-test("desktop category rail opens its canonical menu and preserves localized routing", async ({ page }) => {
+test("desktop category navigation opens its canonical menu and preserves localized routing", async ({ page }) => {
   const locale = "en";
   const localizedCategories = categoryNavigationMessages[locale];
   const localizedCategoryLabel = (id: string) => {
@@ -212,23 +223,23 @@ test("desktop category rail opens its canonical menu and preserves localized rou
   await page.route(/\/en\/search\?/, (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Search</title>" }));
   await page.goto("/en/e2e-ux?view=home");
   await dismissCookieConsent(page);
-  const rail = page.getByRole("navigation", { name: "Categories" });
-  await expect(rail).toBeVisible();
-  const parentControls = rail.locator("button.marketQuickCategory:not(.marketQuickMore)");
-  await expect(parentControls).toHaveCount(DESKTOP_CATEGORY_TAXONOMY.length);
-  for (const canonicalCategory of DESKTOP_CATEGORY_TAXONOMY) {
-    await expect(rail.getByRole("button", { name: localizedCategoryLabel(canonicalCategory.id), exact: true })).toBeVisible();
-  }
+  const navigation = page.getByRole("navigation", { name: "Marketplace navigation" });
+  const trigger = navigation.getByRole("button", { name: "All categories" });
+  await expect(trigger).toBeVisible();
   const firstCategory = DESKTOP_CATEGORY_TAXONOMY[0];
   const firstVisibleLabel = localizedCategoryLabel(firstCategory.id);
-  const category = rail.getByRole("button", { name: firstVisibleLabel, exact: true });
-  await category.hover();
+  await trigger.hover();
   await expect(page.locator("#market-category-mega-menu")).toHaveCount(0);
-  await expect(category).toHaveAttribute("aria-expanded", "false");
-  await category.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await trigger.click();
   const menu = page.getByRole("region", { name: firstVisibleLabel });
   await expect(menu).toBeVisible();
-  await expect(category).toHaveAttribute("aria-expanded", "true");
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  const parentControls = menu.locator(".marketQuickMegaSidebar button");
+  await expect(parentControls).toHaveCount(DESKTOP_CATEGORY_TAXONOMY.length);
+  for (const canonicalCategory of DESKTOP_CATEGORY_TAXONOMY) {
+    await expect(menu.getByRole("button", { name: localizedCategoryLabel(canonicalCategory.id), exact: true })).toBeVisible();
+  }
   await expect(menu.getByRole("link", { name: "View all", exact: true })).toHaveAttribute("href", `/en/search?category=${encodeURIComponent(firstCategory.label)}`);
   const secondCategory = DESKTOP_CATEGORY_TAXONOMY[1];
   const secondVisibleLabel = localizedCategoryLabel(secondCategory.id);
@@ -237,10 +248,11 @@ test("desktop category rail opens its canonical menu and preserves localized rou
   await expect(secondMenu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#market-category-mega-menu")).toHaveCount(0);
-  await category.click();
+  await trigger.click();
   await page.locator(".discoveryHero").click({ position: { x: 10, y: 10 } });
   await expect(page.locator("#market-category-mega-menu")).toHaveCount(0);
-  const secondParent = rail.getByRole("button", { name: secondVisibleLabel, exact: true });
+  await trigger.click();
+  const secondParent = page.locator("#market-category-mega-menu").getByRole("button", { name: secondVisibleLabel, exact: true });
   await secondParent.click();
   const reopenedSecondMenu = page.getByRole("region", { name: secondVisibleLabel });
   const firstChildGroup = secondCategory.groups[0];
@@ -254,15 +266,12 @@ test("desktop category rail opens its canonical menu and preserves localized rou
   expect(navigated.pathname).toBe(`/${locale}/search`);
   expect(navigated.searchParams.get("category")).toBe(canonicalChildId);
   await page.goto("/en/e2e-ux?view=home");
-  await expect(page.locator(".categoryStripSection")).toBeHidden();
-  await expect(page.locator(".categoryShowcase")).toBeHidden();
-  const more = page.getByRole("button", { name: "Categories", exact: true });
-  await more.focus();
-  await expect(more).toHaveAttribute("aria-expanded", "false");
-  await more.click();
-  await expect(more).toHaveAttribute("aria-expanded", "true");
-  await more.click();
-  await expect(more).toHaveAttribute("aria-expanded", "false");
+  const reopenedTrigger = page.getByRole("navigation", { name: "Marketplace navigation" }).getByRole("button", { name: "All categories" });
+  await expect(reopenedTrigger).toHaveAttribute("aria-expanded", "false");
+  await reopenedTrigger.click();
+  await expect(reopenedTrigger).toHaveAttribute("aria-expanded", "true");
+  await reopenedTrigger.click();
+  await expect(reopenedTrigger).toHaveAttribute("aria-expanded", "false");
 });
 
 test("favorites require a database-backed session and reject a JWT-only identity", async ({ page }) => {

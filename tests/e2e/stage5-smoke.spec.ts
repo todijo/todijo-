@@ -16,8 +16,10 @@ test("buyer selects an exact variant, adds it to cart, and reaches safe checkout
   await expect(page.getByText("Color: Blue · Size: M")).toBeVisible();
   const cart = await page.evaluate(() => JSON.parse(localStorage.getItem("todijo-cart-v1") ?? "[]"));
   expect(cart).toEqual([expect.objectContaining({ id: "stage5-variant-product", variantId: "variant-blue-m", quantity: 1 })]);
-  await page.getByRole("link", { name: "Proceed to checkout" }).click();
-  await expect(page).toHaveURL(/\/en\/checkout$/);
+  await Promise.all([
+    page.waitForURL(/\/en\/checkout$/),
+    page.getByRole("link", { name: "Proceed to checkout" }).click(),
+  ]);
   await expect(page.getByRole("heading", { name: "Complete my order" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Add a shipping address" })).toBeVisible();
 });
