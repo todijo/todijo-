@@ -12,22 +12,23 @@ const read = (...parts: string[]) => fs.readFileSync(path.join(process.cwd(), ..
 
 test("admin entry is locale-safe and login cannot loop back to login", () => {
   for (const locale of ["en", "fr", "ar", "ku"] as const) {
-    assert.equal(adminEntryPath(locale), `/${locale}/admin`);
-    assert.equal(postLoginDestination("ADMIN", `/${locale}/login`, locale), `/${locale}/admin`);
+    assert.equal(adminEntryPath(locale), `/${locale}/adm-barewbar-182203`);
+    assert.equal(postLoginDestination("ADMIN", `/${locale}/login`, locale), `/${locale}/adm-barewbar-182203`);
   }
-  const source = read("app", "admin", "page.tsx");
-  assert.match(source, /login\?next=\/\$\{locale\}\/admin/);
-  assert.match(source, /redirect\(`\/\$\{locale\}\/adm-barewbar-182203`\)/);
-  assert.doesNotMatch(source, /redirect\(`\/\$\{locale\}\/login`\);\s*redirect/);
+  assert.equal(fs.existsSync(path.join(process.cwd(), "app", "admin", "page.tsx")), false);
 });
 
-test("middleware canonicalizes /admin once and rewrites localized admin without a loop", () => {
-  const entry = middleware(new NextRequest("https://todijo.test/admin", { headers: { "accept-language": "fr" } }));
-  assert.equal(entry.status, 307);
-  assert.equal(entry.headers.get("location"), "https://todijo.test/fr/admin");
-  const localized = middleware(new NextRequest("https://todijo.test/fr/admin"));
-  assert.equal(localized.status, 200);
-  assert.equal(new URL(localized.headers.get("x-middleware-rewrite")!).pathname, "/admin");
+test("obvious admin entry aliases return 404 without revealing the private route", () => {
+  for (const route of ["/admin", "/fr/admin", "/admin/login", "/fr/admin/login"]) {
+    const response = middleware(new NextRequest(`https://todijo.test${route}`));
+    assert.equal(response.status, 404);
+    assert.equal(response.headers.get("location"), null);
+    assert.equal(response.headers.get("x-middleware-rewrite"), null);
+    assert.doesNotMatch(String(response.body), /adm-barewbar-182203/);
+  }
+  const privateEntry = middleware(new NextRequest("https://todijo.test/fr/adm-barewbar-182203"));
+  assert.equal(privateEntry.status, 200);
+  assert.equal(new URL(privateEntry.headers.get("x-middleware-rewrite")!).pathname, "/adm-barewbar-182203");
 });
 
 test("admin entry and moderation keep the database role as authority", async () => {
@@ -39,7 +40,7 @@ test("admin entry and moderation keep the database role as authority", async () 
   }
   const adminDb = { user: { findUnique: async () => ({ id: "admin", role: "ADMIN" }) } } as unknown as Db;
   assert.deepEqual(await requireAdmin(adminDb, { userId: "admin", role: "ADMIN" }), { id: "admin", role: "ADMIN" });
-  const entry = read("app", "admin", "page.tsx");
+  const entry = read("app", "adm-barewbar-182203", "page.tsx");
   const moderation = read("app", "adm-barewbar-182203", "moderation", "page.tsx");
   const moderationApi = read("app", "api", "admin", "moderation", "product-reports", "[reportId]", "route.ts");
   for (const source of [entry, moderation, moderationApi]) assert.match(source, /requireAdmin\(prisma, session\)/);

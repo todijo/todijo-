@@ -39,7 +39,7 @@ test("Turnstile verification fails closed for missing, rejected, malformed, and 
   assert.equal(await verifyTurnstileTokenWith("token", "secret", async () => { throw new DOMException("timeout", "AbortError"); }), "failed");
 });
 
-test("buyer and seller login destinations are localized and reject open redirects while admin routing is unchanged", () => {
+test("buyer and seller login destinations are localized and reject open redirects while admin uses the private route", () => {
   assert.equal(safeLoginDestination(null, "fr"), "/fr");
   assert.equal(safeLoginDestination("/messages?tab=all", "ku"), "/ku/messages?tab=all");
   assert.equal(safeLoginDestination("/fr/account/orders#latest", "de"), "/de/account/orders#latest");
@@ -47,8 +47,8 @@ test("buyer and seller login destinations are localized and reject open redirect
   for (const destination of ["/%2F%2Fevil.test", "/%5C%5Cevil.test", "/bad%zz", "/messages\u0000evil"]) assert.equal(safeLoginDestination(destination, "fr"), "/fr");
   assert.equal(postLoginDestination("CUSTOMER", null, "fr"), "/fr");
   assert.equal(postLoginDestination("SELLER", null, "ku"), "/ku");
-  assert.equal(adminEntryPath("fr"), "/fr/admin");
-  assert.equal(postLoginDestination("ADMIN", "/messages", "fr"), "/fr/admin");
+  assert.equal(adminEntryPath("fr"), "/fr/adm-barewbar-182203");
+  assert.equal(postLoginDestination("ADMIN", "/messages", "fr"), "/fr/adm-barewbar-182203");
   assert.equal(localizedHome(localeFromReferer("https://todijo.test/fr/dashboard")), "/fr");
   assert.equal(localizedHome(localeFromReferer("https://todijo.test/ku/seller/orders")), "/ku");
   assert.equal(localizedHome(localeFromReferer("not a URL")), "/en");
