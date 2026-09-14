@@ -12,7 +12,7 @@ export function EmptyState({ icon: Icon, title, description, action, secondary }
 export function PageSkeleton({ variant = "cards", label = "Loading" }: { variant?: "cards" | "list" | "detail" | "form"; label?: string }) {
   const count = variant === "detail" ? 2 : variant === "form" ? 4 : 6;
   return <main className={`pageSkeleton is-${variant}`} role="status" aria-live="polite" aria-busy="true">
-    <span className="srOnly">{label}</span><div className="pageSkeletonHeader"><i/><i/></div>
+    <span className="srOnly">{label}</span><div className="pageSkeletonHeader"><div className="pageSkeletonBrand" aria-hidden="true"><span>T</span><strong>Todijo</strong><small>{label}</small></div><i/></div>
     <section>{Array.from({ length: count }, (_, index) => <article key={index}><i/><i/><i/></article>)}</section>
   </main>;
 }
