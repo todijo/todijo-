@@ -2090,3 +2090,10 @@ button,a,input,select,textarea{transition:border-color .2s ease,background-color
 .premiumNotFoundPrimary{color:#fff!important;background:linear-gradient(165deg,#cfaa4d 0%,#ad7717 45%,#83570e 100%);box-shadow:inset 0 1px #fff7,0 9px 20px #81570e35}
 .premiumNotFoundSecondary{color:#073b2d!important;border:1px solid #b8954d;background:#fffdf8}
 @media(max-width:600px){.premiumNotFoundShell{gap:26px}.premiumNotFoundCard{border-radius:24px;padding:44px 18px}.premiumNotFoundMark{width:62px;height:62px;margin:-10px auto 22px}.premiumNotFoundActions{flex-direction:column}.premiumNotFoundActions a{width:100%}}
+/* Global scroll control: clear of mobile navigation and product purchase actions. */
+.backToTop{position:fixed;z-index:70;inset-inline-end:max(24px,env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom));width:46px;height:46px;padding:0;border:1px solid #c99b38;border-radius:50%;background:linear-gradient(145deg,#174f3e,#073b2d 72%);color:#f7df9d;box-shadow:0 5px 18px rgba(5,43,32,.2),inset 0 1px rgba(255,255,255,.16);display:grid;place-items:center;cursor:pointer;transition:background-color .2s,transform .2s,box-shadow .2s}
+.backToTop:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(5,43,32,.25),inset 0 1px rgba(255,255,255,.16)}
+.backToTop:focus-visible{outline:3px solid #a87912;outline-offset:3px}
+@media(max-width:860px){.backToTop{inset-inline-end:max(16px,env(safe-area-inset-right));bottom:calc(82px + env(safe-area-inset-bottom));width:44px;height:44px}body:has(.mobilePurchaseBar) .backToTop{bottom:calc(158px + env(safe-area-inset-bottom))}}
+@media(max-width:780px){body:has(.premiumDashboardMobileNav) .backToTop{bottom:calc(88px + env(safe-area-inset-bottom))}}
+@media(prefers-reduced-motion:reduce){.backToTop{transition:none}.backToTop:hover{transform:none}}

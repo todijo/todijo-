@@ -436,3 +436,20 @@ test("product lower section is compact and report dialog is accessible", async (
   await expect(dialog).toHaveCount(0);
   await expect(reportTrigger).toBeFocused();
 });
+
+test("seller dashboard back-to-top clears mobile navigation and works from the keyboard", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/fr/e2e-ux?view=premium-seller-dashboard");
+  await dismissCookieConsent(page);
+  const button = page.getByRole("button", { name: "Retour en haut" });
+  await expect(button).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await expect(button).toBeVisible();
+  const buttonBox = await button.boundingBox();
+  const navBox = await page.locator(".premiumDashboardMobileNav").boundingBox();
+  expect(buttonBox && navBox && buttonBox.y + buttonBox.height < navBox.y).toBeTruthy();
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(button).toHaveCount(0);
+});
