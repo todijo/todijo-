@@ -15,7 +15,7 @@ const assetlinks = JSON.parse(read("public/.well-known/assetlinks.json"));
 const assetlinksTemplate = read("android/assetlinks.template.json");
 
 test("manifest is scoped, standalone, branded and installable", () => {
-  for (const contract of ['id: "/"', 'start_url: "/?source=pwa"', 'scope: "/"', 'display: "standalone"', 'purpose: "maskable"', 'theme_color: "#16074c"']) assert.ok(manifest.includes(contract), contract);
+  for (const contract of ['id: "/"', 'start_url: "/?source=pwa"', 'scope: "/"', 'display: "standalone"', 'purpose: "maskable"', 'theme_color: "#073b2d"']) assert.ok(manifest.includes(contract), contract);
 });
 
 test("production service worker registration is scope-bound and bypasses HTTP cache", () => {
@@ -25,7 +25,7 @@ test("production service worker registration is scope-bound and bypasses HTTP ca
 });
 
 test("service worker versions caches and removes obsolete caches", () => {
-  assert.match(worker, /CACHE_VERSION = "mobile-brand-v3"/);
+  assert.match(worker, /CACHE_VERSION = "mobile-brand-v4"/);
   assert.match(worker, /key\.startsWith\(CACHE_PREFIX\)/);
   assert.match(worker, /caches\.delete\(key\)/);
   assert.doesNotMatch(worker, /skipWaiting/);

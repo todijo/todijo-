@@ -5,6 +5,10 @@ import sharp from "sharp";
 const source = await readFile(new URL("../app/icon.svg", import.meta.url));
 await mkdir(new URL("../public/", import.meta.url), { recursive: true });
 await sharp(source).resize(180, 180).png().toFile(fileURLToPath(new URL("../app/apple-icon.png", import.meta.url)));
+await sharp(source).resize(180, 180).png().toFile(fileURLToPath(new URL("../public/apple-icon.png", import.meta.url)));
+await sharp(source).resize(192, 192).png().toFile(fileURLToPath(new URL("../public/icon-192.png", import.meta.url)));
+await sharp(source).resize(512, 512).png().toFile(fileURLToPath(new URL("../public/icon-512.png", import.meta.url)));
+await sharp(source).resize(512, 512).png().toFile(fileURLToPath(new URL("../public/icon-maskable-512.png", import.meta.url)));
 
 const faviconPng = await sharp(source).resize(64, 64).png().toBuffer();
 const header = Buffer.alloc(22);

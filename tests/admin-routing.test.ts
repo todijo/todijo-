@@ -18,14 +18,15 @@ test("admin entry is locale-safe and login cannot loop back to login", () => {
   assert.equal(fs.existsSync(path.join(process.cwd(), "app", "admin", "page.tsx")), false);
 });
 
-test("obvious admin entry aliases return 404 without revealing the private route", () => {
+test("obvious admin entry aliases reach the same not-found route without redirecting", () => {
   for (const route of ["/admin", "/fr/admin", "/admin/login", "/fr/admin/login"]) {
     const response = middleware(new NextRequest(`https://todijo.test${route}`));
     assert.equal(response.status, 404);
     assert.equal(response.headers.get("location"), null);
-    assert.equal(response.headers.get("x-middleware-rewrite"), null);
-    assert.doesNotMatch(String(response.body), /adm-barewbar-182203/);
+    assert.equal(new URL(response.headers.get("x-middleware-rewrite")!).pathname, route.endsWith("/login") ? "/admin/login" : "/admin");
   }
+  const alias = read("app", "admin", "[[...slug]]", "page.tsx");
+  assert.match(alias, /notFound\(\)/);
   const privateEntry = middleware(new NextRequest("https://todijo.test/fr/adm-barewbar-182203"));
   assert.equal(privateEntry.status, 200);
   assert.equal(new URL(privateEntry.headers.get("x-middleware-rewrite")!).pathname, "/adm-barewbar-182203");

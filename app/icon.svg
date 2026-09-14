@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2b0870"/><stop offset="1" stop-color="#6d28d9"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#e9ddff"/></linearGradient></defs>
-  <rect width="512" height="512" rx="112" fill="url(#b)"/>
-  <path d="M256 92C169 94 104 143 75 220c61-26 116-15 181 23V92Z" fill="url(#c)"/>
-  <path d="M256 92c-38 21-58 74-62 139 23-5 44-1 62 12 18-13 39-17 62-12-4-65-24-118-62-139Z" fill="#fff"/>
-  <path d="M256 92c87 2 152 51 181 128-61-26-116-15-181 23V92Z" fill="url(#c)"/>
-  <circle cx="256" cy="84" r="16" fill="#22c8df" stroke="#fff" stroke-width="5"/>
-  <path d="M256 239v174h60" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="cream" x2="1" y2="1"><stop stop-color="#fffdf6"/><stop offset="1" stop-color="#f2e8d4"/></linearGradient>
+    <linearGradient id="green" x2="1" y2="1"><stop stop-color="#126348"/><stop offset=".55" stop-color="#074331"/><stop offset="1" stop-color="#00291f"/></linearGradient>
+    <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#f6db83"/><stop offset=".45" stop-color="#b78321"/><stop offset="1" stop-color="#7f530e"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#cream)"/>
+  <rect x="13" y="13" width="486" height="486" rx="108" fill="none" stroke="url(#gold)" stroke-width="14"/>
+  <path d="M84 250C97 158 162 105 256 105s159 53 172 145c-35-27-68-27-101 0-24-25-47-25-71 0-24-25-47-25-71 0-33-27-66-27-101 0Z" fill="url(#green)" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M185 250c8-74 30-121 71-145m71 145c-8-74-30-121-71-145" fill="none" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="256" cy="95" r="16" fill="url(#green)" stroke="url(#gold)" stroke-width="7"/>
+  <path d="M256 252v150c0 25 40 25 40-1" fill="none" stroke="url(#green)" stroke-width="27" stroke-linecap="round"/>
 </svg>

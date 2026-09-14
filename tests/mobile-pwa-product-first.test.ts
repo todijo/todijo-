@@ -43,9 +43,9 @@ test("bottom navigation remains exactly five app-safe destinations",()=>{
   assert.match(source("app/globals.css"),/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
 });
 
-test("current PWA metadata references only versioned purple Todijo launcher assets",()=>{
+test("current PWA metadata references only versioned premium Todijo launcher assets",()=>{
   const manifest=source("app/manifest.ts"),worker=source("public/sw.js"),layout=source("app/layout.tsx");
-  for(const icon of ["icon-192.png?v=3","icon-512.png?v=3","icon-maskable-512.png?v=3","apple-icon.png?v=3"])assert.ok(manifest.includes(icon),icon);
+  for(const icon of ["icon-192.png?v=4","icon-512.png?v=4","icon-maskable-512.png?v=4","apple-icon.png?v=4"])assert.ok(manifest.includes(icon),icon);
   for(const icon of ["public/icon-192.png","public/icon-512.png","public/icon-maskable-512.png","public/apple-icon.png"])assert.ok(existsSync(icon),icon);
   assert.doesNotMatch(layout,/TodijoLaunchSplash/);
   assert.doesNotMatch(manifest+worker,/#0f8f65|#087653|green-shopping-bag/i);

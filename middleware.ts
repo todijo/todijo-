@@ -31,7 +31,15 @@ export function middleware(request: NextRequest) {
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const pathLocale = segments[0];
   const routeSegments = isLocale(pathLocale) ? segments.slice(1) : segments;
-  if (routeSegments[0] === "admin") return new NextResponse("Not Found", { status: 404 });
+  if (routeSegments[0] === "admin") {
+    const locale = isLocale(pathLocale) ? pathLocale : detectLocale(request);
+    const url = request.nextUrl.clone();
+    url.pathname = `/${routeSegments.join("/")}`;
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-todijo-locale", locale);
+    requestHeaders.set("x-todijo-pathname", `/${locale}${url.pathname}`);
+    return NextResponse.rewrite(url, { status: 404, request: { headers: requestHeaders } });
+  }
   const localRewriteLocale = request.nextUrl.searchParams.get("__todijo_local_locale");
   if (process.env.NODE_ENV !== "production" && isLocale(localRewriteLocale)) {
     const requestHeaders = new Headers(request.headers);
