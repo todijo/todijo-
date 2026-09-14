@@ -10,6 +10,7 @@ import { WishlistProvider } from "@/components/WishlistProvider";
 import CookieConsent from "@/components/CookieConsent";
 import BuyerMarketProvider from "@/components/BuyerMarketProvider";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import BackToTop from "@/components/BackToTop";
 
 export const viewport: Viewport = {
   themeColor: "#073b2d",
@@ -44,7 +45,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
-      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
+      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
     </html>
   );
 }
