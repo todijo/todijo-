@@ -7,15 +7,15 @@ const messages = ["en", "fr", "de", "es", "it", "nl", "pt", "tr", "ru", "ar", "f
 test("dashboard actions remain localized and avoid unavailable buyer placeholders", () => {
   const ui = readFileSync("components/DashboardUI.tsx", "utf8");
   const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
-  const productsPage = readFileSync("app/seller/products/page.tsx", "utf8");
+  const productsList = readFileSync("app/seller/products/SellerProductsList.tsx", "utf8");
 
   assert.match(ui, /notificationHref: string/);
   assert.match(ui, /href=\{notificationHref\}/);
   assert.match(dashboardPage, /notificationHref=\{`\/\$\{locale\}\/notifications`\}/);
   assert.doesNotMatch(dashboardPage, /dashboard#favorites|dashboard#addresses|dashboard#payments/);
   assert.match(dashboardPage, /label: common\("cart"\), href: paths\.cart/);
-  assert.match(productsPage, /`\/\$\{locale\}\/seller\/products\/\$\{product\.id\}\/edit`/);
-  assert.match(productsPage, /`\/\$\{locale\}\/product\/\$\{product\.id\}`/);
+  assert.match(productsList, /`\/\$\{locale\}\/seller\/products\/\$\{product\.id\}\/edit`/);
+  assert.match(productsList, /`\/\$\{locale\}\/product\/\$\{product\.id\}`/);
 });
 
 test("seller product actions keep the existing subscription gate", () => {
@@ -41,7 +41,7 @@ test("dashboard polish preserves semantic loading and mobile touch targets", () 
 });
 
 test("seller product titles keep semantic foreground contrast on light cards", () => {
-  const page = readFileSync("app/seller/products/page.tsx", "utf8");
+  const page = readFileSync("app/seller/products/SellerProductsList.tsx", "utf8");
   const css = readFileSync("app/globals.css", "utf8");
   assert.match(page, /className="sellerProductCard"[\s\S]*?<h2>\{product\.name\}<\/h2>/);
   assert.match(page, /product\.status\s*===\s*"PUBLISHED"[\s\S]*?statusDraft/);
