@@ -21,9 +21,9 @@ test("minimum price uses only complete active in-stock purchasable variants",()=
 test("launch branding relies on the native PWA splash without a delayed JavaScript overlay",()=>{
   const layout=source("app/layout.tsx"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
   assert.doesNotMatch(layout,/TodijoLaunchSplash/);
-  assert.match(manifest,/background_color: "#100331"/);
-  assert.match(manifest,/icon-maskable-512\.png\?v=3/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v3"/);
+  assert.match(manifest,/background_color: "#fffaf0"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=4/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v4"/);
 });
 
 test("umbrella identity, exact default title and install icons are wired",()=>{
