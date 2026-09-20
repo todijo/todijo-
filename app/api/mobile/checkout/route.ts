@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { CheckoutError, createCheckout } from "@/lib/payments";
+import { MobileSessionError, readMobileSession } from "@/lib/mobile-session";
+import { configuredStripeMode } from "@/lib/stripe";
+import { defaultLocale, isLocale } from "@/i18n/config";
+
+type MobileCheckoutBody={requestId?:string;shoppingCountry?:unknown;buyerCurrency?:unknown;locale?:unknown;items?:Array<{productId:string;quantity:number;selectedColor?:string|null;selectedSize?:string|null;variantId?:string|null;displayedUnitPrice?:string|number|null;displayedCurrency?:string|null}>};
+
+export async function POST(request:Request){
+  try{
+    const session=await readMobileSession(request);
+    const body=await request.json() as MobileCheckoutBody;
+    const requestedLocale=typeof body.locale==="string"?body.locale:null;
+    const locale=isLocale(requestedLocale)?requestedLocale:defaultLocale;
+    const checkout=await createCheckout(prisma,session.userId,body.requestId??"",body.items??[],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode(),returnLocale:locale});
+    return NextResponse.json({url:checkout.url,orderId:checkout.orderId,reused:checkout.reused},{headers:{"Cache-Control":"no-store"}});
+  }catch(error){
+    if(error instanceof MobileSessionError)return NextResponse.json({error:error.code},{status:error.status});
+    const status=error instanceof CheckoutError?error.status:500;
+    const code=error instanceof CheckoutError?error.message:"CHECKOUT_FAILED";
+    return NextResponse.json({error:code,code,...(error instanceof CheckoutError&&error.details?{details:error.details}:{})},{status});
+  }
+}
