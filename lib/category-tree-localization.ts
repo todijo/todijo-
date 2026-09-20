@@ -1,11 +1,15 @@
 import { isLocale } from "../i18n/config";
 import { CATEGORY_LABELS, categoryGroupTranslationKey, categoryLeafTranslationKey, type TranslatedCategoryLocale } from "./category-locales";
+import { frCategoryLabelOverrides } from "./category-locales/fr";
 import { DESKTOP_CATEGORY_TAXONOMY, subcategoryId } from "./desktop-category-taxonomy";
 
 export type CategoryTranslationSource = "canonical-fr" | "explicit" | "unknown-locale" | "unknown-node";
 
 function translatedLabel(locale: string, key: string, canonicalLabel: string): [string, CategoryTranslationSource] {
-  if (locale === "fr") return [canonicalLabel, "canonical-fr"];
+  if (locale === "fr") {
+    const label = frCategoryLabelOverrides[key];
+    return label ? [label, "explicit"] : [canonicalLabel, "canonical-fr"];
+  }
   if (!isLocale(locale)) return [canonicalLabel, "unknown-locale"];
   const label = CATEGORY_LABELS[locale as TranslatedCategoryLocale][key];
   return label ? [label, "explicit"] : [canonicalLabel, "unknown-node"];

@@ -1,0 +1,10 @@
+export const TODIJO_LOCALES=["en","fr","ar","ku","tr","de","es","it","nl","zh","fa","hi","pt","ru"];
+export const TODIJO_RTL_LOCALES=["ar","fa","ku"];
+export const MARKETPLACE_SORTS=["newest","price-asc","price-desc","best-selling"];
+export const MOBILE_REGISTRATION_CALLBACK="todijo://auth/registration";
+export const AUTH_ERROR_CODES=["INVALID_CREDENTIALS","ACCOUNT_BLOCKED","ACCOUNT_DEACTIVATED","EMAIL_NOT_VERIFIED","RATE_LIMITED","SESSION_EXPIRED","INVALID_REFRESH_TOKEN","REGISTRATION_ATTEMPT_EXPIRED","REGISTRATION_PROOF_INVALID","REGISTRATION_PROOF_EXPIRED"];
+export const ORDER_PUBLIC_STATUSES=["PENDING","PAID","PROCESSING","SHIPPED","DELIVERED","CANCELLED","REFUNDED"];
+export const REFUND_PUBLIC_STATUSES=["PENDING","SELLER_APPROVED","SELLER_REJECTED","ADMIN_APPROVED","ADMIN_REJECTED"];
+export const RETURN_PUBLIC_STATUSES=["PENDING","SELLER_APPROVED","SELLER_REJECTED","ESCALATED","RESOLVED"];
+export const isTodijoLocale=value=>TODIJO_LOCALES.includes(value);
+export const isTodijoRtlLocale=value=>TODIJO_RTL_LOCALES.includes(value);
