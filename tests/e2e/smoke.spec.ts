@@ -360,6 +360,7 @@ test("pre-purchase setting copy and checkbox render with the existing field", as
 test("cart checkout and Stripe refresh controls keep readable state palettes", async ({ page }) => {
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: false } }));
   await page.addInitScript(() => localStorage.setItem("todijo-cart-v1", JSON.stringify([{ id: "cart-product", name: "Cart product", price: 19, currency: "EUR", stock: 2, quantity: 1, lineKey: "cart-product::::" }])));
+  await page.route("**/api/products/buyer-pricing", (route) => route.fulfill({ json: { prices: [{ productId: "cart-product", variantId: null, amount: "19.00", currency: "EUR" }] } }));
   await page.goto("/en/cart");
   const checkout = page.getByRole("link", { name: "Proceed to checkout" });
   const checkoutColors = await checkout.evaluate((element) => { const style = getComputedStyle(element); return [style.color, style.backgroundColor]; });
