@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import { mobileOAuthHash, mobileOAuthPlatform, mobileOAuthProvider } from "../lib/mobile-oauth.js";
+
+const read=(path:string)=>readFileSync(path,"utf8");
+test("native OAuth accepts only fixed providers and platforms",()=>{assert.equal(mobileOAuthProvider("google"),"google");assert.equal(mobileOAuthProvider("other"),null);assert.equal(mobileOAuthPlatform("android"),"android");assert.equal(mobileOAuthPlatform("web"),null)});
+test("native OAuth stores hashes rather than raw state and exchange codes",()=>{const start=read("app/api/mobile/auth/oauth/attempt/route.ts"),callback=read("app/api/auth/social/[provider]/callback/route.ts");assert.match(start,/stateHash:\s*mobileOAuthHash\(state\)/);assert.match(callback,/exchangeCodeHash:mobileOAuthHash\(exchangeCode\)/);assert.doesNotMatch(start,/stateHash:\s*state[,}]/)});
+test("native OAuth exchange is state provider platform bound expiring and atomically one time",()=>{const route=read("app/api/mobile/auth/oauth/exchange/route.ts"),source=read("lib/mobile-oauth-exchange.ts");assert.match(route,/mobileOAuthProvider\(body\?\.provider\)/);assert.match(source,/provider:input\.provider/);assert.match(source,/platform:input\.platform/);assert.match(source,/stateHash:mobileOAuthHash\(input\.state\)/);assert.match(source,/exchangeCodeHash:mobileOAuthHash\(input\.code\)/);assert.match(source,/expiresAt:\{gt:now/);assert.match(source,/consumedAt:null/);assert.match(source,/updateMany/);assert.match(source,/claimed\.count!==1/);assert.match(source,/TransactionIsolationLevel\.Serializable/)});
+test("web OAuth cookie flow remains while native callback is fixed",()=>{const start=read("app/api/auth/social/[provider]/start/route.ts"),callback=read("app/api/auth/social/[provider]/callback/route.ts"),helper=read("lib/mobile-oauth.ts");assert.match(start,/todijo_oauth_/);assert.match(callback,/createSession/);assert.match(callback,/MOBILE_OAUTH_CALLBACK/);assert.match(helper,/todijo:\/\/auth\/oauth/)});
+test("hashes are stable and do not reveal raw values",()=>{assert.equal(mobileOAuthHash("state"),mobileOAuthHash("state"));assert.notEqual(mobileOAuthHash("state"),"state");assert.notEqual(mobileOAuthHash("state"),mobileOAuthHash("other"))});
