@@ -1,0 +1,8 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { chooseDefaultBuyerAddress, deleteBuyerAddress, validateAddressInput } from "@/lib/buyer-addresses";
+import { MobileSessionError, readMobileSession } from "@/lib/mobile-session";
+
+const fail=(error:unknown)=>error instanceof MobileSessionError?NextResponse.json({error:error.code},{status:error.status}):NextResponse.json({error:"ACCOUNT_UNAVAILABLE"},{status:500});
+export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){try{const session=await readMobileSession(request),{id}=await params,body=await request.json().catch(()=>null);if((body as {isDefault?:boolean}|null)?.isDefault===true){const address=await prisma.$transaction(tx=>chooseDefaultBuyerAddress(tx,session.userId,id));return address?NextResponse.json({address}):NextResponse.json({error:"NOT_FOUND"},{status:404})}const parsed=validateAddressInput(body);if(!parsed.ok)return NextResponse.json({error:parsed.code},{status:400});const result=await prisma.buyerShippingAddress.updateMany({where:{id,userId:session.userId},data:parsed.value});return result.count?NextResponse.json({ok:true}):NextResponse.json({error:"NOT_FOUND"},{status:404})}catch(error){return fail(error)}}
+export async function DELETE(request:Request,{params}:{params:Promise<{id:string}>}){try{const session=await readMobileSession(request),{id}=await params,deleted=await prisma.$transaction(tx=>deleteBuyerAddress(tx,session.userId,id));return deleted?NextResponse.json({ok:true}):NextResponse.json({error:"NOT_FOUND"},{status:404})}catch(error){return fail(error)}}
