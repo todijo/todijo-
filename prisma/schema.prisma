@@ -358,6 +358,8 @@ model User {
   sentMessages        Message[]
   notifications       Notification[]
   pushSubscriptions   PushSubscription[]
+  mobileSessions      MobileSession[]
+  mobileOAuthAttempts MobileOAuthAttempt[]
   orders              Order[]
   reviews             Review[]
   reviewReports       ReviewReport[]
@@ -388,6 +390,59 @@ model User {
   @@index([blockedAt, blockExpiresAt])
   @@index([sellerSuspendedAt])
   @@index([deactivatedAt])
+}
+
+model MobileSession {
+  id                 String    @id @default(cuid())
+  userId             String
+  refreshTokenHash   String    @unique @db.Char(64)
+  platform           String    @db.VarChar(16)
+  deviceLabel        String?   @db.VarChar(100)
+  createdAt          DateTime  @default(now())
+  lastUsedAt         DateTime  @default(now())
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  authVersionAtIssue Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([expiresAt])
+}
+
+model MobileRegistrationAttempt {
+  id                     String   @id @default(cuid())
+  platform               String
+  emailHash              String   @db.Char(64)
+  stateHash              String   @unique @db.Char(64)
+  nonceHash              String   @db.Char(64)
+  exchangeCodeHash       String?  @unique @db.Char(64)
+  registrationProofHash  String?  @unique @db.Char(64)
+  createdAt              DateTime @default(now())
+  expiresAt              DateTime
+  turnstileVerifiedAt    DateTime?
+  exchangeConsumedAt     DateTime?
+  registrationConsumedAt DateTime?
+
+  @@index([expiresAt])
+  @@index([emailHash, expiresAt])
+}
+
+model MobileOAuthAttempt {
+  id               String   @id @default(cuid())
+  provider         String   @db.VarChar(16)
+  platform         String   @db.VarChar(16)
+  stateHash        String   @unique @db.Char(64)
+  exchangeCodeHash String?  @unique @db.Char(64)
+  userId           String?
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime
+  consumedAt       DateTime?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, consumedAt])
 }
 
 model NewsArticle {
