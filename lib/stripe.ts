@@ -189,17 +189,25 @@ export async function createStripeCheckoutSession(input: {
   allowedCountries?: string[];
   shipping?: { name: string; amount: number; currency: string; minDays: number; maxDays: number };
   returnLocale?: string;
+  returnTarget?: "web" | "mobile";
 }) {
   const origin = appUrl();
   const returnPrefix = /^(?:en|fr|ar|ku|tr|de|es|it|nl|zh|fa|hi|pt|ru)$/.test(input.returnLocale ?? "") ? `/${input.returnLocale}` : "/en";
+  const mobileReturn = input.returnTarget === "mobile";
+  const successUrl = mobileReturn
+    ? `${origin}/mobile/checkout/return?status=success&order_id=${encodeURIComponent(input.orderId)}&session_id={CHECKOUT_SESSION_ID}`
+    : `${origin}${returnPrefix}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = mobileReturn
+    ? `${origin}/mobile/checkout/return?status=cancel&order_id=${encodeURIComponent(input.orderId)}`
+    : `${origin}${returnPrefix}/checkout/cancel?order_id=${encodeURIComponent(input.orderId)}`;
   const body = new URLSearchParams({
     mode: "payment",
     client_reference_id: input.orderId,
     customer_email: input.email,
     billing_address_collection: "required",
     "phone_number_collection[enabled]": "true",
-    success_url: `${origin}${returnPrefix}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}${returnPrefix}/checkout/cancel?order_id=${encodeURIComponent(input.orderId)}`,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
     "metadata[orderId]": input.orderId,
     "payment_intent_data[metadata][orderId]": input.orderId,
   });

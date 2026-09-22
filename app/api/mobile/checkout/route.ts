@@ -13,7 +13,7 @@ export async function POST(request:Request){
     const body=await request.json() as MobileCheckoutBody;
     const requestedLocale=typeof body.locale==="string"?body.locale:null;
     const locale=isLocale(requestedLocale)?requestedLocale:defaultLocale;
-    const checkout=await createCheckout(prisma,session.userId,body.requestId??"",body.items??[],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode(),returnLocale:locale});
+    const checkout=await createCheckout(prisma,session.userId,body.requestId??"",body.items??[],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode(),returnLocale:locale,returnTarget:"mobile"});
     return NextResponse.json({url:checkout.url,orderId:checkout.orderId,reused:checkout.reused},{headers:{"Cache-Control":"no-store"}});
   }catch(error){
     if(error instanceof MobileSessionError)return NextResponse.json({error:error.code},{status:error.status});

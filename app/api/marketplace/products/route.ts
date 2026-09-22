@@ -13,7 +13,7 @@ import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 const PAGE_SIZE = 24;
 const productSelect = {
   id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
-  stock: true, condition: true, images: true, createdAt: true,
+  stock: true, condition: true, images: true, colors: true, sizes: true, createdAt: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
   store: { select: { name: true, slug: true, city: true, country: true } },
@@ -27,7 +27,7 @@ function serializeProduct(product: ProductRow,locale:string) {
   return {
     id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null,
     currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock,
-    hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
+    hasActiveVariants: availability.hasActiveVariants, requiresSelection: availability.hasActiveVariants || product.colors.length > 0 || product.sizes.length > 0 || product.options.length > 0, isGenerallyAvailable: availability.isGenerallyAvailable,
     condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name,
     storeSlug: product.store.slug, city: product.store.city, country: product.store.country,
     createdAt: product.createdAt.toISOString(), requiresAuthoritativePrice: requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata),

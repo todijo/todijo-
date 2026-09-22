@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'generated_copy.dart';
+
 const todijoLocaleCodes = [
   'en',
   'fr',
@@ -44,7 +46,7 @@ final class TodijoLocalizations {
   static TodijoLocalizations of(BuildContext context) =>
       Localizations.of<TodijoLocalizations>(context, TodijoLocalizations)!;
 
-  static const _copy = <String, Map<String, String>>{
+  static const _coreCopy = <String, Map<String, String>>{
     'en': {
       'appName': 'Todijo',
       'loading': 'Loading',
@@ -131,8 +133,16 @@ final class TodijoLocalizations {
     },
   };
 
-  String text(String key) => _copy[locale.languageCode]![key]!;
-  static Map<String, Map<String, String>> get debugCopy => _copy;
+  String text(String key) =>
+      generatedTodijoCopy[locale.languageCode]?[key] ??
+      _coreCopy[locale.languageCode]![key]!;
+  String countryName(String code) =>
+      generatedCountryNames[locale.languageCode]?[code] ?? code;
+  static List<String> get shippingCountries => generatedShippingCountries;
+  static Map<String, Map<String, String>> get debugCopy => {
+    for (final locale in todijoLocaleCodes)
+      locale: {..._coreCopy[locale]!, ...generatedTodijoCopy[locale]!},
+  };
 }
 
 final class _TodijoDelegate extends LocalizationsDelegate<TodijoLocalizations> {

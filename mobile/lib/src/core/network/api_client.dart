@@ -30,6 +30,10 @@ final class ApiClient {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    if (options.path.endsWith('/api/mobile/auth/refresh')) {
+      handler.next(options);
+      return;
+    }
     final session = await sessionStore.read();
     if (session != null) {
       options.headers['Authorization'] = 'Bearer ${session.accessToken}';
@@ -47,15 +51,35 @@ final class ApiClient {
         request.path.endsWith('/api/mobile/auth/refresh')) {
       return handler.next(error);
     }
+    SessionTokens? session;
     try {
-      final session = await _refreshOnce();
-      if (session == null) return handler.next(error);
+      session = await _refreshOnce();
+    } on DioException catch (refreshError) {
+      if (refreshError.response?.statusCode == 401 ||
+          refreshError.response?.statusCode == 400) {
+        await sessionStore.clear();
+      }
+      return handler.next(refreshError);
+    } on Object catch (refreshError) {
+      return handler.next(
+        DioException(requestOptions: request, error: refreshError),
+      );
+    }
+    if (session == null) {
+      await sessionStore.clear();
+      return handler.next(error);
+    }
+    try {
       request.extra['todijoRetried'] = true;
       request.headers['Authorization'] = 'Bearer ${session.accessToken}';
       handler.resolve(await dio.fetch<Object?>(request));
-    } on Object {
-      await sessionStore.clear();
-      handler.next(error);
+    } on DioException catch (retryError) {
+      if (retryError.response?.statusCode == 401) {
+        await sessionStore.clear();
+      }
+      handler.next(retryError);
+    } on Object catch (retryError) {
+      handler.next(DioException(requestOptions: request, error: retryError));
     }
   }
 
