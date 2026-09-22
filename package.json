@@ -22,7 +22,7 @@
     "test:e2e:ui": "node scripts/run-playwright.mjs --ui"
   },
   "dependencies": {
-    "@todijo/contracts": "file:mobile/packages/contracts",
+    "@todijo/contracts": "file:packages/contracts",
     "@prisma/client": "6.19.3",
     "bcryptjs": "3.0.3",
     "busboy": "1.6.0",
