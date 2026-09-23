@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { markSellerGroupsShipmentVerified } from "./seller-transfers";
 import {safeCarrierTrackingUrl} from "./tracking";
+import { sellerSupplierFulfillmentAllowsTransition } from "./suppliers/seller-fulfillment-policy";
 
 export const fulfillmentTransitions = {
   PAID: { nextOrderStatus: "PROCESSING", nextFulfillmentStatus: "PROCESSING", timestamp: "processingAt" },
@@ -39,12 +40,16 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
     const order = await tx.order.findFirst({
       where: { id: orderId, OR: [
         { storeIdSnapshot: { in: storeIds } },
-        { storeIdSnapshot: null, items: { some: { product: { store: { ownerId: sellerId } } } } },
+        { storeIdSnapshot: null, items: { some: { product: { store: { ownerId: sellerId } } }, every: { product: { store: { ownerId: sellerId } } } } },
       ] },
-      select: { id: true, buyerId: true, status: true,paidAt:true,stripePaymentIntentId:true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true },
+      select: { id: true, buyerId: true, status: true,paidAt:true,stripePaymentIntentId:true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true,
+        supplierFulfillments: { where: { connection: { ownerType: "SELLER", storeId: { in: storeIds } } }, select: { status: true } } },
     });
     if (!order) throw new FulfillmentError("Order not found.", 404);
     if(!order.paidAt&&!order.stripePaymentIntentId)throw new FulfillmentError("Paid order required.",409);
+    if (!sellerSupplierFulfillmentAllowsTransition(action, (order.supplierFulfillments ?? []).map(item => item.status))) {
+      throw new FulfillmentError("Supplier fulfillment requires administrator review.", 409);
+    }
     if (order.status === transition.nextOrderStatus) {
       const verifiedGroups = transition.nextOrderStatus === "SHIPPED" ? await markSellerGroupsShipmentVerified(tx, order.id, storeIds) : [];
       return { idempotent: true, status: order.status, verifiedSellerGroups: verifiedGroups.length };

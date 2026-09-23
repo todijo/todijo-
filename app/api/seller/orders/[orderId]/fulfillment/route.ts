@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { advanceSellerFulfillment, FulfillmentError, type SellerFulfillmentAction } from "@/lib/fulfillment";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
 
 export async function POST(request: Request, context: { params: Promise<{ orderId: string }> }) {
-  const session = await readSession();
+  const session = await readSellerRequestSession(request);
   if (!session || !["SELLER", "ADMIN"].includes(session.role)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   if(session.sellerSuspended&&session.role!=="ADMIN")return NextResponse.json({error:"SELLER_SUSPENDED"},{status:403});
   try {

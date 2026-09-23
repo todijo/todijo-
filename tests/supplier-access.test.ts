@@ -55,16 +55,25 @@ test("ID guessing cannot cross platform or seller supplier ownership", async () 
   assert.deepEqual(where, { id: "seller-b-product", supplierLink: { is: { ownerType: "PLATFORM", connectionId: PLATFORM_CJ_CONNECTION_ID } } });
 });
 
-test("seller connection failures never fall back to platform or another tenant", async () => {
+test("seller CJ uses platform provider only after exact seller and platform authorization", async () => {
   const queries: any[] = [];
-  const db: any = { supplierConnection: { findFirst: async ({ where }: any) => { queries.push(where); return { id: where.id }; } } };
-  const results = await Promise.allSettled([
-    resolveSupplierProvider(db, { ownerType: "SELLER", provider: "CJ", storeId: "store-a", connectionId: "connection-a" }),
-    resolveSupplierProvider(db, { ownerType: "SELLER", provider: "CJ", storeId: "store-b", connectionId: "connection-b" }),
-  ]);
-  assert.equal(results.every((result) => result.status === "rejected" && result.reason.message === "SELLER_SUPPLIER_AUTH_NOT_CONNECTED"), true);
-  assert.equal(queries[0].storeId, "store-a"); assert.equal(queries[1].storeId, "store-b");
-  assert.notEqual(queries[0].id, queries[1].id);
+  let connected = true, platform = true;
+  const db: any = { supplierConnection: { findFirst: async ({ where }: any) => {
+    queries.push(where);
+    return where.ownerType === "PLATFORM" ? platform ? { id: PLATFORM_CJ_CONNECTION_ID } : null : connected ? { id: where.id } : null;
+  } } };
+  const provider: any = { id: "CJ", isConfigured: () => true };
+  const identity = { ownerType: "SELLER" as const, provider: "CJ" as const, storeId: "store-a", connectionId: "connection-a" };
+  assert.equal(await resolveSupplierProvider(db, identity, () => provider), provider);
+  assert.equal(queries[0].storeId, "store-a");
+  assert.equal(queries[0].store.dropshippingEnabled, true);
+  assert.deepEqual(queries[1], { id: PLATFORM_CJ_CONNECTION_ID, ownerType: "PLATFORM", storeId: null, provider: "CJ", status: "CONNECTED" });
+  connected = false;
+  await assert.rejects(() => resolveSupplierProvider(db, identity, () => provider), /SUPPLIER_RECONNECT_REQUIRED/);
+  connected = true; platform = false;
+  await assert.rejects(() => resolveSupplierProvider(db, identity, () => provider), /SUPPLIER_PLATFORM_UNAVAILABLE/);
+  platform = true;
+  await assert.rejects(() => resolveSupplierProvider(db, identity, () => ({ ...provider, isConfigured: () => false })), /SUPPLIER_PLATFORM_UNAVAILABLE/);
 });
 
 test("concurrent token caches remain instance-scoped", async () => {

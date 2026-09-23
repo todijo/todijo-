@@ -62,6 +62,22 @@ class BuyerAccountScreen extends ConsumerWidget {
           TodijoLocalizations.of(context).text('account'),
           style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
         ),
+        if (auth?.session?['role'] == 'SELLER')
+          ListTile(
+            onTap: () => context.push('/seller'),
+            leading: const Icon(Icons.storefront_outlined),
+            title: Text(
+              TodijoLocalizations.of(context).text('sellerDashboard'),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+          ),
+        if (auth?.session?['role'] == 'CUSTOMER')
+          ListTile(
+            onTap: () => context.push('/seller/onboarding'),
+            leading: const Icon(Icons.storefront_outlined),
+            title: Text(TodijoLocalizations.of(context).text('sellerHelp')),
+            trailing: const Icon(Icons.chevron_right),
+          ),
         for (final item in [
           (
             Icons.person_outline,

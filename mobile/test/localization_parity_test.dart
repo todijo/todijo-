@@ -66,6 +66,179 @@ void main() {
     }
   });
 
+  test('seller CJ discovery, quote, import and review copy exists in all 14 locales', () {
+    const keys = [
+      'cjDiscovery',
+      'cjDuplicate',
+      'cjCategory',
+      'cjCategoryReview',
+      'cjVariant',
+      'cjDestination',
+      'cjQuote',
+      'cjPrice',
+      'cjFreight',
+      'cjRevalidate',
+      'cjImportDraft',
+      'cjAdminReview',
+      'cjServiceUnavailable',
+      'cjAvailable',
+      'cjQuarantined',
+    ];
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        expect(copy.text(key).trim(), isNotEmpty, reason: '$locale:$key');
+      }
+    }
+  });
+
+  test('seller dashboard navigation and states exist in all 14 locales', () {
+    const keys = [
+      'sellerDashboard',
+      'sellerProducts',
+      'sellerAddProduct',
+      'sellerOrders',
+      'sellerStatistics',
+      'sellerRevenue',
+      'sellerReviews',
+      'sellerStore',
+      'sellerSettings',
+      'sellerWorkspace',
+      'sellerPendingOrders',
+      'sellerCustomers',
+      'sellerRecentOrders',
+      'sellerEmptyOrders',
+      'sellerAll',
+      'sellerDraft',
+      'sellerPublished',
+      'sellerStock',
+      'sellerAdvancePreparing',
+      'sellerAdvanceShipped',
+      'sellerAdvanceDelivered',
+      'sellerTrackingCarrier',
+      'sellerTrackingNumber',
+      'sellerFulfillmentError',
+      'sellerOrderQuantity',
+      'sellerRefundReason',
+      'sellerRefundNote',
+      'sellerRefundApprove',
+      'sellerRefundReject',
+      'sellerRefundFailed',
+      'sellerRefundEvidence',
+      'sellerVariantImages',
+      'sellerVariantImagesHelp',
+      'sellerVariantPrimaryImage',
+      'sellerMakeVariantPrimary',
+      'sellerProductName',
+      'sellerProductDescription',
+      'sellerProductPrice',
+      'sellerProductStock',
+      'sellerProductCategory',
+      'sellerProductPhotos',
+      'sellerProductPublish',
+      'sellerProductSaveDraft',
+      'sellerProductSaveChanges',
+      'sellerProductDelete',
+      'sellerComplianceTitle',
+      'sellerListingDeclaration',
+      'sellerVariantOptions',
+      'sellerOptionName',
+      'sellerOptionValues',
+      'sellerAddOption',
+      'sellerGenerateVariants',
+      'sellerVariantPrice',
+      'sellerVariantStock',
+      'sellerProductCondition',
+      'sellerConditionNew',
+      'sellerConditionLikeNew',
+      'sellerConditionGood',
+      'sellerConditionUsed',
+      'sellerComparePrice',
+      'sellerLogo',
+      'sellerBanner',
+      'sellerShippingTitle',
+      'sellerShippingEnabled',
+      'sellerShippingMethod',
+      'sellerShippingCarrier',
+      'sellerShippingPrice',
+      'sellerShippingFreeThreshold',
+      'sellerShippingMinDays',
+      'sellerShippingMaxDays',
+      'sellerShippingWorldwide',
+      'sellerShippingCountries',
+      'sellerShippingPostalCodes',
+      'sellerPlans',
+      'sellerSubscription',
+      'sellerPerMonth',
+      'sellerSubscribe',
+      'sellerUnavailable',
+      'sellerConnectStripe',
+      'sellerConnected',
+      'sellerChargesEnabled',
+      'sellerPayoutsEnabled',
+      'sellerPayments',
+      'sellerUnlimited',
+      'sellerTransfer.WAITING_FOR_SHIPMENT',
+      'sellerTransfer.RESERVE_PERIOD',
+      'sellerTransfer.READY',
+      'sellerTransfer.SUBMITTING',
+      'sellerTransfer.TRANSFERRED',
+      'sellerTransfer.RETRYABLE',
+      'sellerTransfer.MANUAL_ACTION_REQUIRED',
+      'sellerTransfer.REVERSED',
+      'sellerTransfer.CANCELLED',
+      'sellerSubscription.NOT_STARTED',
+      'sellerSubscription.INCOMPLETE',
+      'sellerSubscription.TRIALING',
+      'sellerSubscription.ACTIVE',
+      'sellerSubscription.PAST_DUE',
+      'sellerSubscription.UNPAID',
+      'sellerSubscription.CANCELED',
+      'sellerSubscription.EXPIRED',
+      'sellerConnectStatusUnavailable',
+      'sellerTransferPendingAmount',
+      'dropshipping.accessTitle',
+      'dropshipping.approvedNotConnected',
+      'dropshipping.connectPending',
+      'dropshipping.permissionDisabled',
+      'sellerVerification',
+      'sellerVerification.NOT_STARTED',
+      'sellerVerification.IN_PROGRESS',
+      'sellerVerification.PENDING_REVIEW',
+      'sellerVerification.VERIFIED',
+      'sellerVerification.REJECTED',
+      'sellerVerification.NEEDS_INFORMATION',
+      'productVideo.title',
+      'productVideo.help',
+      'productVideo.upload',
+      'productVideo.remove',
+      'productVideo.uploading',
+      'productVideo.configError',
+      'productVideo.failed',
+    ];
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        expect(copy.text(key).trim(), isNotEmpty, reason: '$locale:$key');
+      }
+    }
+  });
+
+  test('seller refund review statuses exist in all 14 locales', () {
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final status in [
+        'PENDING',
+        'SELLER_APPROVED',
+        'SELLER_REJECTED',
+        'ADMIN_APPROVED',
+        'ADMIN_REJECTED',
+      ]) {
+        expect(copy.text('sellerRefundStatus.$status'), isNotEmpty);
+      }
+    }
+  });
+
   test(
     'native auth guidance does not fall back to English in other locales',
     () {

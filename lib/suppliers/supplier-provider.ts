@@ -1,21 +1,26 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { CjCatalogProvider } from "./cj-client";
 import type { SupplierCatalogProvider, SupplierProviderId } from "./types";
-import { sellerConnectionWhere, SupplierAccessError } from "./supplier-access";
+import { PLATFORM_CJ_CONNECTION_ID, sellerConnectionWhere, SupplierAccessError } from "./supplier-access";
 
 type Database = PrismaClient | Prisma.TransactionClient;
 type SupplierIdentity =
   | { ownerType: "PLATFORM"; provider: SupplierProviderId }
   | { ownerType: "SELLER"; provider: SupplierProviderId; storeId: string; connectionId: string };
 
-export async function resolveSupplierProvider(db: Database, identity: SupplierIdentity): Promise<SupplierCatalogProvider> {
-  if (identity.ownerType === "PLATFORM") return new CjCatalogProvider();
+export async function resolveSupplierProvider(db: Database, identity: SupplierIdentity, makeProvider: () => SupplierCatalogProvider = () => new CjCatalogProvider()): Promise<SupplierCatalogProvider> {
+  if (identity.ownerType === "PLATFORM") return makeProvider();
   const connection = await db.supplierConnection.findFirst({
     where: { ...sellerConnectionWhere(identity.storeId, identity.connectionId), provider: identity.provider, status: "CONNECTED", store: { dropshippingEnabled: true } },
     select: { id: true },
   });
   if (!connection) throw new SupplierAccessError("SUPPLIER_RECONNECT_REQUIRED", 403);
-  // Seller authorization is deliberately fail-closed until CJ's partner authorization
-  // can provide an isolated, encrypted credential for this exact connection.
-  throw new SupplierAccessError("SELLER_SUPPLIER_AUTH_NOT_CONNECTED", 503);
+  const platform = await db.supplierConnection.findFirst({
+    where: { id: PLATFORM_CJ_CONNECTION_ID, ownerType: "PLATFORM", storeId: null, provider: identity.provider, status: "CONNECTED" },
+    select: { id: true },
+  });
+  if (!platform) throw new SupplierAccessError("SUPPLIER_PLATFORM_UNAVAILABLE", 503);
+  const provider = makeProvider();
+  if (!provider.isConfigured()) throw new SupplierAccessError("SUPPLIER_PLATFORM_UNAVAILABLE", 503);
+  return provider;
 }

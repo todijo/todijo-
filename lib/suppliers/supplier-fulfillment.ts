@@ -30,7 +30,7 @@ export async function prepareSupplierFulfillments(tx: Database, order: PaidOrder
     const exact = snap.productId === item.productId && snap.variantId === item.variantId && snap.supplierProductId === link?.supplierProductId && Number(snap.quantity) === item.quantity;
     const sellerUnsupported = link?.ownerType === "SELLER";
     const manual = !exact || !connectionId || !originCountry || !destinationCountry || !shippingMethod || sellerUnsupported || connectionId !== PLATFORM_CJ_CONNECTION_ID || link?.connection?.status !== "CONNECTED";
-    const errorCode = !exact || !connectionId || !originCountry || !destinationCountry || !shippingMethod ? "SUPPLIER_FULFILLMENT_MAPPING_INVALID" : sellerUnsupported ? "SELLER_SUPPLIER_AUTH_NOT_CONNECTED" : manual ? "SUPPLIER_CONNECTION_NOT_AUTHORIZED" : null;
+    const errorCode = !exact || !connectionId || !originCountry || !destinationCountry || !shippingMethod ? "SUPPLIER_FULFILLMENT_MAPPING_INVALID" : sellerUnsupported ? "SELLER_SUPPLIER_ADMIN_REVIEW_REQUIRED" : manual ? "SUPPLIER_CONNECTION_NOT_AUTHORIZED" : null;
     const groupKey = manual && (!connectionId || !originCountry || !shippingMethod) ? `manual|${item.id}` : [connectionId, originCountry, destinationCountry, shippingMethod].join("|");
     const group = groups.get(groupKey) ?? { connectionId, originCountry, destinationCountry, shippingMethod, manual, errorCode, items: [] };
     group.manual ||= manual;
@@ -69,6 +69,17 @@ async function loadFulfillment(db: PrismaClient, fulfillmentId: string) {
   return db.supplierFulfillment.findUniqueOrThrow({ where: { id: fulfillmentId }, include: { order: true, connection: true, items: true, tracking: true } });
 }
 
+async function assertApprovedSellerFulfillment(db: PrismaClient, fulfillment: Awaited<ReturnType<typeof loadFulfillment>>) {
+  const storeId = fulfillment.connection?.storeId;
+  if (!storeId || !fulfillment.connection || fulfillment.connection.ownerType !== "SELLER" || fulfillment.connection.status !== "CONNECTED") throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
+  const [store, platform, ownedItems] = await Promise.all([
+    db.store.findFirst({ where: { id: storeId, dropshippingEnabled: true, owner: { role: "SELLER", sellerSuspendedAt: null, deactivatedAt: null } }, select: { id: true } }),
+    db.supplierConnection.findFirst({ where: { id: PLATFORM_CJ_CONNECTION_ID, ownerType: "PLATFORM", storeId: null, provider: "CJ", status: "CONNECTED" }, select: { id: true } }),
+    db.orderItem.count({ where: { orderId: fulfillment.orderId, id: { in: fulfillment.items.map(item => item.orderItemId) }, product: { storeId, supplierLink: { connectionId: fulfillment.connection.id, ownerType: "SELLER" } } } }),
+  ]);
+  if (!store || !platform || !fulfillment.items.length || ownedItems !== fulfillment.items.length) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
+}
+
 function mappedStatus(status: string) {
   const value = status.toUpperCase();
   if (value === "DELIVERED") return "DELIVERED" as const;
@@ -90,15 +101,18 @@ async function persistSupplierDetail(db: PrismaClient, fulfillmentId: string, de
   });
 }
 
-export async function processSupplierFulfillment(db: PrismaClient, fulfillmentId: string, client = new CjFulfillmentClient()) {
+export async function processSupplierFulfillment(db: PrismaClient, fulfillmentId: string, client = new CjFulfillmentClient(), adminApprovedSeller = false) {
   const claimToken = randomUUID(); const now = new Date();
-  const claimed = await db.supplierFulfillment.updateMany({ where: { id: fulfillmentId, status: { in: ["PENDING", "RETRYABLE"] } }, data: { status: "SUBMITTING", claimToken, claimedAt: now, attemptCount: { increment: 1 }, lastErrorCategory: null, lastErrorCode: null, lastErrorMessage: null } });
+  const claimed = await db.supplierFulfillment.updateMany({ where: { id: fulfillmentId,
+    ...(adminApprovedSeller ? { status: { in: ["MANUAL_ACTION_REQUIRED", "RETRYABLE"] }, lastErrorCode: { in: ["SELLER_SUPPLIER_ADMIN_REVIEW_REQUIRED", "CJ_WALLET_INSUFFICIENT"] } } : { status: { in: ["PENDING", "RETRYABLE"] } })
+  }, data: { status: "SUBMITTING", claimToken, claimedAt: now, attemptCount: { increment: 1 }, lastErrorCategory: null, lastErrorCode: null, lastErrorMessage: null } });
   if (claimed.count !== 1) return { claimed: false };
   const fulfillment = await loadFulfillment(db, fulfillmentId);
   try {
     if (!fulfillment.order.paidAt || fulfillment.order.status === "PENDING" || fulfillment.order.status === "CANCELLED") throw new Error("ORDER_PAYMENT_NOT_CONFIRMED");
     if (!fulfillment.connection || !fulfillment.originCountry || !fulfillment.destinationCountry || !fulfillment.shippingMethod) throw new Error("SUPPLIER_FULFILLMENT_MAPPING_INVALID");
-    if (fulfillment.connection.ownerType !== "PLATFORM" || fulfillment.connectionId !== PLATFORM_CJ_CONNECTION_ID || fulfillment.connection.status !== "CONNECTED") throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
+    if (adminApprovedSeller) await assertApprovedSellerFulfillment(db, fulfillment);
+    else if (fulfillment.connection.ownerType !== "PLATFORM" || fulfillment.connectionId !== PLATFORM_CJ_CONNECTION_ID || fulfillment.connection.status !== "CONNECTED") throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
     const detail = await client.createOrder({ fulfillmentId, externalReference: fulfillment.externalReference, originCountry: fulfillment.originCountry, destinationCountry: fulfillment.destinationCountry, shippingMethod: fulfillment.shippingMethod, recipient: address(fulfillment.order), products: fulfillment.items.map((item) => ({ supplierVariantId: item.supplierVariantId, quantity: item.quantity })) });
     if (!detail.supplierOrderId) throw new CjFulfillmentApiError("CJ_CREATE_RESPONSE_UNCONFIRMED", true, false);
     await persistSupplierDetail(db, fulfillmentId, detail, true);
@@ -121,14 +135,18 @@ export async function processOrderSupplierFulfillments(orderId: string) {
 
 export async function syncSupplierFulfillment(db: PrismaClient, fulfillmentId: string, client = new CjFulfillmentClient()) {
   const fulfillment = await loadFulfillment(db, fulfillmentId);
-  if (!fulfillment.connection || fulfillment.connection.ownerType !== "PLATFORM" || fulfillment.connectionId !== PLATFORM_CJ_CONNECTION_ID) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
+  if (!fulfillment.connection) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
+  if (fulfillment.connection.ownerType === "SELLER") {
+    if (fulfillment.attemptCount < 1) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
+    await assertApprovedSellerFulfillment(db, fulfillment);
+  } else if (fulfillment.connection.ownerType !== "PLATFORM" || fulfillment.connectionId !== PLATFORM_CJ_CONNECTION_ID) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
   const detail = await client.getOrderDetail(fulfillment.id, fulfillment.externalReference);
   await persistSupplierDetail(db, fulfillment.id, detail, fulfillment.submittedAt === null);
   return detail;
 }
 
 export async function recoverSupplierFulfillment(db: PrismaClient, fulfillmentId: string, client = new CjFulfillmentClient()) {
-  const fulfillment = await db.supplierFulfillment.findUnique({ where: { id: fulfillmentId }, select: { status: true, lastErrorCode: true } });
+  const fulfillment = await db.supplierFulfillment.findUnique({ where: { id: fulfillmentId }, select: { status: true, lastErrorCode: true, connection: { select: { ownerType: true } } } });
   if (!fulfillment) throw new Error("FULFILLMENT_NOT_FOUND");
   if (fulfillment.status === "PENDING" || fulfillment.status === "RETRYABLE") return processSupplierFulfillment(db, fulfillmentId, client);
   if (fulfillment.status === "AMBIGUOUS" || (fulfillment.status === "MANUAL_ACTION_REQUIRED" && isApprovedManualSupplierRetry(fulfillment.lastErrorCode))) {
@@ -138,6 +156,7 @@ export async function recoverSupplierFulfillment(db: PrismaClient, fulfillmentId
     } catch (error) {
       if (!(error instanceof CjFulfillmentApiError) || error.code !== "CJ_ORDER_NOT_FOUND") throw error;
       if (fulfillment.status === "AMBIGUOUS") return { claimed: false, submitted: false, reconciled: true, status: "AMBIGUOUS" as const, code: error.code };
+      if (fulfillment.connection?.ownerType === "SELLER") return processSupplierFulfillment(db, fulfillmentId, client, true);
       const released = await db.supplierFulfillment.updateMany({ where: { id: fulfillmentId, status: "MANUAL_ACTION_REQUIRED", lastErrorCode: fulfillment.lastErrorCode }, data: { status: "RETRYABLE", lastErrorCategory: "RETRYABLE" } });
       if (released.count !== 1) return { claimed: false };
       return processSupplierFulfillment(db, fulfillmentId, client);

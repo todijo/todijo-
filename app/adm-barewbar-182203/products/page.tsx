@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 import { proposedExistingSupplierContent } from "@/lib/product-content";
 import { productTranslationState } from "@/lib/product-translation";
 import { readSession } from "@/lib/session";
+import { todijoTaxonomyOptions } from "@/lib/suppliers/cj-classification";
+import { AdminSellerCjCategoryReview } from "@/components/AdminSellerCjCategoryReview";
 
 export const dynamic="force-dynamic";
 
@@ -20,6 +22,8 @@ export default async function AdminProductsPage({searchParams}:{searchParams:Pro
   const localization=catalogLocalizationAdminUi[uiLocale],issue=["missing","noisy","stale"].includes(params.issue??"")?params.issue:null;
   const session=await readSession();if(!session)redirect("/en/login");try{await requireAdmin(prisma,session)}catch{redirect("/en/dashboard")}
   const allProducts=await prisma.product.findMany({where:{removedAt:null},orderBy:{updatedAt:"desc"},take:250,select:{id:true,name:true,description:true,status:true,updatedAt:true,supplierLink:{select:{sourceMetadata:true}},store:{select:{name:true,owner:{select:{email:true}}}}}});
+  const sellerCjReviews=await prisma.product.findMany({where:{status:"DRAFT",removedAt:null,supplierLink:{is:{provider:"CJ",ownerType:"SELLER",classificationStatus:"QUARANTINED"}}},orderBy:{updatedAt:"asc"},take:20,select:{id:true,name:true,category:true,store:{select:{name:true}}}});
+  const categoryOptions=todijoTaxonomyOptions().map(option=>({id:option.id,label:`${option.categoryLabel} › ${option.groupLabel} › ${option.label}`}));
   const products=allProducts.filter(product=>{
     if(!issue||!product.supplierLink)return true;
     const content=proposedExistingSupplierContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink.sourceMetadata,locale});
@@ -30,6 +34,7 @@ export default async function AdminProductsPage({searchParams}:{searchParams:Pro
   const translationCandidates=allProducts.filter(product=>product.supplierLink).map(product=>({id:product.id,name:product.name,state:productTranslationState({name:product.name,description:product.description,sourceMetadata:product.supplierLink!.sourceMetadata,targetLocale:locale}).state}));
   return <main className="adminPage"><section className="adminShell">
     <header className="adminHero"><div><span>ADMIN</span><h1>Product catalog</h1><p>Review imported localization without changing preserved supplier content or publishing drafts.</p></div><Link href="/adm-barewbar-182203">Back to admin</Link></header>
+    {sellerCjReviews.length>0&&<section className="adminPanel"><h2>Seller CJ drafts awaiting category review</h2>{sellerCjReviews.map(product=><article key={product.id}><strong>{product.name}</strong> · {product.store.name}<p>Review the supplier product and its canonical category before releasing the draft. Publication remains the seller’s action.</p><Link href={`/product/${product.id}?adminPreview=1`} target="_blank">Preview draft</Link><AdminSellerCjCategoryReview productId={product.id} initialCategory={product.category} options={categoryOptions}/></article>)}</section>}
     <nav className="adminHeroActions" aria-label="Localization audit filters">{locales.map(item=><Link key={item} aria-current={item===locale?"page":undefined} href={`/adm-barewbar-182203/products?locale=${item}${issue?`&issue=${issue}`:""}`}>{item.toUpperCase()}</Link>)}<Link href={`/adm-barewbar-182203/products?locale=${locale}&issue=missing`}>Missing {locale.toUpperCase()}</Link><Link href={`/adm-barewbar-182203/products?locale=${locale}&issue=stale`}>Stale</Link><Link href={`/adm-barewbar-182203/products?locale=${locale}&issue=noisy`}>Noisy titles</Link><Link href={`/adm-barewbar-182203/products?locale=${locale}`}>All</Link></nav>
     <AdminTranslationCenter products={translationCandidates} initialLocale="fr"/>
     <section className="adminPanel adminTablePanel"><div className="adminTableWrap"><table><thead><tr><th>Product</th><th>Seller</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead><tbody>{products.map(product=>{

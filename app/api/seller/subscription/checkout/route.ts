@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { configuredSellerPlan } from "@/lib/seller-plans";
 import { createSellerSubscriptionCheckout, createStripeCustomer } from "@/lib/stripe";
 import { assertSellerActivity } from "@/lib/account-status";
@@ -8,7 +8,7 @@ import { AdminAccessError } from "@/lib/admin-access";
 
 export async function POST(request: Request) {
   try {
-    const session = await readSession();
+    const session = await readSellerRequestSession(request);
     if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     await assertSellerActivity(prisma,session.userId);
     const plan = configuredSellerPlan((await request.json()).planId);

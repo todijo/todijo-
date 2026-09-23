@@ -5,7 +5,7 @@ export const SELLER_PRODUCTS_SEARCH_LIMIT = 100;
 export type SellerProductsStatus = "all" | "PUBLISHED" | "DRAFT";
 export type SellerProductsSort = "newest" | "oldest" | "name";
 export type SellerProductsQuery = { page: number; q: string; status: SellerProductsStatus; sort: SellerProductsSort };
-export type SellerProductCardData = { id: string; name: string; price: string; currency: string; stock: number; status: "PUBLISHED" | "DRAFT"; image: string | null; automaticCjPrice: boolean };
+export type SellerProductCardData = { id: string; name: string; price: string; currency: string; stock: number; status: "PUBLISHED" | "DRAFT"; image: string | null; automaticCjPrice: boolean; supplierProvider: "CJ" | null };
 
 export function parseSellerProductsQuery(params: URLSearchParams): SellerProductsQuery {
   const rawPage = Number(params.get("page"));
@@ -62,6 +62,6 @@ export async function listSellerProducts(db: ProductDb, storeId: string, query: 
   const page = Math.min(query.page, pages);
   const orderBy: Prisma.ProductOrderByWithRelationInput[] = query.sort === "name" ? [{ name: "asc" }, { id: "asc" }] : [{ createdAt: query.sort === "oldest" ? "asc" : "desc" }, { id: query.sort === "oldest" ? "asc" : "desc" }];
   const rows = await db.product.findMany({ where, orderBy, skip: (page - 1) * SELLER_PRODUCTS_PAGE_SIZE, take: SELLER_PRODUCTS_PAGE_SIZE, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true, supplierLink: { select: { provider: true, sourceMetadata: true } } } });
-  const products: SellerProductCardData[] = rows.map((row) => ({ id: row.id, name: row.name, price: row.price.toString(), currency: row.currency, stock: row.stock, status: row.status, image: row.images[0] ?? null, automaticCjPrice: automaticCjPrice(row.supplierLink?.provider, row.supplierLink?.sourceMetadata) }));
+  const products: SellerProductCardData[] = rows.map((row) => ({ id: row.id, name: row.name, price: row.price.toString(), currency: row.currency, stock: row.stock, status: row.status, image: row.images[0] ?? null, automaticCjPrice: automaticCjPrice(row.supplierLink?.provider, row.supplierLink?.sourceMetadata), supplierProvider: row.supplierLink?.provider === "CJ" ? "CJ" : null }));
   return { products, total, allTotal, published, lowStock, page, pages, pageSize: SELLER_PRODUCTS_PAGE_SIZE };
 }

@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { parseShippingSettings, ShippingError } from "@/lib/shipping";
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const session = await readSession();
+    const session = await readSellerRequestSession(request);
     if (!session) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }

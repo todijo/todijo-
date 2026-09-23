@@ -18,6 +18,11 @@ import 'features/marketplace/application/buyer_state.dart';
 import 'features/marketplace/presentation/buyer_chrome.dart';
 import 'features/marketplace/presentation/buyer_screens.dart';
 import 'features/marketplace/presentation/home_screen.dart';
+import 'features/seller/seller_screens.dart';
+import 'features/seller/seller_product_editor.dart';
+import 'features/seller/seller_store_screen.dart';
+import 'features/seller/seller_finance_screen.dart';
+import 'features/seller/seller_cj_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider).value;
@@ -30,6 +35,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/account';
       }
       if (protected &&
+          auth?.status != AuthStatus.authenticated &&
+          auth?.status != AuthStatus.loading) {
+        return '/login?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
+      }
+      if (state.uri.path.startsWith('/seller') &&
+          state.uri.path != '/seller/onboarding' &&
+          auth?.status == AuthStatus.authenticated &&
+          auth?.session?['role'] != 'SELLER') {
+        return '/account';
+      }
+      if (state.uri.path.startsWith('/seller') &&
           auth?.status != AuthStatus.authenticated &&
           auth?.status != AuthStatus.loading) {
         return '/login?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
@@ -103,6 +119,40 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/checkout', builder: (_, _) => const CheckoutScreen()),
       GoRoute(
+        path: '/seller',
+        builder: (_, _) => const SellerDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/seller/onboarding',
+        builder: (_, _) => const SellerOnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/seller/products',
+        builder: (_, _) => const SellerProductsScreen(),
+      ),
+      GoRoute(
+        path: '/seller/products/new',
+        builder: (_, _) => const SellerProductEditorScreen(),
+      ),
+      GoRoute(path: '/seller/cj', builder: (_, _) => const SellerCjScreen()),
+      GoRoute(
+        path: '/seller/products/:id/edit',
+        builder: (_, state) =>
+            SellerProductEditorScreen(productId: state.pathParameters['id']),
+      ),
+      GoRoute(
+        path: '/seller/orders',
+        builder: (_, _) => const SellerOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/seller/store',
+        builder: (_, _) => const SellerStoreScreen(),
+      ),
+      GoRoute(
+        path: '/seller/finance',
+        builder: (_, _) => const SellerFinanceScreen(),
+      ),
+      GoRoute(
         path: '/info/:key',
         builder: (_, state) => InfoScreen(state.pathParameters['key']!),
       ),
@@ -149,13 +199,17 @@ class _TodijoAppState extends ConsumerState<TodijoApp> {
     }
     if (!mounted) return;
     if (handled) {
-      final authenticated = ref.read(authProvider).value?.status ==
-          AuthStatus.authenticated;
-      ref.read(routerProvider).go(authenticated
-          ? '/account'
-          : uri.path == '/registration'
-              ? '/register'
-              : '/login');
+      final authenticated =
+          ref.read(authProvider).value?.status == AuthStatus.authenticated;
+      ref
+          .read(routerProvider)
+          .go(
+            authenticated
+                ? '/account'
+                : uri.path == '/registration'
+                ? '/register'
+                : '/login',
+          );
       return;
     }
     if (uri.scheme == 'todijo' &&

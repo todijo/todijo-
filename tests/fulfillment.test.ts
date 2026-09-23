@@ -16,6 +16,7 @@ function database(order: any, stores = [{ id: "store_1" }]) {
       findFirst: async ({ where }: any) => {
         assert.equal(where.id, "order_1");
         assert.deepEqual(where.OR[0], { storeIdSnapshot: { in: stores.map((store) => store.id) } });
+        assert.deepEqual(where.OR[1].items.every, { product: { store: { ownerId: where.OR[1].items.some.product.store.ownerId } } });
         return order;
       },
       update: async ({ data }: any) => { updates.push(data); return { ...order, ...data, id: "order_1" }; },
@@ -104,3 +105,9 @@ test("seller-provided tracking URLs are never accepted", async () => {
 });
 
 test("unpaid orders cannot advance fulfillment",async()=>{const{db,updates}=database({id:"order_1",status:"PROCESSING",paidAt:null,stripePaymentIntentId:null});await assert.rejects(()=>advanceSellerFulfillment(db,"seller_1","order_1","PROCESSING",{trackingCarrier:"UPS",trackingNumber:"1Z123"}),/Paid order required/);assert.equal(updates.length,0)});
+
+test("seller CJ order cannot be marked shipped before admin-reviewed supplier shipment", async () => {
+  const { db, updates } = database({ id: "order_1", status: "PROCESSING", supplierFulfillments: [{ status: "MANUAL_ACTION_REQUIRED" }] });
+  await assert.rejects(() => advanceSellerFulfillment(db, "seller_1", "order_1", "PROCESSING"), /administrator review/);
+  assert.equal(updates.length, 0);
+});

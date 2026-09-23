@@ -67,7 +67,36 @@ test("only an exact authoritative supplier snapshot creates fulfillment work", a
 test("seller-owned supplier work fails closed without platform credential fallback", async () => {
   const calls: any[] = []; const db = { supplierFulfillment: { upsert: async (args: any) => calls.push(args) } } as any;
   const order: any = { id: "order_2", shippingCountry: "FR", items: [{ id: "item_2", productId: "p2", variantId: "v2", quantity: 1, supplierPricingSnapshot: { snapshot: { provider: "CJ", productId: "p2", variantId: "v2", supplierProductId: "cj-p2", supplierVariantId: "cj-v2", originCountry: "CN", quantity: 1, shippingMethod: "CJPacket" } }, product: { supplierLink: { provider: "CJ", ownerType: "SELLER", connectionId: "seller-cj", supplierProductId: "cj-p2", connection: { id: "seller-cj", status: "CONNECTED" } } } }] };
-  await prepareSupplierFulfillments(db, order); assert.equal(calls[0].create.status, "MANUAL_ACTION_REQUIRED"); assert.equal(calls[0].create.lastErrorCode, "SELLER_SUPPLIER_AUTH_NOT_CONNECTED");
+  await prepareSupplierFulfillments(db, order); assert.equal(calls[0].create.status, "MANUAL_ACTION_REQUIRED"); assert.equal(calls[0].create.lastErrorCode, "SELLER_SUPPLIER_ADMIN_REVIEW_REQUIRED");
+});
+
+test("seller CJ submission requires explicit admin claim and exact store/item ownership", async () => {
+  let submitted = 0, ownedItems = 1;
+  const fulfillment: any = { id: "ful_seller", orderId: "order_seller", connectionId: "seller-cj-store-a", externalReference: "tdj-seller-reviewed", status: "MANUAL_ACTION_REQUIRED", originCountry: "CN", destinationCountry: "FR", shippingMethod: "CJPacket", submittedAt: null,
+    connection: { id: "seller-cj-store-a", ownerType: "SELLER", storeId: "store-a", status: "CONNECTED" },
+    order: { paidAt: new Date(), status: "PAID", recipientName: "Buyer", shippingAddressLine1: "1 street", shippingAddressLine2: null, shippingCity: "Paris", shippingState: null, shippingPostalCode: "75001", recipientPhone: null },
+    items: [{ orderItemId: "item-a", supplierVariantId: "cj-v1", quantity: 1 }], tracking: [] };
+  const claims: any[] = [];
+  const db: any = { supplierFulfillment: {
+    updateMany: async (args: any) => { claims.push(args); return { count: args.where.lastErrorCode?.in?.includes("SELLER_SUPPLIER_ADMIN_REVIEW_REQUIRED") ? 1 : 0 }; },
+    findUniqueOrThrow: async () => fulfillment,
+    findFirst: async ({ where }: any) => where.ownerType === "PLATFORM" ? { id: "platform-cj" } : null,
+  }, supplierConnection: { findFirst: async ({ where }: any) => where.id === "platform-cj" ? { id: "platform-cj" } : null },
+    store: { findFirst: async ({ where }: any) => where.id === "store-a" && where.dropshippingEnabled ? { id: "store-a" } : null },
+    orderItem: { count: async ({ where }: any) => { assert.equal(where.orderId, "order_seller"); assert.equal(where.product.storeId, "store-a"); return ownedItems; } },
+    $transaction: async (callback: any) => callback({ supplierFulfillment: { update: async () => ({}) }, supplierTracking: { upsert: async () => ({}) } }),
+  };
+  const client: any = { createOrder: async () => { submitted++; return { supplierOrderId: "cj-order", supplierOrderNumber: "tdj-seller-reviewed", status: "PROCESSING", tracking: [] }; } };
+  assert.deepEqual(await processSupplierFulfillment(db, "ful_seller", client), { claimed: false });
+  assert.equal(submitted, 0);
+  const approved = await processSupplierFulfillment(db, "ful_seller", client, true);
+  assert.equal(approved.submitted, true);
+  assert.equal(submitted, 1);
+  assert.equal(claims[1].where.status.in[0], "MANUAL_ACTION_REQUIRED");
+  ownedItems = 0;
+  const rejected = await processSupplierFulfillment(db, "ful_seller", client, true);
+  assert.equal(rejected.submitted, false);
+  assert.equal(submitted, 1);
 });
 
 test("normal marketplace lines never create CJ fulfillment work", async () => {
@@ -105,6 +134,17 @@ test("supplier retry and sync routes require database-verified admin authorizati
     const source = readFileSync(join(process.cwd(), "app", "api", "admin", "supplier-fulfillments", "[fulfillmentId]", action, "route.ts"), "utf8");
     assert.match(source, /requireAdmin\(prisma, await readSession\(\)\)/); assert.doesNotMatch(source, /SELLER|CUSTOMER/);
   }
+});
+
+test("seller CJ submission is an explicit admin-only action, never a seller or automatic route", () => {
+  const route = readFileSync(join(process.cwd(), "app", "api", "admin", "supplier-fulfillments", "[fulfillmentId]", "submit-seller", "route.ts"), "utf8");
+  assert.match(route, /assertAdminMutationRequest\(request\)/);
+  assert.match(route, /requireAdmin\(prisma, await readSession\(\)\)/);
+  assert.match(route, /processSupplierFulfillment\(prisma, fulfillmentId, undefined, true\)/);
+  const control = readFileSync(join(process.cwd(), "components", "AdminSupplierFulfillmentControl.tsx"), "utf8");
+  assert.match(control, /SELLER_SUPPLIER_ADMIN_REVIEW_REQUIRED/);
+  assert.match(control, /canApproveSeller/);
+  assert.match(control, /submit-seller/);
 });
 
 test("concurrent fulfillment claims permit exactly one supplier submission", async () => {

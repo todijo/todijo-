@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
+import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { readSession } from "@/lib/session";
 import { requireProductCreationAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
@@ -42,7 +43,7 @@ function makeSlug(value: string) {
 
 export async function POST(request: Request) {
   try {
-    const session = await readSession();
+    const session = await readSellerRequestSession(request);
     if (!session) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }

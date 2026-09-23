@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { ProductVariantError, saveProductVariants, type ProductVariantsInput } from "@/lib/product-variants";
 import {assertSellerActivity}from"@/lib/account-status";
 import {AdminAccessError}from"@/lib/admin-access";
@@ -30,7 +30,7 @@ async function readVariantBody(request: Request): Promise<ProductVariantsInput> 
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await readSession();
+    const session = await readSellerRequestSession(request);
     if (!session) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
     await assertSellerActivity(prisma,session.userId);
     const { id } = await context.params;

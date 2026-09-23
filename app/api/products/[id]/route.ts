@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
@@ -26,7 +26,7 @@ function normalizeList(value: unknown, limit: number) {
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const session = await readSession();
+    const session = await readSellerRequestSession(request);
     if (!session) return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     await assertSellerActivity(prisma, session.userId);
 
@@ -88,7 +88,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         await tx.supplierProductLink.update({where:{id:product.supplierLink.id},data:{sourceMetadata:{...previous,productContent:{...content,normalized:{title:name,description,locale:content.normalized.locale,generated:false}}} as Prisma.InputJsonValue}});
       }
       await replaceProductVariantImages(tx, id, images, body.variantImages);
-      await replaceProductVideo(tx,id,body.video);
+      if (Object.hasOwn(body, "video")) await replaceProductVideo(tx,id,body.video);
     });
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
@@ -106,9 +106,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const result=await removeProductListing(prisma,await readSession(),(await context.params).id);
+    const result=await removeProductListing(prisma,await readSellerRequestSession(request),(await context.params).id);
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true,...result });
   } catch (error) {
