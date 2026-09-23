@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { decideAdminRefundRequest, getAdminRefundRequest, RefundRequestError } from "@/lib/refund-requests";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { assertRefundRequestPaymentMode, ensureRefundOperation, processRefundOperation, RefundPaymentModeError } from "@/lib/refund-lifecycle";
 
-export async function GET(_request: Request, context: { params: Promise<{ requestId: string }> }) {
-  const session = await readSession();
+export async function GET(request: Request, context: { params: Promise<{ requestId: string }> }) {
+  const session = await readAdminRequestSession(request);
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { requestId } = await context.params;
   try {
@@ -16,7 +16,7 @@ export async function GET(_request: Request, context: { params: Promise<{ reques
 }
 
 export async function POST(request: Request, context: { params: Promise<{ requestId: string }> }) {
-  const session = await readSession();
+  const session = await readAdminRequestSession(request);
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { requestId } = await context.params;
   let body: { decision?: unknown; decisionNote?: unknown; returnRequired?: unknown };

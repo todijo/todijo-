@@ -132,14 +132,14 @@ test("buyer order payload exposes normalized progress but no supplier-private co
 test("supplier retry and sync routes require database-verified admin authorization", () => {
   for (const action of ["retry", "sync"]) {
     const source = readFileSync(join(process.cwd(), "app", "api", "admin", "supplier-fulfillments", "[fulfillmentId]", action, "route.ts"), "utf8");
-    assert.match(source, /requireAdmin\(prisma, await readSession\(\)\)/); assert.doesNotMatch(source, /SELLER|CUSTOMER/);
+    assert.match(source, /requireAdmin\(prisma, await readAdminRequestSession\(request\)\)/); assert.doesNotMatch(source, /SELLER|CUSTOMER/);
   }
 });
 
 test("seller CJ submission is an explicit admin-only action, never a seller or automatic route", () => {
   const route = readFileSync(join(process.cwd(), "app", "api", "admin", "supplier-fulfillments", "[fulfillmentId]", "submit-seller", "route.ts"), "utf8");
   assert.match(route, /assertAdminMutationRequest\(request\)/);
-  assert.match(route, /requireAdmin\(prisma, await readSession\(\)\)/);
+  assert.match(route, /requireAdmin\(prisma, await readAdminRequestSession\(request\)\)/);
   assert.match(route, /processSupplierFulfillment\(prisma, fulfillmentId, undefined, true\)/);
   const control = readFileSync(join(process.cwd(), "components", "AdminSupplierFulfillmentControl.tsx"), "utf8");
   assert.match(control, /SELLER_SUPPLIER_ADMIN_REVIEW_REQUIRED/);

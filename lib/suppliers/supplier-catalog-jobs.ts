@@ -96,7 +96,7 @@ export async function verifiedCatalogPricing(provider:SupplierCatalogProvider,sn
   return{status:"VERIFIED_LIVE_FREIGHT",evidence:{variantsExamined:snapshot.variants.length,eligibleVariants:variants.length,variantsProbed:attempts.length,referenceStrategy:"FIRST_PURCHASABLE_VARIANT_WITH_FREIGHT",attempts,supplierVariantId:best.variant.supplierVariantId,quantity:1,originCountry:best.freight.selected.originCountry,destinationCountry,freightMethod:best.freight.selected.name,freightAmount:best.freight.selected.amount,freightCurrency:best.freight.selected.currency,totalIncludedCost:best.calculation.totalIncludedCost,targetMargin:best.calculation.targetMargin,sellingCurrency,referenceSellingPrice:best.presentment.finalSellingPrice,fx:{provider:best.fx.provider,rate:best.fx.rate,effectiveAt:best.fx.effectiveAt},calculatedAt:new Date().toISOString(),source:"CJ_LIVE_FREIGHT_VERIFIED_FX"}};
 }
 
-function quarantineCode(code:string){return code.includes("PRICING")||code.startsWith("FX_")||code.includes("FREIGHT")||code.includes("ORIGIN_OR_COST")||code.includes("PURCHASABLE_VARIANT")||code==="CJ_PRODUCT_NOT_FOUND"||code==="SUPPLIER_PRODUCT_INVALID"||code==="CJ_PRODUCT_INVALID";}
+function quarantineCode(code:string){return code==="PRODUCT_RECALLED"||code.includes("PRICING")||code.startsWith("FX_")||code.includes("FREIGHT")||code.includes("ORIGIN_OR_COST")||code.includes("PURCHASABLE_VARIANT")||code==="CJ_PRODUCT_NOT_FOUND"||code==="SUPPLIER_PRODUCT_INVALID"||code==="CJ_PRODUCT_INVALID";}
 
 async function refreshJobCounts(db:PrismaClient,jobId:string,preserveUpdatedAt?:Date){
   const groups=await db.supplierCatalogImportItem.groupBy({by:["status"],where:{jobId},_count:{_all:true}}),counts=new Map(groups.map((group)=>[group.status,group._count._all]));

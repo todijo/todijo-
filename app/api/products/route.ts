@@ -7,6 +7,7 @@ import { readSession } from "@/lib/session";
 import { requireProductCreationAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
+import { assertNotRecalled, gtinRecallKeys, ProductRecallError } from "@/lib/product-recalls";
 import { ProductVariantImageError } from "@/lib/product-variant-images";
 import { publicProductAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
       suffix += 1;
     }
 
+    const recallIdentity = gtinRecallKeys(compliance.productIdentifier);
     const product = await createProductWithVariants(prisma, {
         name,
         slug,
@@ -120,7 +122,9 @@ export async function POST(request: Request) {
         ...compliance,
         ...productShipping,
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
-      }, variantInput, body.variantImages);
+      }, variantInput, body.variantImages, recallIdentity.length ? async tx => {
+        await assertNotRecalled(tx, recallIdentity);
+      } : undefined);
     await prisma.$transaction((tx)=>replaceProductVideo(tx,product.id,body.video));
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
@@ -128,6 +132,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof SellerSubscriptionError) return NextResponse.json({ error: error.message, code: error.code, redirect: "/seller/subscription" }, { status: error.status });
     if (error instanceof ProductVariantError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProductRecallError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { requirePlatformSupplierAdmin } from "@/lib/suppliers/supplier-access";
 import { AdminAccessError } from "@/lib/admin-access";
 import { syncStalePlatformCjProducts } from "@/lib/suppliers/automatic-sync";
@@ -9,7 +9,7 @@ import { MutationOriginError, assertAdminMutationRequest } from "@/lib/request-s
 export async function POST(request: Request) {
   try {
     assertAdminMutationRequest(request);
-    const session = await readSession();
+    const session = await readAdminRequestSession(request);
     await requirePlatformSupplierAdmin(prisma, session);
     const body = await request.json().catch(() => ({})) as { limit?: unknown; staleMinutes?: unknown };
     const result = await syncStalePlatformCjProducts(prisma, {

@@ -239,6 +239,154 @@ void main() {
     }
   });
 
+  test('Phase 4 admin action and operations copy exists in all 14 locales', () {
+    const keys = [
+      'adminDashboard',
+      'adminUsers',
+      'adminSellers',
+      'adminDropshippingEnable',
+      'adminDropshippingDisable',
+      'adminReason',
+      'adminConfirm',
+      'adminUnpublish',
+      'adminReview',
+      'adminResolve',
+      'adminDismiss',
+      'adminCms',
+      'adminCmsContent',
+      'adminCmsPublish',
+      'adminCmsArchive',
+      'adminReturnRequired',
+      'adminDelete',
+      'adminDeleteWarning',
+      'adminDeleteBlocked',
+      'adminIssues',
+      'adminSubscriptions',
+      'adminTransfers',
+      'adminCjFulfillments',
+      'adminCjImports',
+      'adminCjSync',
+      'adminCjSubmit',
+      'adminCjSubmitWarning',
+      'adminCjMargin',
+      'adminSnapshotMinor',
+      'adminCjCreateImport',
+      'adminCjIdentifiers',
+      'adminCjContinueImport',
+      'adminReleaseTransfer',
+      'adminReleaseTransferWarning',
+      'adminRemoveListing',
+      'adminRemoveWarning',
+      'adminNewsDeleteWarning',
+      'adminPaidOrders30d',
+      'adminGrossVolume30d',
+      'adminGrantAccess',
+      'adminMonths',
+      'adminSeoTitle',
+      'adminSeoDescription',
+      'adminCreateStore',
+      'adminSelectOwner',
+      'adminStoreName',
+      'adminStoreDescription',
+      'adminContactEmail',
+      'adminPhone',
+      'adminCity',
+      'adminInitialAccess',
+    ];
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        expect(copy.text(key).trim(), isNotEmpty, reason: '$locale:$key');
+        expect(copy.text(key), isNot(key), reason: '$locale:$key');
+      }
+    }
+  });
+
+  test('native admin and CMS controls do not fall back to English', () {
+    const keys = [
+      'adminReason',
+      'adminActionFailed',
+      'adminNoUsers',
+      'adminCmsContent',
+      'adminCmsDraft',
+      'adminCmsSaveDraft',
+      'adminCmsPublish',
+      'adminCmsArchive',
+      'adminCmsHistory',
+      'adminSeoTitle',
+      'adminSeoDescription',
+      'adminDeleteWarning',
+      'adminCjSubmitWarning',
+    ];
+    final english = TodijoLocalizations(const Locale('en'));
+    for (final locale in todijoLocaleCodes.where((value) => value != 'en')) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        expect(
+          copy.text(key),
+          isNot(english.text(key)),
+          reason: '$locale:$key',
+        );
+      }
+    }
+  });
+
+  test('all Admin copy is localized in 14 locales, except true cognates', () {
+    final english = TodijoLocalizations.debugCopy['en']!;
+    const cognates = {
+      'fr': {'adminStoreDescription'},
+      'de': {'adminStatus', 'adminModeration'},
+      'nl': {'adminStatus'},
+    };
+    for (final locale in todijoLocaleCodes.where((value) => value != 'en')) {
+      final translated = TodijoLocalizations.debugCopy[locale]!;
+      for (final key in english.keys.where((key) => key.startsWith('admin'))) {
+        if (cognates[locale]?.contains(key) == true) continue;
+        expect(translated[key], isNot(english[key]), reason: '$locale:$key');
+      }
+    }
+  });
+
+  test('admin cancellation, return and dispute states are localized', () {
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final type in ['CANCELLATION', 'RETURN', 'DISPUTE']) {
+        expect(copy.text('adminIssueType.$type'), isNotEmpty);
+      }
+      for (final status in [
+        'PENDING',
+        'UNDER_REVIEW',
+        'ADMIN_APPROVED',
+        'ADMIN_REJECTED',
+        'SELLER_APPROVED',
+        'SELLER_REJECTED',
+        'ESCALATED',
+        'RESOLVED',
+      ]) {
+        expect(copy.text('adminIssueStatus.$status'), isNotEmpty);
+      }
+      for (final key in [
+        'adminIssueDecision',
+        'adminStatusOnlyWarning',
+        'adminReference',
+        'adminEvidence',
+        'adminRecalls',
+        'adminRecall',
+        'adminRecallActive',
+        'adminRecallRevoked',
+        'adminAffectedListings',
+        'adminRevocationReason',
+        'adminRevokeRecall',
+        'adminReactivateRecall',
+        'adminReleaseRecallListing',
+        'adminCreateRecall',
+        'adminPlatformRecallWarning',
+      ]) {
+        expect(copy.text(key), isNotEmpty, reason: '$locale:$key');
+      }
+    }
+  });
+
   test(
     'native auth guidance does not fall back to English in other locales',
     () {

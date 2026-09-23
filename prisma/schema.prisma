@@ -829,10 +829,59 @@ enum OrderIssueType {
 
 enum OrderIssueStatus {
   PENDING
+  UNDER_REVIEW
+  ADMIN_APPROVED
+  ADMIN_REJECTED
   SELLER_APPROVED
   SELLER_REJECTED
   ESCALATED
   RESOLVED
+}
+
+enum ProductRecallStatus {
+  ACTIVE
+  REVOKED
+}
+
+model ProductRecall {
+  id               String              @id @default(cuid())
+  status           ProductRecallStatus @default(ACTIVE)
+  reason           String              @db.VarChar(1000)
+  evidence         String?             @db.VarChar(2000)
+  reference        String?             @db.VarChar(300)
+  createdById      String
+  createdAt        DateTime            @default(now())
+  revokedById      String?
+  revokedAt        DateTime?
+  revocationReason String?             @db.VarChar(1000)
+  keys             ProductRecallKey[]
+  events           ProductRecallEvent[]
+
+  @@index([status, createdAt])
+}
+
+model ProductRecallKey {
+  id       String        @id @default(cuid())
+  recallId String
+  provider String        @db.VarChar(32)
+  kind     String        @db.VarChar(32)
+  value    String        @db.VarChar(200)
+  recall   ProductRecall @relation(fields: [recallId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, kind, value])
+  @@index([recallId])
+}
+
+model ProductRecallEvent {
+  id        String        @id @default(cuid())
+  recallId  String
+  actorId   String
+  action    String        @db.VarChar(32)
+  metadata  Json?
+  createdAt DateTime      @default(now())
+  recall    ProductRecall @relation(fields: [recallId], references: [id], onDelete: Restrict)
+
+  @@index([recallId, createdAt])
 }
 
 model StoreAccessGrant {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { AdminAccessError, requireAdmin } from "@/lib/admin-access";
 import { assertAdminMutationRequest, MutationOriginError } from "@/lib/request-security";
 import { validateTodijoClassification } from "@/lib/suppliers/cj-classification";
@@ -12,7 +12,7 @@ import { PLATFORM_CJ_CONNECTION_ID } from "@/lib/suppliers/supplier-access";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     assertAdminMutationRequest(request);
-    const admin = await requireAdmin(prisma, await readSession());
+    const admin = await requireAdmin(prisma, await readAdminRequestSession(request));
     const category = validateTodijoClassification((await request.json() as { category?: unknown }).category).id;
     const { id } = await params;
     const product = await prisma.product.findFirst({

@@ -151,6 +151,7 @@ test("import blocks duplicates within one connection but permits platform and tw
   const createdVariants: any[] = [];
   let sequence = 0;
   const tx: any = {
+    productRecall: { findFirst: async () => null },
     product: { create: async ({ data }: any) => { const id = `product-${++sequence}`; createdLinks.push(data.supplierLink.create); links.set(supplierIdentityKey(data.supplierLink.create.connectionId, data.supplierLink.create.supplierProductId), id); return { id }; } },
     productOption: { create: async () => ({ id: `option-${sequence}` }) },
     productOptionValue: { create: async () => ({ id: `value-${sequence}` }) },
@@ -159,6 +160,7 @@ test("import blocks duplicates within one connection but permits platform and tw
   };
   const db: any = {
     supplierConnection: { findFirst: async ({ where }: any) => ({ id: where.id }) },
+    productRecall: { findFirst: async () => null },
     supplierProductLink: { findUnique: async ({ where }: any) => { const key = supplierIdentityKey(where.connectionId_supplierProductId.connectionId, where.connectionId_supplierProductId.supplierProductId); const productId = links.get(key); return productId ? { productId } : null; } },
     product: { findUnique: async () => null },
     $transaction: async (callback: any) => callback(tx),
@@ -188,9 +190,10 @@ test("supplier import copies and persists at most 30 ordered images", async () =
   let created:any;
   const db:any={
     supplierConnection:{findFirst:async()=>({id:"platform-cj"})},
+    productRecall:{findFirst:async()=>null},
     supplierProductLink:{findUnique:async()=>null},
     product:{findUnique:async()=>null},
-    $transaction:async(callback:any)=>callback({product:{create:async({data}:any)=>{created=data;return{id:"product-1"};}}}),
+    $transaction:async(callback:any)=>callback({productRecall:{findFirst:async()=>null},product:{create:async({data}:any)=>{created=data;return{id:"product-1"};}}}),
   };
   const provider:any={id:"CJ",isConfigured:()=>true,getProduct:async()=>({provider:"CJ",supplierProductId:"PID",sku:null,title:"Product",description:"Description",categoryReference:null,sourceUrl:null,cost:1,currency:"USD",stock:1,available:true,weightGrams:null,variants:[],media:sourceImages,rawMetadata:{}})};
   const media:any={copyRemote:async(source:any)=>{copied.push(source.url);return{...source,provider:"CLOUDINARY",publicId:`media-${copied.length}`,width:null,height:null,durationMs:null};}};

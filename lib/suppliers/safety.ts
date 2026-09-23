@@ -41,6 +41,12 @@ export function assertProductPublicationEligible(product: PublicationPreflightPr
   }
 }
 
+/** A seller draft edit cannot clear an administrator's moderation hold. */
+export function sellerEditDeactivationReason(current: string, nextStatus: "DRAFT" | "PUBLISHED") {
+  if (current === "ADMIN") return "ADMIN" as const;
+  return nextStatus === "PUBLISHED" ? "NONE" as const : "SELLER" as const;
+}
+
 export function realSupplierFulfillmentAllowed() {
   return false as const;
 }

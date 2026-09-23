@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import { AdminAccessError } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
 import { MutationOriginError, assertAdminMutationRequest } from "@/lib/request-security";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { createCatalogImportJob, listCatalogImportJobs, MAX_CATALOG_JOB_ITEMS } from "@/lib/suppliers/supplier-catalog-jobs";
 import { requirePlatformSupplierAdmin } from "@/lib/suppliers/supplier-access";
 
-export async function GET(){try{const admin=await requirePlatformSupplierAdmin(prisma,await readSession());return NextResponse.json({ok:true,jobs:await listCatalogImportJobs(prisma,admin.id)});}catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});return NextResponse.json({error:"SUPPLIER_CATALOG_JOBS_FAILED"},{status:502});}}
+export async function GET(request:Request){try{const admin=await requirePlatformSupplierAdmin(prisma,await readAdminRequestSession(request));return NextResponse.json({ok:true,jobs:await listCatalogImportJobs(prisma,admin.id)});}catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});return NextResponse.json({error:"SUPPLIER_CATALOG_JOBS_FAILED"},{status:502});}}
 
 export async function POST(request:Request){
   try{
     assertAdminMutationRequest(request);
-    const session=await readSession(),admin=await requirePlatformSupplierAdmin(prisma,session),body=await request.json().catch(()=>({})) as Record<string,unknown>;
+    const session=await readAdminRequestSession(request),admin=await requirePlatformSupplierAdmin(prisma,session),body=await request.json().catch(()=>({})) as Record<string,unknown>;
     const store=await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true}});if(!store)return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
     const canonicalCategoryByIdentifier=typeof body.canonicalCategoryByIdentifier==="object"&&body.canonicalCategoryByIdentifier!==null&&!Array.isArray(body.canonicalCategoryByIdentifier)?body.canonicalCategoryByIdentifier as Record<string,string>:undefined;
     const job=await createCatalogImportJob(prisma,{adminId:admin.id,storeId:store.id,identifiers:body.identifiers,destinationCountry:body.destinationCountry,canonicalCategoryId:typeof body.canonicalCategoryId==="string"?body.canonicalCategoryId:null,canonicalCategoryByIdentifier,batchLimit:body.batchLimit});

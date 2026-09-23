@@ -12,6 +12,7 @@ import { resolveBuyerCurrency } from "@/lib/currency";
 import { verifiedFxRate } from "@/lib/fx";
 import { findOwnedSellerSupplierDuplicate } from "@/lib/suppliers/seller-platform-cj";
 import { catalogComplianceDecision } from "@/lib/suppliers/supplier-catalog-policy";
+import { assertNotRecalled, recallKeys, ProductRecallError } from "@/lib/product-recalls";
 
 function identifier(value: unknown) {
   if (typeof value !== "string" || !/^[\w-]{1,100}$/.test(value)) throw new SupplierAccessError("SUPPLIER_IDENTIFIER_INVALID", 400);
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
     }
     const supplierProductId = identifier(body.supplierProductId);
     const snapshot = await provider.getProduct(supplierProductId);
+    await assertNotRecalled(prisma, recallKeys({ provider: provider.id, supplierProductId: snapshot.supplierProductId, supplierSku: snapshot.sku, variants: snapshot.variants }));
     if (body.action === "detail") {
       const classification = classifyCjProduct(snapshot);
       const compliance = catalogComplianceDecision(snapshot);
@@ -89,6 +91,7 @@ export async function POST(request: Request) {
     }
     throw new SupplierAccessError("SUPPLIER_ACTION_INVALID", 400);
   } catch (error) {
+    if (error instanceof ProductRecallError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof SupplierAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     const failure = mobileSellerError(error);
     if (failure.code !== "SELLER_UNAVAILABLE") return NextResponse.json({ error: failure.code }, { status: failure.status });

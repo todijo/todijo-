@@ -2,6 +2,9 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const locales = ["en", "fr", "ar", "ku", "tr", "de", "es", "it", "nl", "zh", "fa", "hi", "pt", "ru"];
+const { adminUserManagementMessages } = await import("../../i18n/admin-user-management.ts");
+const { dropshippingAccessMessages } = await import("../../i18n/dropshipping-access.ts");
+const { siteContentMessages } = await import("../../i18n/site-content.ts");
 const selectors = {
   appName: ["root", "Metadata.brand"],
   loading: ["root", "Common.loading"],
@@ -498,6 +501,8 @@ for (const locale of locales) {
   countryNames[locale] = Object.fromEntries(shippingCountries.map(code => [code, display.of(code) ?? code]));
   const sources = {
     root: JSON.parse(readFileSync(resolve(root, `messages/${locale}.json`), "utf8")),
+    admin: JSON.parse(readFileSync(resolve(root, `messages/admin/${locale}.json`), "utf8")),
+    trust: JSON.parse(readFileSync(resolve(root, `messages/trust-safety/${locale}.json`), "utf8")),
     auth: JSON.parse(readFileSync(resolve(root, `messages/auth/${locale}.json`), "utf8")),
     dashboard: JSON.parse(readFileSync(resolve(root, `messages/dashboard-premium/${locale}.json`), "utf8")),
     header: JSON.parse(readFileSync(resolve(root, `messages/home-header/${locale}.json`), "utf8")),
@@ -531,6 +536,23 @@ for (const locale of locales) {
   for (const status of ["PENDING", "SELLER_APPROVED", "SELLER_REJECTED", "ADMIN_APPROVED", "ADMIN_REJECTED"]) {
     copy[locale][`sellerRefundStatus.${status}`] = pick(sources.orders, `refundRequest.status.${status}`);
   }
+  for (const type of ["CANCELLATION", "RETURN", "DISPUTE"]) {
+    copy[locale][`adminIssueType.${type}`] = pick(sources.orders, `lifecycle.${type}_REQUESTED`);
+  }
+  for (const status of ["PENDING", "SELLER_APPROVED", "SELLER_REJECTED"]) {
+    copy[locale][`adminIssueStatus.${status}`] = copy[locale][`sellerRefundStatus.${status}`];
+  }
+  copy[locale]['adminIssueStatus.RESOLVED'] = sources.trust.status.RESOLVED;
+  for (const status of ['ADMIN_APPROVED', 'ADMIN_REJECTED']) {
+    copy[locale][`adminIssueStatus.${status}`] = copy[locale][`sellerRefundStatus.${status}`];
+  }
+  copy[locale]['adminIssueStatus.UNDER_REVIEW'] = sellerVerificationLabels[locale][3];
+  copy[locale]['adminIssueStatus.ESCALATED'] = ({
+    en: 'Escalated', fr: 'Transmis à Todijo', ar: 'تم التصعيد', ku: 'بەرزکرایەوە',
+    tr: 'Üst incelemeye alındı', de: 'Eskaliert', es: 'Escalado', it: 'Inoltrato',
+    nl: 'Geëscaleerd', zh: '已升级处理', fa: 'ارجاع داده شد', hi: 'उच्च स्तर पर भेजा गया',
+    pt: 'Encaminhado', ru: 'Передано на рассмотрение',
+  })[locale];
   Object.assign(copy[locale], nativeCopy[locale]);
   Object.assign(copy[locale], nativeExtraCopy[locale]);
   copy[locale].productColor = nativeVariantLabels[locale][0];
@@ -574,6 +596,299 @@ for (const locale of locales) {
     copy[locale][key] = value;
   }
   copy[locale].cjQuarantined = cjQuarantineLabels[locale];
+  const adminLabels = {
+    adminDashboard: sources.admin.title,
+    adminUsers: adminUserManagementMessages[locale].title,
+    adminSellers: sources.admin.sellersTitle,
+    adminStores: sources.admin.stores,
+    adminCreateStore: sources.admin.createStore,
+    adminSelectOwner: sources.admin.selectOwner,
+    adminStoreName: sources.admin.storeName,
+    adminStoreDescription: sources.admin.description,
+    adminContactEmail: sources.admin.email,
+    adminPhone: sources.admin.phone,
+    adminCity: sources.admin.city,
+    adminInitialAccess: sources.admin.initialAccess,
+    adminActiveAccess: sources.admin.activeAccess,
+    adminPendingRefunds: sources.admin.reviewRefundRequests,
+    adminDropshippingEnable: dropshippingAccessMessages[locale].enablePermission,
+    adminDropshippingDisable: dropshippingAccessMessages[locale].disablePermission,
+    adminSearchUsers: adminUserManagementMessages[locale].search,
+    adminUser: adminUserManagementMessages[locale].user,
+    adminRole: adminUserManagementMessages[locale].role,
+    adminStatus: adminUserManagementMessages[locale].status,
+    adminReason: adminUserManagementMessages[locale].reason,
+    adminDecisionNote: sources.trust.decisionNote,
+    adminAccessExpiry: sources.admin.expiry,
+    adminConfirm: adminUserManagementMessages[locale].confirm,
+    adminActionFailed: adminUserManagementMessages[locale].failed,
+    adminNoUsers: adminUserManagementMessages[locale].noUsers,
+    adminBlock: adminUserManagementMessages[locale].BLOCK,
+    adminUnblock: adminUserManagementMessages[locale].UNBLOCK,
+    adminSuspend: adminUserManagementMessages[locale].SELLER_SUSPEND,
+    adminRestore: adminUserManagementMessages[locale].SELLER_RESTORE,
+    adminAnonymize: adminUserManagementMessages[locale].ANONYMIZE,
+    adminOrders: sources.admin.ordersTitle,
+    adminModeration: sources.trust.title,
+    adminUnpublish: sources.trust.action.UNPUBLISH,
+    adminReview: sources.trust.status.UNDER_REVIEW,
+    adminResolve: sources.trust.status.RESOLVED,
+    adminDismiss: sources.trust.status.DISMISSED,
+    adminEmptyQueue: sources.trust.emptyQueue,
+    adminCms: siteContentMessages[locale].title,
+    adminCmsContent: siteContentMessages[locale].content,
+    adminSeoTitle: ({ en: 'SEO title', fr: 'Titre SEO', ar: 'عنوان تحسين محركات البحث',
+      ku: 'ناونیشانی SEO', tr: 'SEO başlığı', de: 'SEO-Titel', es: 'Título SEO',
+      it: 'Titolo SEO', nl: 'SEO-titel', zh: '搜索引擎标题', fa: 'عنوان سئو',
+      hi: 'SEO शीर्षक', pt: 'Título SEO', ru: 'SEO-заголовок' })[locale],
+    adminSeoDescription: ({ en: 'SEO description', fr: 'Description SEO',
+      ar: 'وصف تحسين محركات البحث', ku: 'وەسفی SEO', tr: 'SEO açıklaması',
+      de: 'SEO-Beschreibung', es: 'Descripción SEO', it: 'Descrizione SEO',
+      nl: 'SEO-omschrijving', zh: '搜索引擎描述', fa: 'توضیح سئو',
+      hi: 'SEO विवरण', pt: 'Descrição SEO', ru: 'SEO-описание' })[locale],
+    adminCmsDraft: siteContentMessages[locale].draft,
+    adminCmsSaveDraft: siteContentMessages[locale].saveDraft,
+    adminCmsPublish: siteContentMessages[locale].publish,
+    adminCmsArchive: siteContentMessages[locale].archive,
+    adminCmsHistory: siteContentMessages[locale].history,
+    adminReturnRequired: ({
+      en: 'Require a return', fr: 'Retour requis', ar: 'الإرجاع مطلوب', ku: 'گەڕاندنەوە پێویستە',
+      tr: 'İade gerekli', de: 'Rücksendung erforderlich', es: 'Devolución requerida',
+      it: 'Reso richiesto', nl: 'Retour vereist', zh: '需要退货', fa: 'بازگشت کالا لازم است',
+      hi: 'वापसी आवश्यक', pt: 'Devolução necessária', ru: 'Требуется возврат',
+    })[locale],
+    adminCjMargin: ({
+      en: 'Platform CJ target margin', fr: 'Marge cible CJ de la plateforme',
+      ar: 'هامش CJ المستهدف للمنصة', ku: 'قازانجی ئامانجی CJ بۆ پلاتفۆرم',
+      tr: 'Platform CJ hedef marjı', de: 'CJ-Zielmarge der Plattform',
+      es: 'Margen objetivo CJ de la plataforma', it: 'Margine obiettivo CJ della piattaforma',
+      nl: 'CJ-doelmarge van het platform', zh: '平台 CJ 目标利润率',
+      fa: 'حاشیه سود هدف CJ پلتفرم', hi: 'प्लेटफ़ॉर्म CJ लक्ष्य मार्जिन',
+      pt: 'Margem alvo CJ da plataforma', ru: 'Целевая маржа CJ платформы',
+    })[locale],
+    adminSnapshotMinor: ({
+      en: 'Original net snapshot (minor units)', fr: 'Montant net initial (unités mineures)',
+      ar: 'صافي المبلغ الأصلي (وحدات صغرى)', ku: 'بڕی پاکی سەرەتایی (یەکەی بچووک)',
+      tr: 'İlk net tutar (alt birim)', de: 'Ursprünglicher Nettobetrag (Untereinheiten)',
+      es: 'Importe neto inicial (unidades menores)', it: 'Importo netto iniziale (unità minori)',
+      nl: 'Oorspronkelijk nettobedrag (kleine eenheden)', zh: '原始净额（最小货币单位）',
+      fa: 'مبلغ خالص اولیه (واحد خرد)', hi: 'मूल शुद्ध राशि (छोटी इकाई)',
+      pt: 'Montante líquido inicial (unidades menores)', ru: 'Исходная чистая сумма (малые единицы)',
+    })[locale],
+    adminCjContinueImport: ({
+      en: 'Process next CJ batch', fr: 'Traiter le prochain lot CJ', ar: 'معالجة دفعة CJ التالية',
+      ku: 'چارەسەرکردنی دەستەی داهاتووی CJ', tr: 'Sonraki CJ grubunu işle',
+      de: 'Nächsten CJ-Stapel verarbeiten', es: 'Procesar siguiente lote CJ',
+      it: 'Elabora il prossimo lotto CJ', nl: 'Volgende CJ-batch verwerken',
+      zh: '处理下一批 CJ', fa: 'پردازش دسته بعدی CJ', hi: 'अगला CJ बैच संसाधित करें',
+      pt: 'Processar próximo lote CJ', ru: 'Обработать следующую партию CJ',
+    })[locale],
+    ...Object.fromEntries(['adminReleaseTransfer', 'adminReleaseTransferWarning'].map((key, index) => [key, ({
+      en: ['Release high-risk seller transfer', 'This releases a verified shipped order for server-controlled payout. Provide an audit reason.'],
+      fr: ['Libérer le virement vendeur à haut risque', 'Cette action autorise le paiement contrôlé par le serveur pour une commande expédiée et vérifiée. Indiquez un motif d’audit.'],
+      ar: ['الإفراج عن تحويل البائع عالي المخاطر', 'يسمح هذا بدفع تتحكم به المنصة لطلب شُحن وتم التحقق منه. أدخل سببًا للتدقيق.'],
+      ku: ['ئازادکردنی گواستنەوەی فرۆشیاری مەترسیدار', 'ئەمە پارەدانێکی بە کۆنترۆڵی سێرڤەر بۆ داواکارییەکی نێردراو و پشتڕاستکراو ڕێگەپێدەدات. هۆکارێکی تۆمارکردن بنووسە.'],
+      tr: ['Yüksek riskli satıcı transferini serbest bırak', 'Bu işlem doğrulanmış gönderinin sunucu kontrollü ödemesini açar. Denetim gerekçesi girin.'],
+      de: ['Hochrisiko-Verkäufertransfer freigeben', 'Dies ermöglicht eine servergesteuerte Auszahlung für eine verifizierte Sendung. Prüfgrund angeben.'],
+      es: ['Liberar transferencia de vendedor de alto riesgo', 'Esto permite un pago controlado por el servidor de un pedido enviado y verificado. Indique un motivo de auditoría.'],
+      it: ['Sblocca trasferimento venditore ad alto rischio', 'Consente un pagamento controllato dal server per un ordine spedito e verificato. Indica un motivo di controllo.'],
+      nl: ['Risicovolle verkoperstransfer vrijgeven', 'Dit maakt een servergestuurde uitbetaling mogelijk voor een geverifieerde verzending. Geef een auditreden op.'],
+      zh: ['放行高风险卖家转账', '这将允许服务器控制的已核实发货订单付款。请填写审计原因。'],
+      fa: ['آزادسازی انتقال فروشنده پرخطر', 'این کار پرداخت تحت کنترل سرور را برای سفارش ارسال‌شده و تأییدشده مجاز می‌کند. دلیل ممیزی را وارد کنید.'],
+      hi: ['उच्च जोखिम विक्रेता हस्तांतरण जारी करें', 'यह सत्यापित भेजे गए ऑर्डर के सर्वर-नियंत्रित भुगतान को अनुमति देता है। ऑडिट कारण दें।'],
+      pt: ['Libertar transferência de vendedor de alto risco', 'Isto permite pagamento controlado pelo servidor para uma encomenda enviada e verificada. Indique um motivo de auditoria.'],
+      ru: ['Разрешить перевод продавцу с высоким риском', 'Это разрешит выплату под контролем сервера по проверенному отправленному заказу. Укажите причину для аудита.'],
+    })[locale][index]])),
+    ...Object.fromEntries(['adminCjCreateImport', 'adminCjIdentifiers'].map((key, index) => [key, ({
+      en: ['Create CJ import job', 'CJ product identifiers'],
+      fr: ['Créer un import CJ', 'Identifiants produits CJ'],
+      ar: ['إنشاء مهمة استيراد CJ', 'معرّفات منتجات CJ'],
+      ku: ['دروستکردنی کاری هاوردەی CJ', 'ناسێنەرەکانی کاڵای CJ'],
+      tr: ['CJ içe aktarma işi oluştur', 'CJ ürün kimlikleri'],
+      de: ['CJ-Importauftrag erstellen', 'CJ-Produktkennungen'],
+      es: ['Crear tarea de importación CJ', 'Identificadores de productos CJ'],
+      it: ['Crea attività di importazione CJ', 'Identificativi prodotti CJ'],
+      nl: ['CJ-importtaak maken', 'CJ-productcodes'],
+      zh: ['创建 CJ 导入任务', 'CJ 商品标识'],
+      fa: ['ایجاد کار واردات CJ', 'شناسه‌های محصول CJ'],
+      hi: ['CJ आयात कार्य बनाएँ', 'CJ उत्पाद पहचानकर्ता'],
+      pt: ['Criar tarefa de importação CJ', 'Identificadores de produtos CJ'],
+      ru: ['Создать задачу импорта CJ', 'Идентификаторы товаров CJ'],
+    })[locale][index]])),
+    adminRemoveListing: ({
+      en: 'Remove listing', fr: 'Retirer l’annonce', ar: 'إزالة الإعلان', ku: 'لابردنی کاڵا',
+      tr: 'İlanı kaldır', de: 'Angebot entfernen', es: 'Retirar anuncio', it: 'Rimuovi annuncio',
+      nl: 'Advertentie verwijderen', zh: '移除商品', fa: 'حذف آگهی', hi: 'लिस्टिंग हटाएँ',
+      pt: 'Remover anúncio', ru: 'Удалить объявление',
+    })[locale],
+    adminRemoveWarning: ({
+      en: 'This may permanently remove the listing and its media when no protected history exists.',
+      fr: 'Cette action peut supprimer définitivement l’annonce et ses médias si aucun historique protégé n’existe.',
+      ar: 'قد يؤدي هذا إلى حذف الإعلان ووسائطه نهائيًا إذا لم يوجد سجل محمي.',
+      ku: 'ئەگەر مێژووی پارێزراو نەبێت، ئەم کردارە دەتوانێت کاڵا و میدیاکانی بە هەمیشەیی بسڕێتەوە.',
+      tr: 'Korunan geçmiş yoksa ilan ve medyası kalıcı olarak silinebilir.',
+      de: 'Ohne geschützte Historie können Angebot und Medien dauerhaft gelöscht werden.',
+      es: 'Si no hay historial protegido, el anuncio y sus archivos pueden eliminarse definitivamente.',
+      it: 'Senza uno storico protetto, annuncio e media possono essere eliminati definitivamente.',
+      nl: 'Zonder beschermde geschiedenis kunnen advertentie en media definitief worden verwijderd.',
+      zh: '若无受保护的历史记录，商品及媒体可能被永久删除。',
+      fa: 'اگر سابقهٔ محافظت‌شده‌ای نباشد، آگهی و رسانه‌های آن ممکن است برای همیشه حذف شوند.',
+      hi: 'सुरक्षित इतिहास न होने पर लिस्टिंग और मीडिया स्थायी रूप से हट सकते हैं।',
+      pt: 'Sem histórico protegido, o anúncio e os seus ficheiros podem ser eliminados permanentemente.',
+      ru: 'Если защищённой истории нет, объявление и медиа могут быть удалены навсегда.',
+    })[locale],
+    adminNewsDeleteWarning: ({
+      en: 'Delete this news article permanently?', fr: 'Supprimer définitivement cette actualité ?',
+      ar: 'هل تريد حذف هذا الخبر نهائيًا؟', ku: 'ئەم هەواڵە بە هەمیشەیی بسڕدرێتەوە؟',
+      tr: 'Bu haberi kalıcı olarak sil?', de: 'Diesen Artikel endgültig löschen?',
+      es: '¿Eliminar esta noticia definitivamente?', it: 'Eliminare definitivamente questa notizia?',
+      nl: 'Dit nieuwsbericht definitief verwijderen?', zh: '永久删除这篇新闻？',
+      fa: 'این خبر برای همیشه حذف شود؟', hi: 'इस समाचार को स्थायी रूप से हटाएँ?',
+      pt: 'Eliminar esta notícia permanentemente?', ru: 'Удалить эту новость навсегда?',
+    })[locale],
+    ...Object.fromEntries(['adminGrantAccess', 'adminMonths'].map((key, index) => [key, ({
+      en: ['Extend managed access', 'months'], fr: ['Prolonger l’accès géré', 'mois'],
+      ar: ['تمديد الوصول المُدار', 'أشهر'], ku: ['درێژکردنەوەی دەستگەیشتنی بەڕێوەبراو', 'مانگ'],
+      tr: ['Yönetilen erişimi uzat', 'ay'], de: ['Verwalteten Zugang verlängern', 'Monate'],
+      es: ['Ampliar acceso administrado', 'meses'], it: ['Estendi accesso gestito', 'mesi'],
+      nl: ['Beheerde toegang verlengen', 'maanden'], zh: ['延长托管访问', '个月'],
+      fa: ['تمدید دسترسی مدیریت‌شده', 'ماه'], hi: ['प्रबंधित पहुँच बढ़ाएँ', 'महीने'],
+      pt: ['Prolongar acesso gerido', 'meses'], ru: ['Продлить управляемый доступ', 'месяцев'],
+    })[locale][index]])),
+    ...Object.fromEntries(['adminPaidOrders30d', 'adminGrossVolume30d'].map((key, index) => [key, ({
+      en: ['Paid orders · 30 days', 'Gross paid order volume · 30 days'],
+      fr: ['Commandes payées · 30 jours', 'Volume brut des commandes payées · 30 jours'],
+      ar: ['الطلبات المدفوعة · ٣٠ يومًا', 'إجمالي قيمة الطلبات المدفوعة · ٣٠ يومًا'],
+      ku: ['داواکاری پارەدراوەکان · ٣٠ ڕۆژ', 'کۆی پارەی داواکاری پارەدراوەکان · ٣٠ ڕۆژ'],
+      tr: ['Ödenen siparişler · 30 gün', 'Brüt ödenmiş sipariş hacmi · 30 gün'],
+      de: ['Bezahlte Bestellungen · 30 Tage', 'Bruttovolumen bezahlter Bestellungen · 30 Tage'],
+      es: ['Pedidos pagados · 30 días', 'Volumen bruto de pedidos pagados · 30 días'],
+      it: ['Ordini pagati · 30 giorni', 'Volume lordo degli ordini pagati · 30 giorni'],
+      nl: ['Betaalde bestellingen · 30 dagen', 'Brutovolume betaalde bestellingen · 30 dagen'],
+      zh: ['已付款订单 · 30 天', '已付款订单总额 · 30 天'],
+      fa: ['سفارش‌های پرداخت‌شده · ۳۰ روز', 'حجم ناخالص سفارش‌های پرداخت‌شده · ۳۰ روز'],
+      hi: ['भुगतान किए गए ऑर्डर · 30 दिन', 'भुगतान किए गए ऑर्डर का सकल मूल्य · 30 दिन'],
+      pt: ['Encomendas pagas · 30 dias', 'Volume bruto de encomendas pagas · 30 dias'],
+      ru: ['Оплаченные заказы · 30 дней', 'Валовой объём оплаченных заказов · 30 дней'],
+    })[locale][index]])),
+    ...Object.fromEntries([
+      'adminDelete', 'adminDeleteWarning', 'adminDeleteBlocked',
+    ].map((key, index) => [key, ({
+      en: ['Delete permanently', 'This irreversible action also removes the account’s store and products. Type DELETE to confirm.', 'Protected records prevent permanent deletion. Use anonymization instead.'],
+      fr: ['Supprimer définitivement', 'Cette action irréversible supprime aussi la boutique et ses produits. Saisissez DELETE pour confirmer.', 'Des données protégées empêchent la suppression. Utilisez plutôt l’anonymisation.'],
+      ar: ['حذف نهائي', 'هذا الإجراء غير قابل للتراجع ويحذف المتجر والمنتجات أيضًا. اكتب DELETE للتأكيد.', 'تمنع السجلات المحمية الحذف النهائي. استخدم إخفاء الهوية بدلاً من ذلك.'],
+      ku: ['سڕینەوەی هەمیشەیی', 'ئەم کردارە ناگەڕێتەوە و دوکان و کاڵاکانیش دەسڕێتەوە. بۆ پشتڕاستکردنەوە DELETE بنووسە.', 'تۆمارە پارێزراوەکان ڕێگە بە سڕینەوە نادەن. ناسنامەسڕینەوە بەکاربهێنە.'],
+      tr: ['Kalıcı olarak sil', 'Bu işlem geri alınamaz; mağazayı ve ürünleri de siler. Onay için DELETE yazın.', 'Korunan kayıtlar silmeyi engelliyor. Bunun yerine anonimleştirin.'],
+      de: ['Endgültig löschen', 'Dies ist unwiderruflich und löscht auch Shop und Produkte. Zur Bestätigung DELETE eingeben.', 'Geschützte Datensätze verhindern die Löschung. Stattdessen anonymisieren.'],
+      es: ['Eliminar definitivamente', 'Esta acción irreversible elimina también la tienda y los productos. Escriba DELETE para confirmar.', 'Los registros protegidos impiden la eliminación. Use la anonimización.'],
+      it: ['Elimina definitivamente', 'Questa azione irreversibile elimina anche negozio e prodotti. Digita DELETE per confermare.', 'I dati protetti impediscono l’eliminazione. Usa l’anonimizzazione.'],
+      nl: ['Definitief verwijderen', 'Deze actie kan niet ongedaan worden gemaakt en verwijdert ook winkel en producten. Typ DELETE ter bevestiging.', 'Beschermde gegevens verhinderen verwijdering. Gebruik anonimiseren.'],
+      zh: ['永久删除', '此操作不可撤销，也会删除店铺和商品。输入 DELETE 确认。', '受保护的记录阻止永久删除。请改用匿名化。'],
+      fa: ['حذف دائمی', 'این کار بازگشت‌ناپذیر است و فروشگاه و محصولات را نیز حذف می‌کند. برای تأیید DELETE را وارد کنید.', 'سوابق محافظت‌شده مانع حذف هستند. از ناشناس‌سازی استفاده کنید.'],
+      hi: ['स्थायी रूप से हटाएँ', 'यह कार्रवाई वापस नहीं हो सकती और स्टोर व उत्पाद भी हटाती है। पुष्टि के लिए DELETE लिखें।', 'सुरक्षित रिकॉर्ड हटाने से रोकते हैं। इसके बजाय अनामीकरण करें।'],
+      pt: ['Eliminar permanentemente', 'Esta ação irreversível também elimina a loja e os produtos. Escreva DELETE para confirmar.', 'Registos protegidos impedem a eliminação. Use anonimização.'],
+      ru: ['Удалить навсегда', 'Это необратимое действие также удалит магазин и товары. Для подтверждения введите DELETE.', 'Защищённые записи не позволяют удалить аккаунт. Используйте обезличивание.'],
+    })[locale][index]])),
+    ...Object.fromEntries([
+      'adminIssues', 'adminSubscriptions', 'adminTransfers', 'adminCjFulfillments', 'adminCjImports',
+    ].map((key, index) => [key, ({
+      en: ['Issues and disputes', 'Subscriptions', 'Seller transfers', 'CJ fulfillments', 'CJ imports'],
+      fr: ['Incidents et litiges', 'Abonnements', 'Virements vendeurs', 'Expéditions CJ', 'Imports CJ'],
+      ar: ['المشكلات والنزاعات', 'الاشتراكات', 'تحويلات البائعين', 'شحنات CJ', 'واردات CJ'],
+      ku: ['کێشە و ناکۆکییەکان', 'بەشداریکردنەکان', 'گواستنەوەی فرۆشیاران', 'ناردنەکانی CJ', 'هاوردەکانی CJ'],
+      tr: ['Sorunlar ve anlaşmazlıklar', 'Abonelikler', 'Satıcı transferleri', 'CJ gönderileri', 'CJ ithalatları'],
+      de: ['Probleme und Streitfälle', 'Abonnements', 'Verkäuferauszahlungen', 'CJ-Lieferungen', 'CJ-Importe'],
+      es: ['Problemas y disputas', 'Suscripciones', 'Transferencias a vendedores', 'Envíos CJ', 'Importaciones CJ'],
+      it: ['Problemi e controversie', 'Abbonamenti', 'Trasferimenti venditori', 'Spedizioni CJ', 'Importazioni CJ'],
+      nl: ['Problemen en geschillen', 'Abonnementen', 'Verkopertransfers', 'CJ-verzendingen', 'CJ-importen'],
+      zh: ['问题与争议', '订阅', '卖家转账', 'CJ 履约', 'CJ 导入'],
+      fa: ['مسائل و اختلافات', 'اشتراک‌ها', 'انتقال‌های فروشندگان', 'ارسال‌های CJ', 'واردات CJ'],
+      hi: ['समस्याएँ और विवाद', 'सदस्यताएँ', 'विक्रेता स्थानांतरण', 'CJ पूर्ति', 'CJ आयात'],
+      pt: ['Problemas e disputas', 'Assinaturas', 'Transferências de vendedores', 'Envios CJ', 'Importações CJ'],
+      ru: ['Проблемы и споры', 'Подписки', 'Переводы продавцам', 'Поставки CJ', 'Импорт CJ'],
+    })[locale][index]])),
+    ...Object.fromEntries([
+      'adminCjSync', 'adminCjSubmit', 'adminCjSubmitWarning',
+    ].map((key, index) => [key, ({
+      en: ['Sync supplier status', 'Approve supplier submission', 'This sends a real seller order to the supplier through Todijo’s existing manual approval workflow.'],
+      fr: ['Synchroniser le statut fournisseur', 'Approuver l’envoi au fournisseur', 'Cette action transmet une vraie commande vendeur au fournisseur via la validation manuelle de Todijo.'],
+      ar: ['مزامنة حالة المورّد', 'الموافقة على إرسال الطلب للمورّد', 'يرسل هذا طلب بائع حقيقيًا إلى المورّد عبر مسار الموافقة اليدوية في Todijo.'],
+      ku: ['هاوکاتکردنی دۆخی دابینکەر', 'پەسەندکردنی ناردن بۆ دابینکەر', 'ئەمە داواکارییەکی ڕاستەقینەی فرۆشیار لە ڕێگەی پەسەندکردنی دەستی Todijo ـەوە دەنێرێت.'],
+      tr: ['Tedarikçi durumunu eşitle', 'Tedarikçiye gönderimi onayla', 'Bu işlem gerçek bir satıcı siparişini Todijo’nun manuel onay süreciyle tedarikçiye gönderir.'],
+      de: ['Lieferantenstatus synchronisieren', 'Lieferantenauftrag freigeben', 'Dadurch wird eine echte Verkäuferbestellung über Todijos manuelle Freigabe an den Lieferanten gesendet.'],
+      es: ['Sincronizar estado del proveedor', 'Aprobar envío al proveedor', 'Esto envía un pedido real del vendedor al proveedor mediante la aprobación manual de Todijo.'],
+      it: ['Sincronizza stato fornitore', 'Approva invio al fornitore', 'Questa azione invia un ordine reale del venditore tramite l’approvazione manuale di Todijo.'],
+      nl: ['Leveranciersstatus synchroniseren', 'Leveranciersinzending goedkeuren', 'Hiermee wordt een echte verkopersbestelling via Todijo’s handmatige goedkeuring naar de leverancier gestuurd.'],
+      zh: ['同步供应商状态', '批准提交给供应商', '这会通过 Todijo 现有的人工审批流程向供应商发送真实卖家订单。'],
+      fa: ['همگام‌سازی وضعیت تأمین‌کننده', 'تأیید ارسال به تأمین‌کننده', 'این کار سفارش واقعی فروشنده را از مسیر تأیید دستی Todijo به تأمین‌کننده می‌فرستد.'],
+      hi: ['आपूर्तिकर्ता स्थिति सिंक करें', 'आपूर्तिकर्ता को भेजना स्वीकृत करें', 'यह Todijo की मौजूदा मैन्युअल स्वीकृति प्रक्रिया से वास्तविक विक्रेता ऑर्डर भेजता है।'],
+      pt: ['Sincronizar estado do fornecedor', 'Aprovar envio ao fornecedor', 'Isto envia uma encomenda real do vendedor pelo fluxo de aprovação manual da Todijo.'],
+      ru: ['Синхронизировать статус поставщика', 'Одобрить отправку поставщику', 'Это отправит реальный заказ продавца поставщику через ручное согласование Todijo.'],
+    })[locale][index]])),
+  };
+  for (const [key, value] of Object.entries(adminLabels)) {
+    if (typeof value !== "string" || !value.trim()) throw new Error(`${locale}:${key} missing admin copy`);
+    copy[locale][key] = value;
+  }
+  // The web admin catalogs intentionally fall back to English for some locales.
+  // Native admin controls need complete visible copy without changing web behavior.
+  const nativeAdminKeys = [
+    'adminReason', 'adminActionFailed', 'adminNoUsers', 'adminCmsContent',
+    'adminCmsDraft', 'adminCmsSaveDraft', 'adminCmsPublish', 'adminCmsArchive', 'adminCmsHistory',
+  ];
+  const nativeAdminCopy = {
+    en: ['Required reason', 'The action could not be completed.', 'No users match these filters.', 'Content', 'Draft', 'Save draft', 'Publish', 'Archive', 'Version history'],
+    fr: ['Motif obligatoire', 'L’action n’a pas pu être effectuée.', 'Aucun utilisateur ne correspond aux filtres.', 'Contenu', 'Brouillon', 'Enregistrer le brouillon', 'Publier', 'Archiver', 'Historique des versions'],
+    ar: ['السبب مطلوب', 'تعذر تنفيذ الإجراء.', 'لا يوجد مستخدمون مطابقون.', 'المحتوى', 'مسودة', 'حفظ المسودة', 'نشر', 'أرشفة', 'سجل الإصدارات'],
+    ku: ['هۆکار پێویستە', 'کردارەکە ئەنجام نەدرا.', 'هیچ بەکارهێنەرێک نەدۆزرایەوە.', 'ناوەڕۆک', 'ڕەشنووس', 'پاشەکەوتکردنی ڕەشنووس', 'بڵاوکردنەوە', 'ئەرشیفکردن', 'مێژووی وەشانەکان'],
+    tr: ['Gerekli gerekçe', 'İşlem tamamlanamadı.', 'Eşleşen kullanıcı yok.', 'İçerik', 'Taslak', 'Taslağı kaydet', 'Yayımla', 'Arşivle', 'Sürüm geçmişi'],
+    de: ['Begründung erforderlich', 'Die Aktion konnte nicht abgeschlossen werden.', 'Keine passenden Benutzer.', 'Inhalt', 'Entwurf', 'Entwurf speichern', 'Veröffentlichen', 'Archivieren', 'Versionsverlauf'],
+    es: ['Motivo obligatorio', 'No se pudo completar la acción.', 'No hay usuarios coincidentes.', 'Contenido', 'Borrador', 'Guardar borrador', 'Publicar', 'Archivar', 'Historial de versiones'],
+    it: ['Motivo obbligatorio', 'Impossibile completare l’azione.', 'Nessun utente corrispondente.', 'Contenuto', 'Bozza', 'Salva bozza', 'Pubblica', 'Archivia', 'Cronologia versioni'],
+    nl: ['Reden vereist', 'De actie kon niet worden voltooid.', 'Geen overeenkomende gebruikers.', 'Inhoud', 'Concept', 'Concept opslaan', 'Publiceren', 'Archiveren', 'Versiegeschiedenis'],
+    zh: ['必须填写原因', '操作无法完成。', '没有符合条件的用户。', '内容', '草稿', '保存草稿', '发布', '归档', '版本历史'],
+    fa: ['دلیل الزامی است', 'انجام این اقدام ممکن نشد.', 'کاربری مطابق پیدا نشد.', 'محتوا', 'پیش‌نویس', 'ذخیره پیش‌نویس', 'انتشار', 'بایگانی', 'تاریخچه نسخه‌ها'],
+    hi: ['कारण आवश्यक है', 'कार्रवाई पूरी नहीं हो सकी।', 'कोई मिलान करने वाला उपयोगकर्ता नहीं।', 'सामग्री', 'मसौदा', 'मसौदा सहेजें', 'प्रकाशित करें', 'संग्रह करें', 'संस्करण इतिहास'],
+    pt: ['Motivo obrigatório', 'Não foi possível concluir a ação.', 'Nenhum utilizador correspondente.', 'Conteúdo', 'Rascunho', 'Guardar rascunho', 'Publicar', 'Arquivar', 'Histórico de versões'],
+    ru: ['Причина обязательна', 'Не удалось выполнить действие.', 'Подходящие пользователи не найдены.', 'Содержимое', 'Черновик', 'Сохранить черновик', 'Опубликовать', 'Архивировать', 'История версий'],
+  };
+  for (const [index, key] of nativeAdminKeys.entries()) {
+    copy[locale][key] = nativeAdminCopy[locale][index];
+  }
+  const recallKeys = ['adminIssueDecision', 'adminStatusOnlyWarning', 'adminReference', 'adminEvidence',
+    'adminRecalls', 'adminRecall', 'adminRecallActive', 'adminRecallRevoked',
+    'adminAffectedListings', 'adminRevocationReason', 'adminRevokeRecall', 'adminCreateRecall', 'adminPlatformRecallWarning'];
+  const recallCopy = {
+    en: ['Decide issue status', 'Status only. No refund or payment is made.', 'Reference', 'Evidence', 'Product recalls', 'Product recall', 'Active', 'Revoked', 'Affected listings', 'Reason for revocation', 'Revoke recall', 'Create platform recall', 'Blocks every listing with the same supplier identity across sellers.'],
+    fr: ['Décider du statut du litige', 'Statut uniquement. Aucun remboursement ni paiement.', 'Référence', 'Preuve', 'Rappels de produits', 'Rappel de produit', 'Actif', 'Révoqué', 'Annonces concernées', 'Motif de la révocation', 'Révoquer le rappel', 'Créer un rappel global', 'Bloque les annonces avec la même identité fournisseur chez tous les vendeurs.'],
+    ar: ['تحديد حالة النزاع', 'الحالة فقط. لا يحدث رد أموال أو دفع.', 'المرجع', 'الدليل', 'استدعاءات المنتجات', 'استدعاء منتج', 'نشط', 'ملغى', 'القوائم المتأثرة', 'سبب الإلغاء', 'إلغاء الاستدعاء', 'إنشاء استدعاء شامل', 'يحظر كل القوائم التي تحمل هوية المورد نفسها لدى جميع البائعين.'],
+    ku: ['بڕیاردان لە دۆخی ناکۆکی', 'تەنها دۆخەکە دەگۆڕێت؛ هیچ پارەگەڕاندنەوە یان پارەدانێک ناکرێت.', 'سەرچاوە', 'بەڵگە', 'بانگەوازەکانی گەڕاندنەوەی کاڵا', 'گەڕاندنەوەی کاڵا', 'چالاک', 'هەڵوەشاوەتەوە', 'لیستە کاریگەربووەکان', 'هۆکاری هەڵوەشاندنەوە', 'هەڵوەشاندنەوەی بانگەواز', 'دروستکردنی بانگەوازی گشتی', 'هەموو لیستێک بە هەمان ناسنامەی دابینکەر لە هەموو فرۆشیاران دادەخات.'],
+    tr: ['Uyuşmazlık durumunu kararlaştır', 'Yalnızca durum değişir; iade veya ödeme yapılmaz.', 'Referans', 'Kanıt', 'Ürün geri çağırmaları', 'Ürün geri çağırma', 'Etkin', 'İptal edildi', 'Etkilenen ilanlar', 'İptal nedeni', 'Geri çağırmayı kaldır', 'Platform geri çağırması oluştur', 'Tüm satıcılardaki aynı tedarikçi kimlikli ilanları engeller.'],
+    de: ['Streitfallstatus entscheiden', 'Nur Statusänderung; keine Erstattung oder Zahlung.', 'Referenz', 'Nachweis', 'Produktrückrufe', 'Produktrückruf', 'Aktiv', 'Aufgehoben', 'Betroffene Angebote', 'Grund für Aufhebung', 'Rückruf aufheben', 'Plattformweiten Rückruf erstellen', 'Sperrt Angebote mit derselben Lieferantenkennung bei allen Verkäufern.'],
+    es: ['Decidir estado de disputa', 'Solo cambia el estado; no hay reembolso ni pago.', 'Referencia', 'Prueba', 'Retiradas de productos', 'Retirada de producto', 'Activo', 'Revocado', 'Anuncios afectados', 'Motivo de revocación', 'Revocar retirada', 'Crear retirada global', 'Bloquea anuncios con la misma identidad del proveedor de todos los vendedores.'],
+    it: ['Decidere lo stato della controversia', 'Solo lo stato cambia; nessun rimborso o pagamento.', 'Riferimento', 'Prova', 'Richiami dei prodotti', 'Richiamo prodotto', 'Attivo', 'Revocato', 'Inserzioni interessate', 'Motivo della revoca', 'Revoca richiamo', 'Crea richiamo globale', 'Blocca le inserzioni con la stessa identità del fornitore di tutti i venditori.'],
+    nl: ['Geschilstatus beslissen', 'Alleen de status verandert; geen terugbetaling of betaling.', 'Referentie', 'Bewijs', 'Productterugroepingen', 'Productterugroeping', 'Actief', 'Ingetrokken', 'Betrokken aanbiedingen', 'Reden voor intrekking', 'Terugroeping intrekken', 'Platformterugroeping maken', 'Blokkeert aanbiedingen met dezelfde leveranciersidentiteit bij alle verkopers.'],
+    zh: ['决定争议状态', '只更改状态，不会退款或付款。', '参考编号', '证据', '商品召回', '召回商品', '生效中', '已撤销', '受影响的商品', '撤销原因', '撤销召回', '创建全平台召回', '阻止所有卖家重新上架相同供应商标识的商品。'],
+    fa: ['تصمیم‌گیری درباره وضعیت اختلاف', 'فقط وضعیت تغییر می‌کند؛ بازپرداخت یا پرداختی انجام نمی‌شود.', 'مرجع', 'مدرک', 'فراخوان‌های محصول', 'فراخوان محصول', 'فعال', 'لغوشده', 'آگهی‌های متاثر', 'دلیل لغو', 'لغو فراخوان', 'ایجاد فراخوان سراسری', 'آگهی‌های دارای شناسه یکسان تامین‌کننده را برای همه فروشندگان مسدود می‌کند.'],
+    hi: ['विवाद की स्थिति तय करें', 'केवल स्थिति बदलती है; कोई रिफंड या भुगतान नहीं होता।', 'संदर्भ', 'साक्ष्य', 'उत्पाद रिकॉल', 'उत्पाद रिकॉल विवरण', 'सक्रिय', 'निरस्त', 'प्रभावित लिस्टिंग', 'निरस्तीकरण का कारण', 'रिकॉल निरस्त करें', 'पूरे मंच पर रिकॉल बनाएँ', 'सभी विक्रेताओं की समान आपूर्तिकर्ता पहचान वाली लिस्टिंग रोकता है।'],
+    pt: ['Decidir estado do litígio', 'Apenas muda o estado; não há reembolso nem pagamento.', 'Referência', 'Prova', 'Recolhas de produtos', 'Recolha de produto', 'Ativo', 'Revogado', 'Anúncios afetados', 'Motivo da revogação', 'Revogar recolha', 'Criar recolha global', 'Bloqueia anúncios com a mesma identidade do fornecedor de todos os vendedores.'],
+    ru: ['Решить статус спора', 'Меняется только статус; возврат и платёж не выполняются.', 'Ссылка', 'Доказательство', 'Отзывы товаров', 'Отзыв товара', 'Активно', 'Отменено', 'Затронутые объявления', 'Причина отмены', 'Отменить отзыв', 'Создать общий отзыв', 'Блокирует объявления с тем же идентификатором поставщика у всех продавцов.'],
+  };
+  for (const [index, key] of recallKeys.entries()) copy[locale][key] = recallCopy[locale][index];
+  copy[locale].adminReactivateRecall = ({
+    en: 'Reactivate recall', fr: 'Réactiver le rappel', ar: 'إعادة تفعيل الاستدعاء',
+    ku: 'دووبارە چالاککردنی بانگەواز', tr: 'Geri çağırmayı yeniden etkinleştir',
+    de: 'Rückruf erneut aktivieren', es: 'Reactivar retirada', it: 'Riattiva richiamo',
+    nl: 'Terugroeping opnieuw activeren', zh: '重新启用召回', fa: 'فعال‌سازی دوباره فراخوان',
+    hi: 'रिकॉल फिर सक्रिय करें', pt: 'Reativar recolha', ru: 'Повторно активировать отзыв',
+  })[locale];
+  copy[locale].adminReleaseRecallListing = ({
+    en: 'Release listing', fr: 'Libérer l’annonce', ar: 'رفع الحظر عن الإعلان',
+    ku: 'ئازادکردنی لیستەکە', tr: 'İlan engelini kaldır', de: 'Angebot freigeben',
+    es: 'Liberar anuncio', it: 'Sblocca inserzione', nl: 'Aanbieding vrijgeven',
+    zh: '解除商品限制', fa: 'رفع مسدودی آگهی', hi: 'लिस्टिंग प्रतिबंध हटाएँ',
+    pt: 'Desbloquear anúncio', ru: 'Разблокировать объявление',
+  })[locale];
   const subscriptionStatuses = ["NOT_STARTED", "INCOMPLETE", "TRIALING", "ACTIVE", "PAST_DUE", "UNPAID", "CANCELED", "EXPIRED"];
   for (const [index, status] of subscriptionStatuses.entries()) {
     copy[locale][`sellerSubscription.${status}`] = sellerSubscriptionLabels[locale][index];

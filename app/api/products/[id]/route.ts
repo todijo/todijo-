@@ -9,7 +9,7 @@ import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/pro
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
-import { assertProductPublicationEligible } from "@/lib/suppliers/safety";
+import { assertProductPublicationEligible, sellerEditDeactivationReason } from "@/lib/suppliers/safety";
 import { AdminAccessError } from "@/lib/admin-access";
 import { assertSellerActivity } from "@/lib/account-status";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
@@ -18,6 +18,7 @@ import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/cata
 import { Prisma } from "@prisma/client";
 import { readProductContentMetadata } from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
+import { assertNotRecalled, recallKeys, gtinRecallKeys, ProductRecallError } from "@/lib/product-recalls";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -35,8 +36,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       where: { id, removedAt:null, store: { ownerId: session.userId } },
       select: {
         id: true,name:true,description:true,sourceLocale:true, complianceDeclaredAt: true, deactivationReason: true,
-        supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
-        variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierAvailable: true } },
+        supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierSku: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
+        variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierSku: true, supplierAvailable: true } },
       },
     });
     if (!product) return NextResponse.json({ error: "Produit introuvable ou accès refusé." }, { status: 404 });
@@ -72,9 +73,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) return NextResponse.json({ error: "Le stock est invalide." }, { status: 400 });
 
     await prisma.$transaction(async (tx) => {
+      if (status === "PUBLISHED") await assertNotRecalled(tx, [
+        ...(product.supplierLink ? recallKeys({ ...product.supplierLink, variants: product.variants }) : []),
+        ...gtinRecallKeys(compliance.productIdentifier),
+      ]);
       await tx.product.update({ where: { id }, data: {
         name, description, sourceLocale:name!==product.name||description!==product.description?contentSourceLocale(request):product.sourceLocale, category, condition, status,
-        deactivationReason: status === "PUBLISHED" ? "NONE" : "SELLER",
+        deactivationReason: sellerEditDeactivationReason(product.deactivationReason, status),
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
         colors, sizes, stock, images, allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
@@ -89,7 +94,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       }
       await replaceProductVariantImages(tx, id, images, body.variantImages);
       if (Object.hasOwn(body, "video")) await replaceProductVideo(tx,id,body.video);
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true });
@@ -100,6 +105,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
+    if (error instanceof ProductRecallError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof Error && ["PRODUCT_ADMIN_BLOCKED", "SUPPLIER_PRODUCT_REQUIRES_REVIEW"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });

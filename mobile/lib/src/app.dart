@@ -11,6 +11,13 @@ import 'core/providers.dart';
 import 'core/theme/todijo_theme.dart';
 import 'features/account/account_screens.dart';
 import 'features/account/checkout_return.dart';
+import 'features/admin/admin_screens.dart';
+import 'features/admin/admin_queues_screen.dart';
+import 'features/admin/admin_content_screens.dart';
+import 'features/admin/admin_news_screens.dart';
+import 'features/admin/admin_operations_screen.dart';
+import 'features/admin/admin_products_screen.dart';
+import 'features/admin/admin_recalls_screen.dart';
 import 'features/auth/auth_screens.dart';
 import 'features/auth/auth_state.dart';
 import 'features/content/content_screens.dart';
@@ -46,6 +53,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/account';
       }
       if (state.uri.path.startsWith('/seller') &&
+          auth?.status != AuthStatus.authenticated &&
+          auth?.status != AuthStatus.loading) {
+        return '/login?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
+      }
+      if (state.uri.path.startsWith('/admin') &&
+          auth?.status == AuthStatus.authenticated &&
+          auth?.session?['role'] != 'ADMIN') {
+        return '/account';
+      }
+      if (state.uri.path.startsWith('/admin') &&
           auth?.status != AuthStatus.authenticated &&
           auth?.status != AuthStatus.loading) {
         return '/login?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
@@ -151,6 +168,73 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/seller/finance',
         builder: (_, _) => const SellerFinanceScreen(),
+      ),
+      GoRoute(path: '/admin', builder: (_, _) => const AdminDashboardScreen()),
+      GoRoute(
+        path: '/admin/products',
+        builder: (_, _) => const AdminProductsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/recalls',
+        builder: (_, _) => const AdminRecallsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (_, _) => const AdminUsersScreen(),
+      ),
+      GoRoute(
+        path: '/admin/stores',
+        builder: (_, _) => const AdminStoresScreen(),
+      ),
+      GoRoute(
+        path: '/admin/orders',
+        builder: (_, _) => const AdminQueueScreen(AdminQueueKind.orders),
+      ),
+      GoRoute(
+        path: '/admin/refunds',
+        builder: (_, _) => const AdminQueueScreen(AdminQueueKind.refunds),
+      ),
+      GoRoute(
+        path: '/admin/support',
+        builder: (_, _) => const AdminQueueScreen(AdminQueueKind.support),
+      ),
+      GoRoute(
+        path: '/admin/reports',
+        builder: (_, _) => const AdminQueueScreen(AdminQueueKind.reports),
+      ),
+      GoRoute(
+        path: '/admin/content',
+        builder: (_, _) => const AdminContentScreen(),
+      ),
+      GoRoute(
+        path: '/admin/content/:key/:locale',
+        builder: (_, state) => AdminContentEditorScreen(
+          state.pathParameters['key']!,
+          state.pathParameters['locale']!,
+        ),
+      ),
+      GoRoute(path: '/admin/news', builder: (_, _) => const AdminNewsScreen()),
+      GoRoute(
+        path: '/admin/operations/:kind',
+        builder: (_, state) {
+          final kind = AdminOperationKind.values.where(
+            (value) => value.name == state.pathParameters['kind'],
+          );
+          return AdminOperationsScreen(
+            kind.isEmpty ? AdminOperationKind.issues : kind.first,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/news/new',
+        builder: (_, _) => const AdminNewsEditorScreen(),
+      ),
+      GoRoute(
+        path: '/admin/news/:id',
+        builder: (_, state) => AdminNewsEditorScreen(
+          id: state.pathParameters['id']!,
+          article: state.extra as Map<String, dynamic>?,
+        ),
       ),
       GoRoute(
         path: '/info/:key',

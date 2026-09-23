@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { recoverSupplierFulfillment } from "@/lib/suppliers/supplier-fulfillment";
 
-export async function POST(_request: Request, context: { params: Promise<{ fulfillmentId: string }> }) {
-  try { await requireAdmin(prisma, await readSession()); } catch { return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 }); }
+export async function POST(request: Request, context: { params: Promise<{ fulfillmentId: string }> }) {
+  try { await requireAdmin(prisma, await readAdminRequestSession(request)); } catch { return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 }); }
   const { fulfillmentId } = await context.params;
   try { return NextResponse.json(await recoverSupplierFulfillment(prisma, fulfillmentId)); }
   catch (error) {

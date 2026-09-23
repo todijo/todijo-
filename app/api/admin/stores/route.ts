@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { AdminAccessError, createManagedStore, exemptExistingAdminStore, extendManagedAccess, requireAdmin, validGrantMonths } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 
 function slugify(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
@@ -20,7 +20,7 @@ function errorResponse(error: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const session = await readSession();
+    const session = await readAdminRequestSession(request);
     const admin = await requireAdmin(prisma, session);
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const session = await readSession();
+    const session = await readAdminRequestSession(request);
     const admin = await requireAdmin(prisma, session);
     const body = await request.json();
     const months = Number(body.months);
@@ -67,9 +67,9 @@ export async function PATCH(request: Request) {
   }
 }
 
-export async function PUT() {
+export async function PUT(request: Request) {
   try {
-    const session = await readSession();
+    const session = await readAdminRequestSession(request);
     const admin = await requireAdmin(prisma, session);
     const result = await prisma.$transaction(
       (tx) => exemptExistingAdminStore(tx, admin.id),

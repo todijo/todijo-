@@ -12,6 +12,7 @@ import type { SupplierProductSnapshot } from "./types";
 import { createImportedProductContent } from "../product-content";
 import {readGlobalDropshippingMargin} from "./global-margin";
 import {enqueueNewCjFrenchProductTranslation} from "../dynamic-content-translations";
+import { assertNotRecalled, recallKeys } from "../product-recalls";
 
 type Database = PrismaClient;
 export const SUPPLIER_MEDIA_IMPORT_CONCURRENCY=4;
@@ -57,6 +58,8 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   if (!connection) throw new Error("SUPPLIER_CONNECTION_NOT_AUTHORIZED");
   const snapshot = input.snapshot??await provider.getProduct(input.supplierProductId);
   if (!snapshot.supplierProductId) throw new Error("SUPPLIER_PRODUCT_INVALID");
+  const safetyKeys = recallKeys({provider:provider.id,supplierProductId:snapshot.supplierProductId,supplierSku:snapshot.sku,variants:snapshot.variants});
+  await assertNotRecalled(db,safetyKeys);
   const classification=input.classification??classifyCjProduct(snapshot),selected=validateTodijoClassification(input.category),category=selected.id;
   const sellingCurrency=(input.sellingCurrency??"EUR").trim().toUpperCase();
   const exchangeRates:Record<string,string>={};
@@ -77,6 +80,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
   const content=createImportedProductContent({title:snapshot.title,description:snapshot.description,rawMetadata:snapshot.rawMetadata,sourceLocale:"en"});
   const slug = await uniqueSlug(db,input.storeId,content.title);
   const product=await db.$transaction(async (tx) => {
+    await assertNotRecalled(tx,safetyKeys);
     const product = await tx.product.create({data:{
       storeId:input.storeId,name:content.title,slug,description:content.description,category:category.slice(0,80),condition:"NEUF",status:"DRAFT",deactivationReason:"SELLER",
       price:sellingPrice,currency:sellingCurrency,stock:snapshot.stock,images,
@@ -89,7 +93,7 @@ export async function importSupplierProduct(db: Database, provider: SupplierCata
     }
     if (variantImageAssignments.length) await replaceProductVariantImages(tx,product.id,images,variantImageAssignments);
     return product;
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   try{await enqueueNewCjFrenchProductTranslation(db,{productId:product.id,sourceLocale:"en",title:content.title,description:content.description});}catch(error){console.warn("[supplier-import]",JSON.stringify({event:"french_localization_enqueue_failed",provider:provider.id,productId:product.id,errorCode:error instanceof Error?error.message.slice(0,100):"TRANSLATION_ENQUEUE_FAILED"}));}
   if(input.syncReviews!==false&&provider.getProductReviews){const link=await db.supplierProductLink.findUnique({where:{productId:product.id},select:{id:true}});if(link)await syncSupplierReviews(db,provider,{productId:product.id,supplierProductLinkId:link.id,supplierProductId:snapshot.supplierProductId});}
   return product;

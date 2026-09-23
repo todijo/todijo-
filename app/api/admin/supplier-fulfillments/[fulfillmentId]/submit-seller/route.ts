@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-access";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { assertAdminMutationRequest } from "@/lib/request-security";
 import { processSupplierFulfillment } from "@/lib/suppliers/supplier-fulfillment";
 
@@ -10,7 +10,7 @@ import { processSupplierFulfillment } from "@/lib/suppliers/supplier-fulfillment
 export async function POST(request: Request, { params }: { params: Promise<{ fulfillmentId: string }> }) {
   try {
     assertAdminMutationRequest(request);
-    await requireAdmin(prisma, await readSession());
+    await requireAdmin(prisma, await readAdminRequestSession(request));
     const { fulfillmentId } = await params;
     const result = await processSupplierFulfillment(prisma, fulfillmentId, undefined, true);
     if (!result.claimed) return NextResponse.json({ error: "FULFILLMENT_NOT_REVIEWABLE" }, { status: 409 });

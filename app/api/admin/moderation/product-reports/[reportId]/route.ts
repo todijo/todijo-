@@ -4,13 +4,13 @@ import { getTranslations } from "next-intl/server";
 import { requireAdmin } from "@/lib/admin-access";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { defaultLocale, isLocale } from "@/i18n/config";
 
 const statuses = new Set(["UNDER_REVIEW", "RESOLVED", "DISMISSED"]);
 const actions = new Set(["NONE", "UNPUBLISH"]);
 export async function PATCH(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
-  const session = await readSession(); if (!session) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
+  const session = await readAdminRequestSession(request); if (!session) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
   try { await requireAdmin(prisma, session); } catch { return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 }); }
   const { reportId } = await params; const body = await request.json().catch(() => ({}));
   const status = String(body.status ?? ""), action = String(body.action ?? ""), note = String(body.note ?? "").trim();

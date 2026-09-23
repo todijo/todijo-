@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
-import { readSession } from "@/lib/session";
+import { readAdminRequestSession } from "@/lib/admin-request-session";
 import { archiveSiteContent, publishSiteContent, restoreSiteContent, saveSiteContent, siteContentErrorResponse } from "@/lib/site-content";
 
 function errorResponse(error: unknown) {
@@ -12,7 +12,7 @@ function errorResponse(error: unknown) {
 export async function PATCH(request: Request, { params }: { params: Promise<{ pageKey: string; locale: string }> }) {
   try {
     const { pageKey, locale } = await params;
-    const result = await saveSiteContent(prisma, await readSession(), pageKey, locale, await request.json());
+    const result = await saveSiteContent(prisma, await readAdminRequestSession(request), pageKey, locale, await request.json());
     return NextResponse.json(result);
   } catch (error) { return errorResponse(error); }
 }
@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pag
   try {
     const { pageKey, locale } = await params;
     const body = await request.json();
-    const session = await readSession();
+    const session = await readAdminRequestSession(request);
     await requireAdmin(prisma, session);
     const version = Number(body.expectedVersion);
     if (body.action === "publish") return NextResponse.json({ revision: await publishSiteContent(prisma, session, pageKey, locale, String(body.revisionId ?? ""), version), version: version + 1 });

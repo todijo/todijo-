@@ -71,6 +71,13 @@ class BuyerAccountScreen extends ConsumerWidget {
             ),
             trailing: const Icon(Icons.chevron_right),
           ),
+        if (auth?.session?['role'] == 'ADMIN')
+          ListTile(
+            onTap: () => context.push('/admin'),
+            leading: const Icon(Icons.admin_panel_settings_outlined),
+            title: Text(TodijoLocalizations.of(context).text('adminDashboard')),
+            trailing: const Icon(Icons.chevron_right),
+          ),
         if (auth?.session?['role'] == 'CUSTOMER')
           ListTile(
             onTap: () => context.push('/seller/onboarding'),
