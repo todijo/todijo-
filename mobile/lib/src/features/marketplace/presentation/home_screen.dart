@@ -9,6 +9,7 @@ import '../../../core/localization/todijo_localizations.dart';
 import '../application/buyer_state.dart';
 import '../domain/marketplace_models.dart';
 import 'product_card.dart';
+import 'category_icon.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -27,17 +28,38 @@ class HomeScreen extends ConsumerWidget {
             data: (home) => ListView(
               padding: const EdgeInsets.only(bottom: 28),
               children: [
-                if (home.hero.isNotEmpty) _HeroCarousel(products: home.hero),
+                _HeroCarousel(products: home.hero),
                 const _TrustStrip(),
                 _CategoryStrip(categories: home.categories),
-                _ProductSection(
-                  title: copy.text('newArrivals'),
-                  products: home.newArrivals,
-                ),
-                _ProductSection(
-                  title: copy.text('bestSellers'),
-                  products: home.bestSellers,
-                ),
+                if (home.bestSellers.isNotEmpty)
+                  _ProductSection(
+                    title: copy.text('bestSellers'),
+                    products: home.bestSellers,
+                  ),
+                if (home.newArrivals.isNotEmpty)
+                  _ProductSection(
+                    title: copy.text('newArrivals'),
+                    products: home.newArrivals,
+                  ),
+                if (home.hero.any(
+                  (product) =>
+                      !home.bestSellers.any((item) => item.id == product.id) &&
+                      !home.newArrivals.any((item) => item.id == product.id),
+                ))
+                  _ProductSection(
+                    title: copy.text('exploreProducts'),
+                    products: home.hero
+                        .where(
+                          (product) =>
+                              !home.bestSellers.any(
+                                (item) => item.id == product.id,
+                              ) &&
+                              !home.newArrivals.any(
+                                (item) => item.id == product.id,
+                              ),
+                        )
+                        .toList(growable: false),
+                  ),
                 const _SellerBanner(),
               ],
             ),
@@ -57,22 +79,35 @@ class _HeroCarouselState extends State<_HeroCarousel> {
   final _controller = PageController();
   Timer? _timer;
   int _index = 0;
+  bool _touching = false;
+
+  void _schedule() {
+    _timer?.cancel();
+    if (_touching ||
+        MediaQuery.disableAnimationsOf(context) ||
+        widget.products.isEmpty) {
+      return;
+    }
+    _timer = Timer.periodic(const Duration(milliseconds: 7500), (_) {
+      if (!_controller.hasClients) return;
+      _controller.animateToPage(
+        (_index + 1) % (widget.products.length + 1),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _timer?.cancel();
-    if (!MediaQuery.disableAnimationsOf(context) &&
-        widget.products.length > 1) {
-      _timer = Timer.periodic(const Duration(seconds: 6), (_) {
-        if (!_controller.hasClients) return;
-        _index = (_index + 1) % widget.products.length;
-        _controller.animateToPage(
-          _index,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeOut,
-        );
-      });
-    }
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HeroCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.products.length != widget.products.length) _schedule();
   }
 
   @override
@@ -84,21 +119,114 @@ class _HeroCarouselState extends State<_HeroCarousel> {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 260,
+    height: (MediaQuery.sizeOf(context).width * .48).clamp(164.0, 220.0),
     child: Listener(
-      onPointerDown: (_) => _timer?.cancel(),
+      onPointerDown: (_) {
+        _touching = true;
+        _timer?.cancel();
+      },
+      onPointerUp: (_) {
+        _touching = false;
+        _schedule();
+      },
+      onPointerCancel: (_) {
+        _touching = false;
+        _schedule();
+      },
       child: PageView.builder(
         controller: _controller,
-        itemCount: widget.products.length,
+        onPageChanged: (index) => _index = index,
+        itemCount: widget.products.length + 1,
         itemBuilder: (context, index) {
-          final item = widget.products[index];
+          if (index == 0) {
+            return InkWell(
+              onTap: () => context.go('/search'),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/images/hero-approved-v3-carton-logo-polished.png',
+                    fit: BoxFit.cover,
+                    alignment: AlignmentDirectional.centerEnd,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: [
+                          Color(0xFFFDF9EF),
+                          Color(0xE6FDF9EF),
+                          Colors.transparent,
+                        ],
+                        stops: [0, .49, .86],
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 16),
+                      child: SizedBox(
+                        width: MediaQuery.sizeOf(context).width * .55,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              TodijoLocalizations.of(context).text('heroTitle'),
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: TodijoColors.forest,
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 20,
+                                height: 1.04,
+                              ),
+                            ),
+                            const SizedBox(height: 9),
+                            Text(
+                              TodijoLocalizations.of(context).text('heroText'),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton(
+                              onPressed: () => context.go('/search'),
+                              child: Text(
+                                TodijoLocalizations.of(context)
+                                    .text('exploreProducts'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final item = widget.products[index - 1];
           return InkWell(
             onTap: () => context.push('/products/${item.id}'),
             child: Stack(
               fit: StackFit.expand,
               children: [
                 if (item.image != null)
-                  Image.network(item.image!, fit: BoxFit.cover),
+                  Image.network(
+                    item.image!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const ColoredBox(
+                      color: TodijoColors.cream,
+                      child: Icon(Icons.image_not_supported_outlined),
+                    ),
+                  ),
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -109,9 +237,9 @@ class _HeroCarouselState extends State<_HeroCarousel> {
                   ),
                 ),
                 Positioned(
-                  left: 24,
-                  right: 24,
-                  bottom: 24,
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -120,7 +248,7 @@ class _HeroCarouselState extends State<_HeroCarousel> {
                         maxLines: 2,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 26,
+                          fontSize: 21,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -215,7 +343,7 @@ class _CategoryStrip extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 92,
+          height: 80,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -224,10 +352,14 @@ class _CategoryStrip extends StatelessWidget {
             itemBuilder: (context, index) {
               final category = categories[index];
               return ActionChip(
-                avatar: const Icon(Icons.category_outlined),
+                avatar: Icon(categoryIcon(category.iconKey), size: 20),
                 label: SizedBox(
-                  width: 120,
-                  child: Text(category.label, maxLines: 2),
+                  width: 106,
+                  child: Text(
+                    category.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 onPressed: () => context.go(
                   '/search?category=${Uri.encodeQueryComponent(category.slug)}',

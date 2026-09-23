@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -23,8 +24,12 @@ final class _MemorySessionStore implements SessionStore {
 }
 
 final class _Adapter implements HttpClientAdapter {
-  _Adapter(this.refreshStatus);
+  _Adapter(this.refreshStatus, {this.refreshGate, this.privateGate});
   final int refreshStatus;
+  final Completer<void>? refreshGate;
+  final Completer<void>? privateGate;
+  final refreshStarted = Completer<void>();
+  final privateStarted = Completer<void>();
   final requests = <RequestOptions>[];
 
   @override
@@ -35,6 +40,8 @@ final class _Adapter implements HttpClientAdapter {
   ) async {
     requests.add(options);
     if (options.path.endsWith('/api/mobile/auth/refresh')) {
+      if (!refreshStarted.isCompleted) refreshStarted.complete();
+      if (refreshGate != null) await refreshGate!.future;
       if (refreshStatus == -1) {
         throw DioException(
           requestOptions: options,
@@ -62,6 +69,8 @@ final class _Adapter implements HttpClientAdapter {
         },
       );
     }
+    if (!privateStarted.isCompleted) privateStarted.complete();
+    if (privateGate != null) await privateGate!.future;
     final authorized = options.headers['Authorization'] == 'Bearer new-access';
     return ResponseBody.fromString(
       authorized ? '{"ok":true}' : '{"error":"INVALID_TOKEN"}',
@@ -149,4 +158,81 @@ void main() {
       expect(adapter.requests.length, 3);
     },
   );
+
+  test('in-flight refresh cannot restore a logged-out session', () async {
+    final store = _MemorySessionStore(oldTokens());
+    final gate = Completer<void>();
+    final adapter = _Adapter(200, refreshGate: gate);
+    final client = ApiClient(
+      origin: Uri.parse('https://todijo.com'),
+      sessionStore: store,
+      dio: Dio()..httpClientAdapter = adapter,
+    );
+    final pending = client.dio.get('/private');
+    await adapter.refreshStarted.future;
+    await store.clear();
+    gate.complete();
+    await expectLater(pending, throwsA(isA<DioException>()));
+    expect(store.tokens, isNull);
+    expect(store.clears, 1);
+  });
+
+  test('in-flight refresh cannot replace a newer login', () async {
+    final store = _MemorySessionStore(oldTokens());
+    final gate = Completer<void>();
+    final adapter = _Adapter(200, refreshGate: gate);
+    final client = ApiClient(
+      origin: Uri.parse('https://todijo.com'),
+      sessionStore: store,
+      dio: Dio()..httpClientAdapter = adapter,
+    );
+    final pending = client.dio.get('/private');
+    await adapter.refreshStarted.future;
+    final newLogin = SessionTokens(
+      accessToken: 'different-access',
+      refreshToken: 'different-refresh',
+      accessTokenExpiresAt: DateTime.now().toUtc().add(
+        const Duration(hours: 1),
+      ),
+      refreshTokenExpiresAt: DateTime.now().toUtc().add(
+        const Duration(days: 1),
+      ),
+    );
+    await store.write(newLogin);
+    gate.complete();
+    await expectLater(pending, throwsA(isA<DioException>()));
+    expect(store.tokens, same(newLogin));
+    expect(store.clears, 0);
+  });
+
+  test('old account 401 cannot refresh a newer login', () async {
+    final store = _MemorySessionStore(oldTokens());
+    final gate = Completer<void>();
+    final adapter = _Adapter(200, privateGate: gate);
+    final client = ApiClient(
+      origin: Uri.parse('https://todijo.com'),
+      sessionStore: store,
+      dio: Dio()..httpClientAdapter = adapter,
+    );
+    final pending = client.dio.get('/private');
+    await adapter.privateStarted.future;
+    final newLogin = SessionTokens(
+      accessToken: 'different-access',
+      refreshToken: 'different-refresh',
+      accessTokenExpiresAt: DateTime.now().toUtc().add(
+        const Duration(hours: 1),
+      ),
+      refreshTokenExpiresAt: DateTime.now().toUtc().add(
+        const Duration(days: 1),
+      ),
+    );
+    await store.write(newLogin);
+    gate.complete();
+    await expectLater(pending, throwsA(isA<DioException>()));
+    expect(store.tokens, same(newLogin));
+    expect(
+      adapter.requests.where((request) => request.path.endsWith('/refresh')),
+      isEmpty,
+    );
+  });
 }

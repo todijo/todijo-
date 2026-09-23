@@ -51,7 +51,14 @@ final class AuthRepository {
         );
       }
     } finally {
-      await store.clear();
+      if (current != null) {
+        if (store case ConditionalSessionStore conditional) {
+          await conditional.clearIfCurrent(current.refreshToken);
+        } else {
+          final active = await store.read();
+          if (active?.refreshToken == current.refreshToken) await store.clear();
+        }
+      }
     }
   }
 

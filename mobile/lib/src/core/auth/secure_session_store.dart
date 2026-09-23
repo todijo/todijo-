@@ -8,7 +8,12 @@ abstract interface class SessionStore {
   Future<void> clear();
 }
 
-final class SecureSessionStore implements SessionStore {
+abstract interface class ConditionalSessionStore implements SessionStore {
+  Future<bool> rotateIfCurrent(String refreshToken, SessionTokens next);
+  Future<bool> clearIfCurrent(String refreshToken);
+}
+
+final class SecureSessionStore implements ConditionalSessionStore {
   SecureSessionStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();
 
@@ -18,10 +23,16 @@ final class SecureSessionStore implements SessionStore {
   static const _refreshExpiry = 'todijo.session.refresh_expires_at';
   static const keys = {_access, _refresh, _accessExpiry, _refreshExpiry};
   static final validKey = RegExp(r'^[A-Za-z0-9._-]+$');
+  static Future<void> _pending = Future<void>.value();
   final FlutterSecureStorage _storage;
 
-  @override
-  Future<SessionTokens?> read() async {
+  Future<T> _serial<T>(Future<T> Function() action) {
+    final result = _pending.then((_) => action());
+    _pending = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
+  Future<SessionTokens?> _read() async {
     final values = await Future.wait([
       _storage.read(key: _access),
       _storage.read(key: _refresh),
@@ -37,13 +48,15 @@ final class SecureSessionStore implements SessionStore {
         refreshTokenExpiresAt: DateTime.parse(values[3]!).toUtc(),
       );
     } on FormatException {
-      await clear();
+      await _clear();
       return null;
     }
   }
 
   @override
-  Future<void> write(SessionTokens tokens) async {
+  Future<SessionTokens?> read() => _serial(_read);
+
+  Future<void> _write(SessionTokens tokens) async {
     assert(keys.every(validKey.hasMatch));
     await Future.wait([
       _storage.write(key: _access, value: tokens.accessToken),
@@ -60,6 +73,26 @@ final class SecureSessionStore implements SessionStore {
   }
 
   @override
-  Future<void> clear() =>
+  Future<void> write(SessionTokens tokens) => _serial(() => _write(tokens));
+
+  Future<void> _clear() =>
       Future.wait(keys.map((key) => _storage.delete(key: key)));
+
+  @override
+  Future<void> clear() => _serial(_clear);
+
+  @override
+  Future<bool> rotateIfCurrent(String refreshToken, SessionTokens next) =>
+      _serial(() async {
+        if ((await _read())?.refreshToken != refreshToken) return false;
+        await _write(next);
+        return true;
+      });
+
+  @override
+  Future<bool> clearIfCurrent(String refreshToken) => _serial(() async {
+    if ((await _read())?.refreshToken != refreshToken) return false;
+    await _clear();
+    return true;
+  });
 }

@@ -118,7 +118,8 @@ void main() {
           const AdminQueueScreen(AdminQueueKind.reports),
           const AdminContentScreen(),
           const AdminNewsScreen(),
-          const AdminOperationsScreen(AdminOperationKind.issues),
+          for (final kind in AdminOperationKind.values)
+            AdminOperationsScreen(kind),
         ]) {
           await tester.pumpWidget(
             ProviderScope(

@@ -51,13 +51,19 @@ final class ApiClient {
         request.path.endsWith('/api/mobile/auth/refresh')) {
       return handler.next(error);
     }
+    final activeAtFailure = await sessionStore.read();
+    if (activeAtFailure == null ||
+        request.headers['Authorization'] !=
+            'Bearer ${activeAtFailure.accessToken}') {
+      return handler.next(error);
+    }
     SessionTokens? session;
     try {
       session = await _refreshOnce();
     } on DioException catch (refreshError) {
       if (refreshError.response?.statusCode == 401 ||
           refreshError.response?.statusCode == 400) {
-        await sessionStore.clear();
+        await _clearIfRequestSessionCurrent(request);
       }
       return handler.next(refreshError);
     } on Object catch (refreshError) {
@@ -66,7 +72,7 @@ final class ApiClient {
       );
     }
     if (session == null) {
-      await sessionStore.clear();
+      await _clearIfRequestSessionCurrent(request);
       return handler.next(error);
     }
     try {
@@ -75,11 +81,23 @@ final class ApiClient {
       handler.resolve(await dio.fetch<Object?>(request));
     } on DioException catch (retryError) {
       if (retryError.response?.statusCode == 401) {
-        await sessionStore.clear();
+        await _clearIfRequestSessionCurrent(request);
       }
       handler.next(retryError);
     } on Object catch (retryError) {
       handler.next(DioException(requestOptions: request, error: retryError));
+    }
+  }
+
+  Future<void> _clearIfRequestSessionCurrent(RequestOptions request) async {
+    final active = await sessionStore.read();
+    if (active != null &&
+        request.headers['Authorization'] == 'Bearer ${active.accessToken}') {
+      if (sessionStore case ConditionalSessionStore conditional) {
+        await conditional.clearIfCurrent(active.refreshToken);
+      } else {
+        await sessionStore.clear();
+      }
     }
   }
 
@@ -109,6 +127,15 @@ final class ApiClient {
     final data = response.data;
     if (data == null) throw const ApiException(ApiFailureKind.invalidResponse);
     final next = SessionTokens.fromJson(data);
+    // Logout or a new login may have replaced this session while the network
+    // request was in flight. Never resurrect or overwrite that newer state.
+    if (sessionStore case ConditionalSessionStore conditional) {
+      return await conditional.rotateIfCurrent(current.refreshToken, next)
+          ? next
+          : null;
+    }
+    final active = await sessionStore.read();
+    if (active?.refreshToken != current.refreshToken) return null;
     await sessionStore.write(next);
     return next;
   }

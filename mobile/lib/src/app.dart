@@ -319,7 +319,7 @@ class _TodijoAppState extends ConsumerState<TodijoApp> {
       title: 'Todijo',
       theme: todijoTheme(),
       routerConfig: ref.watch(routerProvider),
-      locale: preferences == null ? null : Locale(preferences.locale),
+      locale: Locale(preferences?.locale ?? 'fr'),
       supportedLocales: TodijoLocalizations.supportedLocales,
       localizationsDelegates: const [
         TodijoLocalizations.delegate,
@@ -327,10 +327,6 @@ class _TodijoAppState extends ConsumerState<TodijoApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      localeResolutionCallback: (device, supported) => supported.firstWhere(
-        (locale) => locale.languageCode == device?.languageCode,
-        orElse: () => const Locale('fr'),
-      ),
     );
   }
 }

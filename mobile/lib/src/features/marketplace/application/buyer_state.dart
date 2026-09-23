@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -68,13 +67,10 @@ final class BuyerPreferencesController extends AsyncNotifier<BuyerPreferences> {
       'pt',
       'ru',
     };
-    final deviceLocale = PlatformDispatcher.instance.locale.languageCode;
     final persistedLocale = store.getString(_localeKey);
     return BuyerPreferences(
       locale: persistedLocale != null && supported.contains(persistedLocale)
           ? persistedLocale
-          : supported.contains(deviceLocale)
-          ? deviceLocale
           : 'fr',
       country: store.getString(_countryKey) ?? 'FR',
       currency: store.getString(_currencyKey) ?? 'EUR',
@@ -95,9 +91,9 @@ final class BuyerPreferencesController extends AsyncNotifier<BuyerPreferences> {
     state = AsyncData(next);
     final store = await SharedPreferences.getInstance();
     await Future.wait([
-      store.setString(_localeKey, next.locale),
-      store.setString(_countryKey, next.country),
-      store.setString(_currencyKey, next.currency),
+      if (locale != null) store.setString(_localeKey, next.locale),
+      if (country != null) store.setString(_countryKey, next.country),
+      if (currency != null) store.setString(_currencyKey, next.currency),
     ]);
   }
 }

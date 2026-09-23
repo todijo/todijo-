@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/todijo_theme.dart';
+import '../../../core/theme/todijo_brand.dart';
 import '../../../core/localization/todijo_localizations.dart';
 
 class BuyerHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -19,22 +20,19 @@ class BuyerHeader extends StatelessWidget implements PreferredSizeWidget {
       title: Row(
         children: [
           IconButton.outlined(
+            tooltip: copy.text(showBack ? 'back' : 'menu'),
             onPressed: () =>
                 showBack ? context.pop() : Scaffold.of(context).openDrawer(),
             icon: Icon(showBack ? Icons.arrow_back : Icons.menu),
             color: TodijoColors.ivory,
           ),
-          const Spacer(),
-          const Text(
-            '☂ Todijo.',
-            style: TextStyle(
-              color: Color(0xFFD5A514),
-              fontWeight: FontWeight.w800,
-              fontSize: 28,
+          const Expanded(
+            child: Center(
+              child: FittedBox(fit: BoxFit.scaleDown, child: TodijoBrand()),
             ),
           ),
-          const Spacer(),
           IconButton(
+            tooltip: copy.text('cart'),
             onPressed: () => context.go('/cart'),
             icon: const Icon(
               Icons.shopping_cart_outlined,
@@ -51,6 +49,7 @@ class BuyerHeader extends StatelessWidget implements PreferredSizeWidget {
             hintText: copy.text('searchPlaceholder'),
             trailing: [
               IconButton(
+                tooltip: copy.text('search'),
                 onPressed: () => context.go('/search'),
                 icon: const Icon(Icons.search),
               ),
@@ -89,16 +88,7 @@ class BuyerDrawer extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const ListTile(
-              title: Text(
-                '☂ Todijo.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: TodijoColors.gold,
-                ),
-              ),
-            ),
+            const ListTile(title: TodijoBrand()),
             const Divider(),
             for (final item in destinations)
               ListTile(

@@ -142,7 +142,11 @@ test("seller CJ facade uses platform credentials only after seller permission an
 test("quarantined seller CJ imports need explicit admin category review and remain drafts", () => {
   const route = source("app/api/admin/supplier-products/[id]/review-seller-category/route.ts");
   assert.match(route, /assertAdminMutationRequest\(request\)/);
-  assert.match(route, /requireAdmin\(prisma, await readSession\(\)\)/);
+  assert.match(route, /requireAdmin\(prisma, await readAdminRequestSession\(request\)\)/);
+  const adminSession = source("lib/admin-request-session.ts");
+  assert.match(adminSession, /if \(request\.headers\.has\("authorization"\)\)/);
+  assert.match(adminSession, /await requireMobileAdmin\(request\)/);
+  assert.match(adminSession, /catch \{ return null; \}/);
   assert.match(route, /validateTodijoClassification/);
   assert.match(route, /ownerType: "SELLER", classificationStatus: "QUARANTINED"/);
   assert.match(route, /classificationStatus: "REVIEWED"/);

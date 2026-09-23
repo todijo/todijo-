@@ -91,16 +91,20 @@ final class CategoryNode {
     required this.iconKey,
     required this.groups,
   });
-  factory CategoryNode.fromJson(JsonMap json) => CategoryNode(
-    id: json['id'] as String,
-    slug: json['slug'] as String,
-    label: json['label'] as String,
-    iconKey: (json['iconKey'] ?? '') as String,
-    groups: (json['groups'] as List<dynamic>? ?? const [])
-        .cast<JsonMap>()
-        .map(CategoryGroup.fromJson)
-        .toList(growable: false),
-  );
+  factory CategoryNode.fromJson(JsonMap json, {Uri? imageOrigin}) =>
+      CategoryNode(
+        id: json['id'] as String,
+        slug: json['slug'] as String,
+        label: json['label'] as String,
+        iconKey: (json['iconKey'] ?? '') as String,
+        groups: (json['groups'] as List<dynamic>? ?? const [])
+            .cast<JsonMap>()
+            .map(
+              (group) =>
+                  CategoryGroup.fromJson(group, imageOrigin: imageOrigin),
+            )
+            .toList(growable: false),
+      );
   final String id;
   final String slug;
   final String label;
@@ -114,14 +118,17 @@ final class CategoryGroup {
     required this.label,
     required this.children,
   });
-  factory CategoryGroup.fromJson(JsonMap json) => CategoryGroup(
-    id: json['id'] as String,
-    label: json['label'] as String,
-    children: (json['children'] as List<dynamic>? ?? const [])
-        .cast<JsonMap>()
-        .map(CategoryLeaf.fromJson)
-        .toList(growable: false),
-  );
+  factory CategoryGroup.fromJson(JsonMap json, {Uri? imageOrigin}) =>
+      CategoryGroup(
+        id: json['id'] as String,
+        label: json['label'] as String,
+        children: (json['children'] as List<dynamic>? ?? const [])
+            .cast<JsonMap>()
+            .map(
+              (leaf) => CategoryLeaf.fromJson(leaf, imageOrigin: imageOrigin),
+            )
+            .toList(growable: false),
+      );
   final String id;
   final String label;
   final List<CategoryLeaf> children;
@@ -133,11 +140,16 @@ final class CategoryLeaf {
     required this.label,
     required this.image,
   });
-  factory CategoryLeaf.fromJson(JsonMap json) => CategoryLeaf(
-    id: json['id'] as String,
-    label: json['label'] as String,
-    image: (json['image'] ?? '') as String,
-  );
+  factory CategoryLeaf.fromJson(JsonMap json, {Uri? imageOrigin}) =>
+      CategoryLeaf(
+        id: json['id'] as String,
+        label: json['label'] as String,
+        image: switch ((json['image'] ?? '') as String) {
+          final path when path.startsWith('/') && imageOrigin != null =>
+            imageOrigin.resolve(path).toString(),
+          final url => url,
+        },
+      );
   final String id;
   final String label;
   final String image;

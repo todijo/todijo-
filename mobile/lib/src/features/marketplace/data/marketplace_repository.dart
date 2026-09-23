@@ -32,7 +32,12 @@ final class MarketplaceRepository {
     );
     return (response.data!['categories'] as List<dynamic>)
         .cast<JsonMap>()
-        .map(CategoryNode.fromJson)
+        .map(
+          (category) => CategoryNode.fromJson(
+            category,
+            imageOrigin: Uri.parse(_client.dio.options.baseUrl),
+          ),
+        )
         .toList(growable: false);
   }
 

@@ -8,6 +8,7 @@ import '../../../core/localization/todijo_country_picker.dart';
 import '../application/buyer_state.dart';
 import '../domain/marketplace_models.dart';
 import 'product_card.dart';
+import 'category_icon.dart';
 
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
@@ -30,7 +31,11 @@ class CategoriesScreen extends ConsumerWidget {
               TabBar(
                 isScrollable: true,
                 tabs: [
-                  for (final category in categories) Tab(text: category.label),
+                  for (final category in categories)
+                    Tab(
+                      icon: Icon(categoryIcon(category.iconKey)),
+                      text: category.label,
+                    ),
                 ],
               ),
               Expanded(
@@ -82,13 +87,11 @@ class _CategoryPanel extends StatelessWidget {
                 child: Column(
                   children: [
                     Expanded(
-                      child: leaf.image.isEmpty
-                          ? const Icon(Icons.category_outlined)
-                          : Image.network(
-                              leaf.image,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
+                      child: CategoryImage(
+                        url: leaf.image,
+                        iconKey: category.iconKey,
+                        label: leaf.label,
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.all(7),
@@ -128,6 +131,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _sort = 'newest';
   String? _category;
   String? _condition;
+  String? _minPrice;
+  String? _maxPrice;
   bool _inStock = false;
   bool _loading = false;
   bool _hasMore = true;
@@ -177,6 +182,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             query: _query.text.trim(),
             category: _category,
             condition: _condition,
+            minPrice: _minPrice,
+            maxPrice: _maxPrice,
             country: preferences.country,
             currency: preferences.currency,
             availability: _inStock ? 'in-stock' : null,
@@ -195,6 +202,224 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _openFilters() async {
+    final copy = TodijoLocalizations.of(context);
+    List<CategoryNode> categories;
+    try {
+      categories = await ref.read(categoriesProvider.future);
+    } catch (_) {
+      categories = const <CategoryNode>[];
+    }
+    if (!mounted) return;
+    final choices = <String, String>{};
+    for (final category in categories) {
+      choices[category.slug] = category.label;
+      for (final group in category.groups) {
+        for (final leaf in group.children) {
+          choices[leaf.id] = leaf.label;
+        }
+      }
+    }
+    var draftSort = _sort;
+    var draftCategory = choices.containsKey(_category) ? _category : null;
+    var draftCondition = _condition;
+    var draftStock = _inStock;
+    var draftMinPrice = _minPrice ?? '';
+    var draftMaxPrice = _maxPrice ?? '';
+    var resetEpoch = 0;
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, update) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.viewInsetsOf(sheetContext).bottom + 16,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  copy.text('filters'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 24),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('sort:$draftSort'),
+                  initialValue: draftSort,
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: copy.text('sort')),
+                  items: [
+                    for (final (value, key) in [
+                      ('newest', 'sortNewest'),
+                      ('best-selling', 'bestSellers'),
+                      ('price-asc', 'sortLow'),
+                      ('price-desc', 'sortHigh'),
+                    ])
+                      DropdownMenuItem(
+                        value: value,
+                        child: Text(
+                          copy.text(key),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) =>
+                      update(() => draftSort = value ?? 'newest'),
+                ),
+                const SizedBox(height: 16),
+                if (choices.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('category:$draftCategory'),
+                    initialValue: draftCategory,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: copy.text('sellerProductCategory'),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: '',
+                        child: Text(copy.text('all')),
+                      ),
+                      for (final choice in choices.entries)
+                        DropdownMenuItem(
+                          value: choice.key,
+                          child: Text(
+                            choice.value,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => update(() => draftCategory = value),
+                  ),
+                if (choices.isNotEmpty) const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('condition:$draftCondition'),
+                  initialValue: draftCondition ?? '',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: copy.text('condition'),
+                  ),
+                  items: [
+                    DropdownMenuItem(value: '', child: Text(copy.text('all'))),
+                    for (final (value, key) in [
+                      ('NEUF', 'sellerConditionNew'),
+                      ('COMME_NEUF', 'sellerConditionLikeNew'),
+                      ('BON_ETAT', 'sellerConditionGood'),
+                      ('OCCASION', 'sellerConditionUsed'),
+                    ])
+                      DropdownMenuItem(
+                        value: value,
+                        child: Text(
+                          copy.text(key),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => update(() => draftCondition = value),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        key: ValueKey('min:$resetEpoch'),
+                        initialValue: draftMinPrice,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: copy.text('minPrice'),
+                        ),
+                        onChanged: (value) =>
+                            update(() => draftMinPrice = value),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        key: ValueKey('max:$resetEpoch'),
+                        initialValue: draftMaxPrice,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: copy.text('maxPrice'),
+                        ),
+                        onChanged: (value) =>
+                            update(() => draftMaxPrice = value),
+                      ),
+                    ),
+                  ],
+                ),
+                SwitchListTile(
+                  title: Text(copy.text('inStock')),
+                  value: draftStock,
+                  onChanged: (value) => update(() => draftStock = value),
+                ),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: () => update(() {
+                        draftSort = 'newest';
+                        draftCategory = '';
+                        draftCondition = '';
+                        draftStock = false;
+                        draftMinPrice = '';
+                        draftMaxPrice = '';
+                        resetEpoch++;
+                      }),
+                      child: Text(copy.text('resetFilters')),
+                    ),
+                    FilledButton(
+                      onPressed: _validPriceRange(draftMinPrice, draftMaxPrice)
+                          ? () => Navigator.pop(sheetContext, true)
+                          : null,
+                      child: Text(copy.text('apply')),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (applied == true && mounted) {
+      _sort = draftSort;
+      _category = draftCategory == '' ? null : draftCategory;
+      _condition = draftCondition == '' ? null : draftCondition;
+      _inStock = draftStock;
+      _minPrice = draftMinPrice.trim().isEmpty
+          ? null
+          : draftMinPrice.trim().replaceAll(',', '.');
+      _maxPrice = draftMaxPrice.trim().isEmpty
+          ? null
+          : draftMaxPrice.trim().replaceAll(',', '.');
+      await _load(reset: true);
+    }
+  }
+
+  bool _validPriceRange(String minText, String maxText) {
+    double? parse(String value) => value.trim().isEmpty
+        ? null
+        : double.tryParse(value.trim().replaceAll(',', '.'));
+    final min = parse(minText);
+    final max = parse(maxText);
+    if (minText.trim().isNotEmpty && min == null) return false;
+    if (maxText.trim().isNotEmpty && max == null) return false;
+    if (min != null && (!min.isFinite || min < 0)) return false;
+    if (max != null && (!max.isFinite || max < 0)) return false;
+    return min == null || max == null || min <= max;
   }
 
   @override
@@ -230,6 +455,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       .setPreferences(country: country);
                   if (mounted) await _load(reset: true);
                 },
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  onPressed: _openFilters,
+                  icon: const Icon(Icons.tune),
+                  label: Text(TodijoLocalizations.of(context).text('filters')),
+                ),
               ),
               const SizedBox(height: 10),
               SingleChildScrollView(
@@ -296,6 +530,48 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ],
                 ),
               ),
+              if (_condition != null || _minPrice != null || _maxPrice != null)
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (_condition != null)
+                      InputChip(
+                        label: Text(
+                          TodijoLocalizations.of(context)
+                              .text(switch (_condition) {
+                                'NEUF' => 'sellerConditionNew',
+                                'COMME_NEUF' => 'sellerConditionLikeNew',
+                                'BON_ETAT' => 'sellerConditionGood',
+                                _ => 'sellerConditionUsed',
+                              }),
+                        ),
+                        onDeleted: () {
+                          _condition = null;
+                          _load(reset: true);
+                        },
+                      ),
+                    if (_minPrice != null)
+                      InputChip(
+                        label: Text(
+                          '${TodijoLocalizations.of(context).text('minPrice')}: $_minPrice',
+                        ),
+                        onDeleted: () {
+                          _minPrice = null;
+                          _load(reset: true);
+                        },
+                      ),
+                    if (_maxPrice != null)
+                      InputChip(
+                        label: Text(
+                          '${TodijoLocalizations.of(context).text('maxPrice')}: $_maxPrice',
+                        ),
+                        onDeleted: () {
+                          _maxPrice = null;
+                          _load(reset: true);
+                        },
+                      ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -505,7 +781,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       for (final option in product.options) ...[
                         const SizedBox(height: 20),
                         Text(
-                          option.name,
+                          switch (option.name.trim().toLowerCase()) {
+                            'color' => TodijoLocalizations.of(
+                              context,
+                            ).text('productColor'),
+                            'size' => TodijoLocalizations.of(
+                              context,
+                            ).text('productSize'),
+                            _ => option.name,
+                          },
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
