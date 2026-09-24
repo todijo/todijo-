@@ -58,6 +58,7 @@ class _SellerProductEditorState
   bool busy = false;
   bool uploading = false;
   bool declared = false;
+  bool loyaltyEligible = false;
   String? error;
 
   SellerRepository get repo => SellerRepository(ref.read(apiClientProvider));
@@ -96,6 +97,8 @@ class _SellerProductEditorState
           condition = product['condition'] as String? ?? 'NEUF';
           status = product['status'] as String? ?? 'DRAFT';
           declared = product['complianceDeclaredAt'] != null;
+          loyaltyEligible =
+              product['supplier'] == null && product['loyaltyEligible'] == true;
           existingOptions = (product['options'] as List<dynamic>)
               .cast<SellerJson>();
           existingVariants = (product['variants'] as List<dynamic>)
@@ -374,6 +377,8 @@ class _SellerProductEditorState
         'allowPrepurchaseQuestions':
             originalProduct?['allowPrepurchaseQuestions'] ?? true,
         'complianceDeclaration': declared,
+        if (originalProduct?['supplier'] == null)
+          'loyaltyEligible': loyaltyEligible,
         'shippingOverrideEnabled':
             originalProduct?['shippingOverrideEnabled'] ?? false,
         if (originalProduct?['shippingOverrideEnabled'] == true)
@@ -679,6 +684,15 @@ class _SellerProductEditorState
                         : (value) =>
                               setState(() => condition = value ?? 'NEUF'),
                   ),
+                  if (originalProduct?['supplier'] == null)
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(copy.text('loyalty.eligibleProducts')),
+                      value: loyaltyEligible,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => loyaltyEligible = value),
+                    ),
                   const SizedBox(height: 16),
                   field(
                     'price',

@@ -8,6 +8,7 @@ import '../auth/auth_state.dart';
 import '../marketplace/application/buyer_state.dart';
 import '../notifications/push_registration.dart';
 import '../../core/localization/todijo_localizations.dart';
+import '../../core/localization/loyalty_money.dart';
 import '../../core/localization/todijo_country_picker.dart';
 import 'account_repository.dart';
 
@@ -110,6 +111,11 @@ class BuyerAccountScreen extends ConsumerWidget {
             Icons.notifications_none,
             TodijoLocalizations.of(context).text('notifications'),
             '/account/notifications',
+          ),
+          (
+            Icons.card_giftcard_outlined,
+            TodijoLocalizations.of(context).text('loyalty.title'),
+            '/account/loyalty',
           ),
         ])
           ListTile(
@@ -420,6 +426,161 @@ class OrdersScreen extends ConsumerWidget {
   );
 }
 
+class BuyerLoyaltyScreen extends ConsumerStatefulWidget {
+  const BuyerLoyaltyScreen({super.key});
+  @override
+  ConsumerState<BuyerLoyaltyScreen> createState() => _BuyerLoyaltyScreenState();
+}
+
+class _BuyerLoyaltyScreenState extends ConsumerState<BuyerLoyaltyScreen> {
+  late Future<AccountJson> summary;
+
+  @override
+  void initState() {
+    super.initState();
+    summary = _repo(ref).loyalty();
+  }
+
+  String _money(Object? minor) {
+    return formatLoyaltyEuro(
+      minor,
+      TodijoLocalizations.of(context).locale.languageCode,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = TodijoLocalizations.of(context);
+    return _Page(
+      title: copy.text('loyalty.title'),
+      child: FutureBuilder<AccountJson>(
+        future: summary,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Retry(() => setState(() => summary = _repo(ref).loyalty()));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator.adaptive());
+          }
+          final data = snapshot.data!;
+          final stores = (data['stores'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>();
+          final history = (data['history'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>();
+          final expiring = (data['expiringSoon'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>();
+          return RefreshIndicator(
+            onRefresh: () async {
+              final next = _repo(ref).loyalty();
+              setState(() => summary = next);
+              await next;
+            },
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(copy.text('loyalty.intro')),
+                const SizedBox(height: 16),
+                Card(
+                  child: ListTile(
+                    title: Text(copy.text('loyalty.available')),
+                    trailing: Text(_money(data['availableMinor'])),
+                  ),
+                ),
+                Card(
+                  child: ListTile(
+                    title: Text(copy.text('loyalty.pending')),
+                    trailing: Text(_money(data['pendingMinor'])),
+                  ),
+                ),
+                Card(
+                  child: ListTile(
+                    title: Text(copy.text('loyaltyCheckout.reserved')),
+                    trailing: Text(_money(data['reservedMinor'])),
+                  ),
+                ),
+                Card(
+                  child: ListTile(
+                    title: Text(copy.text('loyalty.expiringSoon')),
+                    trailing: Text(_money(data['expiringSoonMinor'])),
+                  ),
+                ),
+                if ((data['owedMinor'] as num? ?? 0) > 0)
+                  Card(
+                    child: ListTile(
+                      title: Text(copy.text('loyalty.owed')),
+                      trailing: Text(_money(data['owedMinor'])),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Text(
+                  copy.text('loyalty.store'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                for (final store in stores)
+                  Card(
+                    child: ListTile(
+                      title: Text(store['storeName'] as String? ?? ''),
+                      subtitle: Text(
+                        '${copy.text('loyalty.pending')}: ${_money(store['pendingMinor'])}',
+                      ),
+                      trailing: Text(_money(store['availableMinor'])),
+                    ),
+                  ),
+                if (expiring.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    copy.text('loyalty.expiringSoon'),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  for (final grant in expiring)
+                    ListTile(
+                      title: Text(_money(grant['amountMinor'])),
+                      subtitle: Text(grant['expiresAt'] as String? ?? ''),
+                    ),
+                ],
+                const SizedBox(height: 16),
+                Text(
+                  copy.text('loyalty.history'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                if (history.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(copy.text('loyalty.emptyHistory')),
+                  ),
+                for (final entry in history)
+                  ListTile(
+                    title: Text(_eventLabel(copy, entry['event'] as String?)),
+                    subtitle: Text(entry['createdAt'] as String? ?? ''),
+                    trailing: Text(_money(entry['amountMinor'])),
+                    onTap: entry['orderId'] is String
+                        ? () => context.push(
+                            '/account/orders/${entry['orderId']}',
+                          )
+                        : null,
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _eventLabel(
+    TodijoLocalizations copy,
+    String? event,
+  ) => switch (event) {
+    'EARN_PENDING' => copy.text('loyalty.earnedPending'),
+    'EARN_AVAILABLE' => copy.text('loyalty.earnedAvailable'),
+    'REDEEM' => copy.text('loyalty.redeemed'),
+    'REDEEM_RESTORED' || 'EXPIRED_RESTORED' => copy.text('loyalty.restored'),
+    'EARN_REVERSED' || 'EARN_PENDING_REVERSED' => copy.text('loyalty.reversed'),
+    'EXPIRED' => copy.text('loyalty.expired'),
+    _ => copy.text('loyalty.adjusted'),
+  };
+}
+
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen(this.id, {super.key});
   final String id;
@@ -453,6 +614,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             items = (o['items'] as List<dynamic>).cast<Map<String, dynamic>>(),
             ship = (o['shipments'] as List<dynamic>? ?? const [])
                 .cast<Map<String, dynamic>>();
+        final composition = o['paymentComposition'] as Map<String, dynamic>?;
+        final copy = TodijoLocalizations.of(context);
+        final locale = copy.locale.languageCode;
         return ListView(
           padding: const EdgeInsets.all(18),
           children: [
@@ -463,6 +627,28 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             Text(
               '${TodijoLocalizations.of(context).text('orderStatus.${o['status']}')} · ${TodijoLocalizations.of(context).text('paymentStatus.${o['paymentState']}')}',
             ),
+            if (composition != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                copy.text('loyaltyCheckout.title'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Text(
+                '${copy.text('loyaltyCheckout.creditUsed')}: ${formatLoyaltyEuro(composition['loyaltyRedeemedMinor'], locale)}',
+              ),
+              Text(
+                '${copy.text('loyaltyCheckout.newCash')}: ${formatLoyaltyEuro(composition['newCashMinor'], locale)}',
+              ),
+              if (composition['newCashMinor'] == 0 &&
+                  composition['status'] == 'LOYALTY_SETTLED')
+                Text(copy.text('loyaltyCheckout.zeroCash')),
+              if (composition['status'] == 'PENDING_CASH')
+                Text(copy.text('loyaltyCheckout.paymentPending')),
+              if ((composition['loyaltyRestoredMinor'] as num? ?? 0) > 0)
+                Text(
+                  '${copy.text('loyalty.restored')}: ${formatLoyaltyEuro(composition['loyaltyRestoredMinor'], locale)}',
+                ),
+            ],
             for (final i in items)
               ListTile(
                 title: Text(i['name'] as String),
@@ -748,6 +934,56 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool busy = false;
   String? error;
+  Map<String, int> redeemByStore = {};
+  late Future<AccountJson> preview;
+  String requestId = 'mobile-${DateTime.now().microsecondsSinceEpoch}';
+
+  @override
+  void initState() {
+    super.initState();
+    preview = _loadPreview();
+  }
+
+  Future<(List<Map<String, dynamic>>, BuyerPreferences)> _cartInput() async {
+    final lines = await ref.read(cartProvider.future);
+    final market = await ref.read(buyerPreferencesProvider.future);
+    if (lines.isEmpty ||
+        lines.any(
+          (line) => line.product.price == null || !line.product.available,
+        )) {
+      throw StateError('CHECKOUT_PRICE_UNAVAILABLE');
+    }
+    if (lines.any((line) => line.product.currency != market.currency)) {
+      throw StateError('CHECKOUT_CURRENCY_UNAVAILABLE');
+    }
+    return (
+      [
+        for (final line in lines)
+          <String, dynamic>{
+            'productId': line.product.id,
+            'variantId': line.variantId,
+            'selectedColor': line.selectedColor,
+            'selectedSize': line.selectedSize,
+            'quantity': line.quantity,
+            'displayedUnitPrice': line.product.price,
+            'displayedCurrency': line.product.currency,
+          },
+      ],
+      market,
+    );
+  }
+
+  Future<AccountJson> _loadPreview() async {
+    final (items, market) = await _cartInput();
+    return _repo(ref).checkoutPreview(
+      country: market.country,
+      currency: market.currency,
+      locale: market.locale,
+      items: items,
+      redeemByStore: redeemByStore,
+    );
+  }
+
   Future<void> launch() async {
     final checkoutErrorCopy = TodijoLocalizations.of(context)
         .text('checkoutError');
@@ -759,36 +995,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // Re-read persisted cart and re-quote CJ lines immediately before the
       // server's own authoritative checkout/Stripe validation.
       ref.invalidate(cartProvider);
-      final lines = await ref.read(cartProvider.future);
-      final market = await ref.read(buyerPreferencesProvider.future);
-      if (lines.isEmpty ||
-          lines.any(
-            (line) => line.product.price == null || !line.product.available,
-          )) {
-        throw StateError('CHECKOUT_PRICE_UNAVAILABLE');
-      }
-      if (lines.any((line) => line.product.currency != market.currency)) {
-        throw StateError('CHECKOUT_CURRENCY_UNAVAILABLE');
-      }
-      final url = await _repo(ref).checkout(
-        requestId: 'mobile-${DateTime.now().microsecondsSinceEpoch}',
+      final (items, market) = await _cartInput();
+      final result = await _repo(ref).checkout(
+        requestId: requestId,
         country: market.country,
         currency: market.currency,
         locale: market.locale,
-        items: [
-          for (final line in lines)
-            {
-              'productId': line.product.id,
-              'variantId': line.variantId,
-              'selectedColor': line.selectedColor,
-              'selectedSize': line.selectedSize,
-              'quantity': line.quantity,
-              'displayedUnitPrice': line.product.price,
-              'displayedCurrency': line.product.currency,
-            },
-        ],
+        items: items,
+        redeemByStore: redeemByStore,
       );
-      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (result.completed && result.orderId != null) {
+        if (mounted) context.push('/account/orders/${result.orderId}');
+        return;
+      }
+      if (result.url == null ||
+          !await launchUrl(result.url!, mode: LaunchMode.externalApplication)) {
         throw StateError('CHECKOUT_BROWSER_UNAVAILABLE');
       }
     } on DioException catch (failure) {
@@ -808,30 +1029,115 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) => _Page(
     title: TodijoLocalizations.of(context).text('securePayment'),
-    child: Padding(
+    child: ListView(
       padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(TodijoLocalizations.of(context).text('checkoutIntro')),
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(error!),
-            ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: busy ? null : launch,
-            child: busy
-                ? const CircularProgressIndicator.adaptive()
-                : Text(TodijoLocalizations.of(context).text('checkout')),
-          ),
-          TextButton(
-            onPressed: () => context.push('/account/orders'),
-            child: Text(TodijoLocalizations.of(context).text('orders')),
-          ),
-        ],
-      ),
+      children: [
+        Text(TodijoLocalizations.of(context).text('checkoutIntro')),
+        const SizedBox(height: 16),
+        FutureBuilder<AccountJson>(
+          future: preview,
+          builder: (context, snapshot) {
+            final copy = TodijoLocalizations.of(context);
+            if (!snapshot.hasData) {
+              return snapshot.hasError
+                  ? Column(
+                      children: [
+                        Text(copy.text('loyaltyCheckout.previewError')),
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => preview = _loadPreview()),
+                          child: Text(copy.text('retry')),
+                        ),
+                      ],
+                    )
+                  : const CircularProgressIndicator.adaptive();
+            }
+            final data = snapshot.data!;
+            if (data['redemptionEnabled'] != true ||
+                data['currency'] != 'EUR') {
+              return const SizedBox.shrink();
+            }
+            final stores = (data['stores'] as List<dynamic>? ?? const [])
+                .whereType<Map<String, dynamic>>();
+            final locale = copy.locale.languageCode;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  copy.text('loyaltyCheckout.title'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                Text(copy.text('loyaltyCheckout.storeOnly')),
+                for (final store in stores) ...[
+                  const SizedBox(height: 12),
+                  Text(store['storeName'] as String? ?? ''),
+                  Text(
+                    '${copy.text('loyalty.available')}: ${formatLoyaltyEuro(store['availableMinor'], locale)}',
+                  ),
+                  Text(
+                    '${copy.text('loyaltyCheckout.maximum')}: ${formatLoyaltyEuro(store['maximumUsableMinor'], locale)}',
+                  ),
+                  if ((store['excludedMinor'] as num? ?? 0) > 0)
+                    Text(
+                      '${copy.text('loyaltyCheckout.excluded')}: ${formatLoyaltyEuro(store['excludedMinor'], locale)}',
+                    ),
+                  if ((store['maximumUsableMinor'] as num? ?? 0) > 0)
+                    SwitchListTile.adaptive(
+                      title: Text(copy.text('loyaltyCheckout.useCredit')),
+                      value: (redeemByStore[store['storeId']] ?? 0) > 0,
+                      onChanged: busy
+                          ? null
+                          : (enabled) {
+                              final storeId = store['storeId'] as String;
+                              final max = (store['maximumUsableMinor'] as num)
+                                  .toInt();
+                              setState(() {
+                                redeemByStore = {...redeemByStore};
+                                if (enabled) {
+                                  redeemByStore[storeId] = max;
+                                } else {
+                                  redeemByStore.remove(storeId);
+                                }
+                                requestId =
+                                    'mobile-${DateTime.now().microsecondsSinceEpoch}';
+                                preview = _loadPreview();
+                              });
+                            },
+                    ),
+                ],
+                if ((data['excludedSupplierMinor'] as num? ?? 0) > 0)
+                  Text(
+                    '${copy.text('loyaltyCheckout.excluded')}: ${formatLoyaltyEuro(data['excludedSupplierMinor'], locale)}',
+                  ),
+                Text(copy.text('loyaltyCheckout.shippingExcluded')),
+                Text(
+                  '${copy.text('loyaltyCheckout.creditUsed')}: ${formatLoyaltyEuro(data['redeemedMinor'], locale)}',
+                ),
+                Text(
+                  '${copy.text('loyaltyCheckout.newCash')}: ${formatLoyaltyEuro(data['newCashMinor'], locale)}',
+                ),
+                if (data['newCashMinor'] == 0)
+                  Text(copy.text('loyaltyCheckout.zeroCash')),
+                if ((data['redeemedMinor'] as num? ?? 0) > 0)
+                  Text(copy.text('loyaltyCheckout.pending')),
+              ],
+            );
+          },
+        ),
+        if (error != null)
+          Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!)),
+        const SizedBox(height: 20),
+        FilledButton(
+          onPressed: busy ? null : launch,
+          child: busy
+              ? const CircularProgressIndicator.adaptive()
+              : Text(TodijoLocalizations.of(context).text('checkout')),
+        ),
+        TextButton(
+          onPressed: () => context.push('/account/orders'),
+          child: Text(TodijoLocalizations.of(context).text('orders')),
+        ),
+      ],
     ),
   );
 }

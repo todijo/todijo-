@@ -5,6 +5,10 @@ const locales = ["en", "fr", "ar", "ku", "tr", "de", "es", "it", "nl", "zh", "fa
 const { adminUserManagementMessages } = await import("../../i18n/admin-user-management.ts");
 const { dropshippingAccessMessages } = await import("../../i18n/dropshipping-access.ts");
 const { siteContentMessages } = await import("../../i18n/site-content.ts");
+const { loyaltyKeys, loyaltyMessages } = await import("../../i18n/loyalty.ts");
+const { loyaltyCheckoutKeys, loyaltyCheckoutMessages, loyaltyReservedMessages } = await import("../../i18n/loyalty-checkout.ts");
+const { loyaltyAdminKeys, loyaltyAdminMessages, loyaltyAdminActionMessages, loyaltyAdminAdjustmentKeys, loyaltyAdminAdjustmentMessages, loyaltyReconciliationMessages } = await import("../../i18n/loyalty-admin.ts");
+const { loyaltyAccountingKeys, loyaltyAccountingMessages } = await import("../../i18n/loyalty-accounting.ts");
 const selectors = {
   appName: ["root", "Metadata.brand"],
   loading: ["root", "Common.loading"],
@@ -926,6 +930,42 @@ for (const locale of locales) {
     Object.assign(copy[locale], Object.fromEntries(nativeAuthKeys.map((key, index) => [key, nativeAuthTranslations[locale][index]])));
   }
   copy[locale].emptyNews = emptyNewsCopy[locale];
+  for (const key of loyaltyKeys) {
+    const value = loyaltyMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyalty.${key} missing`);
+    copy[locale][`loyalty.${key}`] = value;
+  }
+  for (const key of loyaltyCheckoutKeys) {
+    const value = loyaltyCheckoutMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyaltyCheckout.${key} missing`);
+    copy[locale][`loyaltyCheckout.${key}`] = value;
+  }
+  copy[locale]['loyaltyCheckout.reserved'] = loyaltyReservedMessages[locale];
+  for (const key of loyaltyAdminKeys) {
+    const value = loyaltyAdminMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyaltyAdmin.${key} missing`);
+    copy[locale][`loyaltyAdmin.${key}`] = value;
+  }
+  for (const key of ["activate", "deactivate", "releaseReference", "confirmation", "gateClosed", "adjustment"]) {
+    const value = loyaltyAdminActionMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyaltyAdminAction.${key} missing`);
+    copy[locale][`loyaltyAdminAction.${key}`] = value;
+  }
+  for (const key of loyaltyAdminAdjustmentKeys) {
+    const value = loyaltyAdminAdjustmentMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyaltyAdminAdjustment.${key} missing`);
+    copy[locale][`loyaltyAdminAdjustment.${key}`] = value;
+  }
+  for (const key of ["balanced", "anomaly"]) {
+    const value = loyaltyReconciliationMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyaltyAdmin.${key} missing`);
+    copy[locale][`loyaltyAdmin.${key}`] = value;
+  }
+  for (const key of loyaltyAccountingKeys) {
+    const value = loyaltyAccountingMessages[locale]?.[key];
+    if (!value) throw new Error(`${locale}:loyaltyAccounting.${key} missing`);
+    copy[locale][`loyaltyAccounting.${key}`] = value;
+  }
 }
 const dart = `// Generated from the responsive Todijo locale catalogs and shipping-countries.ts. Do not edit.\nconst generatedTodijoCopy = ${JSON.stringify(copy, null, 2).replaceAll("\\u2028", " ").replaceAll("\\u2029", " ")};\nconst generatedShippingCountries = ${JSON.stringify(shippingCountries)};\nconst generatedCountryNames = ${JSON.stringify(countryNames, null, 2).replaceAll("\\u2028", " ").replaceAll("\\u2029", " ")};\n`;
 writeFileSync(resolve(import.meta.dirname, "../lib/src/core/localization/generated_copy.dart"), dart);

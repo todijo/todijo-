@@ -155,6 +155,12 @@ class _SellerDashboardScreenState extends ConsumerState<SellerDashboardScreen> {
                   onTap: () => context.push('/seller/store'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.card_giftcard_outlined),
+                  title: Text(copy.text('loyalty.title')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/seller/loyalty'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.payments_outlined),
                   title: Text(copy.text('sellerPayments')),
                   trailing: const Icon(Icons.chevron_right),

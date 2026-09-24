@@ -13,6 +13,8 @@ import ShipmentTrackingCard from "@/components/ShipmentTrackingCard";
 import {canonicalOrderShipments} from "@/lib/tracking";
 import {isLocale} from "@/i18n/config";
 import {trackingUi} from "@/i18n/tracking-ui";
+import {loyaltyCheckoutMessages} from "@/i18n/loyalty-checkout";
+import {loyaltyMessages} from "@/i18n/loyalty";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,11 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   ];
   const lifecycleLabel = (type: string) => ["PAID", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"].includes(type) ? t(`status.${type}`) : t(`lifecycle.${type}`);
   const shipments=canonicalOrderShipments(order),trackingLocale=isLocale(locale)?locale:"en";
+  const loyaltyCopy=loyaltyCheckoutMessages[trackingLocale];
+  const loyaltyBaseCopy=loyaltyMessages[trackingLocale];
+  const loyaltyFunding=order.loyaltyFundingSnapshot;
+  const restoredCreditMinor=order.refundOperations.reduce((sum,refund)=>
+    sum+refund.loyaltyRestoredMinor,0);
 
   return (
     <main className="buyerOrdersPage scopedPublicPage">
@@ -106,6 +113,14 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
             <div><span>{t("subtotal")}</span><strong>{money(subtotal)}</strong></div>
             {order.shippingMethod&&<div className="buyerOrderShippingSnapshot"><span>{shippingText("shipping")}</span><strong>{order.shippingCost?.isZero()?shippingText("freeLabel"):money(Number(order.shippingCost??0))}</strong><small>{order.shippingMethod}{order.shippingCarrier?` · ${order.shippingCarrier}`:""}</small>{order.shippingEstimatedMinDays&&order.shippingEstimatedMaxDays&&<small>{shippingText("estimate",{min:order.shippingEstimatedMinDays,max:order.shippingEstimatedMaxDays})}</small>}</div>}
             <div className="buyerOrderFinalTotal"><span>{t("finalTotal")}</span><strong>{money(Number(order.total))}</strong></div>
+            {loyaltyFunding&&<section aria-label={loyaltyCopy.title}>
+              <h3>{loyaltyCopy.title}</h3>
+              <div><span>{loyaltyCopy.creditUsed}</span><strong>{money(loyaltyFunding.loyaltyRedeemedMinor/100)}</strong></div>
+              <div><span>{loyaltyCopy.newCash}</span><strong>{money(loyaltyFunding.newCashMinor/100)}</strong></div>
+              {loyaltyFunding.newCashMinor===0&&loyaltyFunding.status==="LOYALTY_SETTLED"&&<p>{loyaltyCopy.zeroCash}</p>}
+              {loyaltyFunding.status==="PENDING_CASH"&&<p>{loyaltyCopy.paymentPending}</p>}
+              {restoredCreditMinor>0&&<div><span>{loyaltyBaseCopy.restored}</span><strong>{money(restoredCreditMinor/100)}</strong></div>}
+            </section>}
             <small>{order.currency}</small>
             {order.stripePaymentIntentId && <div className="buyerOrderPaymentReference"><span>{t("paymentReference")}</span><code>{order.stripePaymentIntentId}</code></div>}
           </aside>

@@ -8,6 +8,8 @@ import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerSection, SellerStatusBadge } from "@/components/SellerControlPanel";
 import StoreSettingsForm from "./StoreSettingsForm";
 import { canPublish } from "@/lib/seller-subscription";
+import { isLocale } from "@/i18n/config";
+import { loyaltyMessages } from "@/i18n/loyalty";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +56,7 @@ export default async function StoreSettingsPage() {
     />
 
     <nav className="sellerSettingsTabs" aria-label={t("settingsTitle")}>
-      <a href="#profile">{t("storeProfile")}</a><a href="#shipping">{shippingText("settingsTitle")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a>
+      <a href="#profile">{t("storeProfile")}</a><a href="#shipping">{shippingText("settingsTitle")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a><Link href={`/${locale}/seller/loyalty`}>{loyaltyMessages[isLocale(locale) ? locale : "fr"].title}</Link>
     </nav>
 
     <StoreSettingsForm initialValues={{

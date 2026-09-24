@@ -11,6 +11,43 @@ final class AdminRepository {
   Future<AdminJson> dashboard() async =>
       (await client.dio.get<AdminJson>('/api/mobile/admin/dashboard')).data!;
 
+  Future<AdminJson> loyalty() async =>
+      (await client.dio.get<AdminJson>('/api/mobile/admin/loyalty')).data!;
+
+  Future<AdminJson> updateLoyalty(AdminJson value) async =>
+      (await client.dio.patch<AdminJson>(
+        '/api/mobile/admin/loyalty',
+        data: value,
+      )).data!;
+
+  Future<AdminJson> adjustLoyalty(AdminJson value) async =>
+      (await client.dio.post<AdminJson>(
+        '/api/mobile/admin/loyalty/adjustments',
+        data: value,
+      )).data!;
+
+  Future<AdminJson> loyaltyAccounting(
+    String storeId, {
+    String? orderId,
+    String? cursor,
+  }) async => (await client.dio.get<AdminJson>(
+    '/api/mobile/admin/loyalty/accounting',
+    queryParameters: {
+      'storeId': storeId,
+      if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
+      if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+    },
+  )).data!;
+
+  Future<AdminJson> blockStoreLoyalty(
+    String storeId,
+    bool blocked,
+    String reason,
+  ) async => (await client.dio.patch<AdminJson>(
+    '/api/mobile/admin/loyalty/stores/${Uri.encodeComponent(storeId)}',
+    data: {'blocked': blocked, 'reason': reason},
+  )).data!;
+
   Future<AdminJson> users({
     String query = '',
     String role = '',

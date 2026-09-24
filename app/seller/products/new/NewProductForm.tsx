@@ -2,7 +2,7 @@
 
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Boxes, FileText, ImagePlus, Shapes, Tag, Truck } from "lucide-react";
 import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
 import ProductImageManager from "@/components/ProductImageManager";
@@ -17,10 +17,14 @@ import ProductComplianceFields from "@/components/ProductComplianceFields";
 import SellerCategorySelector from "@/components/SellerCategorySelector";
 import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type ShippingDraft} from "@/components/ShippingRuleFields";
 import {resolveProductPriceInput} from "@/lib/product-price-input";
+import {isLocale} from "@/i18n/config";
+import {loyaltyMessages} from "@/i18n/loyalty";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
+  const requestedLocale = useLocale();
+  const loyaltyCopy = loyaltyMessages[isLocale(requestedLocale) ? requestedLocale : "fr"];
   const ux = useTranslations("Ux");
   const compliance = useTranslations("Compliance");
   const shipping = useTranslations("Shipping");
@@ -110,7 +114,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         colors: String(form.get("colors") || "").split(",").map((value) => value.trim()).filter(Boolean),
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
-        images, video, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on",
+        images, video, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on", loyaltyEligible: form.get("loyaltyEligible") === "on",
         productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}),
       }),
     });
@@ -175,6 +179,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
             <SellerFormField label={t("price", { currency })} htmlFor="price" required={!variantsEnabled}><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required={!variantsEnabled} placeholder={variantsEnabled?"Calculé depuis les variantes":"29.99"} value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
             <SellerFormField label={t("comparePrice", { currency })} htmlFor="compareAtPrice" hint={t("comparePriceHint")}><input id="compareAtPrice" name="compareAtPrice" type="number" min="0.01" max="1000000" step="0.01" aria-describedby="compareAtPrice-hint" placeholder="39.99" /></SellerFormField>
           </div>
+          <label className="sellerQuestionPreference"><input type="checkbox" name="loyaltyEligible"/><span><strong>{loyaltyCopy.title}</strong><small>{loyaltyCopy.eligibleProducts}</small></span></label>
         </SellerSection>
         {!variantsEnabled && <SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><SellerFormField label={t("stock")} htmlFor="stock" hint={t("stockHint")} required><input id="stock" name="stock" type="number" min="0" max="1000000" step="1" value={productStock} onChange={(event) => setProductStock(event.target.value)} required /></SellerFormField></SellerSection>}
         {variantsEnabled && <p className="sellerProductWizardNote">Les prix et le stock de chaque variante sont conservés dans l’étape Variantes.</p>}

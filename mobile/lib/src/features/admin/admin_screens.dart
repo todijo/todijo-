@@ -132,6 +132,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboardScreen> {
                   onTap: () => context.push('/admin/news'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.loyalty_outlined),
+                  title: Text(copy.text('loyalty.title')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/admin/loyalty'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.notifications_outlined),
                   title: Text(copy.text('notifications')),
                   trailing: const Icon(Icons.chevron_right),

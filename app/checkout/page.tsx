@@ -12,6 +12,16 @@ import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
 import {useBuyerMarket} from "@/components/BuyerMarketProvider";
 import { checkoutAddressPath } from "@/lib/checkout-address-routing";
 import { checkoutWithStaleRequestRecovery } from "@/lib/checkout-request";
+import { isLocale } from "@/i18n/config";
+import { loyaltyCheckoutMessages } from "@/i18n/loyalty-checkout";
+import { loyaltyMessages } from "@/i18n/loyalty";
+
+type LoyaltyPreview = { preview: true; currency: string; globalEnabled: boolean; redemptionEnabled: boolean;
+  merchandiseMinor: number; shippingMinor: number; newCashMinor: number;
+  redeemedMinor: number; excludedSupplierMinor: number;
+  stores: Array<{ storeId: string; storeName: string; availableMinor: number;
+    eligibleMinor: number; excludedMinor: number; maximumUsableMinor: number;
+    selectedMinor: number }> };
 
 export default function CheckoutPage() {
   const { items, subtotal, currency, updateDisplayPricing, removeItem } = useCart();
@@ -22,6 +32,10 @@ export default function CheckoutPage() {
   const [quote, setQuote] = useState<{ method: string; amount: string; currency: string; free: boolean; estimatedMinDays: number; estimatedMaxDays: number; carrier: string | null } | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [blockedLines,setBlockedLines]=useState<Record<string,{code:string;allowedCountries:string[]}>>({});
+  const [redeemByStore,setRedeemByStore]=useState<Record<string,number>>({});
+  const [loyaltyPreview,setLoyaltyPreview]=useState<LoyaltyPreview|null>(null);
+  const [loyaltyLoading,setLoyaltyLoading]=useState(false);
+  const [loyaltyError,setLoyaltyError]=useState(false);
   const t = useTranslations("Checkout");
   const cart = useTranslations("Cart");
   const connect = useTranslations("Connect");
@@ -30,9 +44,34 @@ export default function CheckoutPage() {
   const shipping = useTranslations("Shipping");
   const pricing = useTranslations("ProductDetail");
   const locale = useLocale();
+  const loyaltyCopy=loyaltyCheckoutMessages[isLocale(locale)?locale:"fr"];
+  const loyaltyBaseCopy=loyaltyMessages[isLocale(locale)?locale:"fr"];
   const common=useTranslations("Common");
   const market=useBuyerMarket();
   const pricingResolved=items.every(item=>item.authoritativePrice!==false);
+
+  useEffect(()=>{
+    if(!items.length||!address||!quote||!pricingResolved){
+      setLoyaltyPreview(null);setLoyaltyLoading(false);return;
+    }
+    let active=true;setLoyaltyLoading(true);setLoyaltyError(false);
+    const controller=new AbortController();
+    const timer=window.setTimeout(()=>fetch("/api/checkout",{
+      method:"POST",headers:{"Content-Type":"application/json"},signal:controller.signal,
+      body:JSON.stringify({preview:true,shoppingCountry:market.country,
+        buyerCurrency:market.currency,redeemByStore,
+        items:items.map(item=>({productId:item.id,quantity:item.quantity,
+          selectedColor:item.selectedColor,selectedSize:item.selectedSize,
+          variantId:item.variantId,displayedUnitPrice:String(item.price),
+          displayedCurrency:item.currency}))}),
+    }).then(async response=>{
+      if(!response.ok)throw new Error("LOYALTY_PREVIEW_UNAVAILABLE");
+      return response.json() as Promise<LoyaltyPreview>;
+    }).then(result=>{if(active){setLoyaltyPreview(result);setLoyaltyError(false);}})
+      .catch(()=>{if(active){setLoyaltyPreview(null);setLoyaltyError(true);}})
+      .finally(()=>{if(active)setLoyaltyLoading(false);}),300);
+    return()=>{active=false;controller.abort();window.clearTimeout(timer);};
+  },[items,address,quote,pricingResolved,market.country,market.currency,redeemByStore]);
 
   useEffect(()=>{fetch("/api/account/addresses",{cache:"no-store"}).then(async r=>r.ok?await r.json():{addresses:[]}).then(data=>setAddress(data.addresses?.[0]??null)).catch(()=>setAddress(null))},[]);
 
@@ -61,16 +100,23 @@ export default function CheckoutPage() {
   async function beginCheckout() {
     if(!pricingResolved){setError(pricing("pricingLoading"));return;}
     setLoading(true); setError("");
-    const cartSignature = items.map(({ lineKey, quantity }) => `${lineKey}:${quantity}`).sort().join("|");
+    if(Object.values(redeemByStore).some(value=>value>0)&&
+      (!loyaltyPreview||loyaltyLoading)){setError(loyaltyCopy.previewError);setLoading(false);return;}
+    const cartSignature = [...items.map(({ lineKey, quantity }) => `${lineKey}:${quantity}`),
+      ...Object.entries(redeemByStore).map(([storeId,amount])=>`${storeId}:${amount}`)].sort().join("|");
     const storageKey = `todijo-checkout:${cartSignature}`;
     try {
-      type CheckoutResult={url?:string;error?:string;code?:string;details?:{lines?:Array<{lineKey:string;unitPrice:string;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>}};
-      const checkout=await checkoutWithStaleRequestRecovery<CheckoutResult>({storage:window.localStorage,storageKey,createRequestId:()=>crypto.randomUUID(),send:async(requestId)=>{const response=await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, shoppingCountry:market.country,buyerCurrency:market.currency,items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });return{ok:response.ok,status:response.status,result:await response.json() as CheckoutResult};}});
+      type CheckoutResult={url?:string|null;orderId?:string|null;completed?:boolean;error?:string;code?:string;details?:{lines?:Array<{lineKey:string;unitPrice:string;currency:string;freeShipping?:boolean;deliveryMinDays?:number|null;deliveryMaxDays?:number|null}>}};
+      const checkout=await checkoutWithStaleRequestRecovery<CheckoutResult>({storage:window.localStorage,storageKey,createRequestId:()=>crypto.randomUUID(),send:async(requestId)=>{const response=await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, shoppingCountry:market.country,buyerCurrency:market.currency,redeemByStore,items: items.map((item) => ({ productId: item.id, quantity: item.quantity, selectedColor: item.selectedColor, selectedSize: item.selectedSize, variantId: item.variantId, displayedUnitPrice:String(item.price),displayedCurrency:item.currency })) }) });return{ok:response.ok,status:response.status,result:await response.json() as CheckoutResult};}});
       const {ok,status,result,requestId}=checkout;
       if(status===409&&result.code==="CHECKOUT_PRICE_CHANGED"&&result.details?.lines?.length){updateDisplayPricing(result.details.lines.map(line=>({lineKey:line.lineKey,price:Number(line.unitPrice),currency:line.currency,freeShipping:line.freeShipping,deliveryMinDays:line.deliveryMinDays,deliveryMaxDays:line.deliveryMaxDays})));setError(t("startError"));setLoading(false);return;}
-      if (!ok || !result.url) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : result.code === "SELLER_STATUS_REQUIRED" ? sellerTransparency("checkoutBlocked") : result.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : result.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : result.code === "SHIPPING_NOT_CONFIGURED" ? shipping("notConfigured") : t("startError"));
+      if (!ok || (!result.url && !(result.completed&&result.orderId))) throw new Error(result.code === "MULTIPLE_SELLERS" ? connect("multipleSellers") : result.code === "SELLER_STRIPE_NOT_READY" ? connect("sellerNotReady") : result.code === "SELLER_STATUS_REQUIRED" ? sellerTransparency("checkoutBlocked") : result.code === "SHIPPING_POSTAL_UNAVAILABLE" ? shipping("postalUnavailable") : result.code === "SHIPPING_DESTINATION_UNAVAILABLE" ? shipping("destinationUnavailable") : result.code === "SHIPPING_NOT_CONFIGURED" ? shipping("notConfigured") : t("startError"));
+      if(result.completed&&result.orderId){
+        window.location.assign(`/${locale}/account/orders/${encodeURIComponent(result.orderId)}`);
+        return;
+      }
       window.localStorage.setItem(`todijo-pending-checkout:${requestId}`, JSON.stringify({ requestId, lines: items.map((item) => ({ lineKey: item.lineKey ?? cartLineKey(item.id, item.selectedColor, item.selectedSize, item.variantId), quantity: item.quantity })) }));
-      window.location.assign(result.url);
+      window.location.assign(result.url!);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("startError"));
       setLoading(false);
@@ -88,11 +134,33 @@ export default function CheckoutPage() {
       <section className="checkoutForm">
         <section className="checkoutShipping"><div className="checkoutStep"><span>1</span><div><h2>{shipping("destination")}</h2><p>{shipping("destinationHelp")}</p></div></div>{address?<div className="shippingAddressCard"><strong>{address.recipientName}</strong><span>{address.addressLine1}</span>{address.addressLine2&&<span>{address.addressLine2}</span>}<span>{address.postalCode} {address.city}</span><span>{new Intl.DisplayNames([locale],{type:"region"}).of(address.country)}</span><Link href={checkoutAddressPath(locale)}>{shipping("changeAddress")}</Link></div>:address===null?<Link href={checkoutAddressPath(locale)}>{shipping("addAddress")}</Link>:null}{quoteLoading&&<p className="shippingQuoteStatus">{shipping("checking")}</p>}{quote&&<><p className="shippingQuoteStatus isAvailable">{shipping("available")}</p><div className="shippingQuoteCard"><strong>{quote.method}</strong>{quote.carrier&&<span>{quote.carrier}</span>}<span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span><b>{quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)}</b></div></>}</section>
         <section><div className="checkoutStep"><span>2</span><div><h2>{t("card")}</h2><p>{t("stripeDetails")}</p></div></div><div className="paymentNotice">🔒 {t("notice")}</div></section>
+        {loyaltyPreview?.redemptionEnabled&&market.currency==="EUR"&&<section className="buyerOrderCard" aria-label={loyaltyCopy.title}>
+          <h2>{loyaltyCopy.title}</h2>
+          <p>{loyaltyCopy.storeOnly}</p>
+          {loyaltyPreview.stores.map(store=><div key={store.storeId}>
+            <strong>{store.storeName}</strong>
+            <p>{loyaltyBaseCopy.available}: {formatCurrency(store.availableMinor/100,"EUR",locale)} · {loyaltyCopy.maximum}: {formatCurrency(store.maximumUsableMinor/100,"EUR",locale)}</p>
+            {store.excludedMinor>0&&<p>{loyaltyCopy.excluded}: {formatCurrency(store.excludedMinor/100,"EUR",locale)}</p>}
+            {store.maximumUsableMinor>0&&<label><input type="checkbox" checked={Boolean(redeemByStore[store.storeId])}
+              disabled={loading||loyaltyLoading} onChange={event=>setRedeemByStore(current=>{
+                const next={...current};if(event.target.checked)next[store.storeId]=store.maximumUsableMinor;
+                else delete next[store.storeId];return next;
+              })}/> {loyaltyCopy.useCredit}</label>}
+          </div>)}
+          {loyaltyPreview.excludedSupplierMinor>0&&<p>{loyaltyCopy.excluded}: {formatCurrency(loyaltyPreview.excludedSupplierMinor/100,"EUR",locale)}</p>}
+          <p>{loyaltyCopy.shippingExcluded}</p>
+          <p>{loyaltyCopy.creditUsed}: {formatCurrency(loyaltyPreview.redeemedMinor/100,"EUR",locale)}</p>
+          <p><strong>{loyaltyCopy.newCash}: {formatCurrency(loyaltyPreview.newCashMinor/100,"EUR",locale)}</strong></p>
+          {loyaltyPreview.newCashMinor===0&&<p>{loyaltyCopy.zeroCash}</p>}
+          {loyaltyPreview.redeemedMinor>0&&<p>{loyaltyCopy.pending}</p>}
+        </section>}
+        {loyaltyLoading&&<p aria-live="polite">{common("loading")}</p>}
+        {loyaltyError&&Object.values(redeemByStore).some(value=>value>0)&&<p role="alert">{loyaltyCopy.previewError}</p>}
         <aside className="checkoutLegal"><strong>{compliance("precontractTitle")}</strong><p>{compliance("precontractText")}</p><p><Link href={`/${locale}/info/terms`}>{compliance("legalLinks")}</Link></p></aside>
         {error && <p className="formError" role="alert">{error}</p>}
-        <button className="authSubmit" type="button" onClick={beginCheckout} disabled={loading||!quote||!pricingResolved} aria-busy={loading}>{loading ? t("opening") : !pricingResolved ? pricing("pricingLoading") : compliance("paymentObligation")}</button>
+        <button className="authSubmit" type="button" onClick={beginCheckout} disabled={loading||!quote||!pricingResolved||loyaltyLoading} aria-busy={loading}>{loading ? t("opening") : !pricingResolved ? pricing("pricingLoading") : compliance("paymentObligation")}</button>
       </section>
-      <aside className="checkoutSummary"><h2>{t("order")}</h2>{items.map(orderLine)}<div className="summaryLine"><span>{cart("subtotal")}</span><strong>{pricingResolved?formatCurrency(subtotal, currency, locale):pricing("pricingLoading")}</strong></div><div className="summaryLine"><span>{cart("shipping")}</span><span>{quote?(quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)):shipping("selectDestination")}</span></div>{quote&&<div className="shippingSummaryMeta"><strong>{quote.method}</strong><span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span></div>}<div className="summaryTotal"><span>{cart("total")}</span><strong>{pricingResolved?formatCurrency(subtotal+(quote?Number(quote.amount):0), currency, locale):pricing("pricingLoading")}</strong></div><Link href="/cart">← {t("modify")}</Link></aside>
+      <aside className="checkoutSummary"><h2>{t("order")}</h2>{items.map(orderLine)}<div className="summaryLine"><span>{cart("subtotal")}</span><strong>{pricingResolved?formatCurrency(subtotal, currency, locale):pricing("pricingLoading")}</strong></div><div className="summaryLine"><span>{cart("shipping")}</span><span>{quote?(quote.free?shipping("freeLabel"):formatCurrency(Number(quote.amount),quote.currency,locale)):shipping("selectDestination")}</span></div>{quote&&<div className="shippingSummaryMeta"><strong>{quote.method}</strong><span>{shipping("estimate",{min:quote.estimatedMinDays,max:quote.estimatedMaxDays})}</span></div>}{loyaltyPreview?.redeemedMinor? <div className="summaryLine"><span>{loyaltyCopy.creditUsed}</span><strong>−{formatCurrency(loyaltyPreview.redeemedMinor/100,"EUR",locale)}</strong></div>:null}<div className="summaryTotal"><span>{loyaltyPreview?.redeemedMinor?loyaltyCopy.newCash:cart("total")}</span><strong>{loyaltyPreview?formatCurrency(loyaltyPreview.newCashMinor/100,loyaltyPreview.currency,locale):pricingResolved?formatCurrency(subtotal+(quote?Number(quote.amount):0), currency, locale):pricing("pricingLoading")}</strong></div><Link href="/cart">← {t("modify")}</Link></aside>
     </div>}
   </section></main>;
 }

@@ -389,6 +389,12 @@ model User {
   siteContentRevisions SiteContentRevision[] @relation("SiteContentRevisionEditor")
   newsArticles NewsArticle[] @relation("NewsArticleEditor")
   supplierCatalogJobs SupplierCatalogImportJob[] @relation("SupplierCatalogJobAdmin")
+  loyaltyAccounts LoyaltyAccount[]
+  loyaltySettingsChanges LoyaltySettingsChange[] @relation("LoyaltySettingsAdmin")
+  loyaltyAdjustments LoyaltyLedgerEntry[] @relation("LoyaltyAdjustmentAdmin")
+  loyaltyPlatformFunding LoyaltyPlatformFunding[] @relation("LoyaltyPlatformFundingAdmin")
+  loyaltyPlatformFundingAttestations LoyaltyPlatformFundingAttestation[] @relation("LoyaltyPlatformFundingVerifier")
+  loyaltyStoreChanges LoyaltyStoreChange[] @relation("LoyaltyStoreChangeActor")
 
   @@index([blockedAt, blockExpiresAt])
   @@index([sellerSuspendedAt])
@@ -761,6 +767,8 @@ model Store {
   shippingProvider String       @default("MANUAL")
   shippingExternalServiceId String?
   dropshippingEnabled Boolean @default(false)
+  loyaltyEnabled Boolean @default(false)
+  loyaltyBlockedAt DateTime?
   marketplaceActivatedAt DateTime?
   sellerRiskPolicy SellerRiskPolicy @default(AUTOMATIC)
   riskHoldReason String? @db.VarChar(500)
@@ -783,6 +791,8 @@ model Store {
   supplierConnections SupplierConnection[]
   supplierCatalogJobs SupplierCatalogImportJob[]
   orderGroups OrderGroup[]
+  loyaltyAccounts LoyaltyAccount[]
+  loyaltyChanges LoyaltyStoreChange[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -919,6 +929,7 @@ model Product {
   dataClass          CatalogDataClass           @default(PRODUCTION)
   deactivationReason ProductDeactivationReason @default(NONE)
   allowPrepurchaseQuestions Boolean               @default(true)
+  loyaltyEligible Boolean @default(false)
   productIdentifier String?
   manufacturerName String?
   manufacturerContact String?
@@ -1466,6 +1477,8 @@ model Order {
   supplierFulfillments SupplierFulfillment[]
   groups OrderGroup[]
   refundOperations RefundOperation[]
+  loyaltyLedgerEntries LoyaltyLedgerEntry[]
+  loyaltyFundingSnapshot LoyaltyOrderFundingSnapshot?
 
   @@unique([buyerId, checkoutRequestId])
   @@index([buyerId, status, createdAt])
@@ -1518,6 +1531,7 @@ model OrderGroup {
   platformFeeAmountMinor Int
   sellerNetAmountMinor Int
   refundedMerchandiseMinor Int @default(0)
+  refundedCashMerchandiseMinor Int @default(0)
   refundedShippingMinor Int @default(0)
   commissionReversedMinor Int @default(0)
   sellerRecoveredMinor Int @default(0)
@@ -1543,6 +1557,10 @@ model OrderGroup {
   items OrderItem[]
   refundAllocations RefundGroupAllocation[]
   transferReversals TransferReversal[]
+  loyaltyGrants LoyaltyGrant[]
+  loyaltyReserveMinor Int @default(0)
+  loyaltyRedeemedMinor Int @default(0)
+  loyaltyReserveReversedMinor Int @default(0)
   @@unique([orderId,groupKey])
   @@index([storeId,transferStatus])
   @@index([transferStatus,nextTransferAttemptAt])
@@ -1615,6 +1633,11 @@ model OrderItem {
   variantId                  String?
   variantTitleSnapshot       String?
   variantSkuSnapshot         String?
+  loyaltyEligibleSnapshot Boolean @default(false)
+  loyaltyRateBpsSnapshot Int?
+  loyaltyExpiryDaysSnapshot Int?
+  loyaltyEarnMinor Int @default(0)
+  loyaltyRedeemedMinor Int @default(0)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderGroup OrderGroup? @relation(fields:[orderGroupId],references:[id],onDelete:SetNull)
@@ -1623,6 +1646,8 @@ model OrderItem {
   review  Review?
   supplierPricingSnapshot OrderItemSupplierPricingSnapshot?
   supplierFulfillmentItem SupplierFulfillmentItem?
+  loyaltyGrant LoyaltyGrant?
+  loyaltyRedemptionAllocations LoyaltyRedemptionAllocation[]
   refundAllocations RefundItemAllocation[]
   restockEvents InventoryRestockEvent[]
 
@@ -1649,6 +1674,8 @@ model RefundOperation {
  errorCode String? @db.VarChar(120)
  errorMessage String? @db.VarChar(500)
  merchandiseAmountMinor Int @default(0)
+ cashMerchandiseMinor Int @default(0)
+ loyaltyRestoredMinor Int @default(0)
  shippingAmountMinor Int @default(0)
  totalAmountMinor Int @default(0)
  reviewedById String?
@@ -1669,8 +1696,11 @@ model RefundGroupAllocation {
  orderGroupId String
  status RefundAllocationStatus @default(REQUESTED)
  merchandiseAmountMinor Int
+ cashMerchandiseMinor Int @default(0)
+ loyaltyRestoredMinor Int @default(0)
  shippingAmountMinor Int @default(0)
  commissionReversalMinor Int
+ loyaltyReserveReversalMinor Int @default(0)
  sellerRecoveryMinor Int
  shippingRefundReason String? @db.VarChar(500)
  createdAt DateTime @default(now())
@@ -1687,6 +1717,8 @@ model RefundItemAllocation {
  quantity Int
  unitAmountMinor Int
  merchandiseAmountMinor Int
+ cashAmountMinor Int @default(0)
+ loyaltyRestoredMinor Int @default(0)
  createdAt DateTime @default(now())
  refundOperation RefundOperation @relation(fields:[refundOperationId],references:[id],onDelete:Cascade)
  orderItem OrderItem @relation(fields:[orderItemId],references:[id],onDelete:Restrict)
@@ -2073,4 +2105,242 @@ model AuthRateLimitBucket {
   expiresAt       DateTime
 
   @@index([expiresAt])
+}
+
+// Loyalty is deliberately separate from platform revenue. Ledger entries are
+// append-only accounting evidence; cached summaries must be reconcilable here.
+model LoyaltyProgramSettings {
+  id String @id @default("global")
+  enabled Boolean @default(false)
+  rateBps Int @default(200)
+  minRateBps Int @default(0)
+  maxRateBps Int @default(1000)
+  expiryDays Int @default(365)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  changes LoyaltySettingsChange[]
+}
+
+model LoyaltySettingsChange {
+  id String @id @default(cuid())
+  settingsId String
+  adminId String
+  oldEnabled Boolean
+  newEnabled Boolean
+  oldRateBps Int
+  newRateBps Int
+  oldMinRateBps Int
+  newMinRateBps Int
+  oldMaxRateBps Int
+  newMaxRateBps Int
+  oldExpiryDays Int
+  newExpiryDays Int
+  reason String @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  settings LoyaltyProgramSettings @relation(fields: [settingsId], references: [id], onDelete: Restrict)
+  admin User @relation("LoyaltySettingsAdmin", fields: [adminId], references: [id], onDelete: Restrict)
+  @@index([settingsId, createdAt])
+  @@index([adminId, createdAt])
+}
+
+model LoyaltyAccount {
+  id String @id @default(cuid())
+  buyerId String
+  storeId String
+  currency String @db.VarChar(3)
+  createdAt DateTime @default(now())
+  buyer User @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  grants LoyaltyGrant[]
+  entries LoyaltyLedgerEntry[]
+  reservations LoyaltyRedemptionReservation[]
+  platformFunding LoyaltyPlatformFunding[]
+  @@unique([buyerId, storeId, currency])
+  @@index([storeId, currency])
+}
+
+model LoyaltyStoreChange {
+  id String @id @default(cuid())
+  storeId String
+  actorId String
+  actorRole UserRole
+  oldEnabled Boolean
+  newEnabled Boolean
+  oldBlockedAt DateTime?
+  newBlockedAt DateTime?
+  reason String @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  actor User @relation("LoyaltyStoreChangeActor", fields: [actorId], references: [id], onDelete: Restrict)
+  @@index([storeId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+enum LoyaltyGrantStatus {
+  PENDING
+  AVAILABLE
+  REVERSED
+  EXPIRED
+}
+
+enum LoyaltyFundingSource {
+  SELLER_RESERVE
+  PLATFORM_ADMIN
+}
+
+model LoyaltyGrant {
+  id String @id @default(cuid())
+  accountId String
+  orderItemId String? @unique
+  orderGroupId String?
+  fundingSource LoyaltyFundingSource @default(SELLER_RESERVE)
+  rateBps Int
+  expiryDays Int
+  amountMinor Int
+  reversedMinor Int @default(0)
+  status LoyaltyGrantStatus @default(PENDING)
+  availableAt DateTime?
+  expiresAt DateTime?
+  expiryWarnedAt DateTime?
+  createdAt DateTime @default(now())
+  account LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  orderGroup OrderGroup? @relation(fields: [orderGroupId], references: [id], onDelete: Restrict)
+  platformFunding LoyaltyPlatformFunding?
+  entries LoyaltyLedgerEntry[]
+  redemptionAllocations LoyaltyRedemptionAllocation[]
+  @@index([status, availableAt])
+  @@index([accountId, expiresAt])
+}
+
+// Explicit platform-funded credit is a separate liability, never a seller
+// reserve deduction or Todijo commission. The admin reference is idempotent.
+model LoyaltyPlatformFunding {
+  id String @id @default(cuid())
+  accountId String
+  grantId String @unique
+  adminId String
+  amountMinor Int
+  reference String @unique @db.VarChar(200)
+  reason String @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  account LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  grant LoyaltyGrant @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  admin User @relation("LoyaltyPlatformFundingAdmin", fields: [adminId], references: [id], onDelete: Restrict)
+  attestation LoyaltyPlatformFundingAttestation?
+  @@index([accountId, createdAt])
+  @@index([adminId, createdAt])
+}
+
+// Independent, append-only treasury evidence. A platform grant remains
+// PENDING and unspendable until another Admin records an external finance
+// journal/bank reference; this is not a claim of Stripe escrow custody.
+model LoyaltyPlatformFundingAttestation {
+  id String @id @default(cuid())
+  fundingId String @unique
+  verifierId String
+  evidenceReference String @unique @db.VarChar(200)
+  note String @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  funding LoyaltyPlatformFunding @relation(fields: [fundingId], references: [id], onDelete: Restrict)
+  verifier User @relation("LoyaltyPlatformFundingVerifier", fields: [verifierId], references: [id], onDelete: Restrict)
+  @@index([verifierId, createdAt])
+}
+
+enum LoyaltyLedgerEvent {
+  EARN_PENDING
+  EARN_PENDING_REVERSED
+  EARN_AVAILABLE
+  REDEEM
+  REDEEM_RESTORED
+  EARN_REVERSED
+  EXPIRED
+  EXPIRED_RESTORED
+  ADMIN_ADJUSTMENT
+}
+
+model LoyaltyLedgerEntry {
+  id String @id @default(cuid())
+  accountId String
+  grantId String?
+  orderId String?
+  adminId String?
+  event LoyaltyLedgerEvent
+  amountMinor Int
+  reference String @unique @db.VarChar(200)
+  reason String? @db.VarChar(1000)
+  metadata Json?
+  createdAt DateTime @default(now())
+  account LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  grant LoyaltyGrant? @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  admin User? @relation("LoyaltyAdjustmentAdmin", fields: [adminId], references: [id], onDelete: Restrict)
+  @@index([accountId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([event, createdAt])
+}
+
+enum LoyaltyReservationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+}
+
+model LoyaltyRedemptionReservation {
+  id String @id @default(cuid())
+  accountId String
+  checkoutRequestId String @db.VarChar(100)
+  amountMinor Int
+  status LoyaltyReservationStatus @default(ACTIVE)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  account LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  @@unique([accountId, checkoutRequestId])
+  @@index([status, expiresAt])
+}
+
+// Immutable original funding attribution; restoredMinor only tracks confirmed
+// refund restoration of that allocation, never rewrites the original spend.
+model LoyaltyRedemptionAllocation {
+  id String @id @default(cuid())
+  orderItemId String
+  grantId String
+  amountMinor Int
+  restoredMinor Int @default(0)
+  createdAt DateTime @default(now())
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  grant LoyaltyGrant @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  @@unique([orderItemId, grantId])
+  @@index([grantId])
+}
+
+enum LoyaltyFundingStatus {
+  PENDING_CASH
+  CASH_VERIFIED
+  LOYALTY_SETTLED
+  CANCELLED
+}
+
+// Immutable monetary composition captured from authoritative server prices.
+// Old orders have no row; they must never be inferred from current rates.
+model LoyaltyOrderFundingSnapshot {
+  id String @id @default(cuid())
+  orderId String @unique
+  currency String @db.VarChar(3)
+  grossMerchandiseMinor Int
+  eligibleMerchandiseMinor Int
+  excludedMerchandiseMinor Int
+  shippingMinor Int
+  newCashMinor Int
+  loyaltyRedeemedMinor Int
+  commissionBaseMinor Int
+  platformCommissionMinor Int
+  sellerPayableMinor Int
+  newReserveMinor Int
+  status LoyaltyFundingStatus
+  settledAt DateTime?
+  createdAt DateTime @default(now())
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@index([status, createdAt])
 }

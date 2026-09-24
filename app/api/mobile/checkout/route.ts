@@ -5,7 +5,7 @@ import { MobileSessionError, readMobileSession } from "@/lib/mobile-session";
 import { configuredStripeMode } from "@/lib/stripe";
 import { defaultLocale, isLocale } from "@/i18n/config";
 
-type MobileCheckoutBody={requestId?:string;shoppingCountry?:unknown;buyerCurrency?:unknown;locale?:unknown;items?:Array<{productId:string;quantity:number;selectedColor?:string|null;selectedSize?:string|null;variantId?:string|null;displayedUnitPrice?:string|number|null;displayedCurrency?:string|null}>};
+type MobileCheckoutBody={requestId?:string;preview?:boolean;shoppingCountry?:unknown;buyerCurrency?:unknown;redeemByStore?:unknown;locale?:unknown;items?:Array<{productId:string;quantity:number;selectedColor?:string|null;selectedSize?:string|null;variantId?:string|null;displayedUnitPrice?:string|number|null;displayedCurrency?:string|null}>};
 
 export async function POST(request:Request){
   try{
@@ -13,8 +13,10 @@ export async function POST(request:Request){
     const body=await request.json() as MobileCheckoutBody;
     const requestedLocale=typeof body.locale==="string"?body.locale:null;
     const locale=isLocale(requestedLocale)?requestedLocale:defaultLocale;
-    const checkout=await createCheckout(prisma,session.userId,body.requestId??"",body.items??[],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode(),returnLocale:locale,returnTarget:"mobile"});
-    return NextResponse.json({url:checkout.url,orderId:checkout.orderId,reused:checkout.reused},{headers:{"Cache-Control":"no-store"}});
+    const checkout=await createCheckout(prisma,session.userId,body.preview?`preview-${crypto.randomUUID()}`:body.requestId??"",body.items??[],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,redeemByStore:body.redeemByStore,stripeMode:configuredStripeMode(),returnLocale:locale,returnTarget:"mobile",previewOnly:body.preview===true});
+    if("preview" in checkout&&checkout.preview)return NextResponse.json(checkout,{headers:{"Cache-Control":"private, no-store"}});
+    return NextResponse.json({url:checkout.url,orderId:checkout.orderId,reused:checkout.reused,
+      completed:"completed" in checkout&&checkout.completed===true},{headers:{"Cache-Control":"no-store"}});
   }catch(error){
     if(error instanceof MobileSessionError)return NextResponse.json({error:error.code},{status:error.status});
     const status=error instanceof CheckoutError?error.status:500;

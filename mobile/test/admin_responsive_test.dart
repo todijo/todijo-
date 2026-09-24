@@ -14,6 +14,7 @@ import 'package:todijo/src/features/admin/admin_recalls_screen.dart';
 import 'package:todijo/src/features/admin/admin_content_screens.dart';
 import 'package:todijo/src/features/admin/admin_news_screens.dart';
 import 'package:todijo/src/features/admin/admin_screens.dart';
+import 'package:todijo/src/features/admin/admin_loyalty_screen.dart';
 import 'package:todijo/src/features/marketplace/application/buyer_state.dart';
 
 final class _NoSession implements SessionStore {
@@ -82,6 +83,18 @@ void main() {
                   'articles': <Map<String, dynamic>>[],
                   'pages': 1,
                 },
+                '/api/mobile/admin/loyalty' => <String, dynamic>{
+                  'settings': <String, dynamic>{
+                    'enabled': false,
+                    'rateBps': 200,
+                    'minRateBps': 0,
+                    'maxRateBps': 1000,
+                    'expiryDays': 365,
+                  },
+                  'activationReady': false,
+                  'history': <Map<String, dynamic>>[],
+                  'globalAccounting': <String, dynamic>{'balanced': true},
+                },
                 _ => <String, dynamic>{
                   'items': <Map<String, dynamic>>[],
                   'orders': <Map<String, dynamic>>[],
@@ -118,6 +131,7 @@ void main() {
           const AdminQueueScreen(AdminQueueKind.reports),
           const AdminContentScreen(),
           const AdminNewsScreen(),
+          const AdminLoyaltyScreen(),
           for (final kind in AdminOperationKind.values)
             AdminOperationsScreen(kind),
         ]) {

@@ -26,6 +26,109 @@ void main() {
     expect(TodijoLocalizations(const Locale('fr')).text('cart'), isNotEmpty);
   });
 
+  test('loyalty euro-credit copy is complete in all 14 locales', () {
+    const keys = [
+      'title',
+      'intro',
+      'available',
+      'pending',
+      'expiringSoon',
+      'store',
+      'history',
+      'emptyHistory',
+      'earnedPending',
+      'earnedAvailable',
+      'redeemed',
+      'restored',
+      'reversed',
+      'expired',
+      'adjusted',
+      'owed',
+      'participation',
+      'enabled',
+      'disabled',
+      'globalRate',
+      'reserve',
+      'eligibleProducts',
+      'save',
+      'blocked',
+      'unavailable',
+    ];
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        expect(
+          copy.text('loyalty.$key').trim(),
+          isNotEmpty,
+          reason: '$locale:loyalty.$key',
+        );
+      }
+      for (final key in [
+        'activate',
+        'deactivate',
+        'releaseReference',
+        'confirmation',
+        'gateClosed',
+        'adjustment',
+      ]) {
+        expect(copy.text('loyaltyAdminAction.$key').trim(), isNotEmpty);
+      }
+      for (final key in [
+        'pledge',
+        'attest',
+        'cancelPledge',
+        'revoke',
+        'sellerRepair',
+        'buyerId',
+        'storeId',
+        'amountEuro',
+        'reference',
+        'grantId',
+        'orderItemId',
+        'evidence',
+        'note',
+      ]) {
+        expect(copy.text('loyaltyAdminAdjustment.$key').trim(), isNotEmpty);
+      }
+      expect(
+        copy.text('loyaltyCheckout.reserved'),
+        isNotEmpty,
+        reason: '$locale:reserved',
+      );
+    }
+  });
+
+  test('admin loyalty controls are translated in all 14 locales', () {
+    const keys = [
+      'settings',
+      'ratePercent',
+      'minPercent',
+      'maxPercent',
+      'expiryDays',
+      'reason',
+      'rateHistory',
+      'sellerParticipation',
+      'block',
+      'unblock',
+      'updateFailed',
+      'rolloutPaused',
+      'changedAt',
+      'noHistory',
+      'balanced',
+      'anomaly',
+    ];
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        expect(
+          copy.text('loyaltyAdmin.$key').trim(),
+          isNotEmpty,
+          reason: '$locale:loyaltyAdmin.$key',
+        );
+      }
+    }
+  });
+
   test(
     'buyer order and payment states match responsive catalogs in 14 locales',
     () {
@@ -413,6 +516,64 @@ void main() {
             copy.text(key),
             isNot(english.text(key)),
             reason: '$locale:$key',
+          );
+        }
+      }
+    },
+  );
+
+  test('loyalty checkout copy is complete in every native locale', () {
+    const keys = [
+      'title',
+      'maximum',
+      'excluded',
+      'shippingExcluded',
+      'useCredit',
+      'newCash',
+      'zeroCash',
+      'previewError',
+      'pending',
+      'creditUsed',
+      'storeOnly',
+      'paymentPending',
+    ];
+    for (final locale in todijoLocaleCodes) {
+      final copy = TodijoLocalizations(Locale(locale));
+      for (final key in keys) {
+        final value = copy.text('loyaltyCheckout.$key');
+        expect(value, isNotEmpty, reason: '$locale:$key');
+        expect(
+          value,
+          isNot('loyaltyCheckout.$key'),
+          reason: '$locale:$key missing',
+        );
+      }
+    }
+  });
+
+  test(
+    'seller and admin settlement copy is complete in every native locale',
+    () {
+      const keys = [
+        'order',
+        'lookup',
+        'cash',
+        'commission',
+        'sellerPayable',
+        'sellerCredit',
+        'platformCredit',
+        'balanced',
+        'anomaly',
+      ];
+      for (final locale in todijoLocaleCodes) {
+        final copy = TodijoLocalizations(Locale(locale));
+        for (final key in keys) {
+          final value = copy.text('loyaltyAccounting.$key');
+          expect(value, isNotEmpty, reason: '$locale:$key');
+          expect(
+            value,
+            isNot('loyaltyAccounting.$key'),
+            reason: '$locale:$key missing',
           );
         }
       }

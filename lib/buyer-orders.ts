@@ -1,6 +1,13 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
+  loyaltyFundingSnapshot: { select: { status: true, currency: true,
+    grossMerchandiseMinor: true, eligibleMerchandiseMinor: true,
+    excludedMerchandiseMinor: true, shippingMinor: true,
+    newCashMinor: true, loyaltyRedeemedMinor: true } },
+  refundOperations: { where: { status: "COMPLETED" },
+    select: { id: true, totalAmountMinor: true,
+      loyaltyRestoredMinor: true, createdAt: true } },
   lifecycleEvents: { select: { id: true, type: true, createdAt: true }, orderBy: { createdAt: "asc" } },
   supplierFulfillments: {
     select: {

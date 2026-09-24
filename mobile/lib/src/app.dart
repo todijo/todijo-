@@ -18,6 +18,7 @@ import 'features/admin/admin_news_screens.dart';
 import 'features/admin/admin_operations_screen.dart';
 import 'features/admin/admin_products_screen.dart';
 import 'features/admin/admin_recalls_screen.dart';
+import 'features/admin/admin_loyalty_screen.dart';
 import 'features/auth/auth_screens.dart';
 import 'features/auth/auth_state.dart';
 import 'features/content/content_screens.dart';
@@ -26,6 +27,7 @@ import 'features/marketplace/presentation/buyer_chrome.dart';
 import 'features/marketplace/presentation/buyer_screens.dart';
 import 'features/marketplace/presentation/home_screen.dart';
 import 'features/seller/seller_screens.dart';
+import 'features/seller/seller_loyalty_screen.dart';
 import 'features/seller/seller_product_editor.dart';
 import 'features/seller/seller_store_screen.dart';
 import 'features/seller/seller_finance_screen.dart';
@@ -134,6 +136,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/account/notifications',
         builder: (_, _) => const NotificationsScreen(),
       ),
+      GoRoute(
+        path: '/account/loyalty',
+        builder: (_, _) => const BuyerLoyaltyScreen(),
+      ),
       GoRoute(path: '/checkout', builder: (_, _) => const CheckoutScreen()),
       GoRoute(
         path: '/seller',
@@ -166,10 +172,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const SellerStoreScreen(),
       ),
       GoRoute(
+        path: '/seller/loyalty',
+        builder: (_, _) => const SellerLoyaltyScreen(),
+      ),
+      GoRoute(
         path: '/seller/finance',
         builder: (_, _) => const SellerFinanceScreen(),
       ),
       GoRoute(path: '/admin', builder: (_, _) => const AdminDashboardScreen()),
+      GoRoute(
+        path: '/admin/loyalty',
+        builder: (_, _) => const AdminLoyaltyScreen(),
+      ),
       GoRoute(
         path: '/admin/products',
         builder: (_, _) => const AdminProductsScreen(),

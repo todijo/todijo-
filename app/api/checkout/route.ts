@@ -16,9 +16,9 @@ export async function POST(request: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   try {
-    const body = await request.json() as { requestId?: string;shoppingCountry?:unknown;buyerCurrency?:unknown; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?:string|number|null; displayedCurrency?:string|null }> };
-    const checkout = await createCheckout(prisma, session.userId, body.requestId ?? "", body.items ?? [],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,stripeMode:configuredStripeMode(),returnLocale:localeFromReferer(request.headers.get("referer"))});
-    return NextResponse.json(checkout);
+    const body = await request.json() as { requestId?: string;preview?:boolean;shoppingCountry?:unknown;buyerCurrency?:unknown;redeemByStore?:unknown; items?: Array<{ productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?:string|number|null; displayedCurrency?:string|null }> };
+    const checkout = await createCheckout(prisma, session.userId, body.preview ? `preview-${crypto.randomUUID()}` : body.requestId ?? "", body.items ?? [],undefined,body.shoppingCountry,undefined,{buyerCurrency:body.buyerCurrency,redeemByStore:body.redeemByStore,stripeMode:configuredStripeMode(),returnLocale:localeFromReferer(request.headers.get("referer")),previewOnly:body.preview===true});
+    return NextResponse.json(checkout,{headers:{"Cache-Control":"private, no-store"}});
   } catch (error) {
     const status = error instanceof CheckoutError ? error.status : 500;
     const code = error instanceof CheckoutError ? error.message : "CHECKOUT_FAILED";

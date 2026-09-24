@@ -18,6 +18,7 @@ export async function GET(request: Request) {
       prisma.store.count({ where }),
       prisma.store.findMany({ where, skip: (page - 1) * 30, take: 30, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         select: { id: true, name: true, slug: true, status: true, onboardingStatus: true, dropshippingEnabled: true,
+          loyaltyEnabled: true, loyaltyBlockedAt: true,
           sellerType: true, vatStatus: true, sellerRiskPolicy: true, riskHoldReason: true, createdAt: true,
           owner: { select: { id: true, role: true, firstName: true, lastName: true, email: true,
             sellerSuspendedAt: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } },
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ page, pageSize: 30, total, stores: stores.map(store => ({
       id: store.id, name: store.name, slug: store.slug, status: store.status, onboardingStatus: store.onboardingStatus,
       dropshippingEnabled: store.dropshippingEnabled, createdAt: store.createdAt,
+      loyaltyEnabled: store.loyaltyEnabled, loyaltyBlocked: Boolean(store.loyaltyBlockedAt),
       owner: store.owner, subscription: store.subscription,
       access: activeAccessSource(store, now), productCount: store._count.products,
       quota: sellerProductQuota({ role: store.owner.role, plan: store.subscription?.plan, productCount: store._count.products }),

@@ -20,6 +20,20 @@ final class SellerRepository {
         queryParameters: {'locale': locale},
       )).data!;
 
+  Future<SellerJson> loyalty({String? orderId}) async =>
+      (await client.dio.get<SellerJson>(
+        '/api/mobile/seller/loyalty',
+        queryParameters: orderId == null || orderId.isEmpty
+            ? null
+            : {'orderId': orderId},
+      )).data!;
+
+  Future<SellerJson> setLoyaltyParticipation(bool enabled) async =>
+      (await client.dio.patch<SellerJson>(
+        '/api/mobile/seller/loyalty',
+        data: {'enabled': enabled},
+      )).data!;
+
   Future<SellerJson> products({
     int page = 1,
     String query = '',

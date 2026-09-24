@@ -46,11 +46,45 @@ test("successful payment marks order paid and decrements stock once", async () =
 });
 
 test("failed or expired checkout cancels only a pending order", async () => {
-  let cancelled = false;
-  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: { updateMany: async ({ where }: any) => { assert.equal(where.status, "PENDING"); cancelled = true; return { count: 1 }; } } };
+  let cancelled = false; let released = false;
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: {
+    updateMany: async ({ where }: any) => { assert.equal(where.status, "PENDING"); assert.equal(where.stripeCheckoutSessionId, "cs_1"); cancelled = true; return { count: 1 }; },
+    findUniqueOrThrow: async () => ({ buyerId: "buyer_1", checkoutRequestId: "request_123" }),
+  }, loyaltyRedemptionReservation: { updateMany: async ({ where, data }: any) => {
+    assert.deepEqual(where, { checkoutRequestId: "request_123", account: { buyerId: "buyer_1" }, status: "ACTIVE" });
+    assert.deepEqual(data, { status: "RELEASED" }); released = true; return { count: 1 };
+  } } };
   const db: any = { $transaction: (callback: any) => callback(tx) };
   const event: StripeEvent = { id: "evt_cancel", type: "checkout.session.expired", data: { object: { id: "cs_1", payment_intent: null, payment_status: "unpaid", client_reference_id: "order_1" } } };
-  assert.deepEqual(await processStripeEvent(db, event), { cancelled: true }); assert.equal(cancelled, true);
+  assert.deepEqual(await processStripeEvent(db, event), { cancelled: true }); assert.equal(cancelled, true); assert.equal(released, true);
+});
+
+test("late expiry cannot release a paid checkout's loyalty hold", async () => {
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: {
+    updateMany: async () => ({ count: 0 }),
+    findUniqueOrThrow: async () => { throw new Error("A paid order must not be looked up for hold release"); },
+  }, loyaltyRedemptionReservation: { updateMany: async () => {
+    throw new Error("A paid order's hold must not be released");
+  } } };
+  const db: any = { $transaction: (callback: any) => callback(tx) };
+  const event: StripeEvent = { id: "evt_late_expiry", type: "checkout.session.expired", data: {
+    object: { id: "cs_late", payment_intent: null, payment_status: "unpaid",
+      client_reference_id: "paid_order" },
+  } };
+  assert.deepEqual(await processStripeEvent(db, event), { cancelled: true });
+});
+
+test("one failed PaymentIntent attempt cannot cancel a retryable Checkout or release credit", async () => {
+  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, order: {
+    updateMany: async () => { throw new Error("PaymentIntent failure is not Checkout finality"); },
+  }, loyaltyRedemptionReservation: { updateMany: async () => {
+    throw new Error("Retryable checkout must retain its loyalty hold");
+  } } };
+  const db: any = { $transaction: (callback: any) => callback(tx) };
+  const event = { id: "evt_retryable_failure", type: "payment_intent.payment_failed", data: {
+    object: { id: "pi_retry", object: "payment_intent", metadata: { orderId: "order_1" } },
+  } } as unknown as StripeEvent;
+  assert.deepEqual(await processStripeEvent(db, event), { ignored: true });
 });
 
 test("duplicate checkout request creates one order and one Stripe session", async () => {

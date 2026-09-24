@@ -20,6 +20,8 @@ import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/cata
 import {resolveBuyerProductContent} from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
 import {resolveProductPriceInput} from "@/lib/product-price-input";
+import { productLoyaltyEligibility } from "@/lib/loyalty-eligibility";
+import { LoyaltySettingsError } from "@/lib/loyalty-settings";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -119,6 +121,7 @@ export async function POST(request: Request) {
         currency: store.currency,
         storeId: store.id,
         allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
+        loyaltyEligible: productLoyaltyEligibility(body.loyaltyEligible, false),
         ...compliance,
         ...productShipping,
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
@@ -137,6 +140,7 @@ export async function POST(request: Request) {
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
+    if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }

@@ -2,6 +2,13 @@ import '../../core/network/api_client.dart';
 
 typedef AccountJson = Map<String, dynamic>;
 
+final class CheckoutLaunch {
+  const CheckoutLaunch({this.url, this.orderId, required this.completed});
+  final Uri? url;
+  final String? orderId;
+  final bool completed;
+}
+
 final class AccountRepository {
   const AccountRepository(this.client);
   final ApiClient client;
@@ -75,12 +82,34 @@ final class AccountRepository {
     );
   }
 
-  Future<Uri> checkout({
+  Future<AccountJson> loyalty() async =>
+      (await client.dio.get<AccountJson>('/api/mobile/account/loyalty')).data!;
+
+  Future<AccountJson> checkoutPreview({
+    required String country,
+    required String currency,
+    required String locale,
+    required List<Map<String, dynamic>> items,
+    required Map<String, int> redeemByStore,
+  }) async => (await client.dio.post<AccountJson>(
+    '/api/mobile/checkout',
+    data: {
+      'preview': true,
+      'shoppingCountry': country,
+      'buyerCurrency': currency,
+      'locale': locale,
+      'items': items,
+      'redeemByStore': redeemByStore,
+    },
+  )).data!;
+
+  Future<CheckoutLaunch> checkout({
     required String requestId,
     required String country,
     required String currency,
     required String locale,
     required List<Map<String, dynamic>> items,
+    required Map<String, int> redeemByStore,
   }) async {
     final data = (await client.dio.post<AccountJson>(
       '/api/mobile/checkout',
@@ -90,8 +119,14 @@ final class AccountRepository {
         'buyerCurrency': currency,
         'locale': locale,
         'items': items,
+        'redeemByStore': redeemByStore,
       },
     )).data!;
-    return Uri.parse(data['url'] as String);
+    final url = data['url'] as String?;
+    return CheckoutLaunch(
+      url: url == null ? null : Uri.parse(url),
+      orderId: data['orderId'] as String?,
+      completed: data['completed'] == true,
+    );
   }
 }

@@ -19,6 +19,8 @@ import { Prisma } from "@prisma/client";
 import { readProductContentMetadata } from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
 import { assertNotRecalled, recallKeys, gtinRecallKeys, ProductRecallError } from "@/lib/product-recalls";
+import { productLoyaltyEligibility } from "@/lib/loyalty-eligibility";
+import { LoyaltySettingsError } from "@/lib/loyalty-settings";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -35,7 +37,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const product = await prisma.product.findFirst({
       where: { id, removedAt:null, store: { ownerId: session.userId } },
       select: {
-        id: true,name:true,description:true,sourceLocale:true, complianceDeclaredAt: true, deactivationReason: true,
+        id: true,name:true,description:true,sourceLocale:true, complianceDeclaredAt: true, deactivationReason: true, loyaltyEligible: true,
         supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierSku: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
         variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierSku: true, supplierAvailable: true } },
       },
@@ -73,6 +75,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) return NextResponse.json({ error: "Le stock est invalide." }, { status: 400 });
 
     await prisma.$transaction(async (tx) => {
+      const currentSupplierLink = await tx.supplierProductLink.findUnique({ where: { productId: id }, select: { id: true } });
       if (status === "PUBLISHED") await assertNotRecalled(tx, [
         ...(product.supplierLink ? recallKeys({ ...product.supplierLink, variants: product.variants }) : []),
         ...gtinRecallKeys(compliance.productIdentifier),
@@ -83,6 +86,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
         colors, sizes, stock, images, allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
+        loyaltyEligible: productLoyaltyEligibility(body.loyaltyEligible, Boolean(currentSupplierLink), product.loyaltyEligible),
         ...compliance,
         ...productShipping,
         complianceDeclaredAt: product.complianceDeclaredAt ?? (status === "PUBLISHED" ? new Date() : null),
@@ -106,6 +110,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     if (error instanceof ProductRecallError) return NextResponse.json({ error: error.code }, { status: error.status });
+    if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof Error && ["PRODUCT_ADMIN_BLOCKED", "SUPPLIER_PRODUCT_REQUIRES_REVIEW"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });

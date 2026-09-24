@@ -14,6 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         compareAtPrice: true, stock: true, category: true, condition: true,
         status: true, colors: true, sizes: true, images: true, currency: true,
         allowPrepurchaseQuestions: true, productIdentifier: true,
+        loyaltyEligible: true,
         manufacturerName: true, manufacturerContact: true,
         responsiblePerson: true, safetyInformation: true,
         complianceInformation: true, complianceDeclaredAt: true,
@@ -64,6 +65,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         syncStatus: product.supplierLink.syncStatus,
         classificationStatus: product.supplierLink.classificationStatus } : null,
       supplierLink: undefined,
+      loyaltyEligible: product.supplierLink ? false : product.loyaltyEligible,
       media: undefined,
       variants: product.variants.map(variant => serializeProductVariantForEditor({
         ...variant,

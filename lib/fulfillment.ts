@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { markSellerGroupsShipmentVerified } from "./seller-transfers";
 import {safeCarrierTrackingUrl} from "./tracking";
 import { sellerSupplierFulfillmentAllowsTransition } from "./suppliers/seller-fulfillment-policy";
+import { releaseDeliveredLoyalty } from "./loyalty-availability";
 
 export const fulfillmentTransitions = {
   PAID: { nextOrderStatus: "PROCESSING", nextFulfillmentStatus: "PROCESSING", timestamp: "processingAt" },
@@ -59,6 +60,7 @@ export async function advanceSellerFulfillment(db: PrismaClient, sellerId: strin
     const data: Prisma.OrderUpdateInput = { status: transition.nextOrderStatus, fulfillmentStatus: transition.nextFulfillmentStatus, [transition.timestamp]: now };
     if (action === "PROCESSING") Object.assign(data, { trackingCarrier: carrier ?? order.trackingCarrier, trackingNumber: number ?? order.trackingNumber, trackingUrl: trackingUrl ?? order.trackingUrl });
     const updated = await tx.order.update({ where: { id: order.id }, data, select: { id: true, status: true, fulfillmentStatus: true, processingAt: true, shippedAt: true, deliveredAt: true, trackingCarrier: true, trackingNumber: true, trackingUrl: true } });
+    if (transition.nextOrderStatus === "DELIVERED" && tx.loyaltyGrant) await releaseDeliveredLoyalty(tx, order.id, now);
     await tx.orderFulfillmentEvent.create({ data: { orderId: order.id, status: transition.nextFulfillmentStatus, source: "SELLER", actorId: sellerId, occurredAt: now, metadata: action === "PROCESSING" && (carrier || number || trackingUrl) ? { trackingCarrier: carrier, trackingNumber: number, trackingUrl } : undefined } });
     await tx.orderLifecycleEvent.create({ data: { orderId: order.id, type: transition.nextOrderStatus, actorId: sellerId, createdAt: now, metadata: action === "PROCESSING" && (carrier || number) ? { trackingCarrier: carrier, trackingNumber: number } : undefined } });
     const verifiedGroups = transition.nextOrderStatus === "SHIPPED" ? await markSellerGroupsShipmentVerified(tx, order.id, storeIds, now) : [];
