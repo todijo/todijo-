@@ -215,7 +215,7 @@ test("CJ diagnostics identify the failed operation and redact every credential",
   assert.match(output[0],/get-product-detail/);
   assert.match(output[0],/1600100/);
   assert.match(output[0],/request-123/);
-  assert.match(output[0],/\[REDACTED\]/);
+  assert.doesNotMatch(output[0],/responseMessage|bad api-key-secret/);
   assert.doesNotMatch(output[0],/api-key-secret|access-secret|refresh-secret/);
 });
 

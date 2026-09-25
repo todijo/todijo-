@@ -4,6 +4,7 @@ import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { AdminAccessError } from "@/lib/admin-access";
 import { assertSellerActivity } from "@/lib/account-status";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -19,7 +20,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("Update variant images error:", error);
+    logSafeServerError("variant_images_update_failed", error, request);
     return NextResponse.json({ error: "Unable to update variant images." }, { status: 500 });
   }
 }

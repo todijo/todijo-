@@ -2,7 +2,7 @@
 
 ## Readiness verdict
 
-Repository code is production-ready, but deployment is `PRODUCTION_READY_WITH_ACTIONS` until the external checklist below is verified. Green CI cannot prove live credentials, schedules, backups, balances, DNS, or provider account status.
+Phase 7 code and deployment readiness require the outstanding verification in `phase7-proxy-trust.md`, `phase7-media-upload.md`, and `phase7-recovery-runbook.md`. Green CI cannot prove live credentials, schedules, backups, balances, DNS, or provider account status. Do not treat this runbook as launch approval.
 
 ## Safe deploy
 
@@ -27,6 +27,8 @@ Each internal runner requires a distinct secret: `SUPPLIER_SYNC_CRON_SECRET`, `S
 Catalog translation deploys disabled. After Microsoft credentials, all character ceilings, and `CATALOG_TRANSLATION_ENABLED=true` are configured, schedule `POST /api/internal/catalog-translations` separately. Begin with an Admin-selected five-product French job, approve each stored proposal, then repeat with twenty products. Never expose the runner secret or submit arbitrary text to it.
 
 FX-backed multi-currency pricing requires `OPEN_EXCHANGE_RATES_APP_ID` and fails closed when unavailable or stale. OAuth providers are optional and remain disabled unless their complete client ID/secret pair is set. SMTP, R2, Cloudinary, Turnstile, and CJ credentials are feature-specific; validate each enabled feature before advertising it.
+
+Authenticated media uploads now require server-only `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`. Retire the legacy public unsigned preset before deploying the new media path. Authentication rate limiting behind Traefik requires private `AUTH_TRUSTED_PROXY_SECRET` and the ingress/network contract in `phase7-proxy-trust.md`.
 
 `CJ_AUTOMATIC_FULFILLMENT_ENABLED` must reflect an explicit operational decision. Keep it `false` until CJ credentials, balance, address handling, reconciliation, and operator coverage are verified. No automatic CJ order is submitted while false.
 
@@ -66,4 +68,4 @@ Rollback application code only when the deployed schema remains backward-compati
 
 ## Dependency audit
 
-Stage 6 updated Next.js to 15.5.24, next-intl to 4.9.2, Playwright to 1.55.1, and Sharp to 0.35.4, removing the directly actionable runtime and browser advisories without a framework-major migration. `npm audit --omit=dev` still reports five advisory entries (four high, one moderate) through Prisma CLI configuration and PostCSS bundled by Next. The suggested automated remedies are disruptive (a Prisma downgrade or Next 16 upgrade), so they were not forced into this final audit. Track upstream fixed releases and schedule a dedicated compatibility-tested upgrade; do not treat the residual count as zero.
+Stage 6 updated Next.js to 15.5.24, next-intl to 4.9.2, Playwright to 1.55.1, and Sharp to 0.35.4. The Phase 7 local `npm audit --omit=dev --audit-level=high` reported zero known production advisories on 25 September 2026. This is a point-in-time scanner result, not a substitute for monitoring new advisories or reviewing provider configuration.

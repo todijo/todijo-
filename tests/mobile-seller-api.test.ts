@@ -86,12 +86,11 @@ test("native seller category and media contracts reuse responsive sources", () =
   assert.match(categories, /requireMobileSeller\(request\)/);
   assert.match(categories, /DESKTOP_CATEGORY_TAXONOMY\.map/);
   assert.match(categories, /subcategoryId\(category\.id, group\.id, label\)/);
-  const media = source("app/api/mobile/seller/media-config/route.ts");
-  assert.match(media, /requireMobileSeller\(request\)/);
-  assert.match(media, /NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET/);
-  assert.doesNotMatch(media, /CLOUDINARY_API_SECRET|CLOUDINARY_API_KEY/);
-  assert.match(media, /todijo\/stores\/logo/);
-  assert.match(media, /todijo\/stores\/banner/);
+  const media = source("app/api/media/upload/route.ts");
+  assert.match(media, /readSellerRequestSession\(request\)/);
+  assert.match(media, /requireSellerMediaStore\(prisma, session\.userId\)/);
+  assert.match(media, /sellerMediaPublicId\(storeId/);
+  assert.doesNotMatch(media, /NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET/);
 });
 
 test("seller payment visibility is owned and omits Stripe transfer identifiers", () => {

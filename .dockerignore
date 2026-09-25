@@ -11,3 +11,9 @@ playwright-report
 test-results
 coverage
 *.log
+mobile/.dart_tool
+mobile/build
+mobile/.flutter-plugins*
+mobile/android/.gradle
+mobile/android/local.properties
+mobile/ios/Pods

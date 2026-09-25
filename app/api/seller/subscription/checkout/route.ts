@@ -5,6 +5,7 @@ import { configuredSellerPlan } from "@/lib/seller-plans";
 import { createSellerSubscriptionCheckout, createStripeCustomer } from "@/lib/stripe";
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 export async function POST(request: Request) {
   try {
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: checkout.url });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
-    console.error("Seller subscription checkout failed", error);
+    logSafeServerError("seller_subscription_checkout_failed", error, request);
     return NextResponse.json({ error: "Unable to start subscription checkout." }, { status: 500 });
   }
 }

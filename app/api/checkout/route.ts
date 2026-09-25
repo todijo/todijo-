@@ -4,6 +4,7 @@ import { CheckoutError, createCheckout, isBuyerCheckoutComplete } from "@/lib/pa
 import { readSession } from "@/lib/session";
 import { configuredStripeMode } from "@/lib/stripe";
 import { localeFromReferer } from "@/lib/auth-redirects";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const status = error instanceof CheckoutError ? error.status : 500;
     const code = error instanceof CheckoutError ? error.message : "CHECKOUT_FAILED";
     const message = code === "MULTIPLE_SELLERS" ? "Items from different sellers require separate checkout." : code === "SELLER_STRIPE_NOT_READY" ? "The seller cannot receive Stripe payments yet." : code;
-    console.error("Checkout creation failed", error);
+    if (!(error instanceof CheckoutError)) logSafeServerError("checkout_creation_failed", error, request);
     return NextResponse.json({ error: message, code, ...(error instanceof CheckoutError&&error.details?{details:error.details}:{}) }, { status });
   }
 }

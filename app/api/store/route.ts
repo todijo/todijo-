@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { logSafeServerError } from "@/lib/safe-server-error";
 import { readSession } from "@/lib/session";
 import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency";
@@ -139,7 +140,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("Create store error:", error);
+    logSafeServerError("store_create_failed", error, request);
     return NextResponse.json(
       { error: "Impossible de créer la boutique pour le moment." },
       { status: 500 },
@@ -247,7 +248,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Boutique introuvable." }, { status: 404 });
       }
     }
-    console.error("Update store error:", error);
+    logSafeServerError("store_update_failed", error, request);
     return NextResponse.json({ error: "Impossible de modifier la boutique pour le moment." }, { status: 500 });
   }
 }

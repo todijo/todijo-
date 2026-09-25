@@ -11,6 +11,7 @@ import { defaultLocale, isLocale } from "@/i18n/config";
 import { createBuyerAddress } from "@/lib/buyer-addresses";
 import { anonymizedEmailHash } from "@/lib/account-status";
 import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 export async function POST(request: Request) {
   try {
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
     return NextResponse.json({ ok: true, role: user.role });
   } catch (error) {
-    console.error(error);
+    logSafeServerError("web_registration_failed", error, request);
     return NextResponse.json({ error: "Impossible de créer le compte pour le moment." }, { status: 500 });
   }
 }

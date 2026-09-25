@@ -1,14 +1,10 @@
 export class MutationOriginError extends Error { constructor(){super("INVALID_MUTATION_ORIGIN");} }
 
-function firstForwarded(value:string|null){return value?.split(",")[0]?.trim()??"";}
 function normalizedHost(value:string){return value.trim().toLowerCase().replace(/\.$/,"");}
 function expectedPublicOrigin(request:Request){
-  const forwardedHost=firstForwarded(request.headers.get("x-forwarded-host"));
-  const host=forwardedHost||request.headers.get("host")||new URL(request.url).host;
-  const forwardedProto=firstForwarded(request.headers.get("x-forwarded-proto"));
-  const proto=forwardedProto||new URL(request.url).protocol.replace(":","");
-  if(!host||!/^https?$/.test(proto))return null;
-  return `${proto}://${normalizedHost(host)}`;
+  const configured=process.env.NODE_ENV==="production"?process.env.APP_URL:null;
+  if(process.env.NODE_ENV==="production"&&!configured)return null;
+  try{const url=new URL(configured||request.url);if(!["http:","https:"].includes(url.protocol))return null;return `${url.protocol}//${normalizedHost(url.host)}`;}catch{return null;}
 }
 
 export function assertAdminMutationRequest(request:Request){
@@ -31,4 +27,14 @@ export function isTrustedMutationRequest(request:Request){
   let actual:string;
   try{const parsed=new URL(origin);actual=`${parsed.protocol}//${normalizedHost(parsed.host)}`;}catch{return false;}
   return actual===expectedPublicOrigin(request);
+}
+
+/** Native apps do not send browser Origin/Sec-Fetch-Site headers. A bearer is
+ * still verified by each protected route; this only lets it reach that route.
+ * Browser-originated cross-site requests never qualify. */
+export function isNativeApiMutationRequest(request:Request,path:string){
+  if(request.headers.has("origin")||request.headers.has("sec-fetch-site"))return false;
+  if(!path.startsWith("/api/"))return false;
+  if(/^\/api\/mobile\/auth\//.test(path))return true;
+  return /^Bearer [A-Za-z0-9._~+/-]+=*$/.test(request.headers.get("authorization")??"");
 }

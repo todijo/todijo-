@@ -11,7 +11,7 @@ export async function POST(request: Request, context: { params: Promise<{ fulfil
     const detail = await syncSupplierFulfillment(prisma, fulfillmentId);
     return NextResponse.json({ status: detail.status, trackingCount: detail.tracking.length });
   } catch (error) {
-    console.error("[cj-fulfillment]", JSON.stringify({ event: "admin_sync_failed", fulfillmentId, error: error instanceof Error ? error.message : "SYNC_FAILED" }));
+    console.error("[cj-fulfillment]", JSON.stringify({ event: "admin_sync_failed", fulfillmentId, errorClass: error instanceof Error ? error.name : "UnknownError" }));
     return NextResponse.json({ error: "SUPPLIER_SYNC_FAILED" }, { status: 409 });
   }
 }

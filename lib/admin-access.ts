@@ -61,16 +61,20 @@ export function activeAccessSource(store: {
   return active ? { source: active.source, expiresAt: active.endsAt } : { source: "NONE" as const, expiresAt: null };
 }
 
+export function storeActiveAccessWhere(now = new Date()): Prisma.StoreWhereInput {
+  return { OR: [
+      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+      { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
+      { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+    ] };
+}
+
 export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
   return {
     dataClass: "PRODUCTION",
     status: "ACTIVE",
     owner: { sellerSuspendedAt: null, deactivatedAt: null },
-    OR: [
-      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
-      { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
-      { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
-    ],
+    ...storeActiveAccessWhere(now),
   };
 }
 

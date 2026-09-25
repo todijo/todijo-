@@ -40,3 +40,12 @@ test("production container runs as the unprivileged application user", () => {
 
   assert.match(dockerfile, /^USER nextjs$/m);
 });
+
+test("Docker installs the local contracts package before npm ci and excludes Flutter artifacts", () => {
+  const dockerfile = readFileSync(resolve(root, "Dockerfile"), "utf8");
+  const dockerignore = readFileSync(resolve(root, ".dockerignore"), "utf8");
+  assert.ok(dockerfile.indexOf("COPY packages/contracts ./packages/contracts") < dockerfile.indexOf("RUN npm ci"));
+  for (const path of ["mobile/.dart_tool", "mobile/build", "mobile/android/.gradle", "mobile/android/local.properties"]) {
+    assert.ok(dockerignore.split(/\r?\n/).includes(path), `${path} must not enter the build context`);
+  }
+});

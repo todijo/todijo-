@@ -146,28 +146,21 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
       throw new Error("Choisissez une bannière d’au moins 800 × 250 pixels.");
     }
 
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset) {
-      throw new Error("La configuration Cloudinary est manquante dans Coolify.");
-    }
-
     const body = new FormData();
     body.append("file", file);
-    body.append("upload_preset", uploadPreset);
-    body.append("folder", `todijo/stores/${kind}`);
+    body.append("kind", kind);
 
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    const response = await fetch("/api/media/upload", {
       method: "POST",
       body,
     });
 
-    const data = (await response.json()) as { secure_url?: string; error?: { message?: string } };
-    if (!response.ok || !data.secure_url) {
-      throw new Error(data.error?.message || "Impossible d’envoyer cette image.");
+    const data = (await response.json()) as { url?: string };
+    if (!response.ok || !data.url) {
+      throw new Error("Impossible d’envoyer cette image.");
     }
 
-    return data.secure_url;
+    return data.url;
   }
 
   async function processFile(file: File | undefined, kind: MediaKind) {

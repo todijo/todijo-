@@ -1,7 +1,7 @@
 import "server-only";
 import webpush from "web-push";
 import { prisma } from "./prisma";
-import { decryptPushValue } from "./push-subscriptions";
+import { decryptPushValue, validatePushSubscription } from "./push-subscriptions";
 import { webPushConfig } from "./web-push-config";
 
 const safePath = /^\/(?:en|fr|ar|ku|tr|de|es|it|nl|zh|fa|hi|pt|ru)\/(?:account\/orders(?:\/[a-zA-Z0-9_-]+)?|track-order|messages(?:\/[a-zA-Z0-9_-]+)?|notifications)$/;
@@ -23,7 +23,7 @@ export async function dispatchNotificationPush(notificationId:string){
   const claimed=await prisma.notification.updateMany({where:{id:notification.id,pushDispatchedAt:null},data:{pushDispatchedAt:new Date()}});if(claimed.count!==1)return{status:"duplicate" as const};
   const subscriptions=await prisma.pushSubscription.findMany({where:{userId:notification.userId,revokedAt:null},select:{id:true,endpointEncrypted:true,p256dhEncrypted:true,authEncrypted:true}});
   webpush.setVapidDetails(config.subject,config.publicKey,config.privateKey);
-  await sendBounded(subscriptions,async subscription=>{try{const endpoint=decryptPushValue(subscription.endpointEncrypted,config.encryptionKey),p256dh=decryptPushValue(subscription.p256dhEncrypted,config.encryptionKey),auth=decryptPushValue(subscription.authEncrypted,config.encryptionKey);await webpush.sendNotification({endpoint,keys:{p256dh,auth}},JSON.stringify(payload),{TTL:300});await prisma.pushSubscription.update({where:{id:subscription.id},data:{lastUsedAt:new Date(),lastSuccessAt:new Date(),failureCount:0}});}catch(error){const status=typeof error==="object"&&error&&"statusCode" in error?Number((error as{statusCode?:unknown}).statusCode):0;if(status===404||status===410)await prisma.pushSubscription.update({where:{id:subscription.id},data:{revokedAt:new Date(),lastUsedAt:new Date()}});else await prisma.pushSubscription.update({where:{id:subscription.id},data:{failureCount:{increment:1},lastUsedAt:new Date()}}).catch(()=>undefined);}});
+  await sendBounded(subscriptions,async subscription=>{try{const endpoint=decryptPushValue(subscription.endpointEncrypted,config.encryptionKey),p256dh=decryptPushValue(subscription.p256dhEncrypted,config.encryptionKey),auth=decryptPushValue(subscription.authEncrypted,config.encryptionKey);validatePushSubscription({endpoint,keys:{p256dh,auth}});await webpush.sendNotification({endpoint,keys:{p256dh,auth}},JSON.stringify(payload),{TTL:300});await prisma.pushSubscription.update({where:{id:subscription.id},data:{lastUsedAt:new Date(),lastSuccessAt:new Date(),failureCount:0}});}catch(error){const status=typeof error==="object"&&error&&"statusCode" in error?Number((error as{statusCode?:unknown}).statusCode):0;if(status===404||status===410||error instanceof Error&&error.name==="PushSubscriptionError")await prisma.pushSubscription.update({where:{id:subscription.id},data:{revokedAt:new Date(),lastUsedAt:new Date()}});else await prisma.pushSubscription.update({where:{id:subscription.id},data:{failureCount:{increment:1},lastUsedAt:new Date()}}).catch(()=>undefined);}});
   return{status:"sent" as const,devices:subscriptions.length};
 }
 

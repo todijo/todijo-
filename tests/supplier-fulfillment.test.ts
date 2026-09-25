@@ -30,12 +30,15 @@ test("CJ diagnostics redact access tokens and do not log private payloads", asyn
     const client = new CjFulfillmentClient(auth, { minimumRequestIntervalMs: 0, fetcher: async () => new Response(JSON.stringify({ result: false, code: 500, message: "bad super-secret-token" }), { status: 400 }) });
     await assert.rejects(() => client.createOrder(input));
   } finally { console.info = original; }
-  const log = lines.join("\n"); assert.doesNotMatch(log, /super-secret-token|supplierUnitCost|Authorization|CJ-Access-Token/); assert.match(log, /\[REDACTED\]/);
+  const log = lines.join("\n"); assert.doesNotMatch(log, /super-secret-token|supplierUnitCost|Authorization|CJ-Access-Token|responseMessage/);
 });
 
 test("CJ insufficient wallet failures use a stable recoverable-manual code", () => {
   assert.deepEqual(classifyCjFulfillmentFailure({ operation: "create-order-v2", httpStatus: 200, responseCode: 1601001, responseMessage: "Insufficient wallet balance" }), { code: "CJ_WALLET_INSUFFICIENT", retryable: false });
   assert.deepEqual(classifyCjFulfillmentFailure({ operation: "get-order-detail", httpStatus: 200, responseCode: 1602001, responseMessage: "Order not found" }), { code: "CJ_ORDER_NOT_FOUND", retryable: false });
+  assert.deepEqual(classifyCjFulfillmentFailure({ operation: "create-order-v2", httpStatus: 502,
+    responseCode: "buyer@example.com", responseMessage: "Recipient address echoed by provider" }),
+  { code: "CJ_502", retryable: true });
 });
 
 test("order detail and split tracking normalization are conservative and deduplicated", () => {

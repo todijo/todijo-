@@ -10,5 +10,5 @@ export async function GET(request:Request){
     await requirePlatformSupplierAdmin(prisma,await readAdminRequestSession(request));const url=new URL(request.url),query=url.searchParams.get("q")??"",page=Number(url.searchParams.get("page")??1),pageSize=Number(url.searchParams.get("pageSize")??20),provider=new CjCatalogProvider();
     if(!provider.isConfigured())return NextResponse.json({error:"SUPPLIER_NOT_CONFIGURED"},{status:503});
     return NextResponse.json({ok:true,...await provider.searchProducts(query,page,pageSize)});
-  }catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});const code=error instanceof Error?error.message:"SUPPLIER_CATALOG_SEARCH_FAILED";return NextResponse.json({error:code},{status:code.includes("INPUT")?400:502});}
+  }catch(error){if(error instanceof AdminAccessError)return NextResponse.json({error:"SUPPLIER_ACCESS_DENIED"},{status:error.status});if(error instanceof Error&&error.message==="CJ_CATALOG_SEARCH_INPUT_INVALID")return NextResponse.json({error:error.message},{status:400});return NextResponse.json({error:"SUPPLIER_CATALOG_SEARCH_FAILED"},{status:502});}
 }

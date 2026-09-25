@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
+import { logSafeServerError } from "@/lib/safe-server-error";
 import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { readSession } from "@/lib/session";
 import { requireProductCreationAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status });
-    console.error("Create product error:", error);
+    logSafeServerError("product_create_failed", error, request);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
   }
 }

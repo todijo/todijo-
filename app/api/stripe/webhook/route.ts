@@ -48,7 +48,7 @@ async function processAuthenticatedStripeEvent(event: StripeEvent) {
         console.info("[cj-fulfillment]", JSON.stringify({ event: "paid_order_fulfillment_attempted", orderId: paidOrderId, fulfillmentCount: fulfillment.length }));
       } catch (error) {
         // Buyer payment is already final. Supplier failure is persisted/recoverable and must not replay stock/payment effects.
-        console.error("[cj-fulfillment]", JSON.stringify({ event: "paid_order_fulfillment_dispatch_failed", orderId: paidOrderId, error: error instanceof Error ? error.message : "FULFILLMENT_DISPATCH_FAILED" }));
+        console.error("[cj-fulfillment]", JSON.stringify({ event: "paid_order_fulfillment_dispatch_failed", orderId: paidOrderId, errorClass: error instanceof Error ? error.name : "UnknownError" }));
       }
     } else if (paidOrderId) {
       console.info("[cj-fulfillment]", JSON.stringify({ event: "automatic_fulfillment_disabled", orderId: paidOrderId }));

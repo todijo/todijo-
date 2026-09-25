@@ -20,7 +20,7 @@ existing database, then run `npm run db:migrate` separately.
 STORE MEDIA UPLOAD V2
 - Sellers can upload logo and banner directly from phone/computer.
 - Drag and drop, preview, replace and remove are supported.
-- Uses the existing NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET variables.
+- Seller uploads use the authenticated same-origin /api/media/upload route and server-only Cloudinary credentials; the legacy unsigned preset must be disabled at the provider.
 - Logo: JPG/PNG/WebP, max 3 MB, minimum 200x200.
 - Banner: JPG/PNG/WebP, max 8 MB, minimum 800x250.
 - No Prisma schema change is required.

@@ -4,6 +4,7 @@ import { readSellerRequestSession } from "@/lib/seller-request-session";
 import { createConnectedAccount, createConnectedAccountLink } from "@/lib/stripe";
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
-    console.error("Stripe Connect onboarding failed", error);
+    logSafeServerError("stripe_connect_onboarding_failed", error, request);
     return NextResponse.json({ error: "Unable to start Stripe onboarding." }, { status: 502 });
   }
 }

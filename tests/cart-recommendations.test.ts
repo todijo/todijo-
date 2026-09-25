@@ -36,7 +36,8 @@ test("recommendation endpoint preserves marketplace visibility and deterministic
   assert.match(route, /orderBy:[\s\S]*createdAt: "desc"[\s\S]*id: "asc"/);
   assert.match(route, /take: CART_RECOMMENDATION_LIMIT/);
   assert.match(route, /id: \{ notIn: \[\.\.\.productIds, \.\.\.similarIds\] \}/);
-  assert.match(route, /console\.error\("Cart recommendations unavailable", error\)/);
+  assert.match(route, /console\.error\("Cart recommendations unavailable", error instanceof Error \? error\.name : "UnknownError"\)/);
+  assert.doesNotMatch(route, /console\.error\("Cart recommendations unavailable", error\)/);
   assert.match(route, /return NextResponse\.json\(\{ products: \[\], source: "recent" \}\)/);
   assert.doesNotMatch(route, /\$queryRaw|groupBy|analytics|tracking/);
 });

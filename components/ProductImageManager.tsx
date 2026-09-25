@@ -35,23 +35,19 @@ export default function ProductImageManager({ initialImages = [], onChange, onUp
   }
 
   function uploadFile(file: File): Promise<string> {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset) return Promise.reject(new Error(t("imageConfigError")));
     return new Promise((resolve, reject) => {
       const body = new FormData();
       body.append("file", file);
-      body.append("upload_preset", uploadPreset);
-      body.append("folder", "todijo/products");
+      body.append("kind", "product");
       const request = new XMLHttpRequest();
-      request.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`);
+      request.open("POST", "/api/media/upload");
       request.upload.onprogress = (event) => event.lengthComputable && setProgress(Math.round((event.loaded / event.total) * 100));
       request.onerror = () => reject(new Error(t("imageUploadFailed")));
       request.onload = () => {
         try {
-          const data = JSON.parse(request.responseText) as { secure_url?: string; error?: { message?: string } };
-          if (request.status < 200 || request.status >= 300 || !data.secure_url) reject(new Error(data.error?.message || t("imageUploadFailed")));
-          else resolve(data.secure_url);
+          const data = JSON.parse(request.responseText) as { url?: string };
+          if (request.status < 200 || request.status >= 300 || !data.url) reject(new Error(t("imageUploadFailed")));
+          else resolve(data.url);
         } catch {
           reject(new Error(t("imageUploadFailed")));
         }

@@ -192,88 +192,12 @@ void main() {
     },
   );
 
-  test('Cloudinary upload does not receive a Todijo bearer token', () async {
-    final apiDio = Dio();
-    apiDio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          handler.resolve(
-            Response<Map<String, dynamic>>(
-              requestOptions: options,
-              data: {
-                'cloudName': 'public-cloud',
-                'uploadPreset': 'public-preset',
-                'folder': 'todijo/products',
-              },
-            ),
-          );
-        },
-      ),
-    );
-    RequestOptions? upload;
-    final uploadDio = Dio();
-    uploadDio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          upload = options;
-          handler.resolve(
-            Response<Map<String, dynamic>>(
-              requestOptions: options,
-              data: {
-                'secure_url': 'https://res.cloudinary.com/public-cloud/image/upload/a.png',
-              },
-            ),
-          );
-        },
-      ),
-    );
-    final repo = SellerRepository(
-      ApiClient(
-        origin: Uri.parse('https://todijo.com'),
-        sessionStore: _NoSession(),
-        dio: apiDio,
-      ),
-      uploadClient: uploadDio,
-    );
-    final url = await repo.uploadProductImage(
-      XFile.fromData(
-        Uint8List.fromList([1, 2, 3]),
-        name: 'a.png',
-        mimeType: 'image/png',
-      ),
-    );
-    expect(url, startsWith('https://res.cloudinary.com/'));
-    expect(upload?.uri.host, 'api.cloudinary.com');
-    expect(upload?.headers.containsKey('Authorization'), false);
-    final form = upload!.data as FormData;
-    expect(Map.fromEntries(form.fields)['upload_preset'], 'public-preset');
-    expect(Map.fromEntries(form.fields)['folder'], 'todijo/products');
-  });
-
   test(
-    'seller video upload uses the public preset without bearer credentials',
+    'seller image upload goes only to the authenticated Todijo media route',
     () async {
       final apiDio = Dio();
-      apiDio.interceptors.add(
-        InterceptorsWrapper(
-          onRequest: (options, handler) {
-            expect(options.queryParameters['kind'], 'video');
-            handler.resolve(
-              Response<Map<String, dynamic>>(
-                requestOptions: options,
-                data: {
-                  'cloudName': 'public-cloud',
-                  'uploadPreset': 'preset',
-                  'folder': 'todijo/product-videos',
-                },
-              ),
-            );
-          },
-        ),
-      );
       RequestOptions? upload;
-      final uploadDio = Dio();
-      uploadDio.interceptors.add(
+      apiDio.interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) {
             upload = options;
@@ -281,8 +205,7 @@ void main() {
               Response<Map<String, dynamic>>(
                 requestOptions: options,
                 data: {
-                  'secure_url': 'https://res.cloudinary.com/public-cloud/video/upload/a.mp4',
-                  'public_id': 'todijo/product-videos/a',
+                  'url': 'https://res.cloudinary.com/public-cloud/image/upload/a.png',
                 },
               ),
             );
@@ -295,7 +218,49 @@ void main() {
           sessionStore: _NoSession(),
           dio: apiDio,
         ),
-        uploadClient: uploadDio,
+      );
+      final url = await repo.uploadProductImage(
+        XFile.fromData(
+          Uint8List.fromList([1, 2, 3]),
+          name: 'a.png',
+          mimeType: 'image/png',
+        ),
+      );
+      expect(url, startsWith('https://res.cloudinary.com/'));
+      expect(upload?.path, '/api/media/upload');
+      final form = upload!.data as FormData;
+      expect(Map.fromEntries(form.fields)['kind'], 'product');
+      expect(Map.fromEntries(form.fields).containsKey('upload_preset'), false);
+    },
+  );
+
+  test(
+    'seller video upload goes only to the authenticated Todijo media route',
+    () async {
+      final apiDio = Dio();
+      RequestOptions? upload;
+      apiDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            upload = options;
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                data: {
+                  'url': 'https://res.cloudinary.com/public-cloud/video/upload/a.mp4',
+                  'publicId': 'todijo/sellers/store/video/a',
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final repo = SellerRepository(
+        ApiClient(
+          origin: Uri.parse('https://todijo.com'),
+          sessionStore: _NoSession(),
+          dio: apiDio,
+        ),
       );
       final video = await repo.uploadProductVideo(
         XFile.fromData(
@@ -304,9 +269,12 @@ void main() {
           mimeType: 'video/mp4',
         ),
       );
-      expect(video['publicId'], 'todijo/product-videos/a');
-      expect(upload?.uri.path, contains('/video/upload'));
-      expect(upload?.headers.containsKey('Authorization'), false);
+      expect(video['publicId'], 'todijo/sellers/store/video/a');
+      expect(upload?.path, '/api/media/upload');
+      expect(
+        Map.fromEntries((upload!.data as FormData).fields)['kind'],
+        'video',
+      );
     },
   );
 }

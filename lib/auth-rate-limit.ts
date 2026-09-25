@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { trustedClientIp } from "./trusted-client-ip";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS = 5;
@@ -66,9 +67,8 @@ export function createMemoryAuthRateLimitStore(): AuthRateLimitStore {
 const postgresStore = new PostgresAuthRateLimitStore();
 const developmentStore = createMemoryAuthRateLimitStore();
 
-export function authRequestKey(scope: string, identity: string, request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
-  const client = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip") ?? forwarded ?? "unknown";
+export function authRequestKey(scope: string, identity: string, request: Request, proxySecret = process.env.AUTH_TRUSTED_PROXY_SECRET) {
+  const client = trustedClientIp(request, proxySecret) ?? "unknown";
   return createHash("sha256").update(`${scope}:${identity}:${client}`).digest("hex");
 }
 

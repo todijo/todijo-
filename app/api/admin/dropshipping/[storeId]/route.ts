@@ -12,6 +12,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ store
     return NextResponse.json({ ok: true, ...(await setSellerDropshippingPermission(prisma, session, storeId, body.enabled)) });
   } catch (error) {
     const status = error instanceof SupplierAccessError ? error.status : 403;
-    return NextResponse.json({ error: error instanceof Error ? error.message : "SUPPLIER_ACCESS_DENIED" }, { status });
+    return NextResponse.json({ error: error instanceof SupplierAccessError ? error.message : "SUPPLIER_ACCESS_DENIED" }, { status });
   }
 }

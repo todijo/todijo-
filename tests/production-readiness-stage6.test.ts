@@ -9,7 +9,7 @@ test("production environment inventory covers critical, optional, and runner con
   const env = read(".env.example"), runbook = read("docs/production-operations-runbook.md");
   for (const name of ["DATABASE_URL", "SESSION_SECRET", "APP_URL", "STRIPE_SECRET_KEY", "STRIPE_MODE", "STRIPE_WEBHOOK_SECRET", "SUPPLIER_SYNC_CRON_SECRET", "SELLER_TRANSFER_CRON_SECRET", "REFUND_FINANCIAL_CRON_SECRET", "CJ_AUTOMATIC_FULFILLMENT_ENABLED", "OPEN_EXCHANGE_RATES_APP_ID"]) assert.match(env, new RegExp(`^${name}=`, "m"));
   for (const name of ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "APPLE_CLIENT_ID", "APPLE_CLIENT_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"]) assert.match(env, new RegExp(`^${name}=`, "m"));
-  assert.match(runbook, /PRODUCTION_READY_WITH_ACTIONS/);
+  assert.match(runbook, /Do not treat this runbook as launch approval/);
   assert.match(runbook, /liveness only/);
 });
 
@@ -41,5 +41,5 @@ test("operations documentation prohibits silent repair and records the paid inve
   assert.match(runbook, /Never repair financial state with ad-hoc SQL/i);
   assert.match(runbook, /Back up PostgreSQL/i);
   assert.match(runbook, /every 15 minutes/i);
-  assert.match(runbook, /five advisory entries/);
+  assert.match(runbook, /point-in-time scanner result/);
 });

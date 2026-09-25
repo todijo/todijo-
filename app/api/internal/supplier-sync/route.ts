@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const result = await syncStalePlatformCjProducts(prisma);
     return NextResponse.json({ ok: true, ...result });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "SUPPLIER_SYNC_FAILED" }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: "SUPPLIER_SYNC_FAILED" }, { status: 502 });
   }
 }

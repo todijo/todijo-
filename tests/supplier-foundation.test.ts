@@ -72,8 +72,22 @@ test("one controlled-storage product video is validated",()=>{
 
 test("CJ video copy supplies the required download referer before controlled storage upload",async()=>{
   const originalFetch=globalThis.fetch,calls:Array<{url:string;init?:RequestInit}>=[];
-  globalThis.fetch=async(input,init)=>{const url=String(input);calls.push({url,init});return url.includes("cjdropshipping")?new Response(new Blob(["video"],{type:"video/mp4"}),{status:200}):new Response(JSON.stringify({secure_url:"https://res.cloudinary.com/demo/video/upload/product.mp4",public_id:"todijo/product",duration:1}),{status:200});};
-  try{const stored=await new CloudinaryProductMediaProvider("demo","preset").copyRemote({type:"VIDEO",url:"https://download-only-api.cjdropshipping.com/video.mp4",posterUrl:null});assert.equal(stored.type,"VIDEO");assert.equal(calls.length,2);assert.equal(new Headers(calls[0].init?.headers).get("referer"),"https://developers.cjdropshipping.com/");assert.ok(calls[1].url.includes("/video/upload"));assert.ok(calls[1].init?.body instanceof FormData);}finally{globalThis.fetch=originalFetch;}
+  globalThis.fetch=async(input,init)=>{const url=String(input);calls.push({url,init});if(url.includes("cjdropshipping"))return new Response(new Blob(["video"],{type:"video/mp4"}),{status:200});const publicId=(init?.body as FormData).get("public_id");return new Response(JSON.stringify({secure_url:"https://res.cloudinary.com/demo/video/upload/product.mp4",public_id:publicId,duration:1}),{status:200});};
+  try{const stored=await new CloudinaryProductMediaProvider("demo","key","secret").copyRemote({type:"VIDEO",url:"https://download-only-api.cjdropshipping.com/video.mp4",posterUrl:null});assert.equal(stored.type,"VIDEO");assert.equal(calls.length,2);assert.equal(new Headers(calls[0].init?.headers).get("referer"),"https://developers.cjdropshipping.com/");assert.ok(calls[1].url.includes("/video/upload"));assert.ok(calls[1].init?.body instanceof FormData);assert.match(new Headers(calls[1].init?.headers).get("authorization")??"",/^Basic /);}finally{globalThis.fetch=originalFetch;}
+});
+
+test("supplier media rejects arbitrary hosts and redirects before Cloudinary upload",async()=>{
+  const originalFetch=globalThis.fetch;
+  let calls=0;
+  globalThis.fetch=async()=>{calls++;return new Response(null,{status:302,headers:{location:"https://127.0.0.1/private"}});};
+  try {
+    const provider=new CloudinaryProductMediaProvider("demo","key","secret");
+    await assert.rejects(provider.copyRemote({type:"VIDEO",url:"https://127.0.0.1/private",posterUrl:null}),/MEDIA_COPY_INVALID_SOURCE/);
+    await assert.rejects(provider.copyRemote({type:"IMAGE",url:"https://cjdropshipping.com.evil.test/p.jpg",posterUrl:null}),/MEDIA_COPY_INVALID_SOURCE/);
+    assert.equal(calls,0);
+    await assert.rejects(provider.copyRemote({type:"VIDEO",url:"https://cdn.cjdropshipping.com/v.mp4",posterUrl:null}),/MEDIA_COPY_FAILED/);
+    assert.equal(calls,1);
+  } finally {globalThis.fetch=originalFetch;}
 });
 
 test("supplier and video UX have complete 14-locale parity",()=>{

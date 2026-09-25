@@ -19,7 +19,9 @@ export function classifyCjFulfillmentFailure(input: { operation: string; httpSta
   if (input.operation === "get-order-detail" && (input.httpStatus === 404 || /\border\b.{0,30}\bnot found\b|\bno such order\b|\border\b.{0,30}\bdoes not exist\b/i.test(message))) {
     return { code: "CJ_ORDER_NOT_FOUND", retryable: false };
   }
-  return { code: `CJ_${input.responseCode ?? input.httpStatus}`, retryable: input.httpStatus === 429 || input.httpStatus >= 500 };
+  const rawCode = input.responseCode == null ? "" : String(input.responseCode);
+  const safeCode = /^[A-Za-z0-9_]{1,40}$/.test(rawCode) ? rawCode : String(input.httpStatus);
+  return { code: `CJ_${safeCode}`, retryable: input.httpStatus === 429 || input.httpStatus >= 500 };
 }
 
 export type CjCreateOrderInput = {

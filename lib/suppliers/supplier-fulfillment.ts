@@ -120,7 +120,8 @@ export async function processSupplierFulfillment(db: PrismaClient, fulfillmentId
   } catch (error) {
     const api = error instanceof CjFulfillmentApiError ? error : null;
     const status = api?.ambiguous ? "AMBIGUOUS" : api?.retryable ? "RETRYABLE" : "MANUAL_ACTION_REQUIRED";
-    const code = api?.code ?? (error instanceof Error ? error.message : "FULFILLMENT_FAILED");
+    const rawCode = api?.code ?? (error instanceof Error ? error.message : "FULFILLMENT_FAILED");
+    const code = /^[A-Z][A-Z0-9_]{2,119}$/.test(rawCode) ? rawCode : "FULFILLMENT_FAILED";
     await db.supplierFulfillment.updateMany({ where: { id: fulfillmentId, claimToken }, data: { status, claimToken: null, claimedAt: null, lastErrorCategory: api?.ambiguous ? "AMBIGUOUS" : api?.retryable ? "RETRYABLE" : "PERMANENT", lastErrorCode: code.slice(0, 120), lastErrorMessage: (api?.safeMessage ?? code).slice(0, 500) } });
     return { claimed: true, submitted: false, status, code };
   }

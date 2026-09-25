@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createSession, readSession } from "@/lib/session";
 import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
 import { isEffectiveBlock } from "@/lib/account-status";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
     return NextResponse.json({ ok: true, role: user.role });
   } catch (error) {
-    console.error(error);
+    logSafeServerError("web_login_failed", error, request);
     return NextResponse.json({ error: "Connexion impossible pour le moment." }, { status: 500 });
   }
 }

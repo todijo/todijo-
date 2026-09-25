@@ -17,16 +17,23 @@ function redact(value: string | undefined, secrets: Array<string | undefined>) {
     .replace(/Bearer\s+[^\s,;}]+/gi, "Bearer [REDACTED]");
 }
 
-export function logCjFulfillment(diagnostic: CjDiagnostic & { fulfillmentId: string; externalReference: string; outcome: string }, secrets: Array<string | undefined> = []) {
+function safeDiagnosticIdentifier(value: number | string | undefined) {
+  const candidate = value == null ? "" : String(value);
+  return /^[A-Za-z0-9_-]{1,40}$/.test(candidate) ? candidate : null;
+}
+
+export function logCjFulfillment(diagnostic: CjDiagnostic & { fulfillmentId: string; externalReference: string; outcome: string }, _secrets: Array<string | undefined> = []) {
+  void _secrets;
   console.info("[cj-fulfillment]", JSON.stringify({
     event: "cj_fulfillment",
     operation: diagnostic.operation,
     stage: "fulfillment",
     path: diagnostic.path,
     httpStatus: diagnostic.httpStatus ?? null,
-    responseCode: diagnostic.responseCode ?? null,
-    responseMessage: redact(diagnostic.responseMessage, secrets) || null,
-    requestId: redact(diagnostic.requestId, secrets) || null,
+    responseCode: safeDiagnosticIdentifier(diagnostic.responseCode),
+    // Provider messages can echo addresses, names or request bodies. Classify
+    // them in memory; never emit them into persistent production logs.
+    requestId: safeDiagnosticIdentifier(diagnostic.requestId),
     fulfillmentId: diagnostic.fulfillmentId,
     externalReference: diagnostic.externalReference,
     outcome: diagnostic.outcome,
@@ -34,16 +41,16 @@ export function logCjFulfillment(diagnostic: CjDiagnostic & { fulfillmentId: str
   }));
 }
 
-export function logCjFailure(failure: CjDiagnostic, secrets: Array<string | undefined> = []) {
+export function logCjFailure(failure: CjDiagnostic, _secrets: Array<string | undefined> = []) {
+  void _secrets;
   console.error("[cj-api]", JSON.stringify({
     event: "cj_api_failure",
     operation: failure.operation,
     stage: failure.stage,
     path: failure.path,
     httpStatus: failure.httpStatus ?? null,
-    responseCode: failure.responseCode ?? null,
-    responseMessage: redact(failure.responseMessage, secrets) || null,
-    requestId: redact(failure.requestId, secrets) || null,
+    responseCode: safeDiagnosticIdentifier(failure.responseCode),
+    requestId: safeDiagnosticIdentifier(failure.requestId),
     context: failure.context ?? {},
   }));
 }
@@ -61,9 +68,8 @@ export function logCjSkuResolution(diagnostic: CjDiagnostic & {candidateCount:nu
     stage:diagnostic.stage,
     path:diagnostic.path,
     httpStatus:diagnostic.httpStatus ?? null,
-    responseCode:diagnostic.responseCode ?? null,
-    responseMessage:redact(diagnostic.responseMessage,secrets) || null,
-    requestId:redact(diagnostic.requestId,secrets) || null,
+    responseCode:safeDiagnosticIdentifier(diagnostic.responseCode),
+    requestId:safeDiagnosticIdentifier(diagnostic.requestId),
     context:diagnostic.context ?? {},
     candidateCount:diagnostic.candidateCount,
     exactMatchFound:diagnostic.exactMatchFound,

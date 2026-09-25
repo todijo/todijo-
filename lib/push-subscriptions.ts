@@ -6,11 +6,16 @@ import { webPushConfig } from "./web-push-config";
 export type BrowserPushSubscription = { endpoint: string; expirationTime?: number | null; keys: { p256dh: string; auth: string } };
 export class PushSubscriptionError extends Error { constructor(message: string, public status = 400) { super(message); } }
 
+function isKnownPushService(hostname: string) {
+  const host = hostname.toLowerCase();
+  return host === "fcm.googleapis.com" || host === "android.googleapis.com" || host === "updates.push.services.mozilla.com" || host === "push.services.mozilla.com" || host === "push.apple.com" || host.endsWith(".push.apple.com") || host === "notify.windows.com" || host.endsWith(".notify.windows.com");
+}
+
 export function validatePushSubscription(value: unknown): BrowserPushSubscription {
   const item = value as Partial<BrowserPushSubscription> | null;
   if (!item || typeof item.endpoint !== "string" || item.endpoint.length > 2048) throw new PushSubscriptionError("INVALID_SUBSCRIPTION");
   let endpoint: URL; try { endpoint = new URL(item.endpoint); } catch { throw new PushSubscriptionError("INVALID_SUBSCRIPTION"); }
-  if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.hash) throw new PushSubscriptionError("INVALID_SUBSCRIPTION");
+  if (endpoint.protocol !== "https:" || endpoint.port || endpoint.username || endpoint.password || endpoint.hash || !isKnownPushService(endpoint.hostname)) throw new PushSubscriptionError("INVALID_SUBSCRIPTION");
   if (!item.keys || typeof item.keys.p256dh !== "string" || typeof item.keys.auth !== "string" || item.keys.p256dh.length < 40 || item.keys.p256dh.length > 256 || item.keys.auth.length < 8 || item.keys.auth.length > 128 || !/^[A-Za-z0-9_-]+$/.test(item.keys.p256dh + item.keys.auth)) throw new PushSubscriptionError("INVALID_SUBSCRIPTION");
   if (item.expirationTime != null && (typeof item.expirationTime !== "number" || !Number.isFinite(item.expirationTime) || item.expirationTime <= 0)) throw new PushSubscriptionError("INVALID_SUBSCRIPTION");
   return { endpoint: endpoint.href, expirationTime: item.expirationTime ?? null, keys: { p256dh: item.keys.p256dh, auth: item.keys.auth } };

@@ -11,6 +11,7 @@ import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
 import { assertProductPublicationEligible, sellerEditDeactivationReason } from "@/lib/suppliers/safety";
 import { AdminAccessError } from "@/lib/admin-access";
+import { logSafeServerError } from "@/lib/safe-server-error";
 import { assertSellerActivity } from "@/lib/account-status";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 import { productRemovalErrorResponse, removeProductListing } from "@/lib/product-removal";
@@ -112,7 +113,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof ProductRecallError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof Error && ["PRODUCT_ADMIN_BLOCKED", "SUPPLIER_PRODUCT_REQUIRES_REVIEW"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
-    console.error("Update product error:", error);
+    logSafeServerError("product_update_failed", error, request);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });
   }
 }
@@ -123,7 +124,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true,...result });
   } catch (error) {
-    console.error("Delete product error:", error);
+    logSafeServerError("product_delete_failed", error, request);
     const failure=productRemovalErrorResponse(error);return NextResponse.json({error:failure.error},{status:failure.status});
   }
 }

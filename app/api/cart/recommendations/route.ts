@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     const result = mergeCartRecommendations(similar, recent, productIds);
     return NextResponse.json({ products: result.products.map(product=>serializeProduct(product,locale)), source: result.source });
   } catch (error) {
-    console.error("Cart recommendations unavailable", error);
+    console.error("Cart recommendations unavailable", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ products: [], source: "recent" });
   }
 }

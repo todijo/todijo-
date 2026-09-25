@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AdminAccessError, createManagedStore, exemptExistingAdminStore, extendManagedAccess, requireAdmin, validGrantMonths } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
 import { readAdminRequestSession } from "@/lib/admin-request-session";
+import { logSafeServerError } from "@/lib/safe-server-error";
 
 function slugify(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
@@ -14,7 +15,7 @@ function errorResponse(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return NextResponse.json({ error: "A store already uses this name or address." }, { status: 409 });
   }
-  console.error("Admin store mutation failed:", error);
+  logSafeServerError("admin_store_mutation_failed", error);
   return NextResponse.json({ error: "The admin operation could not be completed." }, { status: 500 });
 }
 

@@ -9,10 +9,8 @@ import '../../core/network/api_client.dart';
 typedef SellerJson = Map<String, dynamic>;
 
 final class SellerRepository {
-  SellerRepository(this.client, {Dio? uploadClient})
-    : uploadClient = uploadClient ?? Dio();
+  SellerRepository(this.client);
   final ApiClient client;
-  final Dio uploadClient;
 
   Future<SellerJson> dashboard(String locale) async =>
       (await client.dio.get<SellerJson>(
@@ -124,13 +122,6 @@ final class SellerRepository {
     XFile file, {
     String kind = 'product',
   }) async {
-    final media = (await client.dio.get<SellerJson>(
-      '/api/mobile/seller/media-config',
-      queryParameters: {'kind': kind},
-    )).data!;
-    final cloud = media['cloudName'] as String;
-    final preset = media['uploadPreset'] as String;
-    final folder = media['folder'] as String;
     final size = await file.length();
     if (size < 1 || size > 8 * 1024 * 1024) {
       throw const FormatException('IMAGE_SIZE_INVALID');
@@ -154,26 +145,20 @@ final class SellerRepository {
         filename: file.name,
         contentType: DioMediaType.parse(mime),
       ),
-      'upload_preset': preset,
-      'folder': folder,
+      'kind': kind,
     });
-    // Deliberately use a fresh client: never send a Todijo bearer token to Cloudinary.
-    final response = await uploadClient.post<SellerJson>(
-      'https://api.cloudinary.com/v1_1/$cloud/image/upload',
+    final response = await client.dio.post<SellerJson>(
+      '/api/media/upload',
       data: body,
     );
-    final url = response.data?['secure_url'];
-    if (url is! String || !url.startsWith('https://')) {
+    final url = response.data?['url'];
+    if (url is! String || !url.startsWith('https://res.cloudinary.com/')) {
       throw const FormatException('IMAGE_UPLOAD_FAILED');
     }
     return url;
   }
 
   Future<SellerJson> uploadProductVideo(XFile file) async {
-    final media = (await client.dio.get<SellerJson>(
-      '/api/mobile/seller/media-config',
-      queryParameters: {'kind': 'video'},
-    )).data!;
     final extension = file.name.split('.').last.toLowerCase();
     final mime =
         file.mimeType ??
@@ -189,21 +174,19 @@ final class SellerRepository {
     if (size < 1 || size > 50 * 1024 * 1024) {
       throw const FormatException('VIDEO_SIZE_INVALID');
     }
-    // The upload client has no Todijo authentication interceptor.
-    final response = await uploadClient.post<SellerJson>(
-      'https://api.cloudinary.com/v1_1/${media['cloudName']}/video/upload',
+    final response = await client.dio.post<SellerJson>(
+      '/api/media/upload',
       data: FormData.fromMap({
         'file': MultipartFile.fromBytes(
           await file.readAsBytes(),
           filename: file.name,
           contentType: DioMediaType.parse(mime),
         ),
-        'upload_preset': media['uploadPreset'],
-        'folder': media['folder'],
+        'kind': 'video',
       }),
     );
-    final url = response.data?['secure_url'];
-    final publicId = response.data?['public_id'];
+    final url = response.data?['url'];
+    final publicId = response.data?['publicId'];
     if (url is! String ||
         !url.startsWith('https://res.cloudinary.com/') ||
         publicId is! String ||
