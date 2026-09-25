@@ -1,6 +1,30 @@
-# Pre-launch recovery rehearsal (not yet executed)
+# Pre-launch recovery rehearsal
 
-This is a procedure for an authorized operator, not evidence of a completed restore. Never use the live database for the seven disposable integration tests. Keep the global loyalty switch disabled throughout the first deployment and migration.
+The disposable local restore described below was executed on 25 September 2026. It does **not** prove production backup retention, media recovery, production-sized restore time, or live rollback. Never use the live database for disposable integration tests. Keep global loyalty disabled throughout the first deployment and migration.
+
+## Executed local drill (disposable data only)
+
+PostgreSQL 17.10 was initialized in a new temporary cluster bound to `127.0.0.1:55432`, separate from the existing Windows PostgreSQL service. The `todijo_e2e` database received all 59 repository migrations and synthetic buyer/seller/store rows. `pg_dump -Fc` produced a 324,280-byte custom-format archive in under one second. After verifying the cluster data directory and target database, only `todijo_e2e` was dropped and recreated; `pg_restore --exit-on-error` completed in about 1.5 seconds. Verification found 59 applied migrations, both users, the seller-owned store, its foreign key, the unique user-email index, and global loyalty disabled. The full backend suite passed 1,285/1,285 with no DB skips against this cluster.
+
+A second disposable database was built from the 57 pre-loyalty migration SQL files. Synthetic buyer, seller, store, product, order and item rows were inserted before applying the two pending loyalty SQL files. They completed in approximately 232 ms and 136 ms respectively on the tiny local dataset. The pre-existing rows survived, the funding-source check and platform-funding unique index existed, and loyalty remained disabled. The application started against that schema and returned HTTP 200 from `/api/health`; the local app process was then stopped. These timings say nothing reliable about lock duration on a production-sized database.
+
+On Windows with the installed PostgreSQL binaries, the equivalent isolated commands were:
+
+```powershell
+& 'C:\Program Files\PostgreSQL\17\bin\initdb.exe' -D '<new disposable temp directory>' -U e2e -A trust --encoding=UTF8
+& 'C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe' -D '<same disposable directory>' -o '-h 127.0.0.1 -p 55432' -w start
+& 'C:\Program Files\PostgreSQL\17\bin\createdb.exe' -h 127.0.0.1 -p 55432 -U e2e todijo_e2e
+$env:DATABASE_URL='postgresql://e2e:e2e@127.0.0.1:55432/todijo_e2e?schema=public'
+npx prisma migrate deploy
+npm test
+& 'C:\Program Files\PostgreSQL\17\bin\pg_dump.exe' -h 127.0.0.1 -p 55432 -U e2e -d todijo_e2e -Fc -f '<protected disposable dump>'
+# Verify data_directory and database name before replacing this disposable target.
+& 'C:\Program Files\PostgreSQL\17\bin\dropdb.exe' -h 127.0.0.1 -p 55432 -U e2e todijo_e2e
+& 'C:\Program Files\PostgreSQL\17\bin\createdb.exe' -h 127.0.0.1 -p 55432 -U e2e todijo_e2e
+& 'C:\Program Files\PostgreSQL\17\bin\pg_restore.exe' -h 127.0.0.1 -p 55432 -U e2e -d todijo_e2e --exit-on-error '<protected disposable dump>'
+```
+
+The `trust` setting is acceptable **only** for a short-lived loopback disposable cluster with synthetic data; never use it for a valuable database or exposed network listener. Stop the dedicated cluster with `pg_ctl -D <same disposable directory> -w stop` when the drill is complete.
 
 ## Backup and disposable restore rehearsal
 

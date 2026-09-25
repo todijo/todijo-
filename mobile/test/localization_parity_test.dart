@@ -10,6 +10,11 @@ void main() {
     expect(expectedKeys, isNotEmpty);
     for (final locale in todijoLocaleCodes) {
       expect(copy[locale]!.keys.toSet(), expectedKeys, reason: locale);
+      expect(
+        copy[locale]!['ordersNext']?.trim(),
+        isNotEmpty,
+        reason: '$locale:ordersNext',
+      );
       for (final entry in copy[locale]!.entries) {
         expect(entry.value.trim(), isNotEmpty, reason: '$locale:${entry.key}');
         expect(

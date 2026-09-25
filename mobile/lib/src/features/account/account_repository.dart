@@ -45,11 +45,11 @@ final class AccountRepository {
     await client.dio.delete<AccountJson>('/api/mobile/account/addresses/$id');
   }
 
-  Future<List<AccountJson>> orders() async =>
-      ((await client.dio.get<AccountJson>('/api/mobile/account/orders'))
-                  .data!['orders']
-              as List<dynamic>)
-          .cast<AccountJson>();
+  Future<AccountJson> ordersPage({int page = 1}) async =>
+      (await client.dio.get<AccountJson>(
+        '/api/mobile/account/orders',
+        queryParameters: {'page': page},
+      )).data!;
   Future<AccountJson> order(String id) async =>
       (await client.dio.get<AccountJson>('/api/mobile/account/orders/$id'))
               .data!['order']

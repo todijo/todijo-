@@ -91,6 +91,7 @@ const selectors = {
   country: ["root", "Marketplace.country"],
   selectCountry: ["auth", "selectCountry"],
   orders: ["dashboard", "nav.orders"],
+  ordersNext: ["notifications", "next"],
   sellerDashboard: ["dashboard", "nav.dashboard"],
   sellerProducts: ["dashboard", "nav.products"],
   sellerAddProduct: ["dashboard", "nav.addProduct"],

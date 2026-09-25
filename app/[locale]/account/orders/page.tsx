@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { buyerPaymentState, listBuyerOrders } from "@/lib/buyer-orders";
+import { buyerPaymentState, listBuyerOrdersPage } from "@/lib/buyer-orders";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import SiteHeader from "@/components/SiteHeader";
@@ -13,15 +13,17 @@ import {isLocale} from "@/i18n/config";
 
 export const dynamic = "force-dynamic";
 
-export default async function BuyerOrdersPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function BuyerOrdersPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ page?: string }> }) {
   const { locale } = await params;
+  const { page: requestedPage } = await searchParams;
   const session = await readSession();
   if (!session) redirect(`/${locale}/login?next=/${locale}/account/orders`);
   const buyer = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true } });
   if (!buyer) redirect(`/${locale}/login`);
 
-  const orders = await listBuyerOrders(prisma, session.userId);
+  const { orders, page, hasMore } = await listBuyerOrdersPage(prisma, session.userId, requestedPage);
   const t = await getTranslations("Orders");
+  const pagination = await getTranslations("Notifications");
   const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
   const date = (value: Date) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(value);
   const trackingText=trackingUi[isLocale(locale)?locale:"en"];
@@ -83,6 +85,12 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
               );
             })}
           </section>
+        )}
+        {(page > 1 || hasMore) && (
+          <nav className="buyerOrdersPagination" aria-label={t("title")}>
+            {page > 1 && <Link className="quickActionLink secondary" href={`/${locale}/account/orders?page=${page - 1}`}>{pagination("previous")}</Link>}
+            {hasMore && <Link className="quickActionLink secondary" href={`/${locale}/account/orders?page=${page + 1}`}>{pagination("next")}</Link>}
+          </nav>
         )}
       </div>
       <MarketplaceFooter />

@@ -11,6 +11,7 @@ playwright-report
 test-results
 coverage
 *.log
+mobile/
 mobile/.dart_tool
 mobile/build
 mobile/.flutter-plugins*

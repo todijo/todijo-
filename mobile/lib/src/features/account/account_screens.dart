@@ -408,22 +408,92 @@ class _AddressDialogState extends State<AddressDialog> {
   );
 }
 
-class OrdersScreen extends ConsumerWidget {
+class OrdersScreen extends ConsumerStatefulWidget {
   const OrdersScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) => _FutureList(
-    title: TodijoLocalizations.of(context).text('orders'),
-    load: () => _repo(ref).orders(),
-    empty: TodijoLocalizations.of(context).text('emptyOrders'),
-    builder: (o) => ListTile(
-      onTap: () => context.push('/account/orders/${o['id']}'),
-      title: Text('#${o['id']}'),
-      subtitle: Text(
-        '${TodijoLocalizations.of(context).text('orderStatus.${o['status']}')} · ${o['createdAt']}',
-      ),
-      trailing: Text('${o['total']} ${o['currency']}'),
-    ),
-  );
+  ConsumerState<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends ConsumerState<OrdersScreen> {
+  final List<AccountJson> orders = [];
+  int page = 0;
+  bool loading = true;
+  bool hasMore = false;
+  Object? error;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => _load(1));
+  }
+
+  Future<void> _load(int nextPage) async {
+    if (loading && page != 0) return;
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final result = await _repo(ref).ordersPage(page: nextPage);
+      if (!mounted) return;
+      final rows = (result['orders'] as List<dynamic>).cast<AccountJson>();
+      setState(() {
+        if (nextPage == 1) orders.clear();
+        orders.addAll(rows);
+        page = nextPage;
+        hasMore = result['hasMore'] == true;
+        loading = false;
+      });
+    } catch (failure) {
+      if (mounted) {
+        setState(() {
+          error = failure;
+          loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = TodijoLocalizations.of(context);
+    return _Page(
+      title: copy.text('orders'),
+      child: orders.isEmpty && loading
+          ? const Center(child: CircularProgressIndicator.adaptive())
+          : orders.isEmpty && error != null
+          ? Retry(() => _load(1))
+          : orders.isEmpty
+          ? Center(child: Text(copy.text('emptyOrders')))
+          : ListView.builder(
+              itemCount:
+                  orders.length + (hasMore || error != null || loading ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == orders.length) {
+                  return Center(
+                    child: loading
+                        ? const CircularProgressIndicator.adaptive()
+                        : TextButton(
+                            onPressed: () => _load(page + 1),
+                            child: Text(
+                              copy.text(error == null ? 'ordersNext' : 'retry'),
+                            ),
+                          ),
+                  );
+                }
+                final order = orders[index];
+                return ListTile(
+                  onTap: () => context.push('/account/orders/${order['id']}'),
+                  title: Text('#${order['id']}'),
+                  subtitle: Text(
+                    '${copy.text('orderStatus.${order['status']}')} · ${order['createdAt']}',
+                  ),
+                  trailing: Text('${order['total']} ${order['currency']}'),
+                );
+              },
+            ),
+    );
+  }
 }
 
 class BuyerLoyaltyScreen extends ConsumerStatefulWidget {

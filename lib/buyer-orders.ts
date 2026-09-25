@@ -34,6 +34,24 @@ const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
 
 export type BuyerOrder = Prisma.OrderGetPayload<{ include: typeof buyerOrderInclude }>;
 type BuyerOrderDb = Pick<PrismaClient, "order">;
+export const BUYER_ORDER_PAGE_SIZE = 20;
+
+export function buyerOrderPageNumber(value: unknown) {
+  const page = typeof value === "string" ? Number(value) : value;
+  return Number.isSafeInteger(page) && Number(page) > 0 ? Math.min(Number(page), 10_000) : 1;
+}
+
+export async function listBuyerOrdersPage(db: BuyerOrderDb, buyerId: string, requestedPage: unknown) {
+  const page = buyerOrderPageNumber(requestedPage);
+  const rows = await db.order.findMany({
+    where: { buyerId },
+    include: buyerOrderInclude,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * BUYER_ORDER_PAGE_SIZE,
+    take: BUYER_ORDER_PAGE_SIZE + 1,
+  });
+  return { orders: rows.slice(0, BUYER_ORDER_PAGE_SIZE), page, pageSize: BUYER_ORDER_PAGE_SIZE, hasMore: rows.length > BUYER_ORDER_PAGE_SIZE };
+}
 
 export function listBuyerOrders(db: BuyerOrderDb, buyerId: string): Promise<BuyerOrder[]> {
   return db.order.findMany({

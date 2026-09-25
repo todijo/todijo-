@@ -1,5 +1,30 @@
 # Todijo production operations runbook
 
+## Phase 8 controlled-launch sequence — HOLD until every gate is signed off
+
+This is the single deployment sequence for a **future, separately authorized** release. Phase 8 did not deploy or change production. Keep `CJ_AUTOMATIC_FULFILLMENT_ENABLED=false` and global loyalty `enabled=false`; turning either on needs its own approval.
+
+### Pre-deploy gate
+
+1. Record the reviewed commit and immutable image digest. Build the Docker image from that commit in a clean context, inspect the final image and runtime UID, and run its health check in an isolated environment. A local Next.js/Android build is not a substitute for this Docker gate.
+2. Verify the current production database host/name without revealing credentials. Take a protected custom-format PostgreSQL backup, verify `pg_restore --list` and checksum, then complete an isolated restore rehearsal with representative data. Record baseline counts for users, stores, products, orders, webhook events, supplier fulfillments and loyalty balances. Confirm media-provider backup/retention independently.
+3. Review the two unapplied loyalty migrations, disk/headroom, long transactions and likely DDL lock window. Decide maintenance/traffic handling and stop or drain financial runners if the migration window requires it. Confirm an application rollback image and forward-fix owner are available. Do not treat dropping new columns as a routine rollback.
+4. In private hosting configuration, verify required env presence and mode (not values): database, `APP_URL`, session/mobile secrets, Stripe live platform key and matching webhook secret, runner secrets, Cloudinary server-only key/secret, and `AUTH_TRUSTED_PROXY_SECRET`. Confirm `STRIPE_MODE=live` only for a separately approved live release, and validate optional OAuth/Turnstile/SMTP/CJ config for the features actually enabled.
+5. Identify the legacy preset from the **deployed** `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` setting and disable it in Cloudinary after checking dependencies; follow `phase7-media-upload.md`. Verify app-container network isolation, secret-header overwrite and rightmost peer handling in live Traefik config; follow `phase7-proxy-trust.md`. If either cannot be verified, hold deployment.
+6. In the Stripe dashboard, confirm platform/Connect status, connected-account restrictions, live endpoint `https://todijo.com/api/stripe/webhook`, signing secret and subscribed event types, payouts, refund access, and replay/reconciliation visibility. For CJ, verify read-only catalog/API access, wallet/credential status, scheduled tracking sync and manual/admin submission coverage without placing an order. Hold if either required live contract is unverified.
+
+### Deployment (separate explicit authorization required)
+
+1. Pin and deploy the reviewed image, keeping the prior image available. Apply migrations **once** through `npx prisma migrate deploy` against the verified production target during the approved window; never use `db push`, `migrate reset` or edit an applied migration. Confirm both loyalty migrations are recorded and default-off settings remain false.
+2. Roll out the app behind Traefik; check container startup, non-root UID, `/api/health` HTTP 200, error rate, and migration logs. Resume normal traffic only after the smoke checks below. The health route proves liveness, not provider or database integrity.
+3. Smoke public catalog/home/category/store/PDP reads; authenticated login/session, seller/admin access, authorized seller upload, checkout **initialization only** without creating a real payment for the audit, notifications and tracking reads. Check webhook delivery status in Stripe without forging events. Reconcile DB/provider state before resuming financial runners.
+
+### Post-deploy and rollback
+
+Watch login/rate-limit buckets, upload rejects, webhook failures/duplicates, transfer/refund/reversal queues, CJ manual/ambiguous rows, notifications, tracking sync, database locks and error logs. Compare order/loyalty invariants to the pre-deploy baseline. Keep global loyalty OFF and CJ auto-fulfillment OFF.
+
+If only application code failed and schema is backward compatible, return traffic to the pinned prior image and repeat health/auth/catalog checks. If migration applied, stop and evaluate a reviewed forward fix versus a separately approved restore; do not automatically reverse DDL or restore over newer payments/orders. For Stripe/CJ outages, retain event IDs and idempotency references, pause affected jobs, reconcile before replay, and never create blind duplicate financial/supplier actions. Follow `phase7-recovery-runbook.md` for backup/restore and incident details.
+
 ## Readiness verdict
 
 Phase 7 code and deployment readiness require the outstanding verification in `phase7-proxy-trust.md`, `phase7-media-upload.md`, and `phase7-recovery-runbook.md`. Green CI cannot prove live credentials, schedules, backups, balances, DNS, or provider account status. Do not treat this runbook as launch approval.
