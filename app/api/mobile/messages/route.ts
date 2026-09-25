@@ -1,2 +1,20 @@
 import{NextResponse}from"next/server";import{prisma}from"@/lib/prisma";import{MobileSessionError,readMobileSession}from"@/lib/mobile-session";
+import { startPrepurchaseConversation } from "@/lib/conversation-messages";
+import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
+export async function POST(request: Request) {
+  try {
+    const session = await readMobileSession(request);
+    const payload = await request.json().catch(() => null);
+    const productId = typeof payload?.productId === "string" ? payload.productId : "";
+    const message = typeof payload?.message === "string" ? payload.message.trim() : "";
+    const result = await startPrepurchaseConversation(prisma, session.userId, productId, message);
+    if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    dispatchNotificationPushBestEffort(result.notificationId);
+    return NextResponse.json({ conversationId: result.conversationId }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return error instanceof MobileSessionError
+      ? NextResponse.json({ error: error.code }, { status: error.status })
+      : NextResponse.json({ error: "MESSAGES_UNAVAILABLE" }, { status: 500 });
+  }
+}
 export async function GET(request:Request){try{const session=await readMobileSession(request);await prisma.notification.updateMany({where:{userId:session.userId,type:"NEW_MESSAGE",readAt:null},data:{readAt:new Date()}});const conversations=await prisma.conversation.findMany({where:{OR:[{buyerId:session.userId},{sellerId:session.userId}]},orderBy:{lastMessageAt:"desc"},take:100,select:{id:true,buyerId:true,lastMessageAt:true,product:{select:{id:true,name:true,images:true}},store:{select:{name:true,slug:true}},buyer:{select:{firstName:true,lastName:true}},seller:{select:{firstName:true,lastName:true}},messages:{take:1,orderBy:{createdAt:"desc"},select:{body:true,senderId:true,readAt:true,createdAt:true}}}});return NextResponse.json({conversations:conversations.map(c=>{const other=c.buyerId===session.userId?c.seller:c.buyer,last=c.messages[0];return{id:c.id,product:c.product,store:c.store,counterpart:{name:`${other.firstName} ${other.lastName}`.trim()},lastMessage:last??null,unread:Boolean(last&&last.senderId!==session.userId&&!last.readAt),lastMessageAt:c.lastMessageAt}})},{headers:{"Cache-Control":"private, no-store"}})}catch(error){return error instanceof MobileSessionError?NextResponse.json({error:error.code},{status:error.status}):NextResponse.json({error:"MESSAGES_UNAVAILABLE"},{status:500})}}

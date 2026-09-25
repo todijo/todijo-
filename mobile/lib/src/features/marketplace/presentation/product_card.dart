@@ -7,6 +7,14 @@ import '../../../core/localization/todijo_localizations.dart';
 import '../application/buyer_state.dart';
 import '../domain/marketplace_models.dart';
 
+SliverGridDelegateWithMaxCrossAxisExtent productGridDelegate(double width) =>
+    SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: width < 360 ? 500 : 230,
+      childAspectRatio: width < 360 ? 1.05 : .50,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+    );
+
 class ProductCard extends ConsumerWidget {
   const ProductCard(this.product, {super.key});
   final ProductSummary product;
@@ -27,19 +35,19 @@ class ProductCard extends ConsumerWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  product.image == null
-                      ? const ColoredBox(
-                          color: TodijoColors.cream,
-                          child: Icon(Icons.image_outlined, size: 48),
-                        )
-                      : Image.network(
-                          product.image!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const ColoredBox(
-                            color: TodijoColors.cream,
-                            child: Icon(Icons.broken_image_outlined),
+                  ColoredBox(
+                    color: TodijoColors.cream,
+                    child: product.image == null
+                        ? const Icon(Icons.image_outlined, size: 48)
+                        : Image.network(
+                            product.image!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const ColoredBox(
+                              color: TodijoColors.cream,
+                              child: Icon(Icons.image_outlined),
+                            ),
                           ),
-                        ),
+                  ),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -52,17 +60,11 @@ class ProductCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  if (product.hasActiveVariants)
-                    Positioned(
-                      left: 8,
-                      top: 8,
-                      child: _Badge(copy.text('chooseOptions')),
-                    ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(9),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -72,7 +74,7 @@ class ProductCard extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                   if (product.storeName.isNotEmpty)
@@ -85,14 +87,19 @@ class ProductCard extends ConsumerWidget {
                   if (product.requiresAuthoritativePrice)
                     Text(
                       copy.text('priceByDestination'),
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
                     )
                   else
                     Text(
                       '${product.price ?? '—'} ${product.currency}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 19,
+                        fontSize: 17,
                         color: TodijoColors.forest,
                       ),
                     ),
@@ -113,6 +120,7 @@ class ProductCard extends ConsumerWidget {
                               : copy.text('soldOut'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                       if (product.condition.isNotEmpty)
@@ -121,11 +129,12 @@ class ProductCard extends ConsumerWidget {
                             product.condition,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11),
                           ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   FilledButton(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -159,26 +168,4 @@ class ProductCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: TodijoColors.forest,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    ),
-  );
 }

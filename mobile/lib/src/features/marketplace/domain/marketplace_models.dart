@@ -83,6 +83,19 @@ final class ProductPage {
   final int nextOffset;
 }
 
+List<ProductSummary> appendUniqueProducts(
+  List<ProductSummary> current,
+  List<ProductSummary> incoming, {
+  Set<String> excludedIds = const {},
+}) {
+  final seen = <String>{...excludedIds, ...current.map((item) => item.id)};
+  return [
+    ...current,
+    for (final product in incoming)
+      if (seen.add(product.id)) product,
+  ];
+}
+
 final class CategoryNode {
   const CategoryNode({
     required this.id,
@@ -163,6 +176,7 @@ final class HomeData {
     required this.categories,
     required this.newArrivals,
     required this.bestSellers,
+    this.stores = const [],
   });
   factory HomeData.fromJson(JsonMap json) {
     final market = json['market'] as JsonMap;
@@ -182,6 +196,12 @@ final class HomeData {
           .toList(growable: false),
       newArrivals: products('newArrivals'),
       bestSellers: products('bestSellers'),
+      stores:
+          ((sections['stores'] as JsonMap?)?['items'] as List<dynamic>? ??
+                  const [])
+              .cast<JsonMap>()
+              .map(HomeStorePromo.fromJson)
+              .toList(growable: false),
     );
   }
   final String country;
@@ -190,6 +210,18 @@ final class HomeData {
   final List<CategoryNode> categories;
   final List<ProductSummary> newArrivals;
   final List<ProductSummary> bestSellers;
+  final List<HomeStorePromo> stores;
+}
+
+final class HomeStorePromo {
+  const HomeStorePromo({required this.name, required this.slug, this.logo});
+  factory HomeStorePromo.fromJson(JsonMap json) => HomeStorePromo(
+    name: json['name'] as String,
+    slug: json['slug'] as String,
+    logo: json['logo'] as String?,
+  );
+  final String name, slug;
+  final String? logo;
 }
 
 final class ProductDetail {
@@ -210,6 +242,11 @@ final class ProductDetail {
     required this.sizes,
     required this.storeName,
     required this.storeSlug,
+    this.category = '',
+    this.reviewCount = 0,
+    this.averageRating,
+    this.reviewPreview = const [],
+    this.canAskSeller = false,
   });
   factory ProductDetail.fromJson(JsonMap envelope) {
     final json = envelope['product'] as JsonMap;
@@ -217,6 +254,9 @@ final class ProductDetail {
     final availability = json['availability'] as JsonMap;
     final media = json['media'] as JsonMap;
     final store = json['store'] as JsonMap;
+    final reviews = json['reviews'] as JsonMap?;
+    final reviewSummary = reviews?['summary'] as JsonMap?;
+    final capabilities = json['capabilities'] as JsonMap?;
     return ProductDetail(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -244,9 +284,18 @@ final class ProductDetail {
       sizes: (json['sizes'] as List<dynamic>? ?? const []).cast<String>(),
       storeName: store['name'] as String,
       storeSlug: store['slug'] as String,
+      category: (json['category'] ?? '') as String,
+      reviewCount: (reviewSummary?['count'] ?? 0) as int,
+      averageRating: (reviewSummary?['averageRating'] as num?)?.toDouble(),
+      reviewPreview: (reviews?['items'] as List<dynamic>? ?? const [])
+          .cast<JsonMap>()
+          .map(ProductReview.fromJson)
+          .toList(growable: false),
+      canAskSeller: (capabilities?['canAskSeller'] ?? false) as bool,
     );
   }
   final String id, title, description, currency, storeName, storeSlug;
+  final String category;
   final String? minimumPrice, compareAtPrice;
   final bool requiresAuthoritativePrice, available;
   final int? stock;
@@ -254,6 +303,30 @@ final class ProductDetail {
   final List<ProductOption> options;
   final List<ProductVariant> variants;
   final List<String> colors, sizes;
+  final int reviewCount;
+  final double? averageRating;
+  final List<ProductReview> reviewPreview;
+  final bool canAskSeller;
+}
+
+final class ProductReview {
+  const ProductReview({
+    required this.id,
+    required this.rating,
+    required this.body,
+    this.title,
+    this.authorName,
+  });
+  factory ProductReview.fromJson(JsonMap json) => ProductReview(
+    id: json['id'] as String,
+    rating: (json['rating'] as num).toInt(),
+    body: (json['body'] ?? '') as String,
+    title: json['title'] as String?,
+    authorName: json['authorName'] as String?,
+  );
+  final String id, body;
+  final int rating;
+  final String? title, authorName;
 }
 
 final class ProductOption {

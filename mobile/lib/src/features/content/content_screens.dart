@@ -26,7 +26,9 @@ class InfoScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(
       title: Text(TodijoLocalizations.of(context).text('appName')),
-      leading: BackButton(onPressed: context.pop),
+      leading: BackButton(
+        onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+      ),
     ),
     body: _RetryableFuture<Map<String, dynamic>>(
       key: ValueKey(ref.watch(buyerPreferencesProvider).value?.locale),
@@ -78,7 +80,9 @@ class NewsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(
       title: Text(TodijoLocalizations.of(context).text('news')),
-      leading: BackButton(onPressed: context.pop),
+      leading: BackButton(
+        onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+      ),
     ),
     body: _RetryableFuture<List<Map<String, dynamic>>>(
       key: ValueKey(ref.watch(buyerPreferencesProvider).value?.locale),
@@ -134,7 +138,9 @@ class NewsDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(
       title: Text(TodijoLocalizations.of(context).text('news')),
-      leading: BackButton(onPressed: context.pop),
+      leading: BackButton(
+        onPressed: () => context.canPop() ? context.pop() : context.go('/news'),
+      ),
     ),
     body: _RetryableFuture<Map<String, dynamic>>(
       key: ValueKey('${ref.watch(buyerPreferencesProvider).value?.locale}:$id'),

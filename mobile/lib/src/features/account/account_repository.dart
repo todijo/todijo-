@@ -70,6 +70,17 @@ final class AccountRepository {
     );
   }
 
+  Future<String> startPrepurchaseConversation(
+    String productId,
+    String message,
+  ) async {
+    final response = await client.dio.post<AccountJson>(
+      '/api/mobile/messages',
+      data: {'productId': productId, 'message': message},
+    );
+    return response.data!['conversationId'] as String;
+  }
+
   Future<AccountJson> notifications({int page = 1}) async =>
       (await client.dio.get<AccountJson>(
         '/api/mobile/notifications',

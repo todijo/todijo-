@@ -5,24 +5,29 @@ import '../../../core/theme/todijo_theme.dart';
 import '../../../core/theme/todijo_brand.dart';
 import '../../../core/localization/todijo_localizations.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../application/buyer_state.dart';
+
 class BuyerHeader extends StatelessWidget implements PreferredSizeWidget {
   const BuyerHeader({super.key, this.showBack = false});
   final bool showBack;
   @override
-  Size get preferredSize => const Size.fromHeight(132);
+  Size get preferredSize => const Size.fromHeight(108);
   @override
   Widget build(BuildContext context) {
     final copy = TodijoLocalizations.of(context);
     return AppBar(
       automaticallyImplyLeading: false,
-      toolbarHeight: 72,
+      toolbarHeight: 56,
       titleSpacing: 14,
       title: Row(
         children: [
           IconButton.outlined(
             tooltip: copy.text(showBack ? 'back' : 'menu'),
-            onPressed: () =>
-                showBack ? context.pop() : Scaffold.of(context).openDrawer(),
+            onPressed: () => showBack
+                ? (context.canPop() ? context.pop() : context.go('/'))
+                : Scaffold.of(context).openDrawer(),
             icon: Icon(showBack ? Icons.arrow_back : Icons.menu),
             color: TodijoColors.ivory,
           ),
@@ -42,10 +47,11 @@ class BuyerHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
+        preferredSize: const Size.fromHeight(52),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
           child: SearchBar(
+            constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
             hintText: copy.text('searchPlaceholder'),
             trailing: [
               IconButton(
@@ -63,11 +69,13 @@ class BuyerHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-class BuyerDrawer extends StatelessWidget {
+class BuyerDrawer extends ConsumerWidget {
   const BuyerDrawer({super.key});
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final copy = TodijoLocalizations.of(context);
+    final preferences =
+        ref.watch(buyerPreferencesProvider).value ?? const BuyerPreferences();
     final destinations = <(IconData, String, String)>[
       (Icons.home_outlined, copy.text('home'), '/'),
       (Icons.grid_view_outlined, copy.text('categories'), '/categories'),
@@ -105,7 +113,7 @@ class BuyerDrawer extends StatelessWidget {
               title: Text(copy.text('settings')),
               onTap: () {
                 Navigator.pop(context);
-                context.go('/settings');
+                context.push('/settings');
               },
             ),
             ListTile(
@@ -134,6 +142,47 @@ class BuyerDrawer extends StatelessWidget {
                   ),
               ],
             ),
+            const Divider(),
+            DropdownButtonFormField<String>(
+              key: ValueKey('drawer-language-${preferences.locale}'),
+              initialValue: preferences.locale,
+              isExpanded: true,
+              decoration: InputDecoration(labelText: copy.text('language')),
+              items: [
+                for (final code in todijoLocaleCodes)
+                  DropdownMenuItem(
+                    value: code,
+                    child: Text(code.toUpperCase()),
+                  ),
+              ],
+              onChanged: (locale) {
+                if (locale != null) {
+                  ref
+                      .read(buyerPreferencesProvider.notifier)
+                      .setPreferences(locale: locale);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey('drawer-currency-${preferences.currency}'),
+              initialValue: preferences.currency,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: copy.text('currencyLabel'),
+              ),
+              items: [
+                for (final code in const ['EUR', 'USD', 'GBP', 'TRY', 'CAD'])
+                  DropdownMenuItem(value: code, child: Text(code)),
+              ],
+              onChanged: (currency) {
+                if (currency != null) {
+                  ref
+                      .read(buyerPreferencesProvider.notifier)
+                      .setPreferences(currency: currency);
+                }
+              },
+            ),
           ],
         ),
       ),
@@ -156,32 +205,41 @@ class BuyerShell extends StatelessWidget {
       drawer: const BuyerDrawer(),
       appBar: const BuyerHeader(),
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index < 0 ? 0 : index,
-        onDestinationSelected: (value) => context.go(paths[value]),
-        destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: copy.text('home'),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            label: copy.text('categories'),
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.search),
-            label: copy.text('search'),
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.shopping_cart_outlined),
-            label: copy.text('cart'),
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: copy.text('account'),
-          ),
-        ],
+        ),
+        child: NavigationBar(
+          height: 68,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          selectedIndex: index < 0 ? 0 : index,
+          onDestinationSelected: (value) => context.go(paths[value]),
+          destinations: [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: copy.text('home'),
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.grid_view_outlined),
+              label: copy.text('categories'),
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.search),
+              label: copy.text('search'),
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.shopping_cart_outlined),
+              label: copy.text('cart'),
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              label: copy.text('account'),
+            ),
+          ],
+        ),
       ),
     );
   }

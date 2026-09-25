@@ -1,7 +1,81 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todijo/src/features/marketplace/domain/marketplace_models.dart';
+import 'package:todijo/src/features/marketplace/presentation/product_discovery_sections.dart';
+import 'package:todijo/src/core/localization/todijo_localizations.dart';
 
 void main() {
+  test('related discovery widens only to the same canonical taxonomy root', () {
+    expect(broaderCategoryFor('electronics--watches--smart'), 'electronics');
+    expect(broaderCategoryFor('electronics'), isNull);
+    expect(canonicalCategoryFilter('jewelry'), 'Bijoux & Montres');
+    expect(canonicalCategoryFilter('bijoux-montres'), 'Bijoux & Montres');
+    expect(
+      canonicalCategoryFilter('jewelry--women-watches--montres-creatives'),
+      'jewelry--women-watches--montres-creatives',
+    );
+  });
+  test(
+    'PDP reads only published review preview and category from server contract',
+    () {
+      final product = ProductDetail.fromJson({
+        'product': {
+          'id': 'p1',
+          'title': 'Produit',
+          'description': '',
+          'category': 'women-blazers',
+          'pricing': {
+            'currency': 'EUR',
+            'minimum': null,
+            'compareAt': null,
+            'requiresAuthoritativePrice': false,
+          },
+          'availability': {'available': true, 'stock': 1},
+          'media': {'images': <Object>[]},
+          'store': {'name': 'Boutique', 'slug': 'boutique'},
+          'options': <Object>[],
+          'variants': <Object>[],
+          'reviews': {
+            'summary': {'count': 1, 'averageRating': 5},
+            'items': [
+              {
+                'id': 'r1',
+                'rating': 5,
+                'body': 'Très bien',
+                'title': 'Avis',
+                'authorName': 'A.',
+              },
+            ],
+          },
+          'capabilities': {'canAskSeller': true},
+        },
+      });
+      expect(product.category, 'women-blazers');
+      expect(product.reviewCount, 1);
+      expect(product.averageRating, 5);
+      expect(product.reviewPreview.single.body, 'Très bien');
+      expect(product.canAskSeller, isTrue);
+    },
+  );
+
+  test('catalog pages retain order and deduplicate stable product IDs', () {
+    ProductSummary item(String id) => ProductSummary(
+      id: id,
+      title: id,
+      currency: 'EUR',
+      requiresAuthoritativePrice: false,
+    );
+    final first = [item('a'), item('b')];
+    final second = [item('b'), item('c'), item('c'), item('d')];
+    expect(
+      appendUniqueProducts(
+        first,
+        second,
+        excludedIds: {'d'},
+      ).map((product) => product.id),
+      ['a', 'b', 'c'],
+    );
+  });
+
   test('parses production marketplace pagination without inventing prices', () {
     final page = ProductPage.fromJson({
       'products': [

@@ -25,7 +25,8 @@ test("pre-purchase questions are meaningful and controlled by the seller", () =>
   assert.match(source("components/AskSellerButton.tsx"), /useState\(""\)/);
   assert.match(source("components/AskSellerButton.tsx"), /trimmedLength < MIN_MESSAGE_LENGTH/);
   assert.match(source("components/AskSellerButton.tsx"), /const MIN_MESSAGE_LENGTH = 12/);
-  assert.match(source("app/api/conversations/route.ts"), /PREPURCHASE_QUESTIONS_DISABLED/);
+  assert.match(source("lib/conversation-messages.ts"), /PREPURCHASE_QUESTIONS_DISABLED/);
+  assert.match(source("app/api/conversations/route.ts"), /startPrepurchaseConversation/);
   assert.match(source("prisma/schema.prisma"), /allowPrepurchaseQuestions Boolean\s+@default\(true\)/);
   assert.match(source("app/seller/products/new/NewProductForm.tsx"), /allowPrepurchaseQuestions/);
   assert.match(source("app/seller/products/\[id\]/edit/EditProductForm.tsx"), /allowPrepurchaseQuestions/);

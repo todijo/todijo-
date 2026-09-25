@@ -2097,3 +2097,8 @@ button,a,input,select,textarea{transition:border-color .2s ease,background-color
 @media(max-width:860px){.backToTop{inset-inline-end:max(16px,env(safe-area-inset-right));bottom:calc(82px + env(safe-area-inset-bottom));width:44px;height:44px}body:has(.mobilePurchaseBar) .backToTop{bottom:calc(158px + env(safe-area-inset-bottom))}}
 @media(max-width:780px){body:has(.premiumDashboardMobileNav) .backToTop{bottom:calc(88px + env(safe-area-inset-bottom))}}
 @media(prefers-reduced-motion:reduce){.backToTop{transition:none}.backToTop:hover{transform:none}}
+.homepageCategoryPromoRail{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-block:18px 28px}
+.homepageCategoryPromoRail a{min-width:0;min-height:112px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;border:1px solid #e4d7bd;border-radius:18px;background:linear-gradient(135deg,#104a3c,#1c624e);color:#fff;text-decoration:none;box-shadow:0 10px 24px rgba(8,43,34,.1)}
+.homepageCategoryPromoRail a>svg:first-child{color:#e1ba56}.homepageCategoryPromoRail a>span{font-weight:800;line-height:1.2;overflow-wrap:anywhere}.homepageCategoryPromoRail a>svg:last-child{align-self:flex-end;color:#e1ba56}
+.homepageCategoryPromoRail a:hover,.homepageCategoryPromoRail a:focus-visible{outline:2px solid #d2a62f;outline-offset:2px}
+@media(max-width:860px){.homepageCategoryPromoRail{display:flex;overflow-x:auto;scroll-snap-type:x proximity;padding-block:4px}.homepageCategoryPromoRail a{flex:0 0 min(42vw,180px);scroll-snap-align:start}}

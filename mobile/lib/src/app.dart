@@ -26,6 +26,7 @@ import 'features/marketplace/application/buyer_state.dart';
 import 'features/marketplace/presentation/buyer_chrome.dart';
 import 'features/marketplace/presentation/buyer_screens.dart';
 import 'features/marketplace/presentation/home_screen.dart';
+import 'features/marketplace/presentation/product_reviews_screen.dart';
 import 'features/seller/seller_screens.dart';
 import 'features/seller/seller_loyalty_screen.dart';
 import 'features/seller/seller_product_editor.dart';
@@ -103,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/products/:id',
         builder: (_, state) => ProductDetailScreen(state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/products/:id/reviews',
+        builder: (_, state) => ProductReviewsScreen(state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/stores/:slug',

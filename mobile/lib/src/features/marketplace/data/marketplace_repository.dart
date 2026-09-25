@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/localization/todijo_localizations.dart';
 import '../domain/marketplace_models.dart';
 
 final class MarketplaceRepository {
@@ -55,6 +56,7 @@ final class MarketplaceRepository {
     String? color,
     String? size,
     String? season,
+    String? rating,
     String sort = 'newest',
   }) async {
     final response = await _client.dio.get<JsonMap>(
@@ -62,7 +64,7 @@ final class MarketplaceRepository {
       queryParameters: <String, dynamic>{
         'offset': offset,
         'q': query,
-        'category': category,
+        'category': category == null ? null : canonicalCategoryFilter(category),
         'condition': condition,
         'country': country,
         'currency': currency,
@@ -72,6 +74,7 @@ final class MarketplaceRepository {
         'color': color,
         'size': size,
         'season': season,
+        'rating': rating,
         'sort': sort,
       }..removeWhere((key, value) => value == null || value == ''),
       options: Options(headers: {'Accept-Language': locale}),
@@ -86,6 +89,16 @@ final class MarketplaceRepository {
       options: Options(headers: {'Accept-Language': locale}),
     );
     return ProductDetail.fromJson(response.data!);
+  }
+
+  Future<List<ProductReview>> reviews(String productId) async {
+    final response = await _client.dio.get<JsonMap>(
+      '/api/products/$productId/reviews',
+    );
+    return (response.data!['reviews'] as List<dynamic>? ?? const [])
+        .cast<JsonMap>()
+        .map(ProductReview.fromJson)
+        .toList(growable: false);
   }
 
   Future<AuthoritativePrice> authoritativePrice({

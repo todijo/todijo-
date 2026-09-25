@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,13 +9,78 @@ import '../domain/marketplace_models.dart';
 import 'product_card.dart';
 import 'category_icon.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scroll = ScrollController();
+  List<ProductSummary> _catalog = [];
+  int _offset = 0;
+  int _generation = 0;
+  bool _loading = false;
+  bool _hasMore = true;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+    Future.microtask(() => _load());
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scroll.hasClients && _scroll.position.extentAfter < 600) _load();
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if ((!reset && _loading) || (!reset && !_hasMore)) return;
+    if (reset) _generation++;
+    final generation = _generation;
+    final offset = reset ? 0 : _offset;
+    setState(() {
+      _loading = true;
+      _error = null;
+      if (reset) {
+        _catalog = [];
+        _offset = 0;
+        _hasMore = true;
+      }
+    });
+    try {
+      final page = await ref.read(homeCatalogPageProvider(offset).future);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _catalog = appendUniqueProducts(_catalog, page.products);
+        _offset = page.nextOffset;
+        _hasMore = page.hasMore && page.nextOffset > offset;
+      });
+    } catch (error) {
+      if (mounted && generation == _generation) setState(() => _error = error);
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final copy = TodijoLocalizations.of(context);
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(homeProvider),
+      onRefresh: () async {
+        ref.invalidate(homeProvider);
+        ref.invalidate(homeCatalogPageProvider);
+        await _load(reset: true);
+      },
       child: ref
           .watch(homeProvider)
           .when(
@@ -25,248 +88,247 @@ class HomeScreen extends ConsumerWidget {
                 const Center(child: CircularProgressIndicator.adaptive()),
             error: (error, _) =>
                 _Failure(onRetry: () => ref.invalidate(homeProvider)),
-            data: (home) => ListView(
-              padding: const EdgeInsets.only(bottom: 28),
-              children: [
-                _HeroCarousel(products: home.hero),
-                const _TrustStrip(),
-                _CategoryStrip(categories: home.categories),
-                if (home.bestSellers.isNotEmpty)
-                  _ProductSection(
-                    title: copy.text('bestSellers'),
-                    products: home.bestSellers,
+            data: (home) {
+              final featuredIds = {
+                ...home.bestSellers.map((item) => item.id),
+                ...home.newArrivals.map((item) => item.id),
+              };
+              final feed = _catalog
+                  .where((item) => !featuredIds.contains(item.id))
+                  .toList(growable: false);
+              return CustomScrollView(
+                controller: _scroll,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _Promotions(
+                      categories: home.categories,
+                      stores: home.stores,
+                      heroProducts: home.hero,
+                    ),
                   ),
-                if (home.newArrivals.isNotEmpty)
-                  _ProductSection(
-                    title: copy.text('newArrivals'),
-                    products: home.newArrivals,
+                  const SliverToBoxAdapter(child: _TrustStrip()),
+                  SliverToBoxAdapter(
+                    child: _CategoryStrip(categories: home.categories),
                   ),
-                if (home.hero.any(
-                  (product) =>
-                      !home.bestSellers.any((item) => item.id == product.id) &&
-                      !home.newArrivals.any((item) => item.id == product.id),
-                ))
-                  _ProductSection(
-                    title: copy.text('exploreProducts'),
-                    products: home.hero
-                        .where(
-                          (product) =>
-                              !home.bestSellers.any(
-                                (item) => item.id == product.id,
-                              ) &&
-                              !home.newArrivals.any(
-                                (item) => item.id == product.id,
-                              ),
-                        )
-                        .toList(growable: false),
+                  if (home.bestSellers.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _ProductSection(
+                        title: copy.text('bestSellers'),
+                        products: home.bestSellers,
+                      ),
+                    ),
+                  if (home.newArrivals.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _ProductSection(
+                        title: copy.text('newArrivals'),
+                        products: home.newArrivals,
+                      ),
+                    ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Text(
+                        copy.text('exploreProducts'),
+                        style: const TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                   ),
-                const _SellerBanner(),
-              ],
-            ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    sliver: SliverGrid.builder(
+                      gridDelegate: productGridDelegate(
+                        MediaQuery.sizeOf(context).width,
+                      ),
+                      itemCount: feed.length,
+                      itemBuilder: (_, index) => ProductCard(feed[index]),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _loading
+                        ? const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(
+                              child: CircularProgressIndicator.adaptive(),
+                            ),
+                          )
+                        : _error != null
+                        ? Center(
+                            child: FilledButton(
+                              onPressed: _load,
+                              child: Text(copy.text('retry')),
+                            ),
+                          )
+                        : feed.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Center(
+                              child: Text(copy.text('emptyProducts')),
+                            ),
+                          )
+                        : const SizedBox(height: 16),
+                  ),
+                  const SliverToBoxAdapter(child: _SellerBanner()),
+                ],
+              );
+            },
           ),
     );
   }
 }
 
-class _HeroCarousel extends StatefulWidget {
-  const _HeroCarousel({required this.products});
-  final List<ProductSummary> products;
+class _Promotions extends StatelessWidget {
+  const _Promotions({
+    required this.categories,
+    required this.stores,
+    required this.heroProducts,
+  });
+  final List<CategoryNode> categories;
+  final List<HomeStorePromo> stores;
+  final List<ProductSummary> heroProducts;
+
   @override
-  State<_HeroCarousel> createState() => _HeroCarouselState();
+  Widget build(BuildContext context) {
+    const featured = ['women', 'men', 'jewelry', 'bags-shoes', 'kids'];
+    final selected = [
+      for (final slug in featured)
+        for (final category in categories)
+          if (category.id == slug) category,
+    ];
+    final productStore = heroProducts
+        .where((item) => item.storeSlug.isNotEmpty && item.storeName.isNotEmpty)
+        .firstOrNull;
+    if (selected.isEmpty && stores.isEmpty && productStore == null) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      height: 188,
+      child: ListView.separated(
+        key: const ValueKey('home-promotions'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        itemCount:
+            selected.length +
+            ((stores.isNotEmpty || productStore != null) ? 1 : 0),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          if (index == selected.length) {
+            final store = stores.firstOrNull;
+            return _PromoCard(
+              title: store?.name ?? productStore!.storeName,
+              icon: Icons.storefront_outlined,
+              onTap: () => context.push(
+                '/stores/${store?.slug ?? productStore!.storeSlug}',
+              ),
+              image: store?.logo ?? productStore?.image,
+            );
+          }
+          final category = selected[index];
+          return _PromoCard(
+            title: category.label,
+            icon: categoryIcon(category.iconKey),
+            onTap: () => context.go(
+              '/search?category=${Uri.encodeQueryComponent(category.id)}',
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _HeroCarouselState extends State<_HeroCarousel> {
-  final _controller = PageController();
-  Timer? _timer;
-  int _index = 0;
-  bool _touching = false;
-
-  void _schedule() {
-    _timer?.cancel();
-    if (_touching ||
-        MediaQuery.disableAnimationsOf(context) ||
-        widget.products.isEmpty) {
-      return;
-    }
-    _timer = Timer.periodic(const Duration(milliseconds: 7500), (_) {
-      if (!_controller.hasClients) return;
-      _controller.animateToPage(
-        (_index + 1) % (widget.products.length + 1),
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeOut,
-      );
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _schedule();
-  }
-
-  @override
-  void didUpdateWidget(covariant _HeroCarousel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.products.length != widget.products.length) _schedule();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
+class _PromoCard extends StatelessWidget {
+  const _PromoCard({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+    this.image,
+  });
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? image;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: (MediaQuery.sizeOf(context).width * .48).clamp(164.0, 220.0),
-    child: Listener(
-      onPointerDown: (_) {
-        _touching = true;
-        _timer?.cancel();
-      },
-      onPointerUp: (_) {
-        _touching = false;
-        _schedule();
-      },
-      onPointerCancel: (_) {
-        _touching = false;
-        _schedule();
-      },
-      child: PageView.builder(
-        controller: _controller,
-        onPageChanged: (index) => _index = index,
-        itemCount: widget.products.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return InkWell(
-              onTap: () => context.go('/search'),
-              child: Stack(
-                fit: StackFit.expand,
+    width: 238,
+    child: Material(
+      color: TodijoColors.forest,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: AlignmentDirectional.topStart,
+                  end: AlignmentDirectional.bottomEnd,
+                  colors: [TodijoColors.forest, Color(0xFF245E4B)],
+                ),
+              ),
+            ),
+            if (image != null)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Image.network(
+                  image!,
+                  width: 104,
+                  height: 140,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              )
+            else
+              PositionedDirectional(
+                end: 8,
+                top: 10,
+                child: Icon(icon, size: 88, color: const Color(0x44D5A514)),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset(
-                    'assets/images/hero-approved-v3-carton-logo-polished.png',
-                    fit: BoxFit.cover,
-                    alignment: AlignmentDirectional.centerEnd,
+                  const Text(
+                    'Todijo.',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      color: Color(0xFFD5A514),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: AlignmentDirectional.centerStart,
-                        end: AlignmentDirectional.centerEnd,
-                        colors: [
-                          Color(0xFFFDF9EF),
-                          Color(0xE6FDF9EF),
-                          Colors.transparent,
-                        ],
-                        stops: [0, .49, .86],
-                      ),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
                     ),
                   ),
                   Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 16),
-                      child: SizedBox(
-                        width: MediaQuery.sizeOf(context).width * .55,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              TodijoLocalizations.of(context).text('heroTitle'),
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: TodijoColors.forest,
-                                fontFamily: 'Georgia',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 20,
-                                height: 1.04,
-                              ),
-                            ),
-                            const SizedBox(height: 9),
-                            Text(
-                              TodijoLocalizations.of(context).text('heroText'),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                height: 1.25,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            FilledButton(
-                              onPressed: () => context.go('/search'),
-                              child: Text(
-                                TodijoLocalizations.of(context)
-                                    .text('exploreProducts'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Icon(
+                      Directionality.of(context) == TextDirection.rtl
+                          ? Icons.arrow_back
+                          : Icons.arrow_forward,
+                      color: const Color(0xFFD5A514),
                     ),
                   ),
                 ],
               ),
-            );
-          }
-          final item = widget.products[index - 1];
-          return InkWell(
-            onTap: () => context.push('/products/${item.id}'),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (item.image != null)
-                  Image.network(
-                    item.image!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const ColoredBox(
-                      color: TodijoColors.cream,
-                      child: Icon(Icons.image_not_supported_outlined),
-                    ),
-                  ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0xCC033B2D)],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: () => context.push('/products/${item.id}'),
-                        child: Text(
-                          TodijoLocalizations.of(context)
-                              .text('exploreProducts'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
-          );
-        },
+          ],
+        ),
       ),
     ),
   );
@@ -362,7 +424,7 @@ class _CategoryStrip extends StatelessWidget {
                   ),
                 ),
                 onPressed: () => context.go(
-                  '/search?category=${Uri.encodeQueryComponent(category.slug)}',
+                  '/search?category=${Uri.encodeQueryComponent(category.id)}',
                 ),
               );
             },
@@ -403,15 +465,12 @@ class _ProductSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 390,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: products.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) =>
-                SizedBox(width: 230, child: ProductCard(products[index])),
-          ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: productGridDelegate(MediaQuery.sizeOf(context).width),
+          itemCount: products.length,
+          itemBuilder: (context, index) => ProductCard(products[index]),
         ),
       ],
     ),

@@ -9,6 +9,9 @@ import '../application/buyer_state.dart';
 import '../domain/marketplace_models.dart';
 import 'product_card.dart';
 import 'category_icon.dart';
+import 'product_discovery_sections.dart';
+import 'product_reviews_screen.dart';
+import 'seller_contact_section.dart';
 
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
@@ -123,6 +126,30 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
+  static const _colorKeys = [
+    'black',
+    'white',
+    'gray',
+    'red',
+    'blue',
+    'green',
+    'yellow',
+    'orange',
+    'pink',
+    'purple',
+    'brown',
+    'beige',
+    'navy',
+    'burgundy',
+    'olive',
+    'turquoise',
+    'cyan',
+    'gold',
+    'silver',
+    'cream',
+    'rose',
+    'multicolor',
+  ];
   final _scroll = ScrollController();
   late final TextEditingController _query = TextEditingController(
     text: widget.initialQuery,
@@ -131,6 +158,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _sort = 'newest';
   String? _category;
   String? _condition;
+  String? _color;
+  String? _rating;
+  String? _categoryLabel;
   String? _minPrice;
   String? _maxPrice;
   bool _inStock = false;
@@ -182,6 +212,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             query: _query.text.trim(),
             category: _category,
             condition: _condition,
+            color: _color,
+            rating: _rating,
             minPrice: _minPrice,
             maxPrice: _maxPrice,
             country: preferences.country,
@@ -191,7 +223,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           );
       if (!mounted || generation != _generation) return;
       setState(() {
-        _products.addAll(page.products);
+        final unique = appendUniqueProducts(_products, page.products);
+        _products
+          ..clear()
+          ..addAll(unique);
         _offset = page.nextOffset;
         _hasMore = page.hasMore;
       });
@@ -214,17 +249,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
     if (!mounted) return;
     final choices = <String, String>{};
+    final currentLeafLabels = <String, String>{};
     for (final category in categories) {
-      choices[category.slug] = category.label;
+      choices[category.id] = category.label;
       for (final group in category.groups) {
         for (final leaf in group.children) {
-          choices[leaf.id] = leaf.label;
+          if (leaf.id == _category) currentLeafLabels[leaf.id] = leaf.label;
         }
       }
     }
     var draftSort = _sort;
-    var draftCategory = choices.containsKey(_category) ? _category : null;
+    var draftCategory = _category;
     var draftCondition = _condition;
+    var draftColor = _color;
+    var draftRating = _rating;
     var draftStock = _inStock;
     var draftMinPrice = _minPrice ?? '';
     var draftMaxPrice = _maxPrice ?? '';
@@ -295,6 +333,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                      for (final leaf in currentLeafLabels.entries)
+                        DropdownMenuItem(
+                          value: leaf.key,
+                          child: Text(
+                            leaf.value,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                     ],
                     onChanged: (value) => update(() => draftCategory = value),
                   ),
@@ -323,6 +369,39 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                   ],
                   onChanged: (value) => update(() => draftCondition = value),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('color:$draftColor'),
+                  initialValue: draftColor ?? '',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: copy.text('productColor'),
+                  ),
+                  items: [
+                    DropdownMenuItem(value: '', child: Text(copy.text('all'))),
+                    for (final color in _colorKeys)
+                      DropdownMenuItem(
+                        value: color,
+                        child: Text(copy.text('filterColor.$color')),
+                      ),
+                  ],
+                  onChanged: (value) => update(() => draftColor = value),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('rating:$draftRating'),
+                  initialValue: draftRating ?? '',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: copy.text('filterReviews'),
+                  ),
+                  items: [
+                    DropdownMenuItem(value: '', child: Text(copy.text('all'))),
+                    const DropdownMenuItem(value: '4', child: Text('4★+')),
+                    const DropdownMenuItem(value: '3', child: Text('3★+')),
+                  ],
+                  onChanged: (value) => update(() => draftRating = value),
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -373,6 +452,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         draftSort = 'newest';
                         draftCategory = '';
                         draftCondition = '';
+                        draftColor = '';
+                        draftRating = '';
                         draftStock = false;
                         draftMinPrice = '';
                         draftMaxPrice = '';
@@ -398,6 +479,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _sort = draftSort;
       _category = draftCategory == '' ? null : draftCategory;
       _condition = draftCondition == '' ? null : draftCondition;
+      _color = draftColor == '' ? null : draftColor;
+      _rating = draftRating == '' ? null : draftRating;
+      _categoryLabel = _category == null
+          ? null
+          : (choices[_category] ?? currentLeafLabels[_category]);
       _inStock = draftStock;
       _minPrice = draftMinPrice.trim().isEmpty
           ? null
@@ -520,9 +606,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       Padding(
                         padding: const EdgeInsets.only(left: 8),
                         child: InputChip(
-                          label: Text(_category!),
+                          label: Text(_categoryLabel ?? _category!),
                           onDeleted: () {
                             _category = null;
+                            _categoryLabel = null;
                             _load(reset: true);
                           },
                         ),
@@ -530,7 +617,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ],
                 ),
               ),
-              if (_condition != null || _minPrice != null || _maxPrice != null)
+              if (_condition != null ||
+                  _color != null ||
+                  _rating != null ||
+                  _minPrice != null ||
+                  _maxPrice != null)
                 Wrap(
                   spacing: 8,
                   children: [
@@ -547,6 +638,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         ),
                         onDeleted: () {
                           _condition = null;
+                          _load(reset: true);
+                        },
+                      ),
+                    if (_color != null)
+                      InputChip(
+                        label: Text(
+                          '${TodijoLocalizations.of(context).text('productColor')}: ${TodijoLocalizations.of(context).text('filterColor.$_color')}',
+                        ),
+                        onDeleted: () {
+                          _color = null;
+                          _load(reset: true);
+                        },
+                      ),
+                    if (_rating != null)
+                      InputChip(
+                        label: Text(
+                          '${TodijoLocalizations.of(context).text('filterReviews')}: $_rating★+',
+                        ),
+                        onDeleted: () {
+                          _rating = null;
                           _load(reset: true);
                         },
                       ),
@@ -595,12 +706,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         SliverPadding(
           padding: const EdgeInsets.all(12),
           sliver: SliverGrid.builder(
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 230,
-              childAspectRatio: .52,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
+            gridDelegate: productGridDelegate(MediaQuery.sizeOf(context).width),
             itemCount: _products.length,
             itemBuilder: (_, index) => ProductCard(_products[index]),
           ),
@@ -626,12 +732,86 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
+  static const _translatedColors = {
+    'black',
+    'white',
+    'gray',
+    'red',
+    'blue',
+    'green',
+    'yellow',
+    'orange',
+    'pink',
+    'purple',
+    'brown',
+    'beige',
+    'navy',
+    'burgundy',
+    'olive',
+    'turquoise',
+    'cyan',
+    'gold',
+    'silver',
+    'cream',
+    'rose',
+    'multicolor',
+  };
+
+  String _optionLabel(String name, String value) {
+    if (name.trim().toLowerCase() == 'color') {
+      final parts = value.trim().toLowerCase().split(RegExp(r'\s+(?:and\s+)?'));
+      if (parts.isNotEmpty && parts.every(_translatedColors.contains)) {
+        final copy = TodijoLocalizations.of(context);
+        return parts.map((part) => copy.text('filterColor.$part')).join(' + ');
+      }
+    }
+    return value;
+  }
+
   final Map<String, String> _selected = {};
   String? _selectedColor, _selectedSize;
   int _quantity = 1;
   AuthoritativePrice? _quote;
   bool _pricing = false;
   String? _pricingError;
+  String? _presentment;
+  String? _presentmentKey;
+  bool _loadingPresentment = false;
+  bool _presentmentFailed = false;
+
+  Future<void> _loadPresentment(
+    ProductDetail product,
+    ProductVariant? variant,
+    String currency,
+    String key,
+  ) async {
+    setState(() {
+      _loadingPresentment = true;
+      _presentmentFailed = false;
+      _presentment = null;
+    });
+    try {
+      final price = await ref
+          .read(marketplaceRepositoryProvider)
+          .marketplacePresentment(
+            productId: product.id,
+            variantId: variant?.id,
+            buyerCurrency: currency,
+          );
+      if (mounted && _presentmentKey == key) {
+        setState(() => _presentment = price);
+      }
+    } catch (_) {
+      if (mounted && _presentmentKey == key) {
+        setState(() => _presentmentFailed = true);
+      }
+    } finally {
+      if (mounted && _presentmentKey == key) {
+        setState(() => _loadingPresentment = false);
+      }
+    }
+  }
+
   Future<void> _price(ProductDetail product, ProductVariant variant) async {
     setState(() {
       _pricing = true;
@@ -655,8 +835,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       if (mounted) {
         setState(
           () =>
-              _pricingError = TodijoLocalizations.of(context)
-                  .text('priceUnavailable'),
+              _pricingError = TodijoLocalizations.of(context).text('loadError'),
         );
       }
     } finally {
@@ -668,7 +847,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Todijo'),
-      leading: BackButton(onPressed: context.pop),
+      leading: BackButton(
+        onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+      ),
+      actions: [
+        IconButton(
+          tooltip: TodijoLocalizations.of(context).text('cart'),
+          onPressed: () => context.go('/cart'),
+          icon: const Icon(Icons.shopping_cart_outlined),
+        ),
+      ],
     ),
     body: ref
         .watch(productProvider(widget.productId))
@@ -691,11 +879,27 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 break;
               }
             }
-            final effectivePrice =
-                _quote?.unitPrice ?? variant?.price ?? product.minimumPrice;
-            final effectiveCurrency = _quote?.currency.isNotEmpty == true
-                ? _quote!.currency
-                : product.currency;
+            final market = ref.watch(buyerPreferencesProvider).value;
+            if (!product.requiresAuthoritativePrice &&
+                market != null &&
+                (product.options.isEmpty || variant != null)) {
+              final key =
+                  '${product.id}:${variant?.id ?? ''}:${market.currency}';
+              if (_presentmentKey != key) {
+                _presentmentKey = key;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _loadPresentment(product, variant, market.currency, key);
+                  }
+                });
+              }
+            }
+            final effectivePrice = product.requiresAuthoritativePrice
+                ? _quote?.unitPrice
+                : _presentment;
+            final effectiveCurrency = product.requiresAuthoritativePrice
+                ? (_quote?.currency ?? market?.currency ?? product.currency)
+                : (market?.currency ?? product.currency);
             final canAdd =
                 product.available &&
                 effectivePrice != null &&
@@ -710,7 +914,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               padding: const EdgeInsets.only(bottom: 30),
               children: [
                 SizedBox(
-                  height: 360,
+                  height: (MediaQuery.sizeOf(context).width * .92).clamp(
+                    260.0,
+                    420.0,
+                  ),
                   child: PageView(
                     children: product.images.isEmpty
                         ? [
@@ -721,7 +928,17 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           ]
                         : [
                             for (final image in product.images)
-                              Image.network(image, fit: BoxFit.cover),
+                              ColoredBox(
+                                color: TodijoColors.cream,
+                                child: Image.network(
+                                  image,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, _, _) => const Icon(
+                                    Icons.image_outlined,
+                                    size: 72,
+                                  ),
+                                ),
+                              ),
                           ],
                   ),
                 ),
@@ -730,12 +947,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        product.storeName.toUpperCase(),
-                        style: const TextStyle(
-                          color: TodijoColors.goldDark,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      TextButton(
+                        onPressed: product.storeSlug.isEmpty
+                            ? null
+                            : () =>
+                                  context.push('/stores/${product.storeSlug}'),
+                        child: Text(product.storeName),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -747,10 +964,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        product.requiresAuthoritativePrice && _quote == null
+                        effectivePrice == null
                             ? TodijoLocalizations.of(context)
                                   .text('priceByDestination')
-                            : '${effectivePrice ?? '—'} $effectiveCurrency',
+                            : '$effectivePrice $effectiveCurrency',
                         style: const TextStyle(
                           fontSize: 25,
                           color: TodijoColors.forest,
@@ -765,6 +982,32 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         Text(
                           _pricingError!,
                           style: const TextStyle(color: TodijoColors.danger),
+                        ),
+                      if (_quote?.eligible == false)
+                        Text(
+                          TodijoLocalizations.of(context)
+                              .text('priceUnavailable'),
+                          style: const TextStyle(color: TodijoColors.danger),
+                        ),
+                      if (_loadingPresentment) const LinearProgressIndicator(),
+                      if (_presentmentFailed)
+                        TextButton.icon(
+                          onPressed: () {
+                            if (market == null) return;
+                            final key = _presentmentKey;
+                            if (key != null) {
+                              _loadPresentment(
+                                product,
+                                variant,
+                                market.currency,
+                                key,
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: Text(
+                            TodijoLocalizations.of(context).text('retry'),
+                          ),
                         ),
                       const SizedBox(height: 8),
                       Text(
@@ -802,11 +1045,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           children: [
                             for (final value in option.values)
                               ChoiceChip(
-                                label: Text(value.value),
+                                label: Text(
+                                  _optionLabel(option.name, value.value),
+                                ),
                                 selected: _selected[option.id] == value.id,
                                 onSelected: (_) => setState(() {
                                   _selected[option.id] = value.id;
                                   _quote = null;
+                                  _pricingError = null;
+                                  _presentment = null;
+                                  _presentmentKey = null;
                                 }),
                               ),
                           ],
@@ -823,7 +1071,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           children: [
                             for (final color in product.colors)
                               ChoiceChip(
-                                label: Text(color),
+                                label: Text(_optionLabel('color', color)),
                                 selected: _selectedColor == color,
                                 onSelected: (_) =>
                                     setState(() => _selectedColor = color),
@@ -867,6 +1115,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                 ? () => setState(() {
                                     _quantity--;
                                     _quote = null;
+                                    _pricingError = null;
                                   })
                                 : null,
                             icon: const Icon(Icons.remove),
@@ -879,13 +1128,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                             onPressed: () => setState(() {
                               _quantity++;
                               _quote = null;
+                              _pricingError = null;
                             }),
                             icon: const Icon(Icons.add),
                           ),
                         ],
                       ),
                       const SizedBox(height: 18),
-                      if (product.requiresAuthoritativePrice && _quote == null)
+                      if (product.requiresAuthoritativePrice &&
+                          _quote?.eligible != true)
                         FilledButton.icon(
                           onPressed: variant == null || _pricing
                               ? null
@@ -951,8 +1202,48 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(product.description),
+                      const Divider(height: 44),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              TodijoLocalizations.of(context)
+                                  .text('sellerReviews'),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          if (product.reviewCount > 0)
+                            Text(
+                              '${product.averageRating?.toStringAsFixed(1) ?? '—'} ★ · ${product.reviewCount}',
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (product.reviewPreview.isEmpty)
+                        Text(
+                          TodijoLocalizations.of(context).text('emptyReviews'),
+                        ),
+                      for (final review in product.reviewPreview.take(3))
+                        ProductReviewCard(review),
+                      if (product.reviewCount > 0)
+                        TextButton(
+                          onPressed: () =>
+                              context.push('/products/${product.id}/reviews'),
+                          child: Text(
+                            TodijoLocalizations.of(context).text('viewAll'),
+                          ),
+                        ),
                     ],
                   ),
+                ),
+                if (product.canAskSeller)
+                  SellerContactSection(productId: product.id),
+                ProductDiscoverySections(
+                  productId: product.id,
+                  category: product.category,
                 ),
               ],
             );
@@ -1168,53 +1459,140 @@ class StoresScreen extends ConsumerWidget {
       );
 }
 
-class StoreDetailScreen extends ConsumerWidget {
+class StoreDetailScreen extends ConsumerStatefulWidget {
   const StoreDetailScreen(this.slug, {super.key});
   final String slug;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+  ConsumerState<StoreDetailScreen> createState() => _StoreDetailScreenState();
+}
+
+class _StoreDetailScreenState extends ConsumerState<StoreDetailScreen> {
+  final _scroll = ScrollController();
+  final List<ProductSummary> _products = [];
+  StoreSummary? _store;
+  bool _loading = false;
+  bool _hasMore = true;
+  int _offset = 0;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      if (_scroll.hasClients && _scroll.position.extentAfter < 500) _load();
+    });
+    Future.microtask(_load);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (_loading || !_hasMore) return;
+    final offset = _offset;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final preferences = await ref.read(buyerPreferencesProvider.future);
+      final page = await ref
+          .read(marketplaceRepositoryProvider)
+          .store(widget.slug, preferences.locale, offset: offset);
+      if (!mounted) return;
+      setState(() {
+        _store = page.store;
+        final unique = appendUniqueProducts(_products, page.products);
+        _products
+          ..clear()
+          ..addAll(unique);
+        _offset = page.nextOffset;
+        _hasMore = page.hasMore && page.nextOffset > offset;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      leading: BackButton(onPressed: context.pop),
+      leading: BackButton(
+        onPressed: () =>
+            context.canPop() ? context.pop() : context.go('/stores'),
+      ),
       title: Text(TodijoLocalizations.of(context).text('stores')),
     ),
-    body: ref
-        .watch(storeProvider(slug))
-        .when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator.adaptive()),
-          error: (_, _) => Center(
+    body: _store == null && _loading
+        ? const Center(child: CircularProgressIndicator.adaptive())
+        : _store == null
+        ? Center(
             child: FilledButton(
-              onPressed: () => ref.invalidate(storeProvider(slug)),
+              onPressed: _load,
               child: Text(TodijoLocalizations.of(context).text('retry')),
             ),
-          ),
-          data: (data) => CustomScrollView(
+          )
+        : CustomScrollView(
+            controller: _scroll,
             slivers: [
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (data.store.banner != null)
+                    if (_store!.banner != null)
                       Image.network(
-                        data.store.banner!,
+                        _store!.banner!,
                         height: 180,
                         fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
                       ),
                     Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (_store!.logo != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: ClipOval(
+                                child: Image.network(
+                                  _store!.logo!,
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => const SizedBox(
+                                    width: 56,
+                                    height: 56,
+                                    child: Icon(Icons.storefront_outlined),
+                                  ),
+                                ),
+                              ),
+                            ),
                           Text(
-                            data.store.name,
+                            _store!.name,
                             style: const TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          Text('${data.store.city}, ${data.store.country}'),
-                          if (data.store.description != null)
-                            Text(data.store.description!),
+                          if (_store!.city.isNotEmpty ||
+                              _store!.country.isNotEmpty)
+                            Text(
+                              [
+                                _store!.city,
+                                _store!.country,
+                              ].where((part) => part.isNotEmpty).join(', '),
+                            ),
+                          Text(
+                            '${_store!.productCount} ${TodijoLocalizations.of(context).text('products')}',
+                          ),
+                          if (_store!.description != null)
+                            Text(_store!.description!),
                         ],
                       ),
                     ),
@@ -1224,19 +1602,40 @@ class StoreDetailScreen extends ConsumerWidget {
               SliverPadding(
                 padding: const EdgeInsets.all(12),
                 sliver: SliverGrid.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 230,
-                    childAspectRatio: .52,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
+                  gridDelegate: productGridDelegate(
+                    MediaQuery.sizeOf(context).width,
                   ),
-                  itemCount: data.products.length,
-                  itemBuilder: (_, index) => ProductCard(data.products[index]),
+                  itemCount: _products.length,
+                  itemBuilder: (_, index) => ProductCard(_products[index]),
                 ),
+              ),
+              SliverToBoxAdapter(
+                child: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Center(
+                          child: CircularProgressIndicator.adaptive(),
+                        ),
+                      )
+                    : _error != null
+                    ? Center(
+                        child: FilledButton(
+                          onPressed: _load,
+                          child: Text(
+                            TodijoLocalizations.of(context).text('retry'),
+                          ),
+                        ),
+                      )
+                    : _products.isEmpty
+                    ? Center(
+                        child: Text(
+                          TodijoLocalizations.of(context).text('emptyProducts'),
+                        ),
+                      )
+                    : const SizedBox(height: 24),
               ),
             ],
           ),
-        ),
   );
 }
 
@@ -1332,47 +1731,13 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(copy.text('settings')),
-        leading: BackButton(onPressed: context.pop),
+        leading: BackButton(
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: value.locale,
-            decoration: InputDecoration(labelText: copy.text('language')),
-            items:
-                const [
-                      'en',
-                      'fr',
-                      'ar',
-                      'ku',
-                      'tr',
-                      'de',
-                      'es',
-                      'it',
-                      'nl',
-                      'zh',
-                      'fa',
-                      'hi',
-                      'pt',
-                      'ru',
-                    ]
-                    .map(
-                      (code) => DropdownMenuItem(
-                        value: code,
-                        child: Text(code.toUpperCase()),
-                      ),
-                    )
-                    .toList(),
-            onChanged: (next) {
-              if (next != null) {
-                ref
-                    .read(buyerPreferencesProvider.notifier)
-                    .setPreferences(locale: next);
-              }
-            },
-          ),
-          const SizedBox(height: 16),
           TodijoCountryPicker(
             value: value.country,
             label: copy.text('marketplaceCountry'),
@@ -1381,21 +1746,6 @@ class SettingsScreen extends ConsumerWidget {
                 ref
                     .read(buyerPreferencesProvider.notifier)
                     .setPreferences(country: next);
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: value.currency,
-            decoration: InputDecoration(labelText: copy.text('currencyLabel')),
-            items: const ['EUR', 'USD', 'GBP', 'TRY', 'CAD']
-                .map((code) => DropdownMenuItem(value: code, child: Text(code)))
-                .toList(),
-            onChanged: (next) {
-              if (next != null) {
-                ref
-                    .read(buyerPreferencesProvider.notifier)
-                    .setPreferences(currency: next);
               }
             },
           ),

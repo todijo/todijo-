@@ -21,7 +21,7 @@ test("footer links use normal full-page navigation while Todijo News stays local
 
 test("product recommendations are bounded, category-aware, deduplicated and reuse marketplace cards",()=>{
   const page=read("app/product/[id]/page.tsx");
-  assert.match(page,/startsWith:`\$\{mainCategory\}--`/);assert.match(page,/take:8/);assert.match(page,/take:32/);assert.match(page,/slice\(0,12\)/);assert.match(page,/similarIds=new Set/);
+  assert.match(page,/startsWith:`\$\{mainCategory\}--`/);assert.match(page,/take:24/);assert.match(page,/take:64/);assert.match(page,/slice\(0,20\)/);assert.match(page,/similarIds=new Set/);
   assert.equal((page.match(/<MarketplaceProductCard/g)??[]).length,2);assert.match(page,/recommendationText\.similar/);assert.match(page,/recommendationText\.also/);
   assert.ok(page.indexOf("productLowerActions")<page.indexOf("buyerProtection"));
 });

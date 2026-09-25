@@ -37,7 +37,20 @@ class CategoryImage extends StatelessWidget {
     final fallback = ColoredBox(
       color: TodijoColors.cream,
       child: Center(
-        child: Icon(categoryIcon(iconKey), color: TodijoColors.forest),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFF7E5),
+            shape: BoxShape.circle,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Icon(
+              categoryIcon(iconKey),
+              color: TodijoColors.forest,
+              size: 30,
+            ),
+          ),
+        ),
       ),
     );
     if (url.isEmpty) return fallback;

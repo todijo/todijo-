@@ -41,6 +41,7 @@ const selectors = {
   maxPrice: ["root", "Marketplace.max"],
   sort: ["root", "Marketplace.sort"],
   condition: ["root", "Marketplace.condition"],
+  filterReviews: ["dashboard", "nav.reviews"],
   results: ["root", "Marketplace.results"],
   cartTitle: ["root", "Cart.title"],
   emptyCart: ["root", "Cart.empty"],
@@ -211,6 +212,38 @@ const nativeCopy = {
   hi: {news: "समाचार", retry: "फिर कोशिश करें", loadError: "लोड नहीं हो सका", priceByDestination: "अंतिम मूल्य गंतव्य पर निर्भर है", chooseOptions: "विकल्प चुनें", addToCart: "कार्ट में जोड़ें"},
   pt: {news: "Notícias", retry: "Tentar novamente", loadError: "Não foi possível carregar", priceByDestination: "Preço final conforme o destino", chooseOptions: "Escolher opções", addToCart: "Adicionar ao carrinho"},
   ru: {news: "Новости", retry: "Повторить", loadError: "Не удалось загрузить", priceByDestination: "Итоговая цена зависит от пункта доставки", chooseOptions: "Выбрать варианты", addToCart: "Добавить в корзину"},
+};
+const nativeDiscoveryCopy = {
+  en: ["Similar products", "More to discover", "No reviews yet"],
+  fr: ["Produits similaires", "À découvrir", "Aucun avis pour le moment"],
+  ar: ["منتجات مشابهة", "اكتشف المزيد", "لا توجد تقييمات بعد"],
+  ku: ["کاڵای هاوشێوە", "زیاتر بدۆزەوە", "هێشتا هەڵسەنگاندن نییە"],
+  tr: ["Benzer ürünler", "Daha fazlasını keşfet", "Henüz yorum yok"],
+  de: ["Ähnliche Produkte", "Mehr entdecken", "Noch keine Bewertungen"],
+  es: ["Productos similares", "Descubre más", "Aún no hay reseñas"],
+  it: ["Prodotti simili", "Scopri di più", "Ancora nessuna recensione"],
+  nl: ["Vergelijkbare producten", "Meer ontdekken", "Nog geen beoordelingen"],
+  zh: ["相似商品", "发现更多", "暂无评价"],
+  fa: ["محصولات مشابه", "بیشتر ببینید", "هنوز نظری ثبت نشده است"],
+  hi: ["मिलते-जुलते उत्पाद", "और खोजें", "अभी कोई समीक्षा नहीं"],
+  pt: ["Produtos semelhantes", "Descubra mais", "Ainda não há avaliações"],
+  ru: ["Похожие товары", "Узнать больше", "Пока нет отзывов"],
+};
+const nativeContactCopy = {
+  en: ["Contact the seller", "Ask a question before buying", "Your email stays private. The conversation takes place on Todijo.", "Send message", "Hello, is this item still available?", "The message could not be sent."],
+  fr: ["Contacter le vendeur", "Poser une question avant l’achat", "Votre adresse e-mail reste privée. La conversation se déroule sur Todijo.", "Envoyer le message", "Bonjour, cet article est-il toujours disponible ?", "Le message n’a pas pu être envoyé."],
+  ar: ["تواصل مع البائع", "اسأل قبل الشراء", "يبقى بريدك الإلكتروني خاصًا وتتم المحادثة على Todijo.", "إرسال الرسالة", "مرحبًا، هل هذا المنتج ما زال متوفرًا؟", "تعذر إرسال الرسالة."],
+  ku: ["پەیوەندی بە فرۆشیارەوە بکە", "پێش کڕین پرسیار بکە", "ئیمەیڵەکەت تایبەت دەمێنێتەوە و گفتوگۆکە لە Todijo دەبێت.", "پەیام بنێرە", "سڵاو، ئەم کاڵایە هێشتا بەردەستە؟", "ناردنی پەیام سەرکەوتوو نەبوو."],
+  tr: ["Satıcıyla iletişime geç", "Satın almadan önce soru sor", "E-posta adresiniz gizli kalır. Görüşme Todijo'da gerçekleşir.", "Mesaj gönder", "Merhaba, bu ürün hâlâ mevcut mu?", "Mesaj gönderilemedi."],
+  de: ["Verkäufer kontaktieren", "Vor dem Kauf eine Frage stellen", "Ihre E-Mail-Adresse bleibt privat. Das Gespräch findet auf Todijo statt.", "Nachricht senden", "Hallo, ist dieser Artikel noch verfügbar?", "Die Nachricht konnte nicht gesendet werden."],
+  es: ["Contactar al vendedor", "Preguntar antes de comprar", "Tu correo permanece privado. La conversación tiene lugar en Todijo.", "Enviar mensaje", "Hola, ¿sigue disponible este artículo?", "No se pudo enviar el mensaje."],
+  it: ["Contatta il venditore", "Fai una domanda prima dell'acquisto", "La tua email resta privata. La conversazione avviene su Todijo.", "Invia messaggio", "Salve, questo articolo è ancora disponibile?", "Impossibile inviare il messaggio."],
+  nl: ["Contacteer de verkoper", "Stel een vraag vóór aankoop", "Je e-mailadres blijft privé. Het gesprek vindt plaats op Todijo.", "Bericht verzenden", "Hallo, is dit artikel nog beschikbaar?", "Het bericht kon niet worden verzonden."],
+  zh: ["联系卖家", "购买前提问", "您的邮箱保持私密。对话在 Todijo 上进行。", "发送消息", "您好，这件商品还有货吗？", "消息发送失败。"],
+  fa: ["تماس با فروشنده", "پیش از خرید سؤال بپرسید", "ایمیل شما خصوصی می‌ماند. گفتگو در Todijo انجام می‌شود.", "ارسال پیام", "سلام، آیا این کالا هنوز موجود است؟", "پیام ارسال نشد."],
+  hi: ["विक्रेता से संपर्क करें", "खरीदने से पहले सवाल पूछें", "आपका ईमेल निजी रहता है। बातचीत Todijo पर होती है।", "संदेश भेजें", "नमस्ते, क्या यह उत्पाद अभी उपलब्ध है?", "संदेश नहीं भेजा जा सका।"],
+  pt: ["Contactar o vendedor", "Perguntar antes de comprar", "O seu e-mail permanece privado. A conversa decorre no Todijo.", "Enviar mensagem", "Olá, este artigo ainda está disponível?", "Não foi possível enviar a mensagem."],
+  ru: ["Связаться с продавцом", "Задать вопрос перед покупкой", "Ваш адрес электронной почты остаётся закрытым. Общение проходит на Todijo.", "Отправить сообщение", "Здравствуйте, этот товар ещё доступен?", "Не удалось отправить сообщение."],
 };
 const nativeExtraCopy = {
   en: {emptyAddresses: "No addresses yet", addAddress: "Add address", editAddress: "Edit address", emptyConversations: "No conversations", yourMessage: "Your message", recipientName: "Recipient", addressLine2: "Address details", region: "Region"},
@@ -494,6 +527,12 @@ const shippingSource = readFileSync(resolve(root, "lib/shipping-countries.ts"), 
 const shippingMatch = shippingSource.match(/"([A-Z ]+)"\.split\(" "\)/);
 if (!shippingMatch) throw new Error("Canonical Todijo shipping countries not found");
 const shippingCountries = shippingMatch[1].split(" ");
+const categoryTaxonomy = readFileSync(resolve(root, "lib/desktop-category-taxonomy.ts"), "utf8");
+const categoryFilterLabels = Object.fromEntries(
+  [...categoryTaxonomy.matchAll(/\{id:"([^"]+)",slug:"([^"]+)",label:"([^"]+)"/g)]
+    .flatMap(([, id, slug, label]) => [[id, label], [slug, label]]),
+);
+if (Object.keys(categoryFilterLabels).length < 10) throw new Error("Canonical category filters not found");
 const dropshippingSource = readFileSync(resolve(root, "i18n/dropshipping-access.ts"), "utf8");
 const dropshippingCopy = Object.fromEntries(dropshippingSource.split(/\r?\n/).flatMap(line => {
   const locale = line.startsWith("const en=") ? "en" : line.match(/^(?:en,)?([a-z]{2}):\{/)?.[1];
@@ -541,6 +580,11 @@ for (const locale of locales) {
     if (typeof resolved !== "string" || !resolved.trim()) throw new Error(`${locale}:${key} missing at ${source}:${path}`);
     copy[locale][key] = resolved;
   }
+  const responsiveColorCopy = sources.control.variantColors ?? JSON.parse(readFileSync(resolve(root, "messages/seller-control/en.json"), "utf8")).variantColors;
+  for (const [key, value] of Object.entries(responsiveColorCopy)) {
+    if (typeof value !== "string" || !value.trim()) throw new Error(`${locale}:variantColors.${key} missing`);
+    copy[locale][`filterColor.${key}`] = value;
+  }
   for (const status of ["PENDING", "PAID", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"]) {
     copy[locale][`orderStatus.${status}`] = pick(sources.orders, `status.${status}`);
   }
@@ -568,6 +612,8 @@ for (const locale of locales) {
     pt: 'Encaminhado', ru: 'Передано на рассмотрение',
   })[locale];
   Object.assign(copy[locale], nativeCopy[locale]);
+  [copy[locale].similarProducts, copy[locale].discoverMore, copy[locale].emptyReviews] = nativeDiscoveryCopy[locale];
+  [copy[locale].contactSeller, copy[locale].askSeller, copy[locale].privateConversation, copy[locale].sendMessage, copy[locale].defaultSellerQuestion, copy[locale].sellerMessageError] = nativeContactCopy[locale];
   Object.assign(copy[locale], nativeExtraCopy[locale]);
   copy[locale].productColor = nativeVariantLabels[locale][0];
   copy[locale].productSize = nativeVariantLabels[locale][1];
@@ -968,5 +1014,6 @@ for (const locale of locales) {
     copy[locale][`loyaltyAccounting.${key}`] = value;
   }
 }
-const dart = `// Generated from the responsive Todijo locale catalogs and shipping-countries.ts. Do not edit.\nconst generatedTodijoCopy = ${JSON.stringify(copy, null, 2).replaceAll("\\u2028", " ").replaceAll("\\u2029", " ")};\nconst generatedShippingCountries = ${JSON.stringify(shippingCountries)};\nconst generatedCountryNames = ${JSON.stringify(countryNames, null, 2).replaceAll("\\u2028", " ").replaceAll("\\u2029", " ")};\n`;
+let dart = `// Generated from the responsive Todijo locale catalogs and shipping-countries.ts. Do not edit.\nconst generatedTodijoCopy = ${JSON.stringify(copy, null, 2).replaceAll("\\u2028", " ").replaceAll("\\u2029", " ")};\nconst generatedShippingCountries = ${JSON.stringify(shippingCountries)};\nconst generatedCountryNames = ${JSON.stringify(countryNames, null, 2).replaceAll("\\u2028", " ").replaceAll("\\u2029", " ")};\n`;
+dart += "const generatedCategoryFilterLabels = " + JSON.stringify(categoryFilterLabels, null, 2) + ";\n";
 writeFileSync(resolve(import.meta.dirname, "../lib/src/core/localization/generated_copy.dart"), dart);

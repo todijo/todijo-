@@ -21,6 +21,11 @@ const todijoLocaleCodes = [
 ];
 const todijoRtlLocaleCodes = {'ar', 'fa', 'ku'};
 
+/// The production catalog filter accepts canonical French category labels,
+/// while taxonomy IDs and localized display labels are separate concerns.
+String canonicalCategoryFilter(String value) =>
+    generatedCategoryFilterLabels[value] ?? value;
+
 final class TodijoLocalizations {
   const TodijoLocalizations(this.locale);
   final Locale locale;

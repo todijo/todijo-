@@ -19,6 +19,7 @@ import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
 import {productPath} from "@/lib/product-seo";
 import PremiumHeroSlider from "@/components/PremiumHeroSlider";
 import { localizedCategoryTreeValue } from "@/lib/category-tree-localization";
+import { categorySearchHref, DESKTOP_CATEGORY_TAXONOMY } from "@/lib/desktop-category-taxonomy";
 import { selectDistinctHeroProducts, shouldShowHomepageStores } from "@/lib/homepage-merchandising";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
@@ -76,6 +77,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const h = useTranslations("HomeHeader");
   const d = useTranslations("HomeDiscovery");
   const dashboard = useTranslations("Dashboard");
+  const categoryTitle = useTranslations("CategoryNavigation");
   const productText = useTranslations("Product");
   const categoryText = useTranslations("Categories");
   const displayCategory = (value: string) => localizedCategoryTreeValue(activeLocale, value) ?? categoryLabel(value, (key) => categoryText(key));
@@ -92,6 +94,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const featuredRailIds = useMemo(() => new Set([...distinctBestSellers, ...distinctNewArrivals.slice(0,10)].map((product) => product.id)), [distinctBestSellers, distinctNewArrivals]);
   const distinctVisibleProducts = useMemo(() => resultsOnly ? visibleProducts : visibleProducts.filter((product) => !featuredRailIds.has(product.id)), [featuredRailIds, resultsOnly, visibleProducts]);
   const featuredCategories = categories.slice(0, 4);
+  const heroStore = heroProducts.find((product) => product.storeSlug && product.storeName);
+  const promotionalStore = stores[0] ?? (heroStore ? { name: heroStore.storeName, slug: heroStore.storeSlug } : null);
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 860px)").matches;
     setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
@@ -164,6 +168,11 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
         </PremiumHeroSlider>
         <div className="mobileHeroBrandMessages"><span>{h("heroBagMessage")}</span><span>{h("heroPedestalMessage")}</span></div>
       </div></section>
+
+      <nav className="container homepageCategoryPromoRail" aria-label={h("discoverCategories")}>
+        {(["women", "men", "jewelry", "bags-shoes", "kids"] as const).map((id) => {const category=DESKTOP_CATEGORY_TAXONOMY.find((item)=>item.id===id)!;return <a key={id} href={categorySearchHref(activeLocale, category.label)}><SemanticCategoryIcon category={id} size={30}/><span>{categoryTitle(id)}</span><ArrowRight size={16} aria-hidden="true"/></a>;})}
+        {promotionalStore && <a href={`/${activeLocale}/store/${promotionalStore.slug}`}><Store size={30} aria-hidden="true"/><span>{promotionalStore.name}</span><ArrowRight size={16} aria-hidden="true"/></a>}
+      </nav>
 
       <section className="container todijoTrust todijoTrustPrimary" aria-labelledby="todijo-trust-title"><div className="todijoTrustGrid">{[
         ["/images/homepage/trust-payment-photo.webp","secure",LockKeyhole,d("secureTitle"),d("secureText")],

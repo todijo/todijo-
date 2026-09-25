@@ -109,6 +109,21 @@ final homeProvider = FutureProvider<HomeData>((ref) async {
       );
 });
 
+final homeCatalogPageProvider = FutureProvider.family<ProductPage, int>((
+  ref,
+  offset,
+) async {
+  final preferences = await ref.watch(buyerPreferencesProvider.future);
+  return ref
+      .watch(marketplaceRepositoryProvider)
+      .products(
+        locale: preferences.locale,
+        offset: offset,
+        country: preferences.country,
+        currency: preferences.currency,
+      );
+});
+
 final categoriesProvider = FutureProvider<List<CategoryNode>>((ref) async {
   final preferences = await ref.watch(buyerPreferencesProvider.future);
   return ref

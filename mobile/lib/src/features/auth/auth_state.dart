@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../../core/auth/secure_session_store.dart';
 import '../marketplace/application/buyer_state.dart';
@@ -218,9 +219,7 @@ final class AuthController extends AsyncNotifier<AuthState> {
     return false;
   }
 
-  String _code(Object error) => error.toString().contains('401')
-      ? 'INVALID_CREDENTIALS'
-      : 'AUTH_UNAVAILABLE';
+  String _code(Object error) => authFailureCode(error);
 
   void reportDeepLinkError(Object error) {
     state = AsyncData(AuthState(AuthStatus.guest, error: _code(error)));
@@ -249,4 +248,21 @@ final class AuthController extends AsyncNotifier<AuthState> {
       ref.invalidate(cartProvider);
     }
   }
+}
+
+String authFailureCode(Object error) {
+  if (error is DioException) {
+    final body = error.response?.data;
+    if (body is Map && body['error'] is String) {
+      return body['error'] as String;
+    }
+    if (error.response?.statusCode == 401) return 'INVALID_CREDENTIALS';
+    if (error.response?.statusCode == 403) return 'ACCOUNT_UNAVAILABLE';
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionError) {
+      return 'NETWORK_UNAVAILABLE';
+    }
+  }
+  return 'AUTH_UNAVAILABLE';
 }

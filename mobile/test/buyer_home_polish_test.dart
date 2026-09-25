@@ -11,6 +11,43 @@ import 'package:todijo/src/features/marketplace/presentation/buyer_chrome.dart';
 import 'package:todijo/src/features/marketplace/presentation/home_screen.dart';
 
 void main() {
+  const promotedCategories = [
+    CategoryNode(
+      id: 'women',
+      slug: 'women',
+      label: 'Vêtements pour femmes',
+      iconKey: 'shirt',
+      groups: [],
+    ),
+    CategoryNode(
+      id: 'men',
+      slug: 'men',
+      label: 'Vêtements pour hommes',
+      iconKey: 'shirt',
+      groups: [],
+    ),
+    CategoryNode(
+      id: 'jewelry',
+      slug: 'jewelry',
+      label: 'Bijoux et montres',
+      iconKey: 'gem',
+      groups: [],
+    ),
+    CategoryNode(
+      id: 'bags-shoes',
+      slug: 'bags-shoes',
+      label: 'Sacs et chaussures',
+      iconKey: 'shopping-bag',
+      groups: [],
+    ),
+    CategoryNode(
+      id: 'kids',
+      slug: 'kids',
+      label: 'Jouets, enfants et bébé',
+      iconKey: 'baby',
+      groups: [],
+    ),
+  ];
   test('responsive hero title and description exist in all 14 locales', () {
     for (final locale in todijoLocaleCodes) {
       final copy = TodijoLocalizations(Locale(locale));
@@ -54,19 +91,26 @@ void main() {
 
   for (final width in [320.0, 360.0, 390.0, 412.0]) {
     for (final locale in ['fr', 'ar']) {
-      testWidgets('responsive Todijo hero fits $width px in $locale', (
+      testWidgets('static category promotions fit $width px in $locale', (
         tester,
       ) async {
         await tester.binding.setSurfaceSize(Size(width, 820));
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              homeCatalogPageProvider.overrideWith(
+                (ref, offset) async => const ProductPage(
+                  products: [],
+                  hasMore: false,
+                  nextOffset: 0,
+                ),
+              ),
               homeProvider.overrideWith(
                 (ref) async => const HomeData(
                   country: 'FR',
                   currency: 'EUR',
                   hero: [],
-                  categories: [],
+                  categories: promotedCategories,
                   newArrivals: [],
                   bestSellers: [],
                 ),
@@ -86,11 +130,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.byType(Image), findsOneWidget);
-        expect(
-          find.text(TodijoLocalizations(Locale(locale)).text('heroTitle')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const ValueKey('home-promotions')), findsOneWidget);
+        expect(find.text('Vêtements pour femmes'), findsWidgets);
         expect(tester.takeException(), isNull);
         await tester.binding.setSurfaceSize(null);
       });
@@ -132,12 +173,16 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          homeCatalogPageProvider.overrideWith(
+            (ref, offset) async =>
+                const ProductPage(products: [], hasMore: false, nextOffset: 0),
+          ),
           homeProvider.overrideWith(
             (ref) async => const HomeData(
               country: 'FR',
               currency: 'EUR',
               hero: [],
-              categories: [],
+              categories: promotedCategories,
               newArrivals: [],
               bestSellers: [],
             ),
@@ -160,17 +205,21 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Explorer les produits'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-promotions')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('reduced motion keeps the static responsive hero in place', (
+  testWidgets('promotions do not auto-rotate with reduced motion', (
     tester,
   ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          homeCatalogPageProvider.overrideWith(
+            (ref, offset) async =>
+                const ProductPage(products: [], hasMore: false, nextOffset: 0),
+          ),
           homeProvider.overrideWith(
             (ref) async => const HomeData(
               country: 'FR',
@@ -183,7 +232,7 @@ void main() {
                   requiresAuthoritativePrice: true,
                 ),
               ],
-              categories: [],
+              categories: promotedCategories,
               newArrivals: [],
               bestSellers: [],
             ),
@@ -207,7 +256,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 9));
-    expect(find.text('Un monde de choix sous le même toit'), findsOneWidget);
+    expect(find.text('Vêtements pour femmes'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

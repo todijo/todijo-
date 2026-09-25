@@ -110,9 +110,22 @@ void main() {
         );
         await tester.tap(find.byKey(const ValueKey('category:null')));
         await tester.pumpAndSettle();
+        expect(find.text('Blazers'), findsNothing);
         await tester.tap(find.text('Mode').last);
         await tester.pumpAndSettle();
         await tester.enterText(find.byKey(const ValueKey('min:0')), '10');
+        final color = find.byKey(const ValueKey('color:null'));
+        await tester.ensureVisible(color);
+        await tester.tap(color);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Noir').last);
+        await tester.pumpAndSettle();
+        final rating = find.byKey(const ValueKey('rating:null'));
+        await tester.ensureVisible(rating);
+        await tester.tap(rating);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('4★+').last);
+        await tester.pumpAndSettle();
       }
       await tester.tap(find.byType(SwitchListTile));
       await tester.pumpAndSettle();
@@ -123,6 +136,31 @@ void main() {
       if (width == 390) {
         expect(products.last.queryParameters['category'], 'fashion');
         expect(products.last.queryParameters['minPrice'], '10');
+        expect(products.last.queryParameters['color'], 'black');
+        expect(products.last.queryParameters['rating'], '4');
+        await tester.tap(find.text('Filtres'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Effacer les filtres'));
+        await tester.tap(find.text('Effacer les filtres'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Appliquer'));
+        await tester.pumpAndSettle();
+        final cleared = requests
+            .where((uri) => uri.path.endsWith('/products'))
+            .last;
+        for (final key in [
+          'category',
+          'minPrice',
+          'color',
+          'rating',
+          'availability',
+        ]) {
+          expect(
+            cleared.queryParameters.containsKey(key),
+            isFalse,
+            reason: key,
+          );
+        }
       }
       expect(tester.takeException(), isNull);
       await tester.binding.setSurfaceSize(null);

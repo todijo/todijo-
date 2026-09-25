@@ -26,7 +26,7 @@ test("product description and contact CTA stay bounded and responsive", () => {
 
 test("contact seller enforces the authoritative minimum without premature send errors", () => {
   const ui = source("components/AskSellerButton.tsx");
-  const api = source("app/api/conversations/route.ts");
+  const api = source("lib/conversation-messages.ts");
   assert.match(api, /message\.length < 12 \|\| message\.length > 2000/);
   assert.match(ui, /MIN_MESSAGE_LENGTH = 12/);
   assert.match(ui, /disabled=\{busy \|\| message\.trim\(\)\.length < MIN_MESSAGE_LENGTH/);
