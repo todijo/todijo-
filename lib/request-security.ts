@@ -32,3 +32,11 @@ export function isTrustedMutationRequest(request:Request){
   try{const parsed=new URL(origin);actual=`${parsed.protocol}//${normalizedHost(parsed.host)}`;}catch{return false;}
   return actual===expectedPublicOrigin(request);
 }
+
+/** Native email login has no browser Origin/Fetch-Metadata headers. This only
+ * passes origin screening; the login handler still validates credentials. */
+export function isNativeMobileLoginRequest(request:Request,path:string){
+  return path==="/api/mobile/auth/login"
+    && !request.headers.has("origin")
+    && !request.headers.has("sec-fetch-site");
+}
