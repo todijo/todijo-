@@ -71,6 +71,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/hero-approved-v3-carton-logo-polished.png
+    - assets/images/mobile-categories/
+    - assets/images/mobile-subcategories/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -10,7 +10,7 @@ import '../domain/marketplace_models.dart';
 SliverGridDelegateWithMaxCrossAxisExtent productGridDelegate(double width) =>
     SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: width < 360 ? 500 : 230,
-      childAspectRatio: width < 360 ? 1.05 : .50,
+      childAspectRatio: width < 360 ? .66 : .44,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
     );
@@ -26,6 +26,7 @@ class ProductCard extends ConsumerWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
+      color: Colors.white,
       child: InkWell(
         onTap: () => context.push('/products/${product.id}'),
         child: Column(
@@ -64,7 +65,7 @@ class ProductCard extends ConsumerWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(9),
+              padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -74,16 +75,19 @@ class ProductCard extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 13,
                     ),
                   ),
                   if (product.storeName.isNotEmpty)
                     Text(
                       product.storeName,
                       maxLines: 1,
-                      style: TextStyle(color: Colors.grey.shade700),
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 11,
+                      ),
                     ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 3),
                   if (product.requiresAuthoritativePrice)
                     Text(
                       copy.text('priceByDestination'),
@@ -91,7 +95,7 @@ class ProductCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     )
                   else
@@ -99,7 +103,7 @@ class ProductCard extends ConsumerWidget {
                       '${product.price ?? '—'} ${product.currency}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 17,
+                        fontSize: 16,
                         color: TodijoColors.forest,
                       ),
                     ),
@@ -134,7 +138,7 @@ class ProductCard extends ConsumerWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   FilledButton(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 6),

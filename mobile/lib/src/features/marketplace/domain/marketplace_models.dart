@@ -242,6 +242,7 @@ final class ProductDetail {
     required this.sizes,
     required this.storeName,
     required this.storeSlug,
+    this.publicInformation = const {},
     this.category = '',
     this.reviewCount = 0,
     this.averageRating,
@@ -257,6 +258,21 @@ final class ProductDetail {
     final reviews = json['reviews'] as JsonMap?;
     final reviewSummary = reviews?['summary'] as JsonMap?;
     final capabilities = json['capabilities'] as JsonMap?;
+    final compliance = json['compliance'] as JsonMap? ?? const {};
+    final publicInformation = <String, String>{};
+    void addInfo(String labelKey, Object? value) {
+      if (value is String && value.trim().isNotEmpty) {
+        publicInformation[labelKey] = value.trim();
+      }
+    }
+
+    addInfo('condition', json['condition']);
+    addInfo('sellerProductIdentifier', compliance['productIdentifier']);
+    addInfo('sellerManufacturerName', compliance['manufacturerName']);
+    addInfo('sellerManufacturerContact', compliance['manufacturerContact']);
+    addInfo('sellerResponsiblePerson', compliance['responsiblePerson']);
+    addInfo('sellerSafetyInformation', compliance['safetyInformation']);
+    addInfo('sellerComplianceInformation', compliance['complianceInformation']);
     return ProductDetail(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -284,6 +300,7 @@ final class ProductDetail {
       sizes: (json['sizes'] as List<dynamic>? ?? const []).cast<String>(),
       storeName: store['name'] as String,
       storeSlug: store['slug'] as String,
+      publicInformation: publicInformation,
       category: (json['category'] ?? '') as String,
       reviewCount: (reviewSummary?['count'] ?? 0) as int,
       averageRating: (reviewSummary?['averageRating'] as num?)?.toDouble(),
@@ -295,6 +312,7 @@ final class ProductDetail {
     );
   }
   final String id, title, description, currency, storeName, storeSlug;
+  final Map<String, String> publicInformation;
   final String category;
   final String? minimumPrice, compareAtPrice;
   final bool requiresAuthoritativePrice, available;

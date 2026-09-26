@@ -54,6 +54,20 @@ class CategoryImage extends StatelessWidget {
       ),
     );
     if (url.isEmpty) return fallback;
+    final path = Uri.tryParse(url)?.path ?? '';
+    if (path.startsWith('/images/mobile-subcategories/') &&
+        path.endsWith('.webp')) {
+      final file = path.split('/').last;
+      if (file != '..' && !file.contains('\\')) {
+        return Image.asset(
+          'assets/images/mobile-subcategories/$file',
+          fit: BoxFit.cover,
+          width: double.infinity,
+          semanticLabel: label,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      }
+    }
     return Image.network(
       url,
       fit: BoxFit.cover,

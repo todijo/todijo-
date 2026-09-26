@@ -34,10 +34,19 @@ import 'features/seller/seller_store_screen.dart';
 import 'features/seller/seller_finance_screen.dart';
 import 'features/seller/seller_cj_screen.dart';
 
+final _authRouteRefreshProvider = Provider<ValueNotifier<int>>((ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.listen(authProvider, (_, _) => refresh.value++);
+  ref.onDispose(refresh.dispose);
+  return refresh;
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider).value;
-  return GoRouter(
+  final refresh = ref.watch(_authRouteRefreshProvider);
+  final router = GoRouter(
+    refreshListenable: refresh,
     redirect: (context, state) {
+      final auth = ref.read(authProvider).value;
       final protected =
           state.uri.path.startsWith('/account/') ||
           state.uri.path == '/checkout';
@@ -107,7 +116,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/products/:id/reviews',
-        builder: (_, state) => ProductReviewsScreen(state.pathParameters['id']!),
+        builder: (_, state) =>
+            ProductReviewsScreen(state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/stores/:slug',
@@ -266,6 +276,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  ref.onDispose(router.dispose);
+  return router;
 });
 
 class TodijoApp extends ConsumerStatefulWidget {

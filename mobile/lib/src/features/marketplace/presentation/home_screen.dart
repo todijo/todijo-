@@ -192,6 +192,13 @@ class _Promotions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const featured = ['women', 'men', 'jewelry', 'bags-shoes', 'kids'];
+    const categoryArtwork = {
+      'women': 'assets/images/mobile-categories/category-0.webp',
+      'men': 'assets/images/mobile-categories/category-1.webp',
+      'kids': 'assets/images/mobile-categories/category-2.webp',
+      'bags-shoes': 'assets/images/mobile-categories/category-3.webp',
+      'jewelry': 'assets/images/mobile-categories/category-4.webp',
+    };
     final selected = [
       for (final slug in featured)
         for (final category in categories)
@@ -229,6 +236,7 @@ class _Promotions extends StatelessWidget {
           return _PromoCard(
             title: category.label,
             icon: categoryIcon(category.iconKey),
+            assetImage: categoryArtwork[category.id],
             onTap: () => context.go(
               '/search?category=${Uri.encodeQueryComponent(category.id)}',
             ),
@@ -245,11 +253,13 @@ class _PromoCard extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.image,
+    this.assetImage,
   });
   final String title;
   final IconData icon;
   final VoidCallback onTap;
   final String? image;
+  final String? assetImage;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -272,7 +282,11 @@ class _PromoCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (image != null)
+            if (assetImage != null)
+              Positioned.fill(
+                child: Image.asset(assetImage!, fit: BoxFit.cover),
+              )
+            else if (image != null)
               Align(
                 alignment: AlignmentDirectional.centerEnd,
                 child: Image.network(
@@ -288,6 +302,18 @@ class _PromoCard extends StatelessWidget {
                 end: 8,
                 top: 10,
                 child: Icon(icon, size: 88, color: const Color(0x44D5A514)),
+              ),
+            if (assetImage != null)
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: AlignmentDirectional.centerStart,
+                      end: AlignmentDirectional.centerEnd,
+                      colors: [Color(0xED033B2D), Color(0x22033B2D)],
+                    ),
+                  ),
+                ),
               ),
             Padding(
               padding: const EdgeInsets.all(16),

@@ -22,6 +22,12 @@ void main() {
           'id': 'p1',
           'title': 'Produit',
           'description': '',
+          'condition': 'NEUF',
+          'compliance': {
+            'productIdentifier': 'SKU-1',
+            'manufacturerName': 'Example manufacturer',
+            'safetyInformation': 'Read the label',
+          },
           'category': 'women-blazers',
           'pricing': {
             'currency': 'EUR',
@@ -54,6 +60,12 @@ void main() {
       expect(product.averageRating, 5);
       expect(product.reviewPreview.single.body, 'Très bien');
       expect(product.canAskSeller, isTrue);
+      expect(product.publicInformation['condition'], 'NEUF');
+      expect(product.publicInformation['sellerProductIdentifier'], 'SKU-1');
+      expect(
+        product.publicInformation['sellerSafetyInformation'],
+        'Read the label',
+      );
     },
   );
 

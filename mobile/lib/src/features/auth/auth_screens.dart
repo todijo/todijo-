@@ -117,7 +117,19 @@ class _AuthLoginScreenState extends ConsumerState<AuthLoginScreen> {
         .login(_email.text, _password.text);
     if (mounted) {
       setState(() => _busy = false);
-      if (ok) context.go('/account');
+      if (ok) {
+        final requested = GoRouterState.of(context)
+            .uri
+            .queryParameters['returnTo'];
+        final destination =
+            requested != null &&
+                requested.startsWith('/') &&
+                !requested.startsWith('//') &&
+                !requested.startsWith('/login')
+            ? requested
+            : '/account';
+        context.go(destination);
+      }
     }
   }
 

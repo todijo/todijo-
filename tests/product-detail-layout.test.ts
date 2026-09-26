@@ -239,7 +239,7 @@ test("quantity and review states retain their real-data boundaries", async () =>
   assert.match(purchase, /Math\.min\(stock, value \+ 1\)/);
   assert.match(purchase, /disabled=\{!available \|\| quantity >= stock\}/);
   assert.match(reviews, /data\.reviews\.length===0/);
-  assert.match(reviews, /data\.reviews\.map/);
+  assert.match(reviews, /\(preview \? data\.reviews\.slice\(0, 3\) : data\.reviews\)\.map/);
   assert.match(page, /id:\{not:product\.id\},category:product\.category\.includes/);
   assert.match(page, /similarIds=new Set/);
 });

@@ -3,6 +3,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:todijo/src/features/marketplace/presentation/category_icon.dart';
 
 void main() {
+  testWidgets('published taxonomy path uses bundled responsive artwork', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 120,
+            child: CategoryImage(
+              url: 'https://todijo.com/images/mobile-subcategories/women--outerwear--blazers.webp',
+              iconKey: 'shirt',
+              label: 'Blazers',
+            ),
+          ),
+        ),
+      ),
+    );
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(
+      (image.image as AssetImage).assetName,
+      'assets/images/mobile-subcategories/women--outerwear--blazers.webp',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('missing category asset shows its taxonomy icon', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(

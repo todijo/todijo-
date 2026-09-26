@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { NextRequest } from "next/server";
 import { isNativeApiMutationRequest, isTrustedMutationRequest } from "../lib/request-security";
+import { middleware } from "../middleware";
 
 const request = (headers: Record<string, string> = {}) => new Request("https://todijo.com/api/mobile/auth/login", {
   method: "POST", headers,
@@ -9,6 +12,59 @@ const request = (headers: Record<string, string> = {}) => new Request("https://t
 test("native login without browser origin reaches its server-side authentication handler", () => {
   assert.equal(isNativeApiMutationRequest(request(), "/api/mobile/auth/login"), true);
   assert.equal(isNativeApiMutationRequest(request(), "/api/products"), false);
+  const response = middleware(new NextRequest("https://todijo.com/api/mobile/auth/login", {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-middleware-next"), "1");
+});
+
+test("production origin policy admits only origin-less native login", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousAppUrl = process.env.APP_URL;
+  try {
+    Reflect.set(process.env, "NODE_ENV", "production");
+    process.env.APP_URL = "https://todijo.com";
+    assert.equal(isTrustedMutationRequest(request()), false);
+    const nativeResponse = middleware(new NextRequest("https://todijo.com/api/mobile/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    }));
+    assert.equal(nativeResponse.status, 200);
+    const forgedResponse = middleware(new NextRequest("https://todijo.com/api/mobile/auth/login", {
+      method: "POST", headers: { origin: "https://attacker.example", "sec-fetch-site": "cross-site" }, body: "{}",
+    }));
+    assert.equal(forgedResponse.status, 403);
+  } finally {
+    if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, "NODE_ENV");
+    else Reflect.set(process.env, "NODE_ENV", previousNodeEnv);
+    if (previousAppUrl === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = previousAppUrl;
+  }
+});
+
+test("native login exemption does not admit forged browser origins", () => {
+  const attempts: Record<string, string>[] = [
+    { origin: "https://attacker.example" },
+    { origin: "https://attacker.example", "sec-fetch-site": "same-origin" },
+    { "sec-fetch-site": "cross-site" },
+  ];
+  for (const headers of attempts) {
+    const response = middleware(new NextRequest("https://todijo.com/api/mobile/auth/login", {
+      method: "POST", headers, body: "{}",
+    }));
+    assert.equal(response.status, 403);
+  }
+  const sameOrigin = middleware(new NextRequest("https://todijo.com/api/mobile/auth/login", {
+    method: "POST", headers: { origin: "https://todijo.com", "sec-fetch-site": "same-origin" }, body: "{}",
+  }));
+  assert.equal(sameOrigin.status, 200);
+});
+
+test("origin exemption leaves password authentication and invalid-credential rejection intact", () => {
+  const route = readFileSync("app/api/mobile/auth/login/route.ts", "utf8");
+  assert.match(route, /compare\(password, user\.passwordHash\)/);
+  assert.match(route, /error: "INVALID_CREDENTIALS".*status: 401/);
+  assert.match(route, /createMobileSession\(user/);
 });
 
 test("native bearer mutations reach protected handlers but cross-origin browser requests do not", () => {

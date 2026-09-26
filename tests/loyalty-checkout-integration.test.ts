@@ -157,6 +157,20 @@ test("read-only preview uses checkout pricing and seller-scoped balance without 
   assert.equal(fixture.state.entries.length, 0);
 });
 
+test("ordinary checkout persists seller name and structured store snapshot in their schema fields", async () => {
+  const fixture = loyaltyCheckoutFixture("12.50", false, false);
+  const result = await createCheckout(fixture.db, "buyer_A", "ordinary_checkout_1",
+    [{ productId: "prod_local", quantity: 1 }],
+    async () => ({ id: "cs_test_ordinary", url: "https://checkout.stripe.test/ordinary" }),
+    "FR", undefined, connected);
+  assert.equal(result.sessionId, "cs_test_ordinary");
+  assert.equal(fixture.state.groups[0].storeNameSnapshot, "Seller A");
+  assert.deepEqual(fixture.state.groups[0].storeSnapshot,
+    { id: "store_A", name: "Seller A", slug: "seller-a" });
+  assert.equal(fixture.state.groups[0].loyaltyReserveMinor, 0);
+  assert.equal(fixture.state.groups[0].loyaltyRedeemedMinor, 0);
+});
+
 test("partial loyalty holds €10 and asks Stripe to collect only €40", async () => {
   const fixture = loyaltyCheckoutFixture("50.00");
   let stripeInput: any;

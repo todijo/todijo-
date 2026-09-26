@@ -1202,6 +1202,36 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(product.description),
+                      if (product.publicInformation.isNotEmpty) ...[
+                        const Divider(height: 44),
+                        Text(
+                          TodijoLocalizations.of(context)
+                              .text('sellerComplianceTitle'),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        for (final entry in product.publicInformation.entries)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  TodijoLocalizations.of(context)
+                                      .text(entry.key),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(entry.value),
+                              ],
+                            ),
+                          ),
+                      ],
                       const Divider(height: 44),
                       Row(
                         children: [
