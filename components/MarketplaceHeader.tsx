@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronDown, Heart, Search, SlidersHorizontal, Truck, UserRound } from "lucide-react";
+import { ChevronDown, Heart, Search, ShieldCheck, SlidersHorizontal, Truck, UserRound } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import BuyerMobileHeader from "@/components/BuyerMobileHeader";
@@ -25,6 +25,7 @@ export default function MarketplaceHeader({ showCategoryNav = true, showFilterDo
   const footer = useTranslations("HomeFooter");
   const ux = useTranslations("Ux");
   const marketplace = useTranslations("Marketplace");
+  const discovery = useTranslations("HomeDiscovery");
   const homeHref = localizedPath(locale);
 
   useEffect(() => { setQuery(new URLSearchParams(window.location.search).get("q") ?? ""); }, [pathname]);
@@ -53,7 +54,7 @@ export default function MarketplaceHeader({ showCategoryNav = true, showFilterDo
           <input id="shared-market-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={common("searchPlaceholder")} />
           <button type="submit" aria-label={common("search")}><Search size={21} aria-hidden="true"/><span className="srOnly">{common("search")}</span></button>
         </form>
-        {onToggleFilters && <button type="button" className="marketHeaderFilterButton" aria-expanded={filterOpen} aria-controls="homepage-filter-panel" onClick={onToggleFilters}><SlidersHorizontal size={17} aria-hidden="true"/>{marketplace("filters")}</button>}
+        {onToggleFilters ? <button type="button" className="marketHeaderFilterButton" aria-expanded={filterOpen} aria-controls="homepage-filter-panel" onClick={onToggleFilters}><SlidersHorizontal size={17} aria-hidden="true"/>{marketplace("filters")}</button> : desktopPdp ? <Link className="marketHeaderFilterButton" href={localizedPath(locale,"/search")}><SlidersHorizontal size={17} aria-hidden="true"/>{marketplace("filters")}</Link> : null}
         <nav className="marketDesktopActions" aria-label={header("accountNavigation")}>
           <Link className="marketHeaderIconAction" href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined} aria-label={ux("favoritesNav")}><Heart size={20} aria-hidden="true"/><span>{ux("favoritesNav")}</span></Link>
           <CartLink label={common("cart")} className="homeCartLink" />
@@ -63,7 +64,7 @@ export default function MarketplaceHeader({ showCategoryNav = true, showFilterDo
         <div className="marketMobileActions"><Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-label={accountName ?? common("account")}><UserRound size={22} aria-hidden="true"/></Link><CartLink label={common("cart")} className="homeCartLink"/></div>
       </div></div>
       {showFilterDock ? <MarketplaceBrowseFilterBar/> : null}
-      {showCategoryNav ? <MarketplaceCategoryNavigation className={showFilterDock ? "marketCategoryNavigationBelowFilters" : ""}/> : null}
+      {showCategoryNav ? desktopPdp ? <div className="marketCategoryStickyBoundary marketHeaderDesktopPdpNavigation"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters" compactHomepage showStores={false}/><span className="homepageNavTrust"><ShieldCheck size={17} aria-hidden="true"/>{discovery("confidenceTitle")}</span></div> : <MarketplaceCategoryNavigation className={showFilterDock ? "marketCategoryNavigationBelowFilters" : ""}/> : null}
     </header>
   </>;
 }

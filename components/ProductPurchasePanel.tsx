@@ -15,29 +15,32 @@ type Variant = { id: string; stock: number; active: boolean; priceOverride: numb
 type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
 
 type SelectedOptionStyle = CSSProperties & { "--selected-option-accent"?: string };
-const SAFE_COLOR_ACCENTS: Array<[RegExp,string]> = [
-  [/\b(?:black|noir|schwarz|negro|nero)\b/i,"#171717"],
-  [/\b(?:navy|marine)\b/i,"#1e3a5f"],
-  [/\b(?:blue|bleu|blau|azul|blu)\b/i,"#2563eb"],
-  [/\b(?:red|rouge|rot|rojo|rosso)\b/i,"#dc2626"],
-  [/\b(?:green|vert|gr(?:u|ü)n|verde)\b/i,"#15803d"],
-  [/\b(?:pink|rose|rosa)\b/i,"#db2777"],
-  [/\b(?:purple|violet|lila|morado|viola)\b/i,"#7c3aed"],
-  [/\b(?:orange)\b/i,"#ea580c"],
-  [/\b(?:yellow|jaune|gelb|amarillo|giallo)\b/i,"#ca8a04"],
-  [/\b(?:brown|brun|braun|marron|marrone)\b/i,"#7c4a2d"],
-  [/\b(?:gray|grey|gris|grau|grigio)\b/i,"#6b7280"],
-  [/\b(?:silver|argent|silber|plata|argento)\b/i,"#94a3b8"],
-  [/\b(?:white|blanc|wei(?:ss|ß)|blanco|bianco)\b/i,"#cbd5e1"],
-  [/\b(?:beige|cream|cr[eè]me)\b/i,"#b89b72"],
-  [/\b(?:gold|or|golden|dorado)\b/i,"#b7791f"],
-  [/\b(?:cyan|turquoise|teal)\b/i,"#0f766e"],
+const SAFE_COLOR_ACCENTS: Array<[readonly string[],string]> = [
+  [["black","noir","schwarz","negro","nero"],"#171717"],
+  [["navy","marine","bleu marine"],"#1e3a5f"],
+  [["blue","bleu","blau","azul","blu"],"#2563eb"],
+  [["red","rouge","rot","rojo","rosso"],"#dc2626"],
+  [["green","vert","grun","verde"],"#15803d"],
+  [["pink","rose","rosa"],"#db2777"],
+  [["purple","violet","lila","morado","viola","pourpre"],"#7c3aed"],
+  [["orange"],"#ea580c"],
+  [["yellow","jaune","gelb","amarillo","giallo"],"#ca8a04"],
+  [["brown","brun","braun","marron","marrone"],"#7c4a2d"],
+  [["gray","grey","gris","grau","grigio"],"#64748b"],
+  [["silver","argent","silber","plata","argento"],"#64748b"],
+  [["white","blanc","weiss","blanco","bianco"],"#94a3b8"],
+  [["beige","cream","creme"],"#a18158"],
+  [["gold","or","golden","dorado"],"#b7791f"],
+  [["cyan","turquoise","teal"],"#0f766e"],
 ];
+const COLOR_OPTION_NAMES=new Set(["color","colour","couleur","farbe","colore","cor","couleur du produit"]);
 
-function selectedOptionStyle(label:string,selected:boolean):SelectedOptionStyle|undefined {
-  if(!selected)return undefined;
-  const accent=SAFE_COLOR_ACCENTS.find(([pattern])=>pattern.test(label))?.[1];
-  return accent?{"--selected-option-accent":accent}:undefined;
+function normalizedColorText(value:string){return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim()}
+function isColorOption(name:string){return COLOR_OPTION_NAMES.has(normalizedColorText(name))}
+function optionColorStyle(label:string,colorOption=true):SelectedOptionStyle|undefined {
+  if(!colorOption)return undefined;
+  const normalized=normalizedColorText(label),accent=SAFE_COLOR_ACCENTS.find(([aliases])=>aliases.some((alias)=>` ${normalized} `.includes(` ${alias} `)))?.[1]??"#64748b";
+  return {"--selected-option-accent":accent};
 }
 
 export default function ProductPurchasePanel({ product, colors, sizes, options = [], variants = [], availabilityLabel, dropshippingEligible = false, requiresAuthoritativePrice=false }: { product: CartProduct; colors: string[]; sizes: string[]; options?: Option[]; variants?: Variant[]; availabilityLabel: string; dropshippingEligible?: boolean;requiresAuthoritativePrice?:boolean }) {
@@ -103,10 +106,10 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
         const valueAvailable = activeVariants.some((variant) => matches(variant, next) && variant.stock > 0);
         const image = value.imageUrls?.[0];
         const selected=selection[option.id]===value.id;
-        return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selected ? " selected" : ""}`} style={selectedOptionStyle(value.value,selected)} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-label={value.accessibleLabel ?? value.value} aria-pressed={selected}>
+        return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selected ? " selected" : ""}`} style={optionColorStyle(value.value,isColorOption(option.name))} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-label={value.accessibleLabel ?? value.value} aria-pressed={selected}>
           {image ? <Image src={image} alt="" width={78} height={64} unoptimized /> : null}<span className={value.imageOnly ? "srOnly" : undefined}>{value.value}</span>
         </button>;
-      })}</div></fieldset>) : <><fieldset className="optionGroup"><legend>{t("color")}</legend><div>{colorChoices.map((value) => <button key={value} className={color === value ? "selected" : ""} style={selectedOptionStyle(value,color===value)} onClick={() => setColor(value)} type="button" aria-pressed={color === value}>{value}</button>)}</div></fieldset><fieldset className="optionGroup"><legend>{t("size")}</legend><div>{sizeChoices.map((value) => <button key={value} className={size === value ? "selected" : ""} onClick={() => setSize(value)} type="button" aria-pressed={size === value}>{value}</button>)}</div></fieldset></>}
+      })}</div></fieldset>) : <><fieldset className="optionGroup"><legend>{t("color")}</legend><div>{colorChoices.map((value) => <button key={value} className={color === value ? "selected" : ""} style={optionColorStyle(value)} onClick={() => setColor(value)} type="button" aria-pressed={color === value}>{value}</button>)}</div></fieldset><fieldset className="optionGroup"><legend>{t("size")}</legend><div>{sizeChoices.map((value) => <button key={value} className={size === value ? "selected" : ""} onClick={() => setSize(value)} type="button" aria-pressed={size === value}>{value}</button>)}</div></fieldset></>}
       <p className="selectedOptions">{t("selection", { value: selectedOptions || detail("chooseCombination") })}</p>
       </div>
       <div className="purchaseActionFooter">
