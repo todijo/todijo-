@@ -29,7 +29,9 @@ class _SellerLoyaltyScreenState extends ConsumerState<SellerLoyaltyScreen> {
     data = repository.loyalty();
   }
 
-  void retry() => setState(() => data = repository.loyalty());
+  void retry() => setState(() {
+    data = repository.loyalty();
+  });
 
   @override
   void dispose() {
@@ -40,7 +42,9 @@ class _SellerLoyaltyScreenState extends ConsumerState<SellerLoyaltyScreen> {
   void lookupOrder() {
     final value = orderId.text.trim();
     if (value.isEmpty || value.length > 100) return;
-    setState(() => data = repository.loyalty(orderId: value));
+    setState(() {
+      data = repository.loyalty(orderId: value);
+    });
   }
 
   Future<void> change(bool enabled) async {
@@ -100,13 +104,14 @@ class _SellerLoyaltyScreenState extends ConsumerState<SellerLoyaltyScreen> {
             return RefreshIndicator(
               onRefresh: () async {
                 final next = repository.loyalty();
-                setState(() => data = next);
+                setState(() {
+                  data = next;
+                });
                 await next;
               },
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text(copy.text('loyalty.intro')),
                   const SizedBox(height: 16),
                   Card(
                     child: Padding(

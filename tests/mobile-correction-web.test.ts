@@ -6,10 +6,13 @@ const source = (path: string) => readFileSync(path, "utf8");
 
 test("homepage promotional navigation keeps five canonical categories and a real store", () => {
   const home = source("app/HomeClient.tsx");
+  const css = source("app/globals.css");
   for (const id of ["women", "men", "jewelry", "bags-shoes", "kids"]) assert.match(home, new RegExp(`"${id}"`));
   assert.match(home, /homepageCategoryPromoRail/);
   assert.match(home, /categorySearchHref\(activeLocale, category\.label\)/);
   assert.match(home, /stores\[0\].*heroStore/);
+  assert.match(css, /\.homepageCategoryPromoRail\{display:none;/);
+  assert.match(css, /@media\(max-width:860px\)\{\.homepageCategoryPromoRail\{display:flex;/);
 });
 
 test("web PDP keeps published, access-controlled recommendations and compact review preview", () => {

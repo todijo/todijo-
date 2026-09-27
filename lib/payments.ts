@@ -100,7 +100,14 @@ export async function createCheckout(
     return { orderId: existing.id, sessionId: null, url: null,
       reused: true, completed: true as const };
   }
+  // Only a server-confirmed cancellation makes this key safely replaceable.
+  // A local timeout cannot release a payment/loyalty hold: Stripe may still
+  // confirm payment, so wait for its verified terminal event instead.
+  if (existing?.status === "CANCELLED") throw new CheckoutError("CHECKOUT_REQUEST_STALE", 409);
   if (existing && existing.status !== "PENDING") throw new CheckoutError("CHECKOUT_REQUEST_FINALIZED", 409);
+  if (existing?.stripeCheckoutSessionId && existing.checkoutExpiresAt &&
+    existing.checkoutExpiresAt <= new Date())
+    throw new CheckoutError("CHECKOUT_EXPIRY_PENDING", 409);
 
   const lines = [...quantities.values()];
   const products = await db.product.findMany({ where: { id: { in: [...new Set(lines.map((line) => line.productId))] }, status: "PUBLISHED" }, select: { id: true, name: true, description: true, images: true, colors: true, sizes: true, price: true, currency: true, stock: true, storeId: true, loyaltyEligible:true, shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,shippingProvider:true,shippingExternalServiceId:true, variants: { select: { id: true, stock: true, active: true, sku: true, priceOverride: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true, position: true } } } } } } } }, store: { select: { id: true, ownerId:true, name: true, slug: true, city: true, country: true, contactEmail: true, phone: true, currency: true, sellerType: true, loyaltyEnabled:true, loyaltyBlockedAt:true, legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true, owner: { select: { stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true } } } } } });
@@ -278,18 +285,30 @@ export async function createCheckout(
 
   const buyer = await db.user.findUniqueOrThrow({ where: { id: buyerId }, select: { email: true, firstName: true, lastName: true } });
   let order = existing;
+  const ensurePendingOrder = async (target: PrismaClient | Prisma.TransactionClient) => {
   if (!order) {
     try {
       const store = products[0].store;
-      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: paymentCurrency, total, subtotal, shippingMethod: shipping.method, shippingCost: shipping.amount, shippingCurrency: paymentCurrency, shippingCountry: shipping.destinationCountry, shippingEstimatedMinDays: shipping.estimatedMinDays, shippingEstimatedMaxDays: shipping.estimatedMaxDays, shippingCarrier: shipping.carrier, shippingProvider: shipping.provider, shippingExternalServiceId: shipping.externalServiceId, taxTotal: new Prisma.Decimal(0), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: paymentCurrency, lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null, loyaltyEligibleSnapshot: line.product.loyaltyEligible && !supplierByProduct.has(line.product.id) && line.product.store.ownerId !== buyerId, loyaltyRateBpsSnapshot: loyaltyEarnByLine.has(line.lineKey) ? loyaltySettings?.rateBps : null, loyaltyEarnMinor: loyaltyEarnByLine.get(line.lineKey) ?? 0, loyaltyRedeemedMinor: redeemedByLine.get(line.lineKey) ?? 0, loyaltyExpiryDaysSnapshot: loyaltyEarnByLine.has(line.lineKey) ? loyaltySettings?.expiryDays : null, supplierPricingSnapshot: line.pricingSnapshot ? { create: { snapshot: line.pricingSnapshot as unknown as Prisma.InputJsonValue } } : undefined })) } }, include: { items: true, loyaltyFundingSnapshot: true } });
+      order = await target.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: paymentCurrency, total, subtotal, shippingMethod: shipping.method, shippingCost: shipping.amount, shippingCurrency: paymentCurrency, shippingCountry: shipping.destinationCountry, shippingEstimatedMinDays: shipping.estimatedMinDays, shippingEstimatedMaxDays: shipping.estimatedMaxDays, shippingCarrier: shipping.carrier, shippingProvider: shipping.provider, shippingExternalServiceId: shipping.externalServiceId, taxTotal: new Prisma.Decimal(0), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: paymentCurrency, lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null, loyaltyEligibleSnapshot: line.product.loyaltyEligible && !supplierByProduct.has(line.product.id) && line.product.store.ownerId !== buyerId, loyaltyRateBpsSnapshot: loyaltyEarnByLine.has(line.lineKey) ? loyaltySettings?.rateBps : null, loyaltyEarnMinor: loyaltyEarnByLine.get(line.lineKey) ?? 0, loyaltyRedeemedMinor: redeemedByLine.get(line.lineKey) ?? 0, loyaltyExpiryDaysSnapshot: loyaltyEarnByLine.has(line.lineKey) ? loyaltySettings?.expiryDays : null, supplierPricingSnapshot: line.pricingSnapshot ? { create: { snapshot: line.pricingSnapshot as unknown as Prisma.InputJsonValue } } : undefined })) } }, include: { items: true, loyaltyFundingSnapshot: true } });
     } catch (error) {
       if (!isPrismaCode(error, "P2002")) throw error;
-      order = await db.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true, loyaltyFundingSnapshot: true } });
+      order = await target.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true, loyaltyFundingSnapshot: true } });
       if (!matchesCurrentCheckout(order)) throw new CheckoutError("CHECKOUT_REQUEST_STALE", 409);
-      if (order.stripeCheckoutSessionId && order.stripeCheckoutUrl) return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
     }
   }
+  };
   if(db.orderGroup&&typeof db.$transaction==="function")await db.$transaction(async tx=>{
+    // Serialize retries for this buyer/request before creating the order. A
+    // failed loyalty hold rolls the new order back with the same transaction.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${buyerId}:${requestId}`}, 0))::text AS locked`;
+    order = await tx.order.findUnique({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true, loyaltyFundingSnapshot: true } });
+    if (order?.status === "CANCELLED") throw new CheckoutError("CHECKOUT_REQUEST_STALE", 409);
+    if (order && order.status !== "PENDING") throw new CheckoutError("CHECKOUT_REQUEST_FINALIZED", 409);
+    if (order?.stripeCheckoutSessionId && order.checkoutExpiresAt &&
+      order.checkoutExpiresAt <= new Date())
+      throw new CheckoutError("CHECKOUT_EXPIRY_PENDING", 409);
+    if (order && !matchesCurrentCheckout(order)) throw new CheckoutError("CHECKOUT_REQUEST_STALE", 409);
+    await ensurePendingOrder(tx);
     if (redemptionRequest.size) {
       const current = await tx.loyaltyProgramSettings.findUnique({ where: { id: "global" },
         select: { enabled: true } });
@@ -351,6 +370,11 @@ export async function createCheckout(
       },
     });
   });
+  else await ensurePendingOrder(db);
+  if (!order) throw new CheckoutError("CHECKOUT_ORDER_UNAVAILABLE", 409);
+  if (order?.stripeCheckoutSessionId && order.stripeCheckoutUrl &&
+    (!pricingDependencies.stripeMode || stripeCheckoutSessionMode(order.stripeCheckoutSessionId) === pricingDependencies.stripeMode))
+    return { orderId: order.id, sessionId: order.stripeCheckoutSessionId, url: order.stripeCheckoutUrl, reused: true };
   await db.order.update({where:{id:order.id},data:{stripeConnectedAccountId:null,platformFeeAmount:null,sellerAmount:null,shippingPolicySnapshot:shipping.policies,...(buyerAddress?{recipientName:buyerAddress.recipientName,recipientPhone:buyerAddress.phone,shippingAddressLine1:buyerAddress.addressLine1,shippingAddressLine2:buyerAddress.addressLine2,shippingCity:buyerAddress.city,shippingPostalCode:buyerAddress.postalCode,shippingState:buyerAddress.state}:{})}});
   if (cashAmountMinor === 0 && redemption.redeemedMinor > 0) {
     const alreadyCompleted = await db.$transaction(async tx => {

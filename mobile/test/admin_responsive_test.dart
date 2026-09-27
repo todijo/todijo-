@@ -91,7 +91,7 @@ void main() {
                     'maxRateBps': 1000,
                     'expiryDays': 365,
                   },
-                  'activationReady': false,
+                  'activationReady': true,
                   'history': <Map<String, dynamic>>[],
                   'globalAccounting': <String, dynamic>{'balanced': true},
                 },
@@ -152,6 +152,15 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          if (screen is AdminLoyaltyScreen) {
+            for (var attempt = 0; attempt < 3; attempt++) {
+              await tester.tap(find.byType(SwitchListTile));
+              await tester.pumpAndSettle();
+              expect(find.byType(AlertDialog), findsOneWidget);
+              await tester.tap(find.byType(TextButton).last);
+              await tester.pumpAndSettle();
+            }
+          }
           expect(
             tester.takeException(),
             isNull,

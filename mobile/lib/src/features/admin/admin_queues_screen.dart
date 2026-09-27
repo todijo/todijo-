@@ -25,7 +25,9 @@ class _AdminQueueState extends ConsumerState<AdminQueueScreen> {
     AdminQueueKind.support => repo.support(page: page),
     AdminQueueKind.reports => repo.reports(page: page),
   };
-  void reload() => setState(() => data = load());
+  void reload() => setState(() {
+    data = load();
+  });
 
   String title(TodijoLocalizations copy) => copy.text(switch (widget.kind) {
     AdminQueueKind.orders => 'adminOrders',

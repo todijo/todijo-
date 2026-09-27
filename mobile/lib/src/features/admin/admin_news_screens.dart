@@ -17,7 +17,9 @@ class _AdminNewsState extends ConsumerState<AdminNewsScreen> {
   late Future<AdminJson> data = _load();
   Future<AdminJson> _load() =>
       AdminRepository(ref.read(apiClientProvider)).news(page: page);
-  void reload() => setState(() => data = _load());
+  void reload() => setState(() {
+    data = _load();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +58,7 @@ class _AdminNewsState extends ConsumerState<AdminNewsScreen> {
                     child: ListTile(
                       title: Text(item['title'] as String),
                       subtitle: Text(
-                        '${item['locale']} · ${item['published'] == true ? copy.text('adminCmsPublish') : copy.text('adminCmsDraft')}',
+                        '${item['locale']} · ${item['published'] == true ? copy.text('sellerPublished') : copy.text('adminCmsDraft')}',
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {

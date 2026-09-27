@@ -102,6 +102,10 @@ class _AuthLoginScreenState extends ConsumerState<AuthLoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _busy = false;
+  String _visibleError(TodijoLocalizations copy, String code) =>
+      code == 'ACCOUNT_UNAVAILABLE'
+      ? copy.text('authAccountUnavailable')
+      : copy.text('authError');
   @override
   void dispose() {
     _email.dispose();
@@ -177,6 +181,9 @@ class _AuthLoginScreenState extends ConsumerState<AuthLoginScreen> {
                     ),
                     validator: (v) => v == null || v.isEmpty
                         ? TodijoLocalizations.of(context).text('requiredField')
+                        : v.length < 10
+                        ? TodijoLocalizations.of(context)
+                              .text('invalidPassword')
                         : null,
                   ),
                 ],
@@ -186,7 +193,7 @@ class _AuthLoginScreenState extends ConsumerState<AuthLoginScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Text(
-                  '${TodijoLocalizations.of(context).text('authError')} ($error)',
+                  _visibleError(TodijoLocalizations.of(context), error),
                   style: const TextStyle(color: TodijoColors.danger),
                 ),
               ),
@@ -202,6 +209,14 @@ class _AuthLoginScreenState extends ConsumerState<AuthLoginScreen> {
             ),
             const SocialAuthOptions(),
             TextButton(
+              onPressed: () => context.push('/forgot-password'),
+              child: Text(TodijoLocalizations.of(context).text('forgot')),
+            ),
+            TextButton(
+              onPressed: () => context.push('/resend-verification'),
+              child: Text(TodijoLocalizations.of(context).text('resendTitle')),
+            ),
+            TextButton(
               onPressed: () => context.push('/register'),
               child: Text(
                 TodijoLocalizations.of(context).text('createAccount'),
@@ -212,6 +227,123 @@ class _AuthLoginScreenState extends ConsumerState<AuthLoginScreen> {
       ),
     );
   }
+}
+
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
+  const ForgotPasswordScreen({super.key, this.verification = false});
+
+  final bool verification;
+
+  @override
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
+  final form = GlobalKey<FormState>();
+  final email = TextEditingController();
+  bool busy = false;
+  bool sent = false;
+
+  @override
+  void dispose() {
+    email.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    if (!form.currentState!.validate() || busy) return;
+    setState(() => busy = true);
+    try {
+      final repository = ref.read(authRepositoryProvider);
+      final locale = Localizations.localeOf(context).languageCode;
+      if (widget.verification) {
+        await repository.resendVerificationEmail(email.text, locale);
+      } else {
+        await repository.requestPasswordReset(email.text, locale);
+      }
+    } catch (_) {
+      // The web endpoint deliberately gives a neutral response for unknown
+      // accounts and delivery failures. Do not disclose account existence.
+    } finally {
+      if (mounted) {
+        setState(() {
+          busy = false;
+          sent = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = TodijoLocalizations.of(context);
+    final title = widget.verification ? 'resendTitle' : 'forgotTitle';
+    final intro = widget.verification ? 'resendIntro' : 'forgotIntro';
+    final neutral = widget.verification ? 'resendNeutral' : 'forgotNeutral';
+    final submitLabel = widget.verification ? 'resendSubmit' : 'forgotSubmit';
+    final sending = widget.verification ? 'resendSending' : 'forgotSending';
+    return Scaffold(
+      appBar: AppBar(title: Text(copy.text(title))),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(
+              copy.text(title),
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            Text(copy.text(intro)),
+            const SizedBox(height: 24),
+            if (sent)
+              Text(copy.text(neutral))
+            else
+              Form(
+                key: form,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: email,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: InputDecoration(
+                        labelText: copy.text('email'),
+                      ),
+                      validator: (value) =>
+                          value != null &&
+                              RegExp(r'^[^@]+@[^@]+\.[^@]+$')
+                                  .hasMatch(value.trim())
+                          ? null
+                          : copy.text('invalidEmail'),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: busy ? null : submit,
+                      child: Text(copy.text(busy ? sending : submitLabel)),
+                    ),
+                  ],
+                ),
+              ),
+            TextButton(
+              onPressed: () =>
+                  context.canPop() ? context.pop() : context.go('/login'),
+              child: Text(copy.text('backToLogin')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ResendVerificationScreen extends StatelessWidget {
+  const ResendVerificationScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const ForgotPasswordScreen(verification: true);
 }
 
 class RegistrationScreen extends ConsumerStatefulWidget {
@@ -240,8 +372,8 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     ])
       k: TextEditingController(),
   };
-  String role = 'customer', country = 'FR';
-  bool terms = false, privacy = false, busy = false;
+  String role = 'customer', country = '';
+  bool terms = false, busy = false;
   String? error;
   @override
   void dispose() {
@@ -288,7 +420,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     ),
   );
   Future<void> submit() async {
-    if (!_form.currentState!.validate() || !terms || !privacy) return;
+    if (!_form.currentState!.validate() || !terms) return;
     if (c['password']!.text.length < 10 ||
         c['password']!.text != c['confirmPassword']!.text) {
       setState(() {});
@@ -416,7 +548,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
               field('city', TodijoLocalizations.of(context).text('city')),
               TodijoCountryPicker(
                 value: country,
-                onChanged: (v) => setState(() => country = v ?? 'FR'),
+                onChanged: (v) => setState(() => country = v ?? ''),
               ),
               const SizedBox(height: 12),
               field('state', TodijoLocalizations.of(context).text('region')),
@@ -446,14 +578,22 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
             CheckboxListTile(
               value: terms,
               onChanged: (v) => setState(() => terms = v ?? false),
-              title: Text(TodijoLocalizations.of(context).text('termsLabel')),
+              title: Text(TodijoLocalizations.of(context).text('terms')),
               controlAffinity: ListTileControlAffinity.leading,
             ),
-            CheckboxListTile(
-              value: privacy,
-              onChanged: (v) => setState(() => privacy = v ?? false),
-              title: Text(TodijoLocalizations.of(context).text('privacy')),
-              controlAffinity: ListTileControlAffinity.leading,
+            Wrap(
+              children: [
+                TextButton(
+                  onPressed: () => context.push('/info/terms'),
+                  child: Text(
+                    TodijoLocalizations.of(context).text('termsLabel'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.push('/info/privacy'),
+                  child: Text(TodijoLocalizations.of(context).text('privacy')),
+                ),
+              ],
             ),
             Text(TodijoLocalizations.of(context).text('humanVerificationHelp')),
             if (error != null || ref.watch(authProvider).value?.error != null)
@@ -464,7 +604,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
               ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: busy || !terms || !privacy ? null : submit,
+              onPressed: busy || !terms ? null : submit,
               child: busy
                   ? const CircularProgressIndicator.adaptive()
                   : Text(
@@ -473,6 +613,10 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                           : TodijoLocalizations.of(context)
                                 .text('createAccount'),
                     ),
+            ),
+            TextButton(
+              onPressed: () => context.push('/resend-verification'),
+              child: Text(TodijoLocalizations.of(context).text('resendTitle')),
             ),
           ],
         ),

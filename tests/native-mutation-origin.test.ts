@@ -19,6 +19,42 @@ test("native login without browser origin reaches its server-side authentication
   assert.equal(response.headers.get("x-middleware-next"), "1");
 });
 
+test("native password recovery reuses the neutral web handler without opening browser mutations", () => {
+  const path = "/api/mobile/auth/forgot-password";
+  assert.match(
+    readFileSync("app/api/mobile/auth/forgot-password/route.ts", "utf8"),
+    /export \{ POST \} from "@\/app\/api\/auth\/forgot-password\/route"/,
+  );
+  const native = middleware(new NextRequest(`https://todijo.com${path}`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+  }));
+  assert.equal(native.status, 200);
+  const forged = middleware(new NextRequest(`https://todijo.com${path}`, {
+    method: "POST", headers: { origin: "https://attacker.example", "sec-fetch-site": "cross-site" }, body: "{}",
+  }));
+  assert.equal(forged.status, 403);
+  const browserOnly = middleware(new NextRequest("https://todijo.com/api/auth/forgot-password", {
+    method: "POST", headers: { origin: "https://attacker.example", "sec-fetch-site": "cross-site" }, body: "{}",
+  }));
+  assert.equal(browserOnly.status, 403);
+});
+
+test("native verification resend uses the neutral web handler and still rejects forged origins", () => {
+  const path = "/api/mobile/auth/resend-verification";
+  assert.match(
+    readFileSync("app/api/mobile/auth/resend-verification/route.ts", "utf8"),
+    /export \{ POST \} from "@\/app\/api\/auth\/resend-verification\/route"/,
+  );
+  const native = middleware(new NextRequest(`https://todijo.com${path}`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+  }));
+  assert.equal(native.status, 200);
+  const forged = middleware(new NextRequest(`https://todijo.com${path}`, {
+    method: "POST", headers: { origin: "https://attacker.example", "sec-fetch-site": "cross-site" }, body: "{}",
+  }));
+  assert.equal(forged.status, 403);
+});
+
 test("production origin policy admits only origin-less native login", () => {
   const previousNodeEnv = process.env.NODE_ENV;
   const previousAppUrl = process.env.APP_URL;

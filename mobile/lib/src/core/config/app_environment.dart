@@ -26,6 +26,7 @@ final class AppEnvironment {
         flavor == AppFlavor.development &&
         (origin.host == 'localhost' ||
             origin.host == '127.0.0.1' ||
+            origin.host == '10.0.2.2' ||
             origin.host.startsWith('192.168.'));
     if (origin.scheme != 'https' && !localDevelopment) {
       throw StateError('Non-local API origins must use HTTPS.');

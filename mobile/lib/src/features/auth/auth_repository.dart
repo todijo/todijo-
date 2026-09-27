@@ -41,6 +41,20 @@ final class AuthRepository {
     return response.data!;
   }
 
+  Future<void> requestPasswordReset(String email, String locale) async {
+    await client.dio.post<AuthJson>(
+      '/api/mobile/auth/forgot-password',
+      data: {'email': email.trim(), 'locale': locale},
+    );
+  }
+
+  Future<void> resendVerificationEmail(String email, String locale) async {
+    await client.dio.post<AuthJson>(
+      '/api/mobile/auth/resend-verification',
+      data: {'email': email.trim(), 'locale': locale},
+    );
+  }
+
   Future<void> logout() async {
     final current = await store.read();
     try {

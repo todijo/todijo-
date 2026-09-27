@@ -16,7 +16,9 @@ class _AdminRecallsState extends ConsumerState<AdminRecallsScreen> {
   bool busy = false;
   late Future<AdminJson> data = repo.recalls();
   AdminRepository get repo => AdminRepository(ref.read(apiClientProvider));
-  void reload() => setState(() => data = repo.recalls(page: page));
+  void reload() => setState(() {
+    data = repo.recalls(page: page);
+  });
 
   Future<void> showRecall(AdminJson item) async {
     final copy = TodijoLocalizations.of(context);

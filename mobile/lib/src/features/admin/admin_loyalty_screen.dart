@@ -155,7 +155,7 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
     final release = TextEditingController();
     final confirmation = TextEditingController();
     final expected = enabled ? 'DISABLE_LOYALTY' : 'ENABLE_LOYALTY';
-    final approved = await showDialog<bool>(
+    final dialogRoute = DialogRoute<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
@@ -206,9 +206,11 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
         ],
       ),
     );
+    final approved = await Navigator.of(context).push(dialogRoute);
     final reasonValue = note.text.trim();
     final releaseValue = release.text.trim();
     final confirmationValue = confirmation.text.trim();
+    await dialogRoute.completed;
     note.dispose();
     release.dispose();
     confirmation.dispose();
@@ -299,7 +301,7 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
         ),
       ),
     );
-    final approved = await showDialog<bool>(
+    final dialogRoute = DialogRoute<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(copy.text('loyaltyAdminAdjustment.${labels[direction]}')),
@@ -362,9 +364,11 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
         ],
       ),
     );
+    final approved = await Navigator.of(context).push(dialogRoute);
     final fields = controllers.map(
       (key, value) => MapEntry(key, value.text.trim()),
     );
+    await dialogRoute.completed;
     for (final value in controllers.values) {
       value.dispose();
     }
@@ -426,7 +430,7 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
     final copy = TodijoLocalizations.of(context);
     final input = TextEditingController();
     final blocked = store['loyaltyBlocked'] == true;
-    final note = await showDialog<String>(
+    final dialogRoute = DialogRoute<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
@@ -451,6 +455,8 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
         ],
       ),
     );
+    final note = await Navigator.of(context).push(dialogRoute);
+    await dialogRoute.completed;
     input.dispose();
     if (note == null || note.isEmpty || !mounted) return;
     setState(() {
@@ -637,7 +643,7 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
   Future<void> showOrderAccounting(String storeId) async {
     final copy = TodijoLocalizations.of(context);
     final controller = TextEditingController();
-    final orderId = await showDialog<String>(
+    final dialogRoute = DialogRoute<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(copy.text('loyaltyAccounting.order')),
@@ -661,6 +667,8 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
         ],
       ),
     );
+    final orderId = await Navigator.of(context).push(dialogRoute);
+    await dialogRoute.completed;
     controller.dispose();
     if (!mounted ||
         orderId == null ||
@@ -775,7 +783,11 @@ class _AdminLoyaltyState extends ConsumerState<AdminLoyaltyScreen> {
                                         .titleLarge,
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(copy.text('loyaltyAdmin.rolloutPaused')),
+                                  if (settings?['enabled'] != true &&
+                                      !activationReady)
+                                    Text(
+                                      copy.text('loyaltyAdmin.rolloutPaused'),
+                                    ),
                                   SwitchListTile.adaptive(
                                     title: Text(
                                       copy.text('loyalty.participation'),

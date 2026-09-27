@@ -9,6 +9,38 @@ export const REFUND_CLAIM_MS = 15 * 60_000;
 export const REFUND_RETRY_MS = 15 * 60_000;
 export const MAX_FINANCIAL_ATTEMPTS = 8;
 
+export class RefundSelectionError extends Error {
+  readonly status = 400;
+  constructor() { super("INVALID_REFUND_ITEM_QUANTITIES"); }
+}
+
+function selectedRefundQuantities(raw: unknown, items: Array<{ id: string; quantity: number;
+  refundAllocations: Array<{ quantity: number }> }>) {
+  if (raw === undefined) return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new RefundSelectionError();
+  const entries = Object.entries(raw);
+  if (!entries.length || entries.length > items.length) throw new RefundSelectionError();
+  const byId = new Map(items.map(item => [item.id, item]));
+  const result = new Map<string, number>();
+  for (const [id, quantity] of entries) {
+    const item = byId.get(id);
+    const already = item?.refundAllocations.reduce((sum, row) => sum + row.quantity, 0) ?? 0;
+    if (!item || !Number.isSafeInteger(quantity) || (quantity as number) < 1 ||
+      (quantity as number) > item.quantity - already) throw new RefundSelectionError();
+    result.set(id, quantity as number);
+  }
+  return result;
+}
+
+export async function assertRefundSelection(db: PrismaClient, refundRequestId: string, raw: unknown) {
+  if (raw === undefined) return;
+  const request = await db.refundRequest.findUnique({ where: { id: refundRequestId },
+    select: { order: { select: { items: { select: { id: true, quantity: true,
+      refundAllocations: { select: { quantity: true } } } } } } } });
+  if (!request) throw new RefundSelectionError();
+  selectedRefundQuantities(raw, request.order.items);
+}
+
 export class RefundPaymentModeError extends Error {
   readonly code: "REFUND_PAYMENT_MODE_MISMATCH" | "REFUND_PAYMENT_MODE_UNRESOLVED";
   readonly status = 409;
@@ -47,8 +79,9 @@ function safeMessage(error: unknown) {
   return (error instanceof Error ? error.message : "Stripe financial operation failed").slice(0, 500);
 }
 
-/** Creates the immutable allocation once. The public admin path intentionally requests all remaining lines. */
-export async function ensureRefundOperation(db: PrismaClient, refundRequestId: string, actorId: string, options: { returnRequired?: boolean } = {}, now = new Date()) {
+/** Creates one immutable, line-attributed allocation. Omitted selection retains
+ * the historical full-remaining refund behavior. */
+export async function ensureRefundOperation(db: PrismaClient, refundRequestId: string, actorId: string, options: { returnRequired?: boolean; itemQuantities?: unknown } = {}, now = new Date()) {
   return db.$transaction(async (tx) => {
     const existing = await tx.refundOperation.findUnique({ where: { refundRequestId } });
     if (existing) return existing;
@@ -66,10 +99,13 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
       throw new Error("Order has no authoritative paid Stripe PaymentIntent.");
     const paymentMode = zeroCash ? null : assertRefundPaymentMode(order);
 
+    const selection = selectedRefundQuantities(options.itemQuantities, order.items);
+
     const itemRows = order.items.map((item) => {
       if (!item.orderGroupId) throw new Error("Refundable order line has no authoritative order group.");
       const already = item.refundAllocations.reduce((sum, row) => sum + row.quantity, 0);
-      const quantity = item.quantity - already;
+      const quantity = selection ? selection.get(item.id) ?? 0 : item.quantity - already;
+      if (!quantity) return null;
       const unitAmountMinor = exactMinorAmount(item.unitPrice, order.currency as SupportedBuyerCurrency);
       const funding = loyaltyRefundComposition({ quantity: item.quantity,
         unitGrossMinor: unitAmountMinor, redeemedMinor: item.loyaltyRedeemedMinor ?? 0,
@@ -83,7 +119,7 @@ export async function ensureRefundOperation(db: PrismaClient, refundRequestId: s
         cashAmountMinor: funding.cashRefundMinor,
         loyaltyRestoredMinor: funding.loyaltyRestoredMinor,
         loyaltyReserveReversalMinor: itemReserveReversalMinor };
-    }).filter((row) => row.quantity > 0);
+    }).filter((row): row is NonNullable<typeof row> => Boolean(row));
     if (!itemRows.length) throw new Error("Order has no refundable quantity remaining.");
 
     const groupRows = order.groups.map((group) => {

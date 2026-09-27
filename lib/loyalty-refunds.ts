@@ -85,8 +85,39 @@ export async function restoreRefundedLoyalty(tx: Prisma.TransactionClient,
     }, select: { quantity: true } });
     const quantity = confirmed.reduce((sum, row) => sum + row.quantity, 0);
     if (quantity < 0 || quantity > item.orderItem.quantity) throw new Error("LOYALTY_REFUND_QUANTITY_EXCEEDED");
-    for (const allocation of item.orderItem.loyaltyRedemptionAllocations) {
-      const target = Math.floor(allocation.amountMinor * quantity / item.orderItem.quantity);
+    const allocations = item.orderItem.loyaltyRedemptionAllocations;
+    const totalRedeemed = allocations.reduce((sum, allocation) => sum + allocation.amountMinor, 0);
+    const targetTotal = Math.floor(totalRedeemed * quantity / item.orderItem.quantity);
+    const alreadyRestored = allocations.reduce((sum, allocation) => sum + allocation.restoredMinor, 0);
+    if (alreadyRestored > targetTotal) throw new Error("LOYALTY_RESTORATION_REGRESSION");
+    let remaining = targetTotal - alreadyRestored;
+    // Allocate the newly refundable cents to their original grants. Starting
+    // from the immutable restored amounts makes successive partial refunds
+    // monotonic even when rounding spans several funding buckets.
+    const targets = new Map(allocations.map(allocation => [allocation.id, allocation.restoredMinor]));
+    for (const allocation of allocations) {
+      const current = targets.get(allocation.id) ?? 0;
+      const ideal = Math.floor(allocation.amountMinor * quantity / item.orderItem.quantity);
+      const increase = Math.min(remaining, Math.max(0, ideal - current));
+      targets.set(allocation.id, current + increase);
+      remaining -= increase;
+    }
+    // The sum of individually rounded shares can be below the rounded total.
+    // Give the residual cents to the largest fractional gaps, deterministically.
+    for (const allocation of [...allocations].sort((a, b) => {
+      const aGap = a.amountMinor * quantity / item.orderItem.quantity - (targets.get(a.id) ?? 0);
+      const bGap = b.amountMinor * quantity / item.orderItem.quantity - (targets.get(b.id) ?? 0);
+      return bGap - aGap || a.id.localeCompare(b.id);
+    })) {
+      if (!remaining) break;
+      const current = targets.get(allocation.id) ?? 0;
+      const increase = Math.min(remaining, allocation.amountMinor - current);
+      targets.set(allocation.id, current + increase);
+      remaining -= increase;
+    }
+    if (remaining) throw new Error("LOYALTY_RESTORATION_CAPACITY_EXCEEDED");
+    for (const allocation of allocations) {
+      const target = targets.get(allocation.id) ?? allocation.restoredMinor;
       const delta = target - allocation.restoredMinor;
       if (delta < 0) throw new Error("LOYALTY_RESTORATION_REGRESSION");
       if (delta === 0) continue;

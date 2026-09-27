@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Disposable local checkout review only; release manifest remains HTTPS-only. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

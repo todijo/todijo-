@@ -31,7 +31,9 @@ class _AdminContentState extends ConsumerState<AdminContentScreen> {
     }
   }
 
-  void reload() => setState(() => data = _repo(ref).contentPages(locale));
+  void reload() => setState(() {
+    data = _repo(ref).contentPages(locale);
+  });
   @override
   Widget build(BuildContext context) {
     final copy = TodijoLocalizations.of(context);
@@ -137,7 +139,9 @@ class _AdminContentEditorState extends ConsumerState<AdminContentEditorScreen> {
     return result;
   }
 
-  void reload() => setState(() => data = load());
+  void reload() => setState(() {
+    data = load();
+  });
   @override
   void dispose() {
     title.dispose();

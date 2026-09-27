@@ -125,6 +125,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/login', builder: (_, _) => const AuthLoginScreen()),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (_, _) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/resend-verification',
+        builder: (_, _) => const ResendVerificationScreen(),
+      ),
       GoRoute(path: '/register', builder: (_, _) => const RegistrationScreen()),
       GoRoute(
         path: '/account/profile',

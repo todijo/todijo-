@@ -33,7 +33,9 @@ class _AdminCjImportDetailState
       AdminRepository(ref.read(apiClientProvider))
           .bulkImportJob(widget.jobId, cursor: cursors[page]);
 
-  void reload() => setState(() => details = load());
+  void reload() => setState(() {
+    details = load();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +141,9 @@ class _AdminCjSearchState extends ConsumerState<_AdminCjSearchDialog> {
       AdminRepository(ref.read(apiClientProvider))
           .searchCjCatalog(query.text.trim(), page: page);
 
-  void reload() => setState(() => results = load());
+  void reload() => setState(() {
+    results = load();
+  });
 
   @override
   void dispose() {
@@ -258,7 +262,9 @@ class _AdminOperationsState extends ConsumerState<AdminOperationsScreen> {
   Future<AdminJson> load() =>
       AdminRepository(ref.read(apiClientProvider))
           .operations(widget.kind.name, page: page);
-  void reload() => setState(() => data = load());
+  void reload() => setState(() {
+    data = load();
+  });
 
   Future<void> decideIssue(AdminJson item) async {
     if (busy || !const {'RETURN', 'DISPUTE'}.contains(item['type'])) return;

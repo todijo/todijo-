@@ -26,7 +26,9 @@ class _AdminProductsState extends ConsumerState<AdminProductsScreen> {
     classification: quarantinedOnly ? 'QUARANTINED' : '',
     page: page,
   );
-  void reload() => setState(() => data = load());
+  void reload() => setState(() {
+    data = load();
+  });
 
   @override
   void dispose() {

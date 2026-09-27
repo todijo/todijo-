@@ -153,6 +153,25 @@ test("a finalized checkout request is never mutated or reused",async()=>{
   const unchanged=await fixture.db.order.findUnique();assert.equal(unchanged.status,"PAID");assert.equal(unchanged.total.toString(),originalTotal);assert.equal(stripeCalls,1);
 });
 
+test("confirmed cancelled checkout key is replaceable but an unconfirmed expired session is not", async () => {
+  const cancelled = checkoutDb();
+  const provider = async () => ({ id: "cs_test_cancelled", url: "https://checkout.stripe.test/cancelled" });
+  await createCheckout(cancelled.db, "buyer_1", "request_cancelled", [{ productId: "prod_1", quantity: 1 }], provider, "FR", undefined, connectDeps);
+  await cancelled.db.order.update({ data: { status: "CANCELLED" } });
+  await assert.rejects(
+    createCheckout(cancelled.db, "buyer_1", "request_cancelled", [{ productId: "prod_1", quantity: 1 }], provider, "FR", undefined, connectDeps),
+    (error: unknown) => error instanceof CheckoutError && error.message === "CHECKOUT_REQUEST_STALE" && error.status === 409,
+  );
+
+  const unconfirmed = checkoutDb();
+  await createCheckout(unconfirmed.db, "buyer_1", "request_expired", [{ productId: "prod_1", quantity: 1 }], provider, "FR", undefined, connectDeps);
+  await unconfirmed.db.order.update({ data: { checkoutExpiresAt: new Date(Date.now() - 60_000) } });
+  await assert.rejects(
+    createCheckout(unconfirmed.db, "buyer_1", "request_expired", [{ productId: "prod_1", quantity: 1 }], provider, "FR", undefined, connectDeps),
+    (error: unknown) => error instanceof CheckoutError && error.message === "CHECKOUT_EXPIRY_PENDING" && error.status === 409,
+  );
+});
+
 test("a checkout never reuses a stored Stripe session from another mode",async()=>{
   const fixture=checkoutDb();let stripeCalls=0;
   const create=async()=>{stripeCalls++;return stripeCalls===1?{id:"cs_test_old",url:"https://checkout.stripe.test/old"}:{id:"cs_live_new",url:"https://checkout.stripe.live/new"};};

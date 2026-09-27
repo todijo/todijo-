@@ -1055,8 +1055,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> launch() async {
-    final checkoutErrorCopy = TodijoLocalizations.of(context)
-        .text('checkoutError');
+    final copy = TodijoLocalizations.of(context);
+    final checkoutErrorCopy = copy.text('checkoutError');
+    final retryCopy = copy.text('retry');
+    final paymentPendingCopy = copy.text('loyaltyCheckout.paymentPending');
     setState(() {
       busy = true;
       error = null;
@@ -1088,7 +1090,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ? data['code'] ?? data['error']
           : null;
       if (code == 'CHECKOUT_PRICE_CHANGED') ref.invalidate(cartProvider);
-      error = '$checkoutErrorCopy${code is String ? ' ($code)' : ''}';
+      if (code == 'CHECKOUT_REQUEST_STALE') {
+        // A stale key may refer to an older quote. The next user-initiated
+        // attempt needs a fresh key; never silently launch a second payment.
+        requestId = 'mobile-${DateTime.now().microsecondsSinceEpoch}';
+        preview = _loadPreview();
+        error = '$checkoutErrorCopy $retryCopy';
+      } else if (code == 'CHECKOUT_EXPIRY_PENDING') {
+        error = paymentPendingCopy;
+      } else {
+        error = '$checkoutErrorCopy${code is String ? ' ($code)' : ''}';
+      }
     } catch (_) {
       error = checkoutErrorCopy;
     } finally {

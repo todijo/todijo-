@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,7 +36,9 @@ class _SellerDashboardScreenState extends ConsumerState<SellerDashboardScreen> {
     return _repo(ref).dashboard(market.locale);
   }
 
-  void retry() => setState(() => data = _load());
+  void retry() => setState(() {
+    data = _load();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +221,9 @@ class _SellerProductsScreenState extends ConsumerState<SellerProductsScreen> {
 
   Future<SellerJson> load() =>
       _repo(ref).products(page: page, query: query, status: status, sort: sort);
-  void refresh() => setState(() => data = load());
+  void refresh() => setState(() {
+    data = load();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +402,9 @@ class _SellerOrdersScreenState extends ConsumerState<SellerOrdersScreen> {
   String query = '';
   late Future<SellerJson> data = load();
   Future<SellerJson> load() => _repo(ref).orders(page: page, query: query);
-  void refresh() => setState(() => data = load());
+  void refresh() => setState(() {
+    data = load();
+  });
 
   Future<void> advance(SellerJson order) async {
     final action = order['fulfillmentAction'] as String?;
@@ -817,12 +824,13 @@ class _SellerOnboardingScreenState
     ])
       key: TextEditingController(),
   };
-  String country = 'FR';
+  String country = '';
   String sellerType = 'PRIVATE';
   String legalForm = 'PRIVATE';
   String vatStatus = 'NOT_REGISTERED_OR_NOT_APPLICABLE';
   bool loading = true;
   bool busy = false;
+  bool emailVerified = true;
   String? error;
 
   @override
@@ -835,16 +843,47 @@ class _SellerOnboardingScreenState
     try {
       final result = await _repo(ref).onboarding();
       final draft = result['draft'] as SellerJson?;
+      final store = result['store'] as SellerJson?;
+      final profile = result['profile'] as SellerJson?;
       if (!mounted) return;
       setState(() {
         for (final entry in fields.entries) {
-          entry.value.text = draft?[entry.key] as String? ?? '';
+          final storeKey = switch (entry.key) {
+            'storeName' => 'name',
+            'postalCode' => 'businessPostalCode',
+            'address' => 'businessAddress',
+            'businessRegistrationNumber' => 'businessRegistrationId',
+            _ => entry.key,
+          };
+          final profileKey = switch (entry.key) {
+            'city' => 'profileCity',
+            'postalCode' => 'profilePostalCode',
+            'address' => 'profileAddress',
+            _ => entry.key,
+          };
+          entry.value.text =
+              draft?[entry.key] as String? ??
+              store?[storeKey] as String? ??
+              profile?[profileKey] as String? ??
+              '';
         }
-        country = draft?['country'] as String? ?? 'FR';
-        sellerType = draft?['sellerType'] as String? ?? 'PRIVATE';
-        legalForm = draft?['legalForm'] as String? ?? 'PRIVATE';
+        country =
+            draft?['country'] as String? ??
+            store?['country'] as String? ??
+            profile?['profileCountry'] as String? ??
+            '';
+        emailVerified = result['emailVerified'] == true;
+        sellerType =
+            draft?['sellerType'] as String? ??
+            store?['sellerType'] as String? ??
+            'PRIVATE';
+        legalForm =
+            draft?['legalForm'] as String? ??
+            store?['sellerLegalForm'] as String? ??
+            'PRIVATE';
         vatStatus =
             draft?['vatStatus'] as String? ??
+            store?['vatStatus'] as String? ??
             'NOT_REGISTERED_OR_NOT_APPLICABLE';
         loading = false;
         error = null;
@@ -892,10 +931,23 @@ class _SellerOnboardingScreenState
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(TodijoLocalizations.of(context).text('save')),
+              content: Text(
+                TodijoLocalizations.of(context).text('sellerDraftSaved'),
+              ),
             ),
           );
         }
+      }
+    } on DioException catch (failure) {
+      if (mounted) {
+        setState(
+          () => error =
+              failure.response?.data is Map &&
+                  failure.response?.data['error'] ==
+                      'EMAIL_VERIFICATION_REQUIRED'
+              ? 'emailVerification'
+              : 'submit',
+        );
       }
     } catch (_) {
       if (mounted) setState(() => error = 'submit');
@@ -926,7 +978,7 @@ class _SellerOnboardingScreenState
   Widget build(BuildContext context) {
     final copy = TodijoLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(copy.text('sellerWorkspace'))),
+      appBar: AppBar(title: Text(copy.text('sellerOnboardingTitle'))),
       body: SafeArea(
         child: loading
             ? const Center(child: CircularProgressIndicator.adaptive())
@@ -946,9 +998,11 @@ class _SellerOnboardingScreenState
                   padding: const EdgeInsets.all(20),
                   children: [
                     Text(
-                      copy.text('sellerWorkspace'),
+                      copy.text('sellerOnboardingTitle'),
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
+                    Text(copy.text('sellerOnboardingStep')),
+                    Text(copy.text('sellerOnboardingIntro')),
                     const SizedBox(height: 18),
                     Text(copy.text('sellerTypeLabel')),
                     SegmentedButton<String>(
@@ -975,7 +1029,7 @@ class _SellerOnboardingScreenState
                     TodijoCountryPicker(
                       value: country,
                       onChanged: (value) =>
-                          setState(() => country = value ?? 'FR'),
+                          setState(() => country = value ?? ''),
                     ),
                     const SizedBox(height: 12),
                     input(context, 'city', copy.text('city')),
@@ -1021,8 +1075,13 @@ class _SellerOnboardingScreenState
                       input(
                         context,
                         'businessRegistrationNumber',
-                        copy.text('sellerRegistrationNumber'),
+                        copy.text(
+                          country == 'FR'
+                              ? 'sellerSiret'
+                              : 'sellerCompanyNumber',
+                        ),
                       ),
+                      Text(copy.text('sellerFormatNotVerification')),
                     ],
                     const SizedBox(height: 12),
                     Text(copy.text('sellerVatStatus')),
@@ -1045,17 +1104,26 @@ class _SellerOnboardingScreenState
                     ),
                     if (vatStatus == 'REGISTERED')
                       input(context, 'vatNumber', copy.text('sellerVatNumber')),
-                    if (error != null)
+                    if (!emailVerified || error != null)
                       Text(
-                        copy.text('authError'),
+                        copy.text(
+                          !emailVerified || error == 'emailVerification'
+                              ? 'sellerVerifyBeforeSelling'
+                              : 'authError',
+                        ),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
                         ),
                       ),
+                    if (!emailVerified || error == 'emailVerification')
+                      TextButton(
+                        onPressed: () => context.push('/resend-verification'),
+                        child: Text(copy.text('resendTitle')),
+                      ),
                     const SizedBox(height: 16),
                     OutlinedButton(
                       onPressed: busy ? null : () => save(submit: false),
-                      child: Text(copy.text('save')),
+                      child: Text(copy.text('sellerSaveDraft')),
                     ),
                     FilledButton(
                       onPressed: busy ? null : () => save(submit: true),

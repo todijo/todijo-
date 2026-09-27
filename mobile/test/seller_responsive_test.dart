@@ -25,6 +25,11 @@ final class _NoSession implements SessionStore {
 }
 
 void main() {
+  test('legacy NEW product condition maps to the seller editor option', () {
+    expect(sellerEditorCondition('NEW'), 'NEUF');
+    expect(sellerEditorCondition('OCCASION'), 'OCCASION');
+    expect(sellerEditorCondition(null), 'NEUF');
+  });
   for (final width in [320.0, 360.0, 390.0, 412.0]) {
     testWidgets('seller CJ discovery keeps RTL layout at $width px', (
       tester,

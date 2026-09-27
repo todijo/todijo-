@@ -8,6 +8,14 @@ import '../../core/localization/todijo_localizations.dart';
 import '../marketplace/application/buyer_state.dart';
 import 'seller_repository.dart';
 
+String sellerEditorCondition(String? value) {
+  if (value == 'NEW') return 'NEUF';
+  return switch (value) {
+    'NEUF' || 'COMME_NEUF' || 'BON_ETAT' || 'OCCASION' => value!,
+    _ => 'NEUF',
+  };
+}
+
 class SellerProductEditorScreen extends ConsumerStatefulWidget {
   const SellerProductEditorScreen({super.key, this.productId});
   final String? productId;
@@ -94,7 +102,7 @@ class _SellerProductEditorState
             ..clear()
             ..addAll((product['images'] as List<dynamic>).cast<String>());
           leafCategory = product['category'] as String?;
-          condition = product['condition'] as String? ?? 'NEUF';
+          condition = sellerEditorCondition(product['condition'] as String?);
           status = product['status'] as String? ?? 'DRAFT';
           declared = product['complianceDeclaredAt'] != null;
           loyaltyEligible =
@@ -622,6 +630,7 @@ class _SellerProductEditorState
                             leafCategory = null;
                           }),
                   ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     key: ValueKey(mainCategory),
                     initialValue: groupCategory,
@@ -643,6 +652,7 @@ class _SellerProductEditorState
                             leafCategory = null;
                           }),
                   ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     key: ValueKey(groupCategory),
                     initialValue: leafCategory,
@@ -661,6 +671,7 @@ class _SellerProductEditorState
                         ? null
                         : (value) => setState(() => leafCategory = value),
                   ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: condition,
                     isExpanded: true,
@@ -702,7 +713,12 @@ class _SellerProductEditorState
                   ),
                   field(
                     'compareAtPrice',
-                    copy.text('sellerComparePrice'),
+                    copy
+                        .text('sellerComparePrice')
+                        .replaceAll(
+                          '{currency}',
+                          originalProduct?['currency'] as String? ?? 'EUR',
+                        ),
                     numeric: true,
                   ),
                   if (optionNames.isEmpty)

@@ -23,7 +23,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final copy = TodijoLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(copy.text('adminDashboard'))),
+      appBar: AppBar(
+        toolbarHeight: 80,
+        title: Text(copy.text('adminDashboard'), maxLines: 2),
+      ),
       body: SafeArea(
         child: FutureBuilder<AdminJson>(
           future: data,
@@ -31,8 +34,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboardScreen> {
             if (snapshot.hasError) {
               return Center(
                 child: FilledButton(
-                  onPressed: () =>
-                      setState(() => data = _repo(ref).dashboard()),
+                  onPressed: () => setState(() {
+                    data = _repo(ref).dashboard();
+                  }),
                   child: Text(copy.text('retry')),
                 ),
               );
@@ -137,12 +141,6 @@ class _AdminDashboardState extends ConsumerState<AdminDashboardScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/admin/loyalty'),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.notifications_outlined),
-                  title: Text(copy.text('notifications')),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/account/notifications'),
-                ),
                 for (final operation in [
                   (Icons.assignment_outlined, 'adminIssues', 'issues'),
                   (
@@ -187,7 +185,9 @@ class _AdminUsersState extends ConsumerState<AdminUsersScreen> {
   late Future<AdminJson> data = _load();
   Future<AdminJson> _load() =>
       _repo(ref).users(query: search.text.trim(), page: page);
-  void reload() => setState(() => data = _load());
+  void reload() => setState(() {
+    data = _load();
+  });
   @override
   void dispose() {
     search.dispose();
@@ -380,7 +380,11 @@ class _AdminUsersState extends ConsumerState<AdminUsersScreen> {
                               '${user['firstName']} ${user['lastName']}',
                             ),
                             subtitle: Text(
-                              '${user['email']} · ${user['role']}',
+                              '${user['email']} · ${user['role'] == 'CUSTOMER'
+                                  ? copy.text('buyer')
+                                  : user['role'] == 'SELLER'
+                                  ? copy.text('seller')
+                                  : user['role']}',
                             ),
                             children: [
                               if (user['blocked'] == true)
@@ -478,7 +482,9 @@ class _AdminSellerPickerState extends ConsumerState<_AdminSellerPicker> {
   Future<AdminJson> load() =>
       _repo(ref).users(query: search.text.trim(), role: 'SELLER', page: page);
 
-  void reload() => setState(() => users = load());
+  void reload() => setState(() {
+    users = load();
+  });
 
   @override
   void dispose() {
@@ -599,7 +605,9 @@ class _AdminStoresState extends ConsumerState<AdminStoresScreen> {
   late Future<AdminJson> data = _load();
   Future<AdminJson> _load() =>
       _repo(ref).stores(query: search.text.trim(), page: page);
-  void reload() => setState(() => data = _load());
+  void reload() => setState(() {
+    data = _load();
+  });
   @override
   void dispose() {
     search.dispose();
@@ -1052,7 +1060,13 @@ class _AdminStoresState extends ConsumerState<AdminStoresScreen> {
                                 ),
                               ListTile(
                                 title: Text(copy.text('sellerVatStatus')),
-                                subtitle: Text('${store['vatStatus']}'),
+                                subtitle: Text(
+                                  copy.text(
+                                    store['vatStatus'] == 'REGISTERED'
+                                        ? 'sellerVatRegistered'
+                                        : 'sellerVatNotRegistered',
+                                  ),
+                                ),
                               ),
                               if (store['riskHoldReason'] != null)
                                 ListTile(
