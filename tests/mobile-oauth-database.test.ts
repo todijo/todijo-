@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { prisma } from "../lib/prisma.js";
-import { exchangeMobileOAuthAttempt } from "../lib/mobile-oauth-exchange.js";
+import { exchangeMobileOAuthAttempt, exchangeWebViewOAuthAttempt } from "../lib/mobile-oauth-exchange.js";
 import { mobileOAuthHash, mobileOAuthSecret } from "../lib/mobile-oauth.js";
 
 const disposable=process.env.DATABASE_URL?.includes("127.0.0.1:55432/todijo_e2e")===true;
 const databaseTest={skip:!disposable};
 process.env.MOBILE_SESSION_SECRET ||= "todijo-disposable-mobile-session-secret-only";
 
-async function fixture(status:"active"|"blocked"|"deactivated"="active",overrides:Partial<{provider:string;platform:string;expired:boolean;consumed:boolean}>={}){
+async function fixture(status:"active"|"blocked"|"deactivated"="active",overrides:Partial<{provider:string;platform:string;expired:boolean;consumed:boolean;webviewVerifier:string}>={}){
   const marker=`${Date.now()}-${mobileOAuthSecret().slice(0,8)}`;
   const now=new Date(),state=mobileOAuthSecret(),code=mobileOAuthSecret();
   const user=await prisma.user.create({data:{firstName:"OAuth",lastName:"Test",email:`oauth-${marker}@example.test`,emailVerified:true,blockedAt:status==="blocked"?now:null,deactivatedAt:status==="deactivated"?now:null}});
-  const attempt=await prisma.mobileOAuthAttempt.create({data:{provider:overrides.provider??"google",platform:overrides.platform??"android",stateHash:mobileOAuthHash(state),exchangeCodeHash:mobileOAuthHash(code),userId:user.id,expiresAt:new Date(now.getTime()+(overrides.expired?-1000:60000)),consumedAt:overrides.consumed?now:null}});
+  const attempt=await prisma.mobileOAuthAttempt.create({data:{...(overrides.webviewVerifier?{id:mobileOAuthHash(overrides.webviewVerifier)}:{}),provider:overrides.provider??"google",platform:overrides.platform??"android",stateHash:mobileOAuthHash(state),exchangeCodeHash:mobileOAuthHash(code),userId:user.id,expiresAt:new Date(now.getTime()+(overrides.expired?-1000:60000)),consumedAt:overrides.consumed?now:null}});
   return{now,state,code,user,attempt,async cleanup(){await prisma.mobileSession.deleteMany({where:{userId:user.id}});await prisma.mobileOAuthAttempt.deleteMany({where:{userId:user.id}});await prisma.user.delete({where:{id:user.id}})}};
 }
 
@@ -25,3 +25,7 @@ test("real concurrent exchange allows exactly one transaction to issue a session
 test("real database rejects expired consumed wrong-state wrong-provider and wrong-platform attempts",databaseTest,async()=>{for(const scenario of["expired","consumed","state","provider","platform"]as const){const f=await fixture("active",{expired:scenario==="expired",consumed:scenario==="consumed"});try{await assert.rejects(exchangeMobileOAuthAttempt({attemptId:f.attempt.id,state:scenario==="state"?"wrong":f.state,code:f.code,provider:scenario==="provider"?"facebook":"google",platform:scenario==="platform"?"ios":"android"}));assert.equal(await prisma.mobileSession.count({where:{userId:f.user.id}}),0)}finally{await f.cleanup()}}});
 
 test("real database rejects blocked and deactivated OAuth users without consuming attempts",databaseTest,async()=>{for(const status of["blocked","deactivated"]as const){const f=await fixture(status);try{await assert.rejects(exchangeMobileOAuthAttempt({attemptId:f.attempt.id,state:f.state,code:f.code,provider:"google",platform:"android"}));assert.equal(await prisma.mobileSession.count({where:{userId:f.user.id}}),0);assert.equal((await prisma.mobileOAuthAttempt.findUniqueOrThrow({where:{id:f.attempt.id}})).consumedAt,null)}finally{await f.cleanup()}}});
+
+test("real database consumes OAuth proof once for WebView without minting a bearer session",databaseTest,async()=>{const handoffVerifier=mobileOAuthSecret();const f=await fixture("active",{webviewVerifier:handoffVerifier});try{const input={attemptId:f.attempt.id,state:f.state,code:f.code,provider:"google" as const,platform:"android" as const,handoffVerifier};await assert.rejects(exchangeWebViewOAuthAttempt({...input,handoffVerifier:mobileOAuthSecret()}));const result=await exchangeWebViewOAuthAttempt(input);assert.equal(result.userId,f.user.id);assert.equal(result.role,"CUSTOMER");assert.equal(await prisma.mobileSession.count({where:{userId:f.user.id}}),0);await assert.rejects(exchangeWebViewOAuthAttempt(input));assert.ok((await prisma.mobileOAuthAttempt.findUniqueOrThrow({where:{id:f.attempt.id}})).consumedAt)}finally{await f.cleanup()}});
+
+test("WebView OAuth proof rejects blocked user without consuming attempt",databaseTest,async()=>{const handoffVerifier=mobileOAuthSecret();const f=await fixture("blocked",{webviewVerifier:handoffVerifier});try{await assert.rejects(exchangeWebViewOAuthAttempt({attemptId:f.attempt.id,state:f.state,code:f.code,provider:"google",platform:"android",handoffVerifier}));assert.equal((await prisma.mobileOAuthAttempt.findUniqueOrThrow({where:{id:f.attempt.id}})).consumedAt,null)}finally{await f.cleanup()}});

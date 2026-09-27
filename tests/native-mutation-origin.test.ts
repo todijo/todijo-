@@ -122,3 +122,24 @@ test("forged forwarding headers cannot redefine the browser same-origin boundary
   });
   assert.equal(isTrustedMutationRequest(attempt), false);
 });
+
+test("disposable Android WebView origin reaches local web login only", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  try {
+    Reflect.set(process.env, "NODE_ENV", "development");
+    const attempt = (url: string, origin: string, site = "same-origin") => middleware(new NextRequest(url, {
+      method: "POST", headers: { origin, "sec-fetch-site": site }, body: "{}",
+    }));
+    assert.equal(attempt("http://localhost:3001/api/auth/login", "http://10.0.2.2:3001").status, 200);
+    assert.equal(attempt("http://localhost:3001/api/auth/login", "http://10.0.2.2:3002").status, 403);
+    assert.equal(attempt("http://localhost:3001/api/auth/login", "http://evil.example").status, 403);
+    assert.equal(attempt("http://localhost:3001/api/auth/login", "http://10.0.2.2:3001", "cross-site").status, 403);
+    assert.equal(attempt("https://todijo.com/api/auth/login", "http://10.0.2.2:3001").status, 403);
+    assert.equal(attempt("http://192.168.1.20:3001/api/auth/login", "http://10.0.2.2:3001").status, 403);
+    Reflect.set(process.env, "NODE_ENV", "production");
+    assert.equal(attempt("http://localhost:3001/api/auth/login", "http://10.0.2.2:3001").status, 403);
+  } finally {
+    if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, "NODE_ENV");
+    else Reflect.set(process.env, "NODE_ENV", previousNodeEnv);
+  }
+});

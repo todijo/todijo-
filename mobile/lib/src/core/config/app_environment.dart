@@ -24,6 +24,7 @@ final class AppEnvironment {
     }
     final localDevelopment =
         flavor == AppFlavor.development &&
+        !const bool.fromEnvironment('dart.vm.product') &&
         (origin.host == 'localhost' ||
             origin.host == '127.0.0.1' ||
             origin.host == '10.0.2.2' ||

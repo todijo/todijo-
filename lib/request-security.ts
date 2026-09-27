@@ -7,6 +7,18 @@ function expectedPublicOrigin(request:Request){
   try{const url=new URL(configured||request.url);if(!["http:","https:"].includes(url.protocol))return null;return `${url.protocol}//${normalizedHost(url.host)}`;}catch{return null;}
 }
 
+/** Android's emulator reaches a disposable loopback Next server through
+ * 10.0.2.2. Next dev canonicalizes that request URL to localhost. This exact
+ * alias is never accepted in production or for a non-loopback server. */
+function isDisposableEmulatorOrigin(request:Request, actual:string){
+  if(process.env.NODE_ENV==="production")return false;
+  try{
+    const expected=new URL(request.url);
+    if(expected.protocol!=="http:"||!["localhost","127.0.0.1"].includes(expected.hostname))return false;
+    return actual==="http://10.0.2.2:"+(expected.port||"80");
+  }catch{return false;}
+}
+
 export function assertAdminMutationRequest(request:Request){
   if(request.headers.get("x-todijo-admin-action")!=="1")throw new MutationOriginError();
   const site=request.headers.get("sec-fetch-site");
@@ -26,7 +38,7 @@ export function isTrustedMutationRequest(request:Request){
   if(!origin)return site==="same-origin"||site==="none"||process.env.NODE_ENV!=="production";
   let actual:string;
   try{const parsed=new URL(origin);actual=`${parsed.protocol}//${normalizedHost(parsed.host)}`;}catch{return false;}
-  return actual===expectedPublicOrigin(request);
+  return actual===expectedPublicOrigin(request)||isDisposableEmulatorOrigin(request,actual);
 }
 
 /** Native apps do not send browser Origin/Sec-Fetch-Site headers. A bearer is

@@ -1,9 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'src/app.dart';
+import 'src/native_shell/todijo_shell_app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: TodijoApp()));
+  runApp(const TodijoShellApp());
 }

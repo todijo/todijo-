@@ -4,6 +4,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseKeystorePath = providers.environmentVariable("TODIJO_ANDROID_KEYSTORE_PATH").orNull
+val releaseStorePassword = providers.environmentVariable("TODIJO_ANDROID_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("TODIJO_ANDROID_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("TODIJO_ANDROID_KEY_PASSWORD").orNull
+val releaseSigningReady = listOf(releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+    .all { !it.isNullOrBlank() }
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+if (releaseRequested && !releaseSigningReady) {
+    throw GradleException("Todijo release signing requires the four TODIJO_ANDROID_* environment variables.")
+}
+
 android {
     namespace = "com.todijo.app"
     compileSdk = flutter.compileSdkVersion
@@ -29,11 +40,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("todijoRelease") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("todijoRelease")
         }
     }
 }

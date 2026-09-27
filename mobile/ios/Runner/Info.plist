@@ -8,6 +8,10 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Todijo</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Todijo uses the camera only when you choose to capture media for an upload.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Todijo lets you select photos and videos for product and support uploads.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

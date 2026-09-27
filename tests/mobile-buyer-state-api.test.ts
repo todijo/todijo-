@@ -38,11 +38,15 @@ test("mobile buyer-state migration is additive", () => {
 test("native push registration is bearer-owned and raw tokens are encrypted", () => {
   const route = read("app/api/mobile/push/devices/route.ts");
   const service = read("lib/mobile-push.ts");
+  const registration = read("lib/mobile-push-registration.ts");
+  const webview = read("app/api/mobile/push/webview-devices/route.ts");
   assert.match(route, /readMobileSession\(request\)/);
-  assert.match(route, /userId:session\.userId/);
-  assert.match(route, /tokenEncrypted:encryptMobilePushToken\(token\)/);
-  assert.match(route, /tokenHash=mobilePushHash\(token\)/);
-  assert.doesNotMatch(route, /data:\{[^}]*token,/);
+  assert.match(route, /registerMobilePushDevice\(session\.userId,body\)/);
+  assert.match(registration, /userId,tokenHash,tokenEncrypted:encryptMobilePushToken\(token\)/);
+  assert.match(registration, /tokenHash=mobilePushHash\(token\)/);
+  assert.doesNotMatch(registration, /data:\{[^}]*token,/);
+  assert.match(webview, /readSession\(\)/);
+  assert.match(webview, /registerMobilePushDevice\(session\.userId/);
   assert.match(service, /createCipheriv\("aes-256-gcm"/);
   assert.match(service, /createHash\("sha256"\)/);
 });
