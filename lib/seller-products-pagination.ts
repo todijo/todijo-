@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+export { pageNumbers as sellerPageNumbers } from "./pagination";
 
 export const SELLER_PRODUCTS_PAGE_SIZE = 40;
 export const SELLER_PRODUCTS_SEARCH_LIMIT = 100;
@@ -27,10 +28,6 @@ export function sellerProductsHref(locale: string, query: SellerProductsQuery, p
   if (query.sort !== "newest") params.set("sort", query.sort);
   params.set("page", String(page));
   return `/${locale}/seller/products?${params}`;
-}
-
-export function sellerPageNumbers(page: number, pages: number) {
-  return [...new Set([1, pages, page - 2, page - 1, page, page + 1, page + 2])].filter((number) => number >= 1 && number <= pages).sort((a, b) => a - b);
 }
 
 export function appendUniqueSellerProducts(previous: SellerProductCardData[], incoming: SellerProductCardData[]) {

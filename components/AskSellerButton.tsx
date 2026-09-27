@@ -8,7 +8,7 @@ import { MessageCircle } from "lucide-react";
 const MIN_MESSAGE_LENGTH = 12;
 const MAX_MESSAGE_LENGTH = 2000;
 
-export default function AskSellerButton({ productId, loggedIn }: { productId: string; loggedIn: boolean }) {
+export default function AskSellerButton({ productId, loggedIn, className = "askSellerButton" }: { productId: string; loggedIn: boolean; className?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const productText = useTranslations("Product");
@@ -46,7 +46,7 @@ export default function AskSellerButton({ productId, loggedIn }: { productId: st
   }
 
   return <>
-    <button className="askSellerButton" type="button" onClick={begin}><MessageCircle size={18} aria-hidden="true" /> {productText("ask")}</button>
+    <button className={className} type="button" onClick={begin}><MessageCircle size={18} aria-hidden="true" /> {productText("ask")}</button>
     {open && <div className="messageModalBackdrop" role="presentation" onMouseDown={() => setOpen(false)}>
       <section className="messageModal" role="dialog" aria-modal="true" aria-labelledby="ask-seller-title" onMouseDown={(event) => event.stopPropagation()}>
         <button className="messageModalClose" onClick={() => setOpen(false)} aria-label={productText("close")}>×</button>

@@ -81,7 +81,6 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const displayCategory = (value: string) => localizedCategoryTreeValue(activeLocale, value) ?? categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), best:h("bestSellers"), low:m("low"), high:m("high"), reviews:dashboard("reviews"), availability:c("available"), season:m("season"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const moreProductsLabel = activeLocale === "fr" ? "Voir plus de produits" : activeLocale === "ku" ? "کاڵای زیاتر ببینە" : "See more products";
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
 
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length, [filters]);
@@ -204,7 +203,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
           {totalPages > 1 && <nav className={`pagination${page === 1 ? " firstPagePagination" : ""}`} aria-label={t.products}>
             {page > 1 ? <a href={buildUrl(filters, page - 1)}>← {t.previous}</a> : <span />}
             {page > 1 ? <strong>{page} / {totalPages}</strong> : <span />}
-            {page < totalPages ? <a className={page === 1 ? "moreProductsLink" : undefined} href={buildUrl(filters, page + 1)}>{page === 1 ? moreProductsLabel : t.next} →</a> : <span />}
+            {page < totalPages ? <a className={page === 1 ? "moreProductsLink" : undefined} href={buildUrl(filters, page + 1)}>{page === 1 ? h("exploreProducts") : t.next} →</a> : <span />}
           </nav>}
         </div>
       </section>
