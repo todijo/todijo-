@@ -18,6 +18,7 @@ import {accountStatusMessages} from "./account-status";
 import {categoryNavigationMessages} from "./category-navigation";
 import { legalPhase5Messages } from "./legal-phase5";
 import {globalDropshippingMarginMessages} from "./global-dropshipping-margin";
+import {productReviewMessages} from "./product-reviews";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -62,7 +63,7 @@ export default getRequestConfig(async () => {
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = {...(["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
     ? (await import(`../messages/product-detail/${locale}.json`)).default
-    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale],genericModel:genericModelMessages[locale],deliveryTo:locale==="fr"?"Livraison à :":"Delivery to:",changeAddress:locale==="fr"?"Modifier":"Change",addShippingAddress:buyerAddressMessages[locale].addAddress};
+    : (await import("../messages/product-detail/en.json")).default),...buyerPricingMessages[locale],...productReviewMessages[locale],genericModel:genericModelMessages[locale],deliveryTo:locale==="fr"?"Livraison à :":"Delivery to:",changeAddress:locale==="fr"?"Modifier":"Change",addShippingAddress:buyerAddressMessages[locale].addAddress};
   const adminLocale = ["ar", "en", "fa", "fr", "hi", "ku", "pt", "ru", "zh"].includes(locale) ? locale : "en";
   messages.Admin = (await import(`../messages/admin/${adminLocale}.json`)).default;
   messages.GlobalDropshippingMargin=globalDropshippingMarginMessages[locale];
