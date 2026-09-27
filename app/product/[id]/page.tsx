@@ -102,6 +102,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const minimumVariantPrice=minimumPurchasableVariantPrice({basePrice:persistedPrice,activeOptionCount:product.options.length,variants:product.variants.map((variant)=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
   const price=minimumVariantPrice??persistedPrice;
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
+  const conditionLabel=product.condition==="NEUF"?detailText("conditionNew"):product.condition==="COMME_NEUF"?detailText("conditionLikeNew"):product.condition==="BON_ETAT"?detailText("conditionGood"):product.condition==="OCCASION"?detailText("conditionUsed"):product.condition.replaceAll("_"," ");
   const productJsonLd = productStructuredData({ ...product, available: availability.isGenerallyAvailable }, locale);
   const publicProductInfo = [
     ["productIdentifier", product.productIdentifier], ["manufacturerName", product.manufacturerName],
@@ -123,7 +124,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
         <div className="productTopMeta"><p className="dashboardBadge">{categoryLabel(product.category, (key) => categoryText(key))}</p><div className="productQuickActions"><WishlistButton productId={product.id}/></div></div>
         <h1>{product.name}</h1><ProductDetailPrice pendingPresentment initialMinimum={Boolean(minimumVariantPrice!=null||requiresAuthoritativePrice)} price={price} compareAtPrice={compare} currency={product.currency}/>
         <div className="productTrustRow"><span>★★★★★</span><a href="#reviews">{common("view")}</a></div>
-        <dl className="productFacts productFactsDesktop" id="product-facts"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div></dl>
+        <dl className="productFacts productFactsDesktop" id="product-facts"><div><dt>{market("condition")}</dt><dd>{conditionLabel}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div></dl>
       </article>
       <div className="productPurchaseColumn">
         <ProductPurchasePanel dropshippingEligible={dropshippingEligibility.eligible} requiresAuthoritativePrice={requiresAuthoritativePrice} availabilityLabel={common("available")} colors={product.colors} sizes={product.sizes} options={buyerVariants.options} variants={buyerVariants.variants} product={{id:product.id,name:product.name,price,currency:product.currency,image:product.images[0],stock:product.stock,storeName:product.store.name,storeSlug:product.store.slug,shippingPrice:shippingRule.shippingPrice==null?null:Number(shippingRule.shippingPrice),shippingFreeThreshold:shippingRule.shippingFreeThreshold==null?null:Number(shippingRule.shippingFreeThreshold),shippingMethodName:shippingRule.shippingMethodName}}/>
@@ -134,7 +135,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     <section className="productDetailDescriptionSection" id="description" aria-labelledby="product-details-title">
       <h2 id="product-details-title">{detailText("description")}</h2>
       <ProductDescription description={product.description} supplierManaged={Boolean(product.supplierLink)}/>
-      <dl className="productFacts productFactsMobile" id="product-facts-mobile"><div><dt>{market("condition")}</dt><dd>{product.condition.replaceAll("_"," ")}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div></dl>
+      <dl className="productFacts productFactsMobile" id="product-facts-mobile"><div><dt>{market("condition")}</dt><dd>{conditionLabel}</dd></div><div><dt>{common("available")}</dt><dd>{availability.isGenerallyAvailable ? common("available") : common("soldOut")}</dd></div></dl>
     </section>
     {hasPublicProductInfo && <section className="productCompliancePublic" aria-labelledby="product-information-title"><h2 id="product-information-title">{compliance("publicProductInfo")}</h2>{publicProductInfo.length > 0 && <dl>{publicProductInfo.map(([key,value])=><div key={key}><dt>{compliance(key)}</dt><dd>{value}</dd></div>)}</dl>}<div className="productComplianceLongText">{safetyInformation && <section><h3>{compliance("publicSafetyInfo")}</h3><p>{safetyInformation}</p></section>}{complianceInformation && <section><h3>{compliance("complianceInformation")}</h3><p>{complianceInformation}</p></section>}</div></section>}
     <section className="productSellerInformationCard">
