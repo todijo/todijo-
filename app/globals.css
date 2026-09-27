@@ -1166,6 +1166,21 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 @media(max-width:1200px){.productDetailPage{--product-detail-sticky-top:0}.productMainImageZoomSurface{overflow:hidden;cursor:default}.productHoverZoomLens,.productHoverZoomPanel{display:none!important}.productGallerySticky,.productPurchaseColumn{position:static;max-height:none}.productPurchaseCard{max-height:none}.purchaseOptionsScroll{overflow:visible;padding-inline-end:0}}
 @media(max-width:760px){.productSellerInformationCard{grid-template-columns:1fr;margin:14px 12px 0;padding:17px}.productSellerInformationCard .productLowerActions{align-items:stretch;justify-content:stretch;flex-direction:column}.productSellerInformationCard .productAskSeller,.productSellerInformationCard .askSellerButton,.productSellerInformationCard .productReportTrigger{width:100%}.purchasePanel.variantPurchasePanel{display:block}.purchaseActionFooter{padding-top:6px;border-top:0}.productMainImageZoomSurface{border:0;border-radius:0}}
 
+/* Desktop PDP only: use the homepage primary header without catalog controls,
+   give variant choices more room, and keep positive availability unobtrusive. */
+@media(min-width:861px){
+  .marketHeaderDesktopPdp .marketFilterDockV3,
+  .marketHeaderDesktopPdp .marketFilterDock,
+  .marketHeaderDesktopPdp .marketCategoryNavigation{display:none}
+  .productDetailPage{--product-detail-sticky-top:86px}
+  .productDetailPage .productDetailShell{padding-top:28px}
+  .productDetailPage .purchaseOptionsScroll{max-height:clamp(420px,calc(100vh - 250px),760px);overflow-y:auto}
+  .productDetailPage .optionGroup button.selected[style]{border-color:var(--selected-option-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--selected-option-accent) 24%,transparent)}
+  .productDetailPage .purchaseAvailability.isAvailable{justify-content:flex-end;padding-bottom:0;border-bottom:0}
+  .productDetailPage .purchaseAvailability.isAvailable>span[aria-hidden="true"],
+  .productDetailPage .purchaseAvailability.isAvailable>.purchaseAvailabilityLabel{display:none}
+}
+
 /* Shared seller shell: keep navigation independently scrollable and logout reachable. */
 .premiumSidebarDetails{min-height:0;flex:1;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}.premiumSidebarDetails nav{min-height:0;margin-top:12px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.32) transparent;padding-right:3px}.premiumDashboardSidebar>form{flex:0 0 auto;padding-top:8px}.premiumDashboardContent .accountSettingsPage{min-height:0;padding:0;background:transparent}.premiumDashboardContent .accountSettingsShell{width:100%;max-width:1000px}.accountMarketplaceContent{min-height:70vh;padding:24px 16px 64px}
 .adminUserActions{display:flex;flex-wrap:wrap;gap:.5rem}.adminUserActions button{min-height:44px}.adminUserActions .isDanger{color:#9f1d1d}.adminUserDialog{width:min(92vw,560px);border:0;border-radius:18px;padding:0;box-shadow:0 24px 80px #0004}.adminUserDialog::backdrop{background:#071d17aa}.adminUserDialog form{display:grid;gap:1rem;padding:1.5rem}.adminUserDialog label{display:grid;gap:.4rem;font-weight:700}.adminUserDialog textarea{min-height:120px;resize:vertical}.adminUserDialog form>div{display:flex;justify-content:flex-end;gap:.75rem}.adminConfirmCheck{grid-template-columns:auto 1fr;align-items:start}.moderationCard pre{white-space:pre-wrap;overflow-wrap:anywhere}

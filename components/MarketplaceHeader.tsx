@@ -14,7 +14,7 @@ import MarketplaceBrowseFilterBar from "@/components/MarketplaceBrowseFilterBar"
 import TodijoLogo from "@/components/TodijoLogo";
 import { isNavigationActive, localizedPath } from "@/lib/navigation";
 
-export default function MarketplaceHeader({ showCategoryNav = true, showFilterDock = false, filterOpen, onToggleFilters }: { showCategoryNav?: boolean; showFilterDock?: boolean; filterOpen?: boolean; onToggleFilters?: () => void }) {
+export default function MarketplaceHeader({ showCategoryNav = true, showFilterDock = false, filterOpen, onToggleFilters, desktopPdp = false }: { showCategoryNav?: boolean; showFilterDock?: boolean; filterOpen?: boolean; onToggleFilters?: () => void; desktopPdp?: boolean }) {
   const [query, setQuery] = useState("");
   const [accountName, setAccountName] = useState<string | null>(null);
   const locale = useLocale();
@@ -44,7 +44,7 @@ export default function MarketplaceHeader({ showCategoryNav = true, showFilterDo
 
   return <>
     <BuyerMobileHeader accountName={accountName}/>
-    <header className="marketHeader" data-marketplace-header="true">
+    <header className={`marketHeader${desktopPdp ? " marketHeaderDesktopPdp" : ""}`} data-marketplace-header="true">
       <div className="marketUtilityBar"><div className="marketUtilityInner"><div className="marketUtilityPromises"><span><Truck size={14} aria-hidden="true"/>{header("utilityDelivery")}</span><span>{header("utilityPromise")}</span></div><div className="marketUtilityControls"><a href={localizedPath(locale,"/info/help")}>{footer("helpCenter")}</a><LanguageSwitcher className="marketUtilityLanguage"/></div></div></div>
       <div className="marketPrimaryHeader"><div className="marketHeaderInner">
         <TodijoLogo href={homeHref}/>

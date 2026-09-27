@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback,useEffect,useLayoutEffect,useMemo,useState } from "react";
+import { useCallback,useEffect,useLayoutEffect,useMemo,useState,type CSSProperties } from "react";
 import Image from "next/image";
 import AddToCartButton from "@/components/AddToCartButton";
 import type { CartProduct } from "@/components/CartProvider";
@@ -13,6 +13,32 @@ import BuyerProductPrice from "@/components/BuyerProductPrice";
 
 type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null;supplierVariantId?:string|null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
+
+type SelectedOptionStyle = CSSProperties & { "--selected-option-accent"?: string };
+const SAFE_COLOR_ACCENTS: Array<[RegExp,string]> = [
+  [/\b(?:black|noir|schwarz|negro|nero)\b/i,"#171717"],
+  [/\b(?:navy|marine)\b/i,"#1e3a5f"],
+  [/\b(?:blue|bleu|blau|azul|blu)\b/i,"#2563eb"],
+  [/\b(?:red|rouge|rot|rojo|rosso)\b/i,"#dc2626"],
+  [/\b(?:green|vert|gr(?:u|ü)n|verde)\b/i,"#15803d"],
+  [/\b(?:pink|rose|rosa)\b/i,"#db2777"],
+  [/\b(?:purple|violet|lila|morado|viola)\b/i,"#7c3aed"],
+  [/\b(?:orange)\b/i,"#ea580c"],
+  [/\b(?:yellow|jaune|gelb|amarillo|giallo)\b/i,"#ca8a04"],
+  [/\b(?:brown|brun|braun|marron|marrone)\b/i,"#7c4a2d"],
+  [/\b(?:gray|grey|gris|grau|grigio)\b/i,"#6b7280"],
+  [/\b(?:silver|argent|silber|plata|argento)\b/i,"#94a3b8"],
+  [/\b(?:white|blanc|wei(?:ss|ß)|blanco|bianco)\b/i,"#cbd5e1"],
+  [/\b(?:beige|cream|cr[eè]me)\b/i,"#b89b72"],
+  [/\b(?:gold|or|golden|dorado)\b/i,"#b7791f"],
+  [/\b(?:cyan|turquoise|teal)\b/i,"#0f766e"],
+];
+
+function selectedOptionStyle(label:string,selected:boolean):SelectedOptionStyle|undefined {
+  if(!selected)return undefined;
+  const accent=SAFE_COLOR_ACCENTS.find(([pattern])=>pattern.test(label))?.[1];
+  return accent?{"--selected-option-accent":accent}:undefined;
+}
 
 export default function ProductPurchasePanel({ product, colors, sizes, options = [], variants = [], availabilityLabel, dropshippingEligible = false, requiresAuthoritativePrice=false }: { product: CartProduct; colors: string[]; sizes: string[]; options?: Option[]; variants?: Variant[]; availabilityLabel: string; dropshippingEligible?: boolean;requiresAuthoritativePrice?:boolean }) {
   const t = useTranslations("Product");
@@ -76,10 +102,11 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
         const next = { ...Object.fromEntries(Object.entries(selection).filter(([selectedOptionId])=>(genericOptions.find((candidate)=>candidate.id===selectedOptionId)?.position??0)<=option.position)), [option.id]: value.id };
         const valueAvailable = activeVariants.some((variant) => matches(variant, next) && variant.stock > 0);
         const image = value.imageUrls?.[0];
-        return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selection[option.id] === value.id ? " selected" : ""}`} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-label={value.accessibleLabel ?? value.value} aria-pressed={selection[option.id] === value.id}>
+        const selected=selection[option.id]===value.id;
+        return <button key={value.id} className={`${image ? "optionImageChoice" : ""}${selected ? " selected" : ""}`} style={selectedOptionStyle(value.value,selected)} disabled={!valueAvailable} onClick={() => selectOption(option.id, value.id)} type="button" aria-label={value.accessibleLabel ?? value.value} aria-pressed={selected}>
           {image ? <Image src={image} alt="" width={78} height={64} unoptimized /> : null}<span className={value.imageOnly ? "srOnly" : undefined}>{value.value}</span>
         </button>;
-      })}</div></fieldset>) : <><fieldset className="optionGroup"><legend>{t("color")}</legend><div>{colorChoices.map((value) => <button key={value} className={color === value ? "selected" : ""} onClick={() => setColor(value)} type="button" aria-pressed={color === value}>{value}</button>)}</div></fieldset><fieldset className="optionGroup"><legend>{t("size")}</legend><div>{sizeChoices.map((value) => <button key={value} className={size === value ? "selected" : ""} onClick={() => setSize(value)} type="button" aria-pressed={size === value}>{value}</button>)}</div></fieldset></>}
+      })}</div></fieldset>) : <><fieldset className="optionGroup"><legend>{t("color")}</legend><div>{colorChoices.map((value) => <button key={value} className={color === value ? "selected" : ""} style={selectedOptionStyle(value,color===value)} onClick={() => setColor(value)} type="button" aria-pressed={color === value}>{value}</button>)}</div></fieldset><fieldset className="optionGroup"><legend>{t("size")}</legend><div>{sizeChoices.map((value) => <button key={value} className={size === value ? "selected" : ""} onClick={() => setSize(value)} type="button" aria-pressed={size === value}>{value}</button>)}</div></fieldset></>}
       <p className="selectedOptions">{t("selection", { value: selectedOptions || detail("chooseCombination") })}</p>
       </div>
       <div className="purchaseActionFooter">
