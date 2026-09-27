@@ -35,6 +35,7 @@ test("desktop precise-pointer gallery uses object-fit-aware hover zoom while tou
   assert.match(gallery, /className="productMobileImageSlide"[\s\S]*setIsOpen\(true\)/);
   assert.match(gallery, /addEventListener\("todijo:variant-images"/);
   assert.match(css, /productHoverZoomPanel\{[^}]*left:calc\(100% \+ 16px\)/);
+  assert.match(css, /\[dir="rtl"\] \.productHoverZoomPanel\{right:calc\(100% \+ 16px\);left:auto\}/);
 });
 
 test("shipping presentation authority is product-specific and manual override is not reclassified", () => {

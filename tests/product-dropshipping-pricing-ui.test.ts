@@ -69,6 +69,15 @@ test("all 14 locales provide product pricing states and the scoped mobile path i
  const css=source("app/globals.css");assert.match(css,/\.dropshippingBuyerPricing/);assert.match(css,/@media\(max-width:760px\).*\.dropshippingBuyerPricing/);
 });
 
+test("RTL pricing loading labels are valid Unicode on the initial authoritative-price render",()=>{
+ assert.equal(buyerPricingMessages.ar.pricingLoading,"جارٍ التحقق من السعر والتوصيل…");
+ assert.equal(buyerPricingMessages.ku.pricingLoading,"نرخ و گەیاندن پشکنین دەکرێت…");
+ assert.equal(buyerPricingMessages.fa.pricingLoading,"در حال بررسی قیمت و تحویل…");
+ for(const locale of ["ar","ku","fa"] as const)assert.doesNotMatch(buyerPricingMessages[locale].pricingLoading,/Ã|Â|â€¦|Ø|Ù|Ú|Û|�/);
+ const panel=source("components/ProductPurchasePanel.tsx");
+ assert.match(panel,/disabledLabel=\{!pricingReady\?detail\("pricingLoading"\):disabledLabel\}/);
+});
+
 test("manual override and errors cannot enable embedded shipping client-side",()=>{
  const service=source("lib/suppliers/commerce-pricing.ts"),ui=source("components/DropshippingProductPricing.tsx");assert.match(service,/shippingIncluded=mode==="AUTOMATIC"/);assert.match(ui,/data\.eligible===true/);assert.match(ui,/!validQuote\(data,input\)/);assert.match(ui,/setState\(\{status:"error",data:null\}\)/);
 });
