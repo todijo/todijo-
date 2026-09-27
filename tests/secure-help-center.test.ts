@@ -44,7 +44,9 @@ test("informational pages retain category navigation without the filter dock whi
   assert.match(header,/path\.startsWith\("\/info\/"\)[\s\S]*<MarketplaceHeader showCategoryNav showFilterDock=\{false\}/);
   assert.match(header,/return <MarketplaceHeader showFilterDock\/>/);
   assert.match(marketplace,/showFilterDock \? <MarketplaceBrowseFilterBar\/>/);
-  assert.match(marketplace,/showCategoryNav \? <MarketplaceCategoryNavigation/);
+  assert.match(marketplace,/\{showCategoryNav \?/);
+  assert.match(marketplace,/<MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters" compactHomepage showStores=\{false\}\/>/);
+  assert.match(marketplace,/<MarketplaceCategoryNavigation className=\{showFilterDock \? "marketCategoryNavigationBelowFilters" : ""\}\/>/);
 });
 
 test("public endpoint fails closed for guest automation and validates owned order or public product context",()=>{
