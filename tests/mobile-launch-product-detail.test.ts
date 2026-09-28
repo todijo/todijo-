@@ -20,12 +20,34 @@ test("minimum price uses only complete active in-stock purchasable variants",()=
   assert.equal(minimumPurchasableVariantPrice({basePrice:25,activeOptionCount:1,variants:[{active:false,stock:1,valueCount:1,priceOverride:10}]}),null);
 });
 
-test("launch branding relies on the native PWA splash without a delayed JavaScript overlay",()=>{
-  const layout=source("app/layout.tsx"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
-  assert.doesNotMatch(layout,/TodijoLaunchSplash/);
+test("startup branding is a first-paint standalone-PWA layer without an arbitrary delay",()=>{
+  const layout=source("app/layout.tsx"),layer=source("components/PwaStartupLayer.tsx"),css=source("app/globals.css"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
+  assert.match(layout,/display-mode: standalone/);
+  assert.match(layout,/navigator\.standalone === true/);
+  assert.match(layout,/<PwaStartupLayer\/>/);
+  assert.match(layout,/href="\/images\/brand\/todijo-pwa-startup\.png\?v=1" media="\(display-mode: standalone\)"/);
+  assert.match(layer,/<source media="\(display-mode: standalone\)" srcSet="\/images\/brand\/todijo-pwa-startup\.png\?v=1"/);
+  assert.match(layer,/requestAnimationFrame/);
+  assert.match(layer,/await image\.decode\(\)/);
+  assert.match(layer,/addEventListener\("load"/);
+  assert.match(layer,/transitionend/);
+  assert.doesNotMatch(layer,/setTimeout|setInterval/);
+  assert.match(css,/\.pwaStartupLayer\{display:none\}/);
+  assert.match(css,/html\.todijoStandaloneLaunch \.pwaStartupLayer/);
+  assert.match(css,/env\(safe-area-inset-top\)/);
+  assert.match(css,/prefers-reduced-motion:reduce/);
   assert.match(manifest,/background_color: "#fffaf0"/);
   assert.match(manifest,/icon-maskable-512\.png\?v=8/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v8"/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v9"/);
+  assert.match(worker,/todijo-pwa-startup\.png\?v=1/);
+});
+
+test("standalone startup uses the exact approved Todijo artwork",()=>{
+  const path="public/images/brand/todijo-pwa-startup.png";
+  const png=readFileSync(path);
+  assert.equal(png.readUInt32BE(16),941);
+  assert.equal(png.readUInt32BE(20),1672);
+  assert.equal(createHash("sha256").update(png).digest("hex"),"24ce205c3bec68f9a126be82a6fe5be0e72a6e7bc830e76d14564b03e1005e96");
 });
 
 test("PWA startup icons use the centered square derivative of the supplied Todijo artwork",()=>{

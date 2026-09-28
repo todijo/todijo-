@@ -11,6 +11,12 @@ import CookieConsent from "@/components/CookieConsent";
 import BuyerMarketProvider from "@/components/BuyerMarketProvider";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import BackToTop from "@/components/BackToTop";
+import PwaStartupLayer from "@/components/PwaStartupLayer";
+
+const standaloneStartupDetection = `(() => {
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if (standalone) document.documentElement.classList.add("todijoStandaloneLaunch");
+})();`;
 
 export const viewport: Viewport = {
   themeColor: "#073b2d",
@@ -44,8 +50,12 @@ export default async function RootLayout({
   const locale = await getLocale() as Locale;
   const messages = await getMessages();
   return (
-    <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
-      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
+    <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"} suppressHydrationWarning>
+      <head>
+        <link rel="preload" as="image" href="/images/brand/todijo-pwa-startup.png?v=1" media="(display-mode: standalone)" fetchPriority="high" />
+        <script id="todijo-standalone-startup" dangerouslySetInnerHTML={{ __html: standaloneStartupDetection }} />
+      </head>
+      <body className="todijoRootBody"><PwaStartupLayer/><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
     </html>
   );
 }
