@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { minimumPurchasableVariantPrice } from "../lib/product-availability";
 
@@ -24,6 +25,17 @@ test("launch branding relies on the native PWA splash without a delayed JavaScri
   assert.match(manifest,/background_color: "#fffaf0"/);
   assert.match(manifest,/icon-maskable-512\.png\?v=4/);
   assert.match(worker,/CACHE_VERSION = "mobile-brand-v4"/);
+});
+
+test("Android startup references the exact supplied Todijo artwork without a delayed web overlay",()=>{
+  const layout=source("app/layout.tsx"),manifest=source("android/app/src/main/AndroidManifest.xml"),activity=source("android/app/src/main/java/com/todijo/marketplace/TodijoLauncherActivity.java"),styles=source("android/app/src/main/res/values-v31/styles.xml"),asset="android/app/src/main/res/drawable-nodpi/todijo_startup_splash.png";
+  assert.equal(existsSync(asset),true);
+  assert.equal(createHash("sha256").update(readFileSync(asset)).digest("hex"),"24ce205c3bec68f9a126be82a6fe5be0e72a6e7bc830e76d14564b03e1005e96");
+  assert.match(manifest,/SPLASH_IMAGE_DRAWABLE[\s\S]*@drawable\/todijo_startup_splash/);
+  assert.match(manifest,/SPLASH_SCREEN_FADE_OUT_DURATION[\s\S]*android:value="0"/);
+  assert.match(activity,/ImageView\.ScaleType\.FIT_CENTER/);
+  assert.match(styles,/windowSplashScreenAnimatedIcon">@android:color\/transparent/);
+  assert.doesNotMatch(layout,/TodijoLaunchSplash|setTimeout|splash/i);
 });
 
 test("umbrella identity, exact default title and install icons are wired",()=>{

@@ -8,6 +8,6 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowNavigationBarContrastEnforced">false</item>
-        <item name="android:windowBackground">@color/todijo_violet</item>
+        <item name="android:windowBackground">@color/todijo_splash_background</item>
     </style>
 </resources>
