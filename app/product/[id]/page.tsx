@@ -37,7 +37,8 @@ import { pageNumbers } from "@/lib/pagination";
 import { isMobilePdpRequest, pdpRecommendationLimits, pdpRecommendationPage } from "@/lib/pdp-recommendations";
 
 export const dynamic = "force-dynamic";
-type Props = { params: Promise<{ id: string;slug?:string }>; searchParams?:Promise<Record<string, string | string[] | undefined>> };
+type PageSearchParams = Record<string, string | string[] | undefined>;
+type Props = { params: Promise<{ id: string;slug?:string }>; searchParams?:Promise<PageSearchParams> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
@@ -64,7 +65,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, ordersText, resolvedParams, session, locale, requestHeaders, query] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
     getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"), getTranslations("SellerControl"),
-    getTranslations("Orders"), params, readSession(), getLocale(), headers(), searchParams ?? Promise.resolve({}),
+    getTranslations("Orders"), params, readSession(), getLocale(), headers(), searchParams ?? Promise.resolve<PageSearchParams>({}),
   ]);
   const { id,slug } = resolvedParams;
   const previewRequested=(Array.isArray(query.adminPreview)?query.adminPreview[0]:query.adminPreview)==="1";
