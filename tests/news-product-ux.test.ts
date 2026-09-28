@@ -22,7 +22,7 @@ test("footer links use normal full-page navigation while Todijo News stays local
 test("product recommendations are bounded, category-aware, deduplicated and reuse marketplace cards",()=>{
   const page=read("app/product/[id]/page.tsx"),limits=read("lib/pdp-recommendations.ts");
   assert.match(page,/startsWith:`\$\{mainCategory\}--`/);assert.match(page,/take:8/);assert.match(page,/take:recommendationLimits\.queryLimit/);assert.match(page,/slice\(0,recommendationLimits\.resultLimit\)/);assert.match(page,/similarIds=new Set/);
-  assert.match(limits,/PDP_DESKTOP_RECOMMENDATION_QUERY_LIMIT = 32/);assert.match(limits,/PDP_MOBILE_RECOMMENDATION_QUERY_LIMIT = 48/);assert.match(limits,/PDP_DESKTOP_ALSO_LIMIT = 12/);assert.match(limits,/PDP_MOBILE_ALSO_LIMIT = 40/);
+  assert.match(limits,/PDP_DESKTOP_RECOMMENDATION_QUERY_LIMIT = 32/);assert.match(limits,/PDP_MOBILE_RECOMMENDATION_QUERY_LIMIT = 208/);assert.match(limits,/PDP_DESKTOP_ALSO_LIMIT = 12/);assert.match(limits,/PDP_MOBILE_ALSO_LIMIT = 200/);
   assert.equal((page.match(/<MarketplaceProductCard/g)??[]).length,2);assert.match(page,/recommendationText\.similar/);assert.match(page,/recommendationText\.also/);
   assert.ok(page.indexOf("productLowerActions")<page.indexOf("buyerProtection"));
 });

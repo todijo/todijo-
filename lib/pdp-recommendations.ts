@@ -1,8 +1,8 @@
 export const PDP_DESKTOP_ALSO_LIMIT = 12;
-export const PDP_MOBILE_ALSO_LIMIT = 40;
-export const PDP_MOBILE_RECOMMENDATION_PAGE_SIZE = 8;
+export const PDP_MOBILE_ALSO_LIMIT = 200;
+export const PDP_MOBILE_RECOMMENDATION_PAGE_SIZE = 40;
 export const PDP_DESKTOP_RECOMMENDATION_QUERY_LIMIT = 32;
-export const PDP_MOBILE_RECOMMENDATION_QUERY_LIMIT = 48;
+export const PDP_MOBILE_RECOMMENDATION_QUERY_LIMIT = 208;
 
 const MOBILE_USER_AGENT = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i;
 
