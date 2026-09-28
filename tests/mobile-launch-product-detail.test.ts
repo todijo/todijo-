@@ -23,8 +23,8 @@ test("launch branding relies on the native PWA splash without a delayed JavaScri
   const layout=source("app/layout.tsx"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
   assert.doesNotMatch(layout,/TodijoLaunchSplash/);
   assert.match(manifest,/background_color: "#fffaf0"/);
-  assert.match(manifest,/icon-maskable-512\.png\?v=5/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v5"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=6/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v6"/);
 });
 
 test("PWA startup icons use the centered square derivative of the supplied Todijo artwork",()=>{
@@ -32,6 +32,7 @@ test("PWA startup icons use the centered square derivative of the supplied Todij
     ["public/icon-192.png",192,"7e880cea052e50b627887fa13946ca77eb718e72dd54f29af0d54f4cc1bca6da"],
     ["public/icon-512.png",512,"6cf80f6495cbf2da4281c9b7fae51a47fb4c3b91e2aa6239b1eeb2858aae64e0"],
     ["public/icon-maskable-512.png",512,"6cf80f6495cbf2da4281c9b7fae51a47fb4c3b91e2aa6239b1eeb2858aae64e0"],
+    ["public/apple-icon.png",180,"d4d2f34958af850a52c970de292ff85f0c562410b1406e55c2ef06440eaeb9ee"],
   ] as const;
   for(const [path,size,sha256] of icons){
     const png=readFileSync(path);
@@ -46,8 +47,12 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
   assert.match(mark,/>To<\/text>/);assert.match(mark,/>Di<\/text>/);assert.match(mark,/>Jo<\/text>/);
   assert.match(mark,/umbrellaPanelLeft/);assert.match(mark,/umbrellaPanelCenter/);assert.match(mark,/umbrellaPanelRight/);assert.match(mark,/umbrellaShaft/);
   assert.match(layout,/default: "Todijo Marketplace"/);
-  for(const path of ["app/icon.svg","public/favicon.ico","public/apple-icon.png","public/icon-192.png","public/icon-512.png","public/icon-maskable-512.png"])assert.equal(existsSync(path),true,path);
-  for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png","apple-icon.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
+  for(const path of ["public/favicon.ico","public/apple-icon.png","public/icon-192.png","public/icon-512.png","public/icon-maskable-512.png"])assert.equal(existsSync(path),true,path);
+  assert.equal(existsSync("app/icon.svg"),false);
+  for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
+  assert.doesNotMatch(manifest,/apple-icon|favicon|icon\.svg/);
+  assert.match(layout,/apple-icon\.png\?v=6/);
+  assert.doesNotMatch(layout,/icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
 });
 
 test("pricing failures terminate with a retry without exposing stale source-currency prices",()=>{

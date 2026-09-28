@@ -16,13 +16,15 @@ test("missing-page copy and recovery actions exist in every supported locale", (
   assert.doesNotMatch(source, /adm-barewbar-182203|\/admin(?:\/|\b)/);
 });
 
-test("the simplified app icon is referenced by the existing manifest and favicon setup", () => {
-  const icon = fs.readFileSync(path.join(process.cwd(), "app/icon.svg"), "utf8");
-  assert.match(icon, /#073b2d|#074331|#00291f/);
-  assert.doesNotMatch(icon, /#2b0870|#6d28d9/);
+test("install metadata references only the current PWA startup artwork", () => {
   const manifest = fs.readFileSync(path.join(process.cwd(), "app/manifest.ts"), "utf8");
-  for (const asset of ["icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-icon.png"]) {
+  const layout = fs.readFileSync(path.join(process.cwd(), "app/layout.tsx"), "utf8");
+  for (const asset of ["icon-192.png", "icon-512.png", "icon-maskable-512.png"]) {
     assert.match(manifest, new RegExp(asset.replace(".", "\\.")));
     assert.ok(fs.existsSync(path.join(process.cwd(), "public", asset)));
   }
+  assert.doesNotMatch(manifest, /apple-icon|favicon|icon\.svg/);
+  assert.doesNotMatch(layout, /icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
+  assert.match(layout, /apple-icon\.png\?v=6/);
+  assert.equal(fs.existsSync(path.join(process.cwd(), "app/icon.svg")), false);
 });
