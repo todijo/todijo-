@@ -69,10 +69,7 @@ test("Digital Asset Links fails safely until Play certificate is supplied", () =
 });
 
 test("Stage 1 introduces no native business, auth, payment or database code", () => {
-  const javaRoot="android/app/src/main/java";
-  const javaFiles=fs.existsSync(javaRoot)?fs.readdirSync(javaRoot,{recursive:true}).filter((entry)=>String(entry).endsWith(".java")).map((entry)=>String(entry).replaceAll("\\","/")):[];
-  assert.deepEqual(javaFiles,["com/todijo/marketplace/TodijoLauncherActivity.java"]);
-  assert.doesNotMatch(read(`${javaRoot}/${javaFiles[0]}`),/stripe|checkout|cart|price|stock|variant|auth|database|prisma/i);
+  assert.equal(fs.existsSync("android/app/src/main/java"), false);
   assert.equal(fs.existsSync("android/app/src/main/kotlin"), false);
   assert.doesNotMatch(androidBuild, /stripe|firebase|billing|auth/i);
 });
