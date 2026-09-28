@@ -1,10 +1,10 @@
 /* Todijo Stage 1 service worker: public shell assets only; commerce stays network-authoritative. */
-const CACHE_VERSION = "mobile-brand-v7";
+const CACHE_VERSION = "mobile-brand-v8";
 const CACHE_PREFIX = "todijo-pwa-";
 const SHELL_CACHE = CACHE_PREFIX + "shell-" + CACHE_VERSION;
 const STATIC_CACHE = CACHE_PREFIX + "static-" + CACHE_VERSION;
 const OFFLINE_PAGES = ["/en/offline", "/fr/offline", "/ar/offline"];
-const SHELL_ASSETS = ["/icon-192.png?v=7", "/icon-512.png?v=7", "/icon-maskable-512.png?v=7", "/apple-icon.png?v=7", ...OFFLINE_PAGES];
+const SHELL_ASSETS = ["/icon-192.png?v=8", "/icon-512.png?v=8", "/icon-maskable-512.png?v=8", "/apple-icon.png?v=8", ...OFFLINE_PAGES];
 const STATIC_DESTINATIONS = new Set(["style", "script", "font", "image"]);
 const PUBLIC_IMAGE_PREFIXES = ["/images/", "/icon", "/favicon.ico", "/apple-icon.png"];
 const LOCALIZED_PREFIX = /^\/(?:en|fr|ar|ku|tr|de|es|it|nl|zh|fa|hi|pt|ru)(?=\/|$)/i;
@@ -59,8 +59,8 @@ self.addEventListener("push", (event) => {
   const data = safePushData(event);
   event.waitUntil(self.registration.showNotification("Todijo", {
     body: PUSH_COPY[data.category],
-    icon: "/icon-192.png?v=7",
-    badge: "/icon-192.png?v=7",
+    icon: "/icon-192.png?v=8",
+    badge: "/icon-192.png?v=8",
     tag: `todijo-${data.category.toLowerCase()}`,
     data: { href: data.href },
   }));

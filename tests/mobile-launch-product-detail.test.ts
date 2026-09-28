@@ -24,16 +24,16 @@ test("launch branding relies on the native PWA splash without a delayed JavaScri
   const layout=source("app/layout.tsx"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
   assert.doesNotMatch(layout,/TodijoLaunchSplash/);
   assert.match(manifest,/background_color: "#fffaf0"/);
-  assert.match(manifest,/icon-maskable-512\.png\?v=7/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v7"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=8/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v8"/);
 });
 
 test("PWA startup icons use the centered square derivative of the supplied Todijo artwork",()=>{
   const icons=[
-    ["public/icon-192.png",192,"e4262bfd4873faf554189bbc4d8060c11340af4ca2687899a0224c41f7c54f84"],
-    ["public/icon-512.png",512,"ade82a61f0105df45a8aefa48fe450e6380b9a32385db986aeae569a61b116e4"],
-    ["public/icon-maskable-512.png",512,"8a20fc41ff08cab2b8eadbcfd05e97a08aa9da68caa43c2a06bae0c37f1af27a"],
-    ["public/apple-icon.png",180,"7a7641d077e51de94dbb3a500e3270ab21d6312e258e81577105d0099575a6c2"],
+    ["public/icon-192.png",192,"ef23601f02e251fda88392f98e52902e07bcb9f7337da53b51d7f0e05f8cdcb4"],
+    ["public/icon-512.png",512,"08e8fa34e853b60d011f95618713ad8188a021cffafa6f81eb152203fc5ced11"],
+    ["public/icon-maskable-512.png",512,"9cbe8c594591823e2bb35c8604008f7f8b0159d6d5acda35483a2327a7a0da0a"],
+    ["public/apple-icon.png",180,"2a3353920ae9c92b58490f41b1162ca9363c3f85f7569ce9bbb04e7295a598ea"],
   ] as const;
   for(const [path,size,sha256] of icons){
     const png=readFileSync(path);
@@ -60,10 +60,10 @@ test("PWA artwork fills the regular icon canvas while the maskable derivative st
     return {width:(maxX-minX+1)/info.width,height:(maxY-minY+1)/info.height,maxRadius:maxRadius/info.width};
   }
   const regular=await bounds("public/icon-512.png");
-  assert.ok(regular.width>=.89,`regular icon width occupancy ${regular.width}`);
-  assert.ok(regular.height>=.52,`regular icon height occupancy ${regular.height}`);
+  assert.ok(regular.width>=.945,`regular icon width occupancy ${regular.width}`);
+  assert.ok(regular.height>=.55,`regular icon height occupancy ${regular.height}`);
   const maskable=await bounds("public/icon-maskable-512.png");
-  assert.ok(maskable.width>=.76,`maskable icon width occupancy ${maskable.width}`);
+  assert.ok(maskable.width>=.78,`maskable icon width occupancy ${maskable.width}`);
   assert.ok(maskable.maxRadius<=.4,`maskable artwork radius ${maskable.maxRadius}`);
 });
 
@@ -77,7 +77,7 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
   assert.equal(existsSync("app/icon.svg"),false);
   for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
   assert.doesNotMatch(manifest,/apple-icon|favicon|icon\.svg/);
-  assert.match(layout,/apple-icon\.png\?v=7/);
+  assert.match(layout,/apple-icon\.png\?v=8/);
   assert.doesNotMatch(layout,/icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
 });
 
