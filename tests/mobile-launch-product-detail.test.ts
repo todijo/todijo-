@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { minimumPurchasableVariantPrice } from "../lib/product-availability";
 
@@ -22,8 +23,22 @@ test("launch branding relies on the native PWA splash without a delayed JavaScri
   const layout=source("app/layout.tsx"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
   assert.doesNotMatch(layout,/TodijoLaunchSplash/);
   assert.match(manifest,/background_color: "#fffaf0"/);
-  assert.match(manifest,/icon-maskable-512\.png\?v=4/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v4"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=5/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v5"/);
+});
+
+test("PWA startup icons use the centered square derivative of the supplied Todijo artwork",()=>{
+  const icons=[
+    ["public/icon-192.png",192,"7e880cea052e50b627887fa13946ca77eb718e72dd54f29af0d54f4cc1bca6da"],
+    ["public/icon-512.png",512,"6cf80f6495cbf2da4281c9b7fae51a47fb4c3b91e2aa6239b1eeb2858aae64e0"],
+    ["public/icon-maskable-512.png",512,"6cf80f6495cbf2da4281c9b7fae51a47fb4c3b91e2aa6239b1eeb2858aae64e0"],
+  ] as const;
+  for(const [path,size,sha256] of icons){
+    const png=readFileSync(path);
+    assert.equal(png.readUInt32BE(16),size,path);
+    assert.equal(png.readUInt32BE(20),size,path);
+    assert.equal(createHash("sha256").update(png).digest("hex"),sha256,path);
+  }
 });
 
 test("umbrella identity, exact default title and install icons are wired",()=>{
