@@ -76,6 +76,15 @@ test("mobile availability hides only the positive label and mobile colors avoid 
   assert.doesNotMatch(css.match(/@media\(max-width:760px\)\{[^\n]+/)?.[0] ?? "", /optionGroup[^}]+todijo-gold/);
 });
 
+test("mobile color cards override the global gold fill with their shared real-color accent", () => {
+  const css = read("app/globals.css");
+  const correction = css.match(/\/\* Mobile PDP color cards:[\s\S]*?\*\/\s*(@media\(max-width:760px\)\{[^\r\n]+\})/)?.[1] ?? "";
+  assert.match(correction, /@media\(max-width:760px\)/);
+  assert.match(correction, /button:not\(\.selected\)\[style\][^{]*\{[^}]*border-color:var\(--selected-option-accent\)!important[^}]*background:#fff!important[^}]*var\(--selected-option-accent\) 10%/);
+  assert.match(correction, /button\.selected:not\(:disabled\)\[style\][^{]*\{[^}]*border-color:var\(--selected-option-accent\)!important[^}]*background:#fff!important[^}]*var\(--selected-option-accent\) 22%/);
+  assert.doesNotMatch(correction, /todijo-gold|#fff4cf|#c59618/);
+});
+
 test("desktop PDP recommendation presentation and review order stay unchanged", () => {
   const page = read("app/product/[id]/page.tsx");
   const css = read("app/globals.css");
