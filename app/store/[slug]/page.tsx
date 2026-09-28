@@ -12,12 +12,12 @@ import { type Locale } from "@/i18n/config";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 import {resolveBuyerProductContent} from "@/lib/product-content";
 import {readSession} from "@/lib/session";
+import { headers } from "next/headers";
+import { publicStorePageSize } from "@/lib/public-store-pagination";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
-const STORE_PAGE_SIZE = 24;
-
 export async function generateMetadata({ params }: Pick<Props, "params">): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getLocale() as Promise<Locale>]);
   const store = await prisma.store.findFirst({
@@ -43,7 +43,8 @@ function initials(firstName: string, lastName: string) {
 }
 
 export default async function StorePage({ params, searchParams }: Props) {
-  const [locale, { slug }, query, session] = await Promise.all([getLocale(), params, searchParams, readSession()]);
+  const [locale, { slug }, query, session, requestHeaders] = await Promise.all([getLocale(), params, searchParams, readSession(), headers()]);
+  const pageSize = publicStorePageSize(requestHeaders.get("user-agent"), requestHeaders.get("sec-ch-ua-mobile"));
   const requestedPage = Number(Array.isArray(query.page) ? query.page[0] : query.page);
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 10_000) : 1;
   const store = await prisma.store.findFirst({
@@ -53,13 +54,13 @@ export default async function StorePage({ params, searchParams }: Props) {
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true,
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
       _count: { select: { products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } } },
-      products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, skip: (page - 1) * STORE_PAGE_SIZE, take: STORE_PAGE_SIZE, select: { id: true, name: true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
+      products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize, select: { id: true, name: true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
     },
   });
 
   if (!store) notFound();
   const contactProduct = await prisma.product.findFirst({ where: { storeId: store.id, status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null, allowPrepurchaseQuestions: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
-  const pages = Math.max(1, Math.ceil(store._count.products / STORE_PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(store._count.products / pageSize));
   if (page > pages) redirect(`/${locale}/store/${slug}?page=${pages}`);
 
   const dateFormat = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" });
