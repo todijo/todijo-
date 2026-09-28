@@ -25,6 +25,6 @@ test("install metadata references only the current PWA startup artwork", () => {
   }
   assert.doesNotMatch(manifest, /apple-icon|favicon|icon\.svg/);
   assert.doesNotMatch(layout, /icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
-  assert.match(layout, /apple-icon\.png\?v=6/);
+  assert.match(layout, /apple-icon\.png\?v=7/);
   assert.equal(fs.existsSync(path.join(process.cwd(), "app/icon.svg")), false);
 });
