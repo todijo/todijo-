@@ -32,9 +32,12 @@ import MarketplaceProductCard from "@/components/MarketplaceProductCard";
 import {newsMessages} from "@/i18n/news";
 import { requireAdmin } from "@/lib/admin-access";
 import { resolveBuyerProductContent } from "@/lib/product-content";
+import { headers } from "next/headers";
+import { pageNumbers } from "@/lib/pagination";
+import { isMobilePdpRequest, pdpRecommendationLimits, pdpRecommendationPage } from "@/lib/pdp-recommendations";
 
 export const dynamic = "force-dynamic";
-type Props = { params: Promise<{ id: string;slug?:string }>; searchParams?:Promise<{adminPreview?:string}> };
+type Props = { params: Promise<{ id: string;slug?:string }>; searchParams?:Promise<Record<string, string | string[] | undefined>> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
@@ -58,13 +61,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductPage({ params, searchParams }: Props) {
-  const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, resolvedParams, session, locale] = await Promise.all([
+  const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, ordersText, resolvedParams, session, locale, requestHeaders, query] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
     getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"), getTranslations("SellerControl"),
-    params, readSession(), getLocale(),
+    getTranslations("Orders"), params, readSession(), getLocale(), headers(), searchParams ?? Promise.resolve({}),
   ]);
   const { id,slug } = resolvedParams;
-  const previewRequested=(await searchParams)?.adminPreview==="1";
+  const previewRequested=(Array.isArray(query.adminPreview)?query.adminPreview[0]:query.adminPreview)==="1";
   if(previewRequested){try{await requireAdmin(prisma,session);}catch{notFound();}}
   const publicAccess = previewRequested?{}:publicProductAccessWhere();
   const product = await prisma.product.findFirst({
@@ -90,14 +93,16 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const canonicalSlug=productSlug(buyerContent.title);
   if(!previewRequested&&slug!==canonicalSlug)permanentRedirect(productPath(locale,id,buyerContent.title));
   product.name=buyerContent.title;product.description=buyerContent.description;
+  const mobilePdp=isMobilePdpRequest(requestHeaders.get("user-agent"),requestHeaders.get("sec-ch-ua-mobile")),recommendationLimits=pdpRecommendationLimits(mobilePdp);
   const mainCategory=product.category.split("--")[0],recommendationSelect={id:true,name:true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}},price:true,compareAtPrice:true,currency:true,category:true,stock:true,condition:true,images:true,options:{where:{active:true},select:{id:true}},variants:{where:buyerVisibleVariantWhere(),select:{active:true,stock:true,values:{select:{optionValueId:true}}}},supplierLink:{select:{sourceMetadata:true}},store:{select:{name:true,slug:true}}} as const;
   const [similarRows,marketplaceRows]=await Promise.all([
     prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},category:product.category.includes("--")?{startsWith:`${mainCategory}--`}:product.category,...publicAccess},take:8,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
-    prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},...publicAccess},take:32,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
+    prisma.product.findMany({where:{status:"PUBLISHED",id:{not:product.id},...publicAccess},take:recommendationLimits.queryLimit,orderBy:[{createdAt:"desc"},{id:"desc"}],select:recommendationSelect}),
   ]);
-  const similarIds=new Set(similarRows.map(item=>item.id)),pool=marketplaceRows.filter(item=>!similarIds.has(item.id)),offset=pool.length?Array.from(product.id).reduce((sum,char)=>sum+char.charCodeAt(0),0)%pool.length:0,alsoRows=[...pool.slice(offset),...pool.slice(0,offset)].slice(0,12);
+  const similarIds=new Set(similarRows.map(item=>item.id)),pool=marketplaceRows.filter(item=>!similarIds.has(item.id)),offset=pool.length?Array.from(product.id).reduce((sum,char)=>sum+char.charCodeAt(0),0)%pool.length:0,alsoRows=[...pool.slice(offset),...pool.slice(0,offset)].slice(0,recommendationLimits.resultLimit);
   const recommendationCard=(item:(typeof similarRows)[number])=>{const content=resolveBuyerProductContent({name:item.name,description:item.description,sourceMetadata:item.supplierLink?.sourceMetadata,locale,sourceLocale:item.sourceLocale,translations:item.translations}),availability=resolveProductAvailability({stock:item.stock,activeOptionCount:item.options.length,variants:item.variants.map(variant=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length}))});return{id:item.id,name:content.title,price:item.price.toString(),compareAtPrice:item.compareAtPrice?.toString()??null,currency:item.currency,category:item.category,stock:availability.hasActiveVariants?null:item.stock,hasActiveVariants:availability.hasActiveVariants,isGenerallyAvailable:availability.isGenerallyAvailable,condition:item.condition,image:item.images[0]??null,storeName:item.store.name,storeSlug:item.store.slug,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(item.supplierLink?.sourceMetadata)}};
-  const similar=similarRows.map(recommendationCard),also=alsoRows.map(recommendationCard),recommendationText=newsMessages[locale as Locale];
+  const similar=similarRows.map(recommendationCard),allAlso=alsoRows.map(recommendationCard),requestedRelatedPage=Number(Array.isArray(query.relatedPage)?query.relatedPage[0]:query.relatedPage),relatedPagination=pdpRecommendationPage(requestedRelatedPage,allAlso.length),also=mobilePdp?allAlso.slice(relatedPagination.start,relatedPagination.end):allAlso,recommendationText=newsMessages[locale as Locale];
+  const relatedPageHref=(page:number)=>{const params=new URLSearchParams();for(const [key,value] of Object.entries(query)){if(key==="relatedPage"||value==null)continue;params.set(key,Array.isArray(value)?value[0]??"":value);}params.set("relatedPage",String(page));return `${productPath(locale,id,product.name)}?${params}#related-products`;};
   const persistedPrice=Number(product.price), compare=product.compareAtPrice?Number(product.compareAtPrice):null;
   const minimumVariantPrice=minimumPurchasableVariantPrice({basePrice:persistedPrice,activeOptionCount:product.options.length,variants:product.variants.map((variant)=>({active:variant.active,stock:variant.stock,valueCount:variant.values.length,priceOverride:variant.priceOverride==null?null:Number(variant.priceOverride)}))});
   const price=minimumVariantPrice??persistedPrice;
@@ -145,6 +150,6 @@ export default async function ProductPage({ params, searchParams }: Props) {
     </section>
   </section>
   {similar.length>0&&<section className="relatedSection productRecommendationSection"><div className="sectionTitle"><h2>{recommendationText.similar}</h2></div><div className="premiumProductGrid productRecommendationGrid">{similar.map(item=><MarketplaceProductCard key={item.id} product={item} soldOut={common("soldOut")}/>)}</div></section>}
-  {also.length>0&&<section className="relatedSection productRecommendationSection"><div className="sectionTitle"><h2>{recommendationText.also}</h2></div><div className="premiumProductGrid productRecommendationGrid">{also.map(item=><MarketplaceProductCard key={item.id} product={item} soldOut={common("soldOut")}/>)}</div></section>}
+  {also.length>0&&<section className="relatedSection productRecommendationSection" id="related-products"><div className="sectionTitle"><h2>{recommendationText.also}</h2></div><div className="premiumProductGrid productRecommendationGrid">{also.map(item=><MarketplaceProductCard key={item.id} product={item} soldOut={common("soldOut")}/>)}</div>{mobilePdp&&relatedPagination.pages>1&&<nav className="pdpRecommendationPagination" aria-label={ordersText("history.pagination")}><span>{relatedPagination.page>1?<Link href={relatedPageHref(relatedPagination.page-1)}>{ordersText("history.previous")}</Link>:<span aria-disabled="true">{ordersText("history.previous")}</span>}</span><div>{pageNumbers(relatedPagination.page,relatedPagination.pages).map((number,index,numbers)=><span key={number}>{index>0&&number-numbers[index-1]>1&&<span className="paginationEllipsis" aria-hidden="true">…</span>}<Link href={relatedPageHref(number)} aria-current={number===relatedPagination.page?"page":undefined}>{number}</Link></span>)}</div><span>{relatedPagination.page<relatedPagination.pages?<Link href={relatedPageHref(relatedPagination.page+1)}>{ordersText("history.next")}</Link>:<span aria-disabled="true">{ordersText("history.next")}</span>}</span><small>{ordersText("history.page",{page:relatedPagination.page,pages:relatedPagination.pages})}</small></nav>}</section>}
   <ReviewSection productId={product.id}/><MarketplaceFooter /></main>;
 }
