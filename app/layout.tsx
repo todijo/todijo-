@@ -11,12 +11,6 @@ import CookieConsent from "@/components/CookieConsent";
 import BuyerMarketProvider from "@/components/BuyerMarketProvider";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import BackToTop from "@/components/BackToTop";
-import PwaStartupLayer from "@/components/PwaStartupLayer";
-
-const standaloneStartupDetection = `(() => {
-  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-  if (standalone) document.documentElement.classList.add("todijoStandaloneLaunch");
-})();`;
 
 export const viewport: Viewport = {
   themeColor: "#fffaf0",
@@ -34,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: "Todijo Marketplace", template: `%s · ${t("brand")}` },
     description: t("description"),
     metadataBase: new URL(base),
-    icons: { icon: [{ url: "/favicon.png?v=1", sizes: "1254x1254", type: "image/png" }, { url: "/icon-192.png?v=11", sizes: "192x192", type: "image/png" }, { url: "/icon-512.png?v=11", sizes: "512x512", type: "image/png" }], apple: "/apple-icon.png?v=11" },
+    icons: { icon: [{ url: "/favicon.png?v=1", sizes: "1254x1254", type: "image/png" }, { url: "/icon-192.png?v=12", sizes: "192x192", type: "image/png" }, { url: "/icon-512.png?v=12", sizes: "512x512", type: "image/png" }], apple: "/apple-icon.png?v=12" },
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Todijo" },
     manifest: "/manifest.webmanifest",
     openGraph: { title: t("title"), description: t("description"), type: "website", images: [{ url: "/images/brand/todijo-horizontal-dark.webp", width: 720, height: 400, alt: "Todijo" }] },
@@ -51,11 +45,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"} suppressHydrationWarning>
-      <head>
-        <link rel="preload" as="image" href="/images/brand/todijo-pwa-startup.png?v=1" media="(display-mode: standalone)" fetchPriority="high" />
-        <script id="todijo-standalone-startup" dangerouslySetInnerHTML={{ __html: standaloneStartupDetection }} />
-      </head>
-      <body className="todijoRootBody"><PwaStartupLayer/><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
+      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
     </html>
   );
 }

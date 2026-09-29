@@ -20,27 +20,16 @@ test("minimum price uses only complete active in-stock purchasable variants",()=
   assert.equal(minimumPurchasableVariantPrice({basePrice:25,activeOptionCount:1,variants:[{active:false,stock:1,valueCount:1,priceOverride:10}]}),null);
 });
 
-test("startup branding is a first-paint standalone-PWA layer without an arbitrary delay",()=>{
-  const layout=source("app/layout.tsx"),layer=source("components/PwaStartupLayer.tsx"),css=source("app/globals.css"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
-  assert.match(layout,/display-mode: standalone/);
-  assert.match(layout,/navigator\.standalone === true/);
-  assert.match(layout,/<PwaStartupLayer\/>/);
-  assert.match(layout,/href="\/images\/brand\/todijo-pwa-startup\.png\?v=1" media="\(display-mode: standalone\)"/);
-  assert.match(layer,/<source media="\(display-mode: standalone\)" srcSet="\/images\/brand\/todijo-pwa-startup\.png\?v=1"/);
-  assert.match(layer,/requestAnimationFrame/);
-  assert.match(layer,/await image\.decode\(\)/);
-  assert.match(layer,/addEventListener\("load"/);
-  assert.match(layer,/transitionend/);
-  assert.doesNotMatch(layer,/setTimeout|setInterval/);
-  assert.match(css,/\.pwaStartupLayer\{display:none\}/);
-  assert.match(css,/html\.todijoStandaloneLaunch \.pwaStartupLayer/);
-  assert.match(css,/env\(safe-area-inset-top\)/);
-  assert.match(css,/prefers-reduced-motion:reduce/);
-  assert.match(css,/\.pwaStartupLayer img\{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;object-position:center;user-select:none\}/);
+test("startup branding relies only on native PWA metadata without a JavaScript splash",()=>{
+  const layout=source("app/layout.tsx"),css=source("app/globals.css"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
+  assert.equal(existsSync("components/PwaStartupLayer.tsx"),false);
+  assert.doesNotMatch(layout,/PwaStartupLayer|todijo-standalone-startup|todijoStandaloneLaunch|display-mode: standalone|navigator\.standalone|todijo-pwa-startup/);
+  assert.doesNotMatch(css,/pwaStartupLayer|pwaStartupArtwork|todijoStandaloneLaunch/);
   assert.match(manifest,/background_color: "#fffaf0", theme_color: "#fffaf0"/);
-  assert.match(manifest,/icon-maskable-512\.png\?v=11/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v12"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=12/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v13"/);
   assert.match(worker,/todijo-pwa-startup\.png\?v=1/);
+  assert.doesNotMatch(worker,/setTimeout|setInterval/);
 });
 
 test("standalone startup uses the exact approved Todijo artwork",()=>{
@@ -51,12 +40,12 @@ test("standalone startup uses the exact approved Todijo artwork",()=>{
   assert.equal(createHash("sha256").update(png).digest("hex"),"24ce205c3bec68f9a126be82a6fe5be0e72a6e7bc830e76d14564b03e1005e96");
 });
 
-test("PWA startup icons use the centered square derivative of the supplied Todijo artwork",()=>{
+test("PWA launcher icons use the reviewed compact Todijo umbrella composition",()=>{
   const icons=[
-    ["public/icon-192.png",192,"408d29e5c0c21dde30cfd9fb15a76fbc0aa68754e0725e575b84e3437ee0ce57"],
-    ["public/icon-512.png",512,"9754d4cedf8a8f1ec5646f3f43f8de09437de71244b924003c3e3a2aad13ff4e"],
-    ["public/icon-maskable-512.png",512,"2385e7e0dcd8ea73a1cedaaa1c55b8f3ca3a401c2f530ec4ccf8e1a03773c329"],
-    ["public/apple-icon.png",180,"b4bf1f1f9c3e6a83d046665e334746a875e64373ddcec29579bd379ca0324c65"],
+    ["public/icon-192.png",192,"ede0b541ef94cbe986eaf58ac57271d8137e4d6249ca571a868b4c32d59b686a"],
+    ["public/icon-512.png",512,"ada7018a52e115b27499d18284a637b4f308f8dd487bab73e3a6a2ecfade56f2"],
+    ["public/icon-maskable-512.png",512,"c25516040a96f37786121f16fd0e7c61e11ad77166a5f589924943d429e4da29"],
+    ["public/apple-icon.png",180,"a03901f731e6d6131dd39d8982e90224055e8c00c38e147ca798a5da8a20fe32"],
   ] as const;
   for(const [path,size,sha256] of icons){
     const png=readFileSync(path);
@@ -83,11 +72,11 @@ test("PWA artwork fills the regular icon canvas while the maskable derivative st
     return {width:(maxX-minX+1)/info.width,height:(maxY-minY+1)/info.height,maxRadius:maxRadius/info.width};
   }
   const regular=await bounds("public/icon-512.png");
-  assert.ok(regular.width>=.99,`regular icon width occupancy ${regular.width}`);
-  assert.ok(regular.height>=.99,`regular icon height occupancy ${regular.height}`);
+  assert.ok(regular.width>=.94,`regular icon width occupancy ${regular.width}`);
+  assert.ok(regular.height>=.53,`regular icon height occupancy ${regular.height}`);
   const maskable=await bounds("public/icon-maskable-512.png");
-  assert.ok(maskable.width>=.56,`maskable icon width occupancy ${maskable.width}`);
-  assert.ok(maskable.height>=.56,`maskable icon height occupancy ${maskable.height}`);
+  assert.ok(maskable.width>=.74,`maskable icon width occupancy ${maskable.width}`);
+  assert.ok(maskable.height>=.42,`maskable icon height occupancy ${maskable.height}`);
   assert.ok(maskable.maxRadius<=.4,`maskable artwork radius ${maskable.maxRadius}`);
 });
 
@@ -102,7 +91,7 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
   assert.equal(existsSync("app/icon.svg"),false);
   for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
   assert.doesNotMatch(manifest,/apple-icon|favicon|icon\.svg/);
-  assert.match(layout,/apple-icon\.png\?v=11/);
+  assert.match(layout,/apple-icon\.png\?v=12/);
   assert.match(layout,/favicon\.png\?v=1/);
   assert.doesNotMatch(layout,/icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
 });

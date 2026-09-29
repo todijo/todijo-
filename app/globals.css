@@ -1278,13 +1278,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 .marketplaceFooterCompact small{grid-column:1/-1;color:#ad9dbc;font-size:9px}
 }
 
-/* Installed-PWA first paint only. Hidden unless the head detector confirms standalone display mode. */
-.pwaStartupLayer{display:none}
-html.todijoStandaloneLaunch{background:#fffaf0}
-html.todijoStandaloneLaunch .pwaStartupLayer{position:fixed;z-index:2147483647;inset:0;padding:max(6px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left));display:grid;place-items:center;overflow:hidden;pointer-events:none;background:#fffaf0;opacity:1;visibility:visible;transition:opacity .16s ease-out,visibility .16s ease-out}
-.pwaStartupArtwork{display:contents}.pwaStartupLayer img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;object-position:center;user-select:none}
-html.todijoStandaloneLaunch .pwaStartupLayer.isExiting{opacity:0;visibility:hidden}
-
 .pricingRetry{display:flex;align-items:center;justify-content:space-between;gap:10px}.pricingRetry p{margin:0}.pricingRetry button{min-height:44px;padding:8px 12px;border:1px solid #cdb9e8;border-radius:10px;background:#fff;color:#5b21b6;font:800 12px/1.2 inherit;cursor:pointer}
 
 @media(max-width:760px){
@@ -1303,8 +1296,6 @@ html.todijoStandaloneLaunch .pwaStartupLayer.isExiting{opacity:0;visibility:hidd
   .productGallerySticky .productThumbs{display:none}
 }
 @media(max-width:860px) and (max-height:500px){.productGallerySticky{top:calc(58px + env(safe-area-inset-top))}.productGallerySticky .productGalleryInteractive{height:clamp(150px,34dvh,190px)}}
-@media(prefers-reduced-motion:reduce){html.todijoStandaloneLaunch .pwaStartupLayer{transition:none}}
-
 /* Authentication editorial artwork: form content stays primary and readable. */
 .authPage>*,.authForm>*,.formRow>*,.roleOptions>*{min-width:0}.registrationAddress>label{display:grid;min-width:0;gap:8px}.registrationAddress>label select{width:100%;max-width:100%}.authBrandWithArtwork{isolation:isolate;background:#2b0d52}.authBrandWithArtwork .authArtwork{z-index:-2;object-fit:cover;object-position:center}.authBrandWithArtwork:before{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(180deg,rgba(31,9,57,.28),rgba(31,9,57,.7) 62%,rgba(31,9,57,.9))}.authBrandWithArtwork.is-seller .authArtwork{object-position:48% center}.authBrandWithArtwork.is-customer .authArtwork{object-position:center 42%}.authBrandWithArtwork.is-login .authArtwork{object-position:center 40%}.authBrandWithArtwork .authLogo,.authBrandWithArtwork .authPitch,.authBrandWithArtwork>small{position:relative;z-index:2;text-shadow:0 2px 18px rgba(24,5,47,.45)}.authBox,.roleCard,.roleCard strong,.roleCard span{min-width:0}.roleCard strong,.roleCard span{overflow-wrap:anywhere}
 @media(max-width:850px){.authBrandWithArtwork{min-height:220px}.authBrandWithArtwork:before{background:linear-gradient(90deg,rgba(35,10,66,.84),rgba(35,10,66,.42))}.authBrandWithArtwork .authArtwork{object-position:center 34%}.authBrandWithArtwork .authPitch p{max-width:540px}.authBrandWithArtwork>small{display:none}}
