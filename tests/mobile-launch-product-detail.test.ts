@@ -36,9 +36,9 @@ test("startup branding is a first-paint standalone-PWA layer without an arbitrar
   assert.match(css,/html\.todijoStandaloneLaunch \.pwaStartupLayer/);
   assert.match(css,/env\(safe-area-inset-top\)/);
   assert.match(css,/prefers-reduced-motion:reduce/);
-  assert.match(manifest,/background_color: "#fffaf0"/);
-  assert.match(manifest,/icon-maskable-512\.png\?v=8/);
-  assert.match(worker,/CACHE_VERSION = "mobile-brand-v9"/);
+  assert.match(manifest,/background_color: "#fffaf0", theme_color: "#fffaf0"/);
+  assert.match(manifest,/icon-maskable-512\.png\?v=9/);
+  assert.match(worker,/CACHE_VERSION = "mobile-brand-v10"/);
   assert.match(worker,/todijo-pwa-startup\.png\?v=1/);
 });
 
@@ -99,7 +99,7 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
   assert.equal(existsSync("app/icon.svg"),false);
   for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
   assert.doesNotMatch(manifest,/apple-icon|favicon|icon\.svg/);
-  assert.match(layout,/apple-icon\.png\?v=8/);
+  assert.match(layout,/apple-icon\.png\?v=9/);
   assert.doesNotMatch(layout,/icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
 });
 

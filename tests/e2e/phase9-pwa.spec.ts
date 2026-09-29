@@ -26,7 +26,7 @@ test("Phase 9 manifest, worker and asset-links endpoints have safe headers and d
   const manifest = await request.get("/manifest.webmanifest");
   expect(manifest.ok()).toBeTruthy();
   const data = await manifest.json();
-  expect(data).toMatchObject({ id: "/", scope: "/", display: "standalone", theme_color: "#073b2d" });
+  expect(data).toMatchObject({ id: "/", scope: "/", display: "standalone", background_color: "#fffaf0", theme_color: "#fffaf0" });
 
   const worker = await request.get("/sw.js");
   expect(worker.ok()).toBeTruthy();
