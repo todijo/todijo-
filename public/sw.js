@@ -6,7 +6,7 @@ const STATIC_CACHE = CACHE_PREFIX + "static-" + CACHE_VERSION;
 const OFFLINE_PAGES = ["/en/offline", "/fr/offline", "/ar/offline"];
 const SHELL_ASSETS = ["/icon-192.png?v=10", "/icon-512.png?v=10", "/icon-maskable-512.png?v=10", "/apple-icon.png?v=10", "/images/brand/todijo-pwa-startup.png?v=1", ...OFFLINE_PAGES];
 const STATIC_DESTINATIONS = new Set(["style", "script", "font", "image"]);
-const PUBLIC_IMAGE_PREFIXES = ["/images/", "/icon", "/favicon.ico", "/apple-icon.png"];
+const PUBLIC_IMAGE_PREFIXES = ["/images/", "/icon", "/favicon.png", "/apple-icon.png"];
 const LOCALIZED_PREFIX = /^\/(?:en|fr|ar|ku|tr|de|es|it|nl|zh|fa|hi|pt|ru)(?=\/|$)/i;
 const SENSITIVE_PATH = /^\/(?:api(?:\/|$)|checkout(?:\/|$)|cart(?:\/|$)|account(?:\/|$)|dashboard(?:\/|$)|orders?(?:\/|$)|messages(?:\/|$)|notifications(?:\/|$)|favorites(?:\/|$)|seller(?:\/|$)|admin(?:\/|$)|adm-barewbar-182203(?:\/|$)|connect(?:\/|$)|login(?:\/|$)|register(?:\/|$)|forgot-password(?:\/|$)|reset-password(?:\/|$)|verify-email(?:\/|$))/i;
 

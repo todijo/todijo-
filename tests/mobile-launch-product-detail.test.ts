@@ -96,12 +96,14 @@ test("umbrella identity, exact default title and install icons are wired",()=>{
   assert.match(mark,/>To<\/text>/);assert.match(mark,/>Di<\/text>/);assert.match(mark,/>Jo<\/text>/);
   assert.match(mark,/umbrellaPanelLeft/);assert.match(mark,/umbrellaPanelCenter/);assert.match(mark,/umbrellaPanelRight/);assert.match(mark,/umbrellaShaft/);
   assert.match(layout,/default: "Todijo Marketplace"/);
-  for(const path of ["public/favicon.ico","public/apple-icon.png","public/icon-192.png","public/icon-512.png","public/icon-maskable-512.png"])assert.equal(existsSync(path),true,path);
+  for(const path of ["public/favicon.png","public/apple-icon.png","public/icon-192.png","public/icon-512.png","public/icon-maskable-512.png"])assert.equal(existsSync(path),true,path);
+  assert.equal(existsSync("public/favicon.ico"),false);
   assert.equal(existsSync("app/apple-icon.png"),false);
   assert.equal(existsSync("app/icon.svg"),false);
   for(const icon of ["icon-192.png","icon-512.png","icon-maskable-512.png"])assert.match(manifest,new RegExp(icon.replace(".","\\.")));
   assert.doesNotMatch(manifest,/apple-icon|favicon|icon\.svg/);
   assert.match(layout,/apple-icon\.png\?v=10/);
+  assert.match(layout,/favicon\.png\?v=1/);
   assert.doesNotMatch(layout,/icon\.svg|favicon\.ico|apple-icon\.png\?v=4/);
 });
 
