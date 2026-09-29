@@ -36,6 +36,7 @@ test("startup branding is a first-paint standalone-PWA layer without an arbitrar
   assert.match(css,/html\.todijoStandaloneLaunch \.pwaStartupLayer/);
   assert.match(css,/env\(safe-area-inset-top\)/);
   assert.match(css,/prefers-reduced-motion:reduce/);
+  assert.match(css,/\.pwaStartupLayer img\{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;object-position:center;user-select:none\}/);
   assert.match(manifest,/background_color: "#fffaf0", theme_color: "#fffaf0"/);
   assert.match(manifest,/icon-maskable-512\.png\?v=10/);
   assert.match(worker,/CACHE_VERSION = "mobile-brand-v11"/);
