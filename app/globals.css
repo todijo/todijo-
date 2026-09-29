@@ -1282,7 +1282,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 .pwaStartupLayer{display:none}
 html.todijoStandaloneLaunch{background:#fffaf0}
 html.todijoStandaloneLaunch .pwaStartupLayer{position:fixed;z-index:2147483647;inset:0;padding:max(6px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left));display:grid;place-items:center;overflow:hidden;pointer-events:none;background:#fffaf0;opacity:1;visibility:visible;transition:opacity .16s ease-out,visibility .16s ease-out}
-.pwaStartupArtwork{display:contents}.pwaStartupLayer img{display:block;width:min(100%,560px);height:auto;max-height:calc(100dvh - max(6px,env(safe-area-inset-top)) - max(6px,env(safe-area-inset-bottom)));object-fit:contain;object-position:center;user-select:none}
+.pwaStartupArtwork{display:contents}.pwaStartupLayer img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;object-position:center;user-select:none}
 html.todijoStandaloneLaunch .pwaStartupLayer.isExiting{opacity:0;visibility:hidden}
 
 .pricingRetry{display:flex;align-items:center;justify-content:space-between;gap:10px}.pricingRetry p{margin:0}.pricingRetry button{min-height:44px;padding:8px 12px;border:1px solid #cdb9e8;border-radius:10px;background:#fff;color:#5b21b6;font:800 12px/1.2 inherit;cursor:pointer}
