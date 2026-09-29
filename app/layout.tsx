@@ -11,6 +11,7 @@ import CookieConsent from "@/components/CookieConsent";
 import BuyerMarketProvider from "@/components/BuyerMarketProvider";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import BackToTop from "@/components/BackToTop";
+import MobileStartupArtwork from "@/components/MobileStartupArtwork";
 
 export const viewport: Viewport = {
   themeColor: "#fffaf0",
@@ -45,7 +46,7 @@ export default async function RootLayout({
   const messages = await getMessages();
   return (
     <html lang={locale} dir={rtlLocales.has(locale) ? "rtl" : "ltr"} suppressHydrationWarning>
-      <body className="todijoRootBody"><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
+      <body className="todijoRootBody"><MobileStartupArtwork/><NextIntlClientProvider messages={messages}><BuyerMarketProvider><ToastProvider><WishlistProvider><CartProvider><ServiceWorkerRegistration/>{children}<BackToTop /><CookieConsent /></CartProvider></WishlistProvider></ToastProvider></BuyerMarketProvider></NextIntlClientProvider></body>
     </html>
   );
 }

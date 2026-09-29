@@ -20,10 +20,18 @@ test("minimum price uses only complete active in-stock purchasable variants",()=
   assert.equal(minimumPurchasableVariantPrice({basePrice:25,activeOptionCount:1,variants:[{active:false,stock:1,valueCount:1,priceOverride:10}]}),null);
 });
 
-test("startup branding relies only on native PWA metadata without a JavaScript splash",()=>{
-  const layout=source("app/layout.tsx"),css=source("app/globals.css"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
+test("mobile startup shows the complete approved artwork without crop, zoom or artificial delay",()=>{
+  const layout=source("app/layout.tsx"),startup=source("components/MobileStartupArtwork.tsx"),css=source("app/globals.css"),manifest=source("app/manifest.ts"),worker=source("public/sw.js");
   assert.equal(existsSync("components/PwaStartupLayer.tsx"),false);
-  assert.doesNotMatch(layout,/PwaStartupLayer|todijo-standalone-startup|todijoStandaloneLaunch|display-mode: standalone|navigator\.standalone|todijo-pwa-startup/);
+  assert.match(layout,/<MobileStartupArtwork\/>/);
+  assert.match(startup,/src="\/images\/brand\/todijo-pwa-startup\.png\?v=1"/);
+  assert.match(startup,/width="941"/);
+  assert.match(startup,/height="1672"/);
+  assert.doesNotMatch(startup,/setTimeout|setInterval|MINIMUM_VISIBLE|isExiting/);
+  assert.match(css,/\.mobileStartupArtwork\{display:none\}/);
+  assert.match(css,/@media\(max-width:860px\)\{\.mobileStartupArtwork/);
+  assert.match(css,/\.mobileStartupArtwork img\{[^}]*width:100%;height:100%[^}]*object-fit:contain;object-position:center/);
+  assert.doesNotMatch(layout,/PwaStartupLayer|todijo-standalone-startup|todijoStandaloneLaunch|display-mode: standalone|navigator\.standalone/);
   assert.doesNotMatch(css,/pwaStartupLayer|pwaStartupArtwork|todijoStandaloneLaunch/);
   assert.match(manifest,/background_color: "#fffaf0", theme_color: "#fffaf0"/);
   assert.match(manifest,/icon-maskable-512\.png\?v=12/);
