@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
-import { BarChart3, Boxes, CircleDollarSign, Home, MessageCircle, Plus, ReceiptText, Settings, ShieldCheck, Star, Store, UserRound } from "lucide-react";
+import { BarChart3, Boxes, CircleDollarSign, Gift, Home, MessageCircle, Plus, ReceiptText, Settings, ShieldCheck, Star, Store, UserRound } from "lucide-react";
+import { isLocale } from "@/i18n/config";
+import { loyaltyMessages } from "@/i18n/loyalty";
 import { DashboardHeader, DashboardSidebar, type DashboardNavItem } from "./DashboardUI";
 
 type Labels = {
@@ -9,7 +11,7 @@ type Labels = {
   eyebrow: string; logout: string; menu: string; collapse: string; addProduct: string;
 };
 
-export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "orders" | "messages" | "settings" | "reviews" | "account";
+export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "orders" | "messages" | "settings" | "loyalty" | "reviews" | "account";
 
 export function sellerDashboardNavItems({ locale, storeSlug, labels, accountLabel, privacyLabel, active, unreadMessages = 0 }: { locale: string; storeSlug?: string; labels: Labels; accountLabel: string; privacyLabel: string; active: SellerNavigationActive; unreadMessages?: number }): DashboardNavItem[] {
   return [
@@ -23,6 +25,7 @@ export function sellerDashboardNavItems({ locale, storeSlug, labels, accountLabe
     { label: labels.reviews, href: `/${locale}/seller/reviews`, icon: Star, active: active === "reviews" },
     { label: labels.store, href: storeSlug ? `/${locale}/store/${storeSlug}` : `/${locale}/seller/create-store`, icon: Store },
     { label: labels.settings, href: `/${locale}/seller/store-settings`, icon: Settings, active: active === "settings" },
+    { label: loyaltyMessages[isLocale(locale) ? locale : "fr"].title, href: `/${locale}/seller/loyalty`, icon: Gift, active: active === "loyalty" },
     { label: accountLabel, href: `/${locale}/account`, icon: UserRound, active: active === "account" },
     { label: privacyLabel, href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];

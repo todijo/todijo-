@@ -15,6 +15,8 @@ import { replaceProductVideo } from "@/lib/product-media";
 import {requiresAuthoritativeDropshippingPrice} from "@/lib/suppliers/buyer-price-safety";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
+import { productLoyaltyEligibility } from "@/lib/loyalty-eligibility";
+import { LoyaltySettingsError } from "@/lib/loyalty-settings";
 import {resolveBuyerProductContent} from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
 import {resolveProductPriceInput} from "@/lib/product-price-input";
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
         currency: store.currency,
         storeId: store.id,
         allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
+        loyaltyEligible: productLoyaltyEligibility(body.loyaltyEligible, false),
         ...compliance,
         ...productShipping,
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
@@ -130,6 +133,7 @@ export async function POST(request: Request) {
     if (error instanceof ProductVariantImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof ProductComplianceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     console.error("Create product error:", error);
     return NextResponse.json({ error: "Impossible de créer le produit pour le moment." }, { status: 500 });
