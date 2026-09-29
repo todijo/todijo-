@@ -20,11 +20,11 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   if (!session) redirect("/login");
   const { id } = await params;
   const product = await prisma.product.findFirst({ where: { id, removedAt:null, store: { ownerId: session.userId } }, select: {
-    id:true,name:true,description:true,price:true,compareAtPrice:true,stock:true,category:true,condition:true,status:true,colors:true,sizes:true,images:true,currency:true,allowPrepurchaseQuestions:true,loyaltyEligible:true,supplierLink:{select:{id:true}},productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,complianceDeclaredAt:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
+    id:true,name:true,description:true,price:true,compareAtPrice:true,stock:true,category:true,condition:true,status:true,colors:true,sizes:true,images:true,currency:true,allowPrepurchaseQuestions:true,loyaltyEligible:true,productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,complianceDeclaredAt:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
     options:{where:{active:true},orderBy:{position:"asc"},select:{id:true,name:true,values:{where:{active:true},orderBy:{position:"asc"},select:{id:true,value:true}}}},
     imageRecords:{orderBy:{position:"asc"},select:{url:true,optionValueImages:{orderBy:{position:"asc"},select:{isPrimary:true,optionValue:{select:{id:true}}}}}},
     variants:{orderBy:{createdAt:"asc"},select:{combinationKey:true,sku:true,barcode:true,priceOverride:true,compareAtPrice:true,stock:true,active:true,values:{select:{optionValue:{select:{value:true}}}}}},
-    supplierLink:{select:{sourceMetadata:true}},
+    supplierLink:{select:{id:true,sourceMetadata:true}},
     store:{select:{name:true,slug:true,status:true,sellerType:true,vatStatus:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,subscription:{select:{status:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},owner:{select:{firstName:true,lastName:true}}}},
   }});
   if (!product) notFound();
