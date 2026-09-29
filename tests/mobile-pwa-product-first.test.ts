@@ -45,8 +45,8 @@ test("bottom navigation remains exactly five app-safe destinations",()=>{
 
 test("current PWA metadata references only versioned premium Todijo launcher assets",()=>{
   const manifest=source("app/manifest.ts"),worker=source("public/sw.js"),layout=source("app/layout.tsx");
-  for(const icon of ["icon-192.png?v=9","icon-512.png?v=9","icon-maskable-512.png?v=9"])assert.ok(manifest.includes(icon),icon);
-  assert.ok(layout.includes("apple-icon.png?v=9"));
+  for(const icon of ["icon-192.png?v=10","icon-512.png?v=10","icon-maskable-512.png?v=10"])assert.ok(manifest.includes(icon),icon);
+  assert.ok(layout.includes("apple-icon.png?v=10"));
   assert.ok(!manifest.includes("apple-icon.png"));
   for(const icon of ["public/icon-192.png","public/icon-512.png","public/icon-maskable-512.png","public/apple-icon.png"])assert.ok(existsSync(icon),icon);
   assert.doesNotMatch(layout,/TodijoLaunchSplash/);
