@@ -1904,6 +1904,8 @@ button,a,input,select,textarea{transition:border-color .2s ease,background-color
 .siteSearch{border-color:#d8c797;background:#fffdf8}
 .siteSearch button{background:linear-gradient(180deg,#d7bb69,#98650c 55%,#704500);color:#fff}
 .siteNav a:hover{color:var(--todijo-gold-dark)}
+.adminPage>.siteHeader .todijoBrand,.adminPage>.siteHeader .siteNav>a{color:var(--todijo-forest-deep)}
+.adminPage>.siteHeader .siteNav>a:hover,.adminPage>.siteHeader .siteNav>a:focus-visible,.adminPage>.siteHeader .siteNav>a[aria-current="page"]{color:var(--todijo-gold-dark)}
 .marketCategoryNavigationShell{box-sizing:border-box}
 .marketCategoryNavigation .marketQuickCategory{color:var(--todijo-forest)}
 .marketCategoryNavigation .marketQuickCategory:hover,.marketCategoryNavigation .marketQuickCategory.active{border-bottom-color:var(--todijo-gold);background:#fbf5e5;color:var(--todijo-forest-deep)}

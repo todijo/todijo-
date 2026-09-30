@@ -21,6 +21,13 @@ test("premium presentation covers marketplace product dashboards and information
   }
 });
 
+test("Admin legacy header labels use dark foregrounds without changing non-Admin headers", () => {
+  const css = read("app/globals.css");
+  assert.match(css, /\.adminPage>\.siteHeader \.todijoBrand,\.adminPage>\.siteHeader \.siteNav>a\{color:var\(--todijo-forest-deep\)\}/);
+  assert.match(css, /\.adminPage>\.siteHeader \.siteNav>a:hover,\.adminPage>\.siteHeader \.siteNav>a:focus-visible,\.adminPage>\.siteHeader \.siteNav>a\[aria-current="page"\]\{color:var\(--todijo-gold-dark\)\}/);
+  assert.doesNotMatch(css, /(?:^|\})\.siteHeader \.siteNav>a\{color:var\(--todijo-forest-deep\)\}/);
+});
+
 test("homepage sections avoid new-arrival and best-seller repetition without static merchandising", () => {
   const home = read("app/HomeClient.tsx");
   assert.match(home, /uniqueProductsById\(newArrivals\)\.filter\(\(product\) => !bestSellerIds\.has\(product\.id\)\)/);
