@@ -45,6 +45,9 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
   StreamSubscription<Uri>? _links;
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
   Timer? _loadTimeout;
+  Timer? _indicatorDelay;
+  bool _showIndicator = true;
+  bool _handlingBack = false;
   bool _loading = true;
   bool _offline = false;
   bool _loadFailed = false;
@@ -59,7 +62,7 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
     _policy = TrustedNavigation(_environment);
     _oauth = WebViewOAuthCoordinator(_environment);
     _web = WebViewController();
-    unawaited(_configure());
+    unawaited(_configure().catchError((Object _) => _failLoad()));
     final appLinks = AppLinks();
     unawaited(
       appLinks
@@ -126,14 +129,10 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
               todijoLocaleCodes.contains(segments.first)) {
             _locale = segments.first;
           }
-          _loadTimeout?.cancel();
-          _loadTimeout = Timer(const Duration(seconds: 30), () {
-            if (mounted && _loading) {
-              setState(() {
-                _loading = false;
-                _loadFailed = true;
-              });
-            }
+          _startLoadTimeout();
+          _indicatorDelay?.cancel();
+          _indicatorDelay = Timer(const Duration(milliseconds: 180), () {
+            if (mounted && _loading) setState(() => _showIndicator = true);
           });
           if (mounted) {
             setState(() {
@@ -144,15 +143,17 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
         },
         onPageFinished: (_) {
           _loadTimeout?.cancel();
-          if (mounted) setState(() => _loading = false);
+          _indicatorDelay?.cancel();
+          if (mounted) {
+            setState(() {
+              _loading = false;
+              _showIndicator = false;
+            });
+          }
         },
         onWebResourceError: (error) {
           if (error.isForMainFrame == true && mounted) {
-            _loadTimeout?.cancel();
-            setState(() {
-              _loadFailed = true;
-              _loading = false;
-            });
+            _failLoad();
           }
         },
       ),
@@ -165,6 +166,7 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
       await android.setOnPlatformPermissionRequest((request) => request.deny());
     }
     _configured = true;
+    _startLoadTimeout();
     await _web.loadRequest(
       _initialDestination ?? _policy.origin.replace(path: '/fr'),
     );
@@ -203,25 +205,58 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
       _loadFailed = false;
       _offline = false;
       _loading = true;
+      _showIndicator = true;
     });
-    if (destination != null && _policy.isInternal(destination)) {
-      await _web.loadRequest(destination);
-    } else {
-      await _web.loadRequest(_policy.origin.replace(path: '/fr'));
+    _startLoadTimeout();
+    try {
+      if (destination != null && _policy.isInternal(destination)) {
+        await _web.loadRequest(destination);
+      } else {
+        await _web.loadRequest(_policy.origin.replace(path: '/fr'));
+      }
+    } catch (_) {
+      _failLoad();
+    }
+  }
+
+  void _startLoadTimeout() {
+    _loadTimeout?.cancel();
+    _loadTimeout = Timer(const Duration(seconds: 30), () {
+      if (mounted && _loading) _failLoad();
+    });
+  }
+
+  void _failLoad() {
+    _loadTimeout?.cancel();
+    _indicatorDelay?.cancel();
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _showIndicator = false;
+        _loadFailed = true;
+      });
     }
   }
 
   Future<void> _back() async {
-    if (await _web.canGoBack()) {
-      await _web.goBack();
-    } else {
-      await SystemNavigator.pop();
+    if (_handlingBack) return;
+    _handlingBack = true;
+    try {
+      if (await _web.canGoBack()) {
+        await _web.goBack();
+      } else if (mounted &&
+          Theme.of(context).platform == TargetPlatform.android) {
+        await SystemNavigator.pop();
+      }
+    } finally {
+      _handlingBack = false;
     }
   }
 
   @override
   void dispose() {
     _loadTimeout?.cancel();
+    _indicatorDelay?.cancel();
     _links?.cancel();
     _connectivity?.cancel();
     super.dispose();
@@ -240,8 +275,23 @@ class _TodijoWebShellState extends State<TodijoWebShell> {
           child: Stack(
             children: [
               WebViewWidget(controller: _web),
-              if (_loading && !_offline && !_loadFailed)
-                const Center(child: CircularProgressIndicator()),
+              if (_loading && _showIndicator && !_offline && !_loadFailed)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: IgnorePointer(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: TodijoColors.forest,
+                        backgroundColor: TodijoColors.ivory,
+                        semanticsLabel: copy.text('loading'),
+                      ),
+                    ),
+                  ),
+                ),
               if (_offline || _loadFailed)
                 Directionality(
                   textDirection: todijoRtlLocaleCodes.contains(_locale)

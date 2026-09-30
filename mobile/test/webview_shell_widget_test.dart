@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 // The fake implements the platform API exported by the WebView dependency.
 // ignore: depend_on_referenced_packages
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
-import 'package:todijo/src/native_shell/simple_webview_app.dart';
+import 'package:todijo/src/native_shell/todijo_shell_app.dart';
+
+const todijoWebUrl = 'https://todijo.com';
 
 class TestController extends PlatformWebViewController {
   TestController(super.params) : super.implementation();
@@ -112,13 +114,18 @@ void main() {
           const MethodChannel('com.llfbandit.app_links/messages'),
           (_) async => initialLink,
         );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('dev.fluttercommunity.plus/connectivity_status'),
+          (_) async => null,
+        );
   });
 
   testWidgets(
     'cold-start page link loads once; unrelated navigation is blocked',
     (tester) async {
       initialLink = 'todijo://open/fr/product/42';
-      await tester.pumpWidget(const SimpleTodijoWebViewApp());
+      await tester.pumpWidget(const TodijoShellApp());
       await tester.pump();
       expect(platform.controller.loads.map((uri) => uri.toString()), [
         'https://todijo.com/fr/product/42',
@@ -155,7 +162,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       platform.delegate.finish('https://todijo.com/fr/cart');
       await tester.pump(const Duration(milliseconds: 200));
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -163,23 +170,24 @@ void main() {
   testWidgets(
     'JS enabled, stable controller, delayed loading and timeout recovery',
     (tester) async {
-      await tester.pumpWidget(const SimpleTodijoWebViewApp());
+      await tester.pumpWidget(const TodijoShellApp());
       await tester.pump();
       final controller = platform.controller;
       expect(controller.mode, JavaScriptMode.unrestricted);
-      expect(controller.loads.single.toString(), todijoWebUrl);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(controller.loads.single.toString(), '$todijoWebUrl/fr');
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
       platform.delegate.finish(todijoWebUrl);
       await tester.pump();
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      controller.current = Uri.parse('$todijoWebUrl/fr/product/1');
       platform.delegate.start('$todijoWebUrl/fr/product/1');
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
       await tester.pump(const Duration(seconds: 30));
       expect(find.text('Réessayer'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       await tester.tap(find.text('Réessayer'));
       await tester.pump();
       expect(controller.loads.last.path, '/fr/product/1');
@@ -190,23 +198,29 @@ void main() {
   );
 
   testWidgets(
-    'main-page HTTP errors stay covered; subresource errors are ignored',
+    'branded website pages remain visible; only main-frame failures are covered',
     (tester) async {
-      await tester.pumpWidget(const SimpleTodijoWebViewApp());
+      await tester.pumpWidget(const TodijoShellApp());
       await tester.pump();
       platform.delegate.finish(todijoWebUrl);
-      platform.delegate.httpError(
-        HttpResponseError(
-          request: WebResourceRequest(
-            uri: Uri.parse('$todijoWebUrl/image.png'),
-          ),
+      platform.delegate.error(
+        const WebResourceError(
+          errorCode: -2,
+          description: 'image unavailable',
+          isForMainFrame: false,
         ),
       );
       await tester.pump();
       expect(find.text('Réessayer'), findsNothing);
-      platform.delegate.httpError(
-        HttpResponseError(
-          request: WebResourceRequest(uri: Uri.parse(todijoWebUrl)),
+      platform.delegate.start('$todijoWebUrl/fr/nonexistent');
+      platform.delegate.finish('$todijoWebUrl/fr/nonexistent');
+      await tester.pump();
+      expect(find.text('Réessayer'), findsNothing);
+      platform.delegate.error(
+        const WebResourceError(
+          errorCode: -2,
+          description: 'network unavailable',
+          isForMainFrame: true,
         ),
       );
       platform.delegate.finish(todijoWebUrl);
@@ -238,7 +252,7 @@ void main() {
           if (call.method == 'SystemNavigator.pop') exits++;
           return null;
         });
-    await tester.pumpWidget(const SimpleTodijoWebViewApp());
+    await tester.pumpWidget(const TodijoShellApp());
     await tester.pump();
     await tester.binding.handlePopRoute();
     await tester.pump();
@@ -254,12 +268,39 @@ void main() {
   testWidgets('safe area applies top and bottom insets once', (tester) async {
     tester.view.padding = FakeViewPadding(top: 30, bottom: 24);
     addTearDown(tester.view.resetPadding);
-    await tester.pumpWidget(const SimpleTodijoWebViewApp());
+    await tester.pumpWidget(const TodijoShellApp());
     await tester.pump();
     final rect = tester.getRect(find.byKey(const Key('web-content')));
     final ratio = tester.view.devicePixelRatio;
     expect(rect.top, 30 / ratio);
     expect(rect.bottom, tester.view.physicalSize.height / ratio - 24 / ratio);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('original localized native failure UI retains RTL', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const TodijoShellApp());
+    await tester.pump();
+    platform.delegate.start('$todijoWebUrl/ar/product/1');
+    platform.delegate.error(
+      const WebResourceError(
+        errorCode: -2,
+        description: 'network unavailable',
+        isForMainFrame: true,
+      ),
+    );
+    await tester.pump();
+    expect(find.text('إعادة المحاولة'), findsOneWidget);
+    final direction = tester.widget<Directionality>(
+      find
+          .ancestor(
+            of: find.text('إعادة المحاولة'),
+            matching: find.byType(Directionality),
+          )
+          .first,
+    );
+    expect(direction.textDirection, TextDirection.rtl);
     await tester.pumpWidget(const SizedBox());
   });
 }
