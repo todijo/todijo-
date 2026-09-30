@@ -164,7 +164,7 @@ export function connectedAccountReady(account: StripeConnectedAccount, expectedA
 
 export function platformFeePercent() {
   const raw = process.env.STRIPE_PLATFORM_FEE_PERCENT;
-  const value = raw == null || raw.trim() === "" ? 10 : Number(raw);
+  const value = raw == null || raw.trim() === "" ? 6 : Number(raw);
   if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error("STRIPE_PLATFORM_FEE_PERCENT must be between 0 and 100.");
   return value;
 }

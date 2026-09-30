@@ -11,7 +11,8 @@ export async function POST(request: Request) {
     const session = await readSession();
     if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     await assertSellerActivity(prisma,session.userId);
-    const plan = configuredSellerPlan((await request.json()).planId);
+    const body = await request.json();
+    const plan = configuredSellerPlan(body.planId, body.interval);
     if (!plan) return NextResponse.json({ error: "Invalid or unavailable subscription plan." }, { status: 400 });
     const store = await prisma.store.findUnique({
       where: { ownerId: session.userId },
@@ -30,8 +31,8 @@ export async function POST(request: Request) {
     }
     await prisma.sellerSubscription.upsert({
       where: { storeId: store.id },
-      create: { storeId: store.id, stripePriceId: plan.priceId, plan: plan.id, status: "INCOMPLETE" },
-      update: { stripePriceId: plan.priceId, plan: plan.id, status: "INCOMPLETE" },
+      create: { storeId: store.id, stripePriceId: plan.priceId, plan: plan.id, billingInterval: plan.interval, status: "INCOMPLETE" },
+      update: { stripePriceId: plan.priceId, plan: plan.id, billingInterval: plan.interval, status: "INCOMPLETE" },
     });
     console.info(`[Seller subscription] Prepared ${plan.id} subscription record for store ${store.id} with price ${plan.priceId}.`);
     const checkout = await createSellerSubscriptionCheckout({ storeId: store.id, userId: session.userId, customerId, priceId: plan.priceId, plan: plan.id });

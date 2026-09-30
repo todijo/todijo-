@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { requireAdmin } from "../admin-access";
+import { effectiveSellerPlan } from "../seller-subscription";
 
 type Database = PrismaClient | Prisma.TransactionClient;
 export const PLATFORM_CJ_CONNECTION_ID = "platform-cj";
@@ -24,8 +25,16 @@ export async function setSellerDropshippingPermission(db: Database, session: { u
 
 export async function requireSellerSupplierAccess(db: Database, session: { userId: string; role?: string } | null) {
   if (!session) throw new SupplierAccessError("AUTH_REQUIRED", 401);
-  const store = await db.store.findFirst({ where: { ownerId: session.userId, owner:{sellerSuspendedAt:null,deactivatedAt:null} }, select: { id: true, dropshippingEnabled: true } });
+  const store = await db.store.findFirst({ where: { ownerId: session.userId, owner:{sellerSuspendedAt:null,deactivatedAt:null} }, select: {
+    id: true,
+    dropshippingEnabled: true,
+    owner: { select: { role: true } },
+    subscription: { select: { status: true, plan: true } },
+    accessGrants: { select: { source: true, plan: true, startsAt: true, endsAt: true } },
+  } });
   if (!store || !store.dropshippingEnabled) throw new SupplierAccessError("DROPSHIPPING_PERMISSION_DENIED");
+  const plan = effectiveSellerPlan({ role: store.owner.role, subscription: store.subscription, accessGrants: store.accessGrants });
+  if (plan !== "pro" && plan !== "admin-exempt") throw new SupplierAccessError("DROPSHIPPING_PRO_PLAN_REQUIRED");
   return store;
 }
 

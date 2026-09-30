@@ -19,7 +19,11 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
   const active = ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
   if (query.checkout === "success" && active) redirect(`/${locale}/seller/products/new`);
   const copy=sellerEntitlementSubscriptionMessages[isLocale(locale)?locale:"en"];
-  const plans = sellerPlans().map(({ priceId, ...plan }) => ({ ...plan, features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue], available: Boolean(priceId) }));
+  const plans = sellerPlans().map(({ priceIds, ...plan }) => ({
+    ...plan,
+    features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue],
+    available: { monthly: Boolean(priceIds.monthly), annual: Boolean(priceIds.annual) },
+  }));
   const activePlanId = canonicalActiveSellerPlanId(store.subscription);
   return <main className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
     <a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><p className="dashboardBadge">{store.name}</p>

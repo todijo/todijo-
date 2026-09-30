@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AdminAccessError, createManagedStore, exemptExistingAdminStore, extendManagedAccess, requireAdmin, validGrantMonths } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import { isSellerPlanId } from "@/lib/seller-plans";
 
 function slugify(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       currency,
       language,
       months: validGrantMonths(months) ? months : undefined,
+      plan: isSellerPlanId(body.plan) ? body.plan : undefined,
     }));
     return NextResponse.json({ ok: true, store });
   } catch (error) {
@@ -60,7 +62,8 @@ export async function PATCH(request: Request) {
     const months = Number(body.months);
     if (!validGrantMonths(months)) throw new AdminAccessError("Duration must be 1, 3, 6, or 12 months.", 400, "INVALID_DURATION");
     const storeIds = Array.isArray(body.storeIds) ? body.storeIds.map(String) : [];
-    const grants = await prisma.$transaction((tx) => extendManagedAccess(tx, admin.id, storeIds, months));
+    const plan = isSellerPlanId(body.plan) ? body.plan : undefined;
+    const grants = await prisma.$transaction((tx) => extendManagedAccess(tx, admin.id, storeIds, months, new Date(), plan));
     return NextResponse.json({ ok: true, grants: grants.map((grant) => ({ ...grant, endsAt: grant.endsAt?.toISOString() })) });
   } catch (error) {
     return errorResponse(error);

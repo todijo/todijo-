@@ -27,7 +27,8 @@ export default async function SellOnTodijoPage() {
     <section className="container sellerPlanSection" id="plans">
       <div className="sellerPlanHeading"><h2>{french ? "Choisissez votre formule" : "Choose your plan"}</h2><p>{french ? "Les montants ci-dessous correspondent aux formules actuellement configurées dans Todijo. Le paiement de l’abonnement est géré de manière sécurisée par Stripe après la création de votre boutique." : "These prices reflect the seller plans currently configured in Todijo. Subscription billing is securely handled by Stripe after your store is created."}</p></div>
       <div className="publicSellerPlanGrid">{plans.map((plan, index) => <article className={`publicSellerPlan${index === plans.length - 1 ? " isFeatured" : ""}`} key={plan.id}>
-        <h3>{plan.name}</h3><p className="publicSellerPlanPrice"><strong>{plan.price} {plan.currency}</strong><span>{french ? "/ mois" : "/ month"}</span></p>
+        <h3>{plan.name}</h3><p className="publicSellerPlanPrice"><strong>{(plan.monthlyAmountMinor / 100).toFixed(2)} {plan.currency}</strong><span>{french ? "/ mois" : "/ month"}</span></p>
+        <p>{(plan.annualAmountMinor / 100).toFixed(2)} {plan.currency} {french ? "/ an · économie de 20 %" : "/ year · save 20%"}</p>
         <p>{plan.productLimit ? (french ? `Jusqu’à ${plan.productLimit} produits` : `Up to ${plan.productLimit} products`) : (french ? "Produits illimités" : "Unlimited products")}</p>
         <ul>{[french ? "Tableau de bord vendeur" : "Seller dashboard", french ? "Gestion des commandes" : "Order management", french ? "Suivi des revenus" : "Revenue tracking"].map((feature) => <li key={feature}>{feature}</li>)}</ul>
         <a href={`/${locale}/register?role=seller&plan=${plan.id}`}>{french ? `Commencer avec ${plan.name}` : `Start with ${plan.name}`}<ArrowRight size={16}/></a>

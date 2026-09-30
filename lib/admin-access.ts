@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient, StoreAccessSource, UserRole } from "@prisma/client";
+import { isSellerPlanId, type SellerPlanId } from "./seller-plans";
 
 export const adminGrantMonths = [1, 3, 6, 12] as const;
 export type AdminGrantMonths = (typeof adminGrantMonths)[number];
@@ -98,6 +99,7 @@ export type ManagedStoreInput = {
   currency: string;
   language: string;
   months?: AdminGrantMonths;
+  plan?: SellerPlanId;
 };
 
 export async function createManagedStore(db: Database, adminId: string, input: ManagedStoreInput, now = new Date()) {
@@ -108,6 +110,7 @@ export async function createManagedStore(db: Database, adminId: string, input: M
   if (ownStore && owner.role !== "ADMIN") throw new AdminAccessError("Administrator store ownership is invalid.", 403, "ADMIN_REQUIRED");
   if (!ownStore && owner.role !== "SELLER") throw new AdminAccessError("Only an existing seller can receive a managed store.", 400, "OWNER_INELIGIBLE");
   if (!ownStore && !validGrantMonths(input.months)) throw new AdminAccessError("Select an initial access duration.", 400, "INVALID_DURATION");
+  if (!ownStore && !isSellerPlanId(input.plan)) throw new AdminAccessError("Select a valid seller plan.", 400, "INVALID_SELLER_PLAN");
   const period = ownStore ? null : calculateGrantPeriod(now, input.months!);
   return db.store.create({
     data: {
@@ -127,6 +130,7 @@ export async function createManagedStore(db: Database, adminId: string, input: M
         create: {
           grantedById: adminId,
           source: ownStore ? "ADMIN_EXEMPT" : "ADMIN_GRANTED",
+          plan: ownStore ? null : input.plan,
           startsAt: period?.startsAt ?? now,
           endsAt: period?.endsAt ?? null,
         },
@@ -166,8 +170,10 @@ export async function extendManagedAccess(
   storeIds: string[],
   months: AdminGrantMonths,
   now = new Date(),
+  plan?: SellerPlanId,
 ) {
   if (!validGrantMonths(months)) throw new AdminAccessError("Duration must be 1, 3, 6, or 12 months.", 400, "INVALID_DURATION");
+  if (!isSellerPlanId(plan)) throw new AdminAccessError("Select a valid seller plan.", 400, "INVALID_SELLER_PLAN");
   const ids = [...new Set(storeIds.filter(Boolean))];
   if (!ids.length) throw new AdminAccessError("Select at least one store.", 400, "STORE_REQUIRED");
   const stores = await db.store.findMany({
@@ -187,7 +193,7 @@ export async function extendManagedAccess(
       .sort((a, b) => b.getTime() - a.getTime())[0];
     const period = calculateGrantPeriod(now, months, currentEnd);
     results.push(await db.storeAccessGrant.create({
-      data: { storeId: store.id, grantedById: adminId, source: "ADMIN_GRANTED", ...period },
+      data: { storeId: store.id, grantedById: adminId, source: "ADMIN_GRANTED", plan, ...period },
       select: { storeId: true, endsAt: true },
     }));
     await db.product.updateMany({

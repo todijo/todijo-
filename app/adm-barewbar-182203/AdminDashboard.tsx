@@ -65,7 +65,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
     event.preventDefault();
     if (!selected.length || !window.confirm(t("confirmExtension", { count: selected.length }))) return;
     const form = new FormData(event.currentTarget);
-    if (await request("PATCH", { storeIds: selected, months: Number(form.get("months")) })) setSelected([]);
+    if (await request("PATCH", { storeIds: selected, months: Number(form.get("months")), plan: form.get("plan") })) setSelected([]);
   }
 
   async function exemptMyStore() {
@@ -104,6 +104,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
           <div><label>{t("country")}<input name="country" required/></label><label>{t("city")}<input name="city" required/></label></div>
           <div><label>{t("currency")}<select name="currency" defaultValue="EUR"><option>EUR</option><option>USD</option><option>GBP</option></select></label><label>{t("language")}<select name="language" defaultValue={locale}>{["en","fr","ar","ku","tr","de","es","it","nl","fa","hi","pt","ru"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
           <label>{t("initialAccess")}<select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
+          <label>{t("subscription")}<select name="plan" defaultValue="basic"><option value="basic">BASIC</option><option value="plus">PLUS</option><option value="pro">PRO</option></select></label>
           <button disabled={busy || !eligibleUsers.length}>{busy ? t("working") : t("createStoreAction")}</button>
         </form>
       </section>
@@ -112,6 +113,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
         <div className="adminPanelHeading"><CalendarPlus/><div><h2>{t("grantAccess")}</h2><p>{t("grantAccessHelp")}</p></div></div>
         <form className="adminGrantForm" onSubmit={extend}>
           <label><span>{t("duration")}</span><select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
+          <label><span>{t("subscription")}</span><select name="plan" defaultValue="basic"><option value="basic">BASIC</option><option value="plus">PLUS</option><option value="pro">PRO</option></select></label>
           <button disabled={busy || !selected.length}>{t("extendSelected", { count: selected.length })}</button>
         </form>
         <div className="adminStoreList">

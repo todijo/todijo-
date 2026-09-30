@@ -45,9 +45,10 @@ test("admin creates an eligible seller store with timed access and no Stripe dat
     store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; } },
   } as unknown as Db;
   const now = new Date("2026-01-15T12:00:00Z");
-  await createManagedStore(db, "admin", { ownerId: "seller", name: "Seller Shop", slug: "seller-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr", months: 3 }, now);
-  const nested = (data?.accessGrants as { create: { source: string; endsAt: Date } }).create;
+  await createManagedStore(db, "admin", { ownerId: "seller", name: "Seller Shop", slug: "seller-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr", months: 3, plan: "plus" }, now);
+  const nested = (data?.accessGrants as { create: { source: string; plan: string; endsAt: Date } }).create;
   assert.equal(nested.source, "ADMIN_GRANTED");
+  assert.equal(nested.plan, "plus");
   assert.equal(nested.endsAt.toISOString(), "2026-04-15T12:00:00.000Z");
   assert.equal("subscription" in (data ?? {}), false);
 });
@@ -78,9 +79,10 @@ test("bulk extension creates one audit grant per store and leaves Stripe untouch
     product: { updateMany: async () => ({ count: 0 }) },
     sellerSubscription: { update: async () => { subscriptionTouched = true; } },
   } as unknown as Db;
-  await extendManagedAccess(db, "admin", ["one", "two"], 12, new Date("2026-01-01T00:00:00Z"));
+  await extendManagedAccess(db, "admin", ["one", "two"], 12, new Date("2026-01-01T00:00:00Z"), "pro");
   assert.equal(created.length, 2);
   assert.equal((created[0].startsAt as Date).toISOString(), "2026-02-01T00:00:00.000Z");
+  assert.equal(created[0].plan, "pro");
   assert.equal(subscriptionTouched, false);
 });
 

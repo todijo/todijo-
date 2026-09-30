@@ -847,6 +847,7 @@ model StoreAccessGrant {
   storeId     String
   grantedById String
   source      StoreAccessSource
+  plan        String?
   startsAt    DateTime
   endsAt      DateTime?
   createdAt   DateTime          @default(now())
@@ -1218,6 +1219,10 @@ model SellerSubscription {
   stripeSubscriptionId String?            @unique
   stripePriceId        String
   plan                 String
+  billingInterval      String             @default("monthly")
+  scheduledPlan        String?
+  scheduledBillingInterval String?
+  scheduledChangeAt    DateTime?
   status               SubscriptionStatus @default(INCOMPLETE)
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
@@ -1228,6 +1233,7 @@ model SellerSubscription {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([status])
+  @@index([scheduledChangeAt])
 }
 
 model Conversation {
