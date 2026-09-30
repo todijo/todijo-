@@ -85,6 +85,32 @@ void main() {
     },
   );
 
+  test('HTTPS app links preserve route details without broadening trust', () {
+    final destination = Uri.parse(
+      'https://todijo.com/en/account?tab=orders&return=%2Fen%2Fcart#history',
+    );
+    expect(production.appLinkDestination(destination), destination);
+    for (final raw in [
+      'https://www.todijo.com/fr',
+      'https://todijo.com.evil.test/fr',
+      'https://todijo.com:444/fr',
+      'https://user:password@todijo.com/fr',
+      'http://todijo.com/fr',
+      'https://todijo.com/api',
+      'https://todijo.com/_next/static/app.js',
+    ]) {
+      expect(
+        production.appLinkDestination(Uri.parse(raw)),
+        isNull,
+        reason: raw,
+      );
+    }
+    expect(
+      production.classify(Uri.parse('https://www.todijo.com/fr')),
+      TodijoNavigation.external,
+    );
+  });
+
   test('disposable local origin is exact, not a wildcard for LAN hosts', () {
     final local = TrustedNavigation(
       AppEnvironment(

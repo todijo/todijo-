@@ -1,5 +1,14 @@
 # Todijo Android TWA release project
 
+This is an unpublished legacy TWA project, not the current mobile release target.
+The authoritative Flutter project is `mobile`, with application ID
+`com.todijo.app`. Do not publish the legacy `com.todijo.marketplace` identity.
+The shared `assetlinks.template.json` now targets only the Flutter application.
+Its empty `sha256_cert_fingerprints` array is deliberately incomplete: do not
+deploy it until the real release/distribution signing fingerprint is supplied.
+The public association remains `[]`; production App Links are not verified.
+The TWA instructions below are historical and must not be used for Flutter.
+
 This Stage 1 project is a thin Trusted Web Activity. It contains no marketplace,
 pricing, payment, or authentication logic.
 
@@ -23,7 +32,7 @@ Before an Internal Testing release:
 
 1. Enroll in Play App Signing.
 2. Copy the App signing key certificate SHA-256 fingerprint from Play Console.
-3. Copy `android/assetlinks.template.json`, replacing the placeholder only with
+3. Copy `android/assetlinks.template.json`, populating the fingerprint array with
    that Play App Signing fingerprint (not the upload or debug certificate).
 4. Publish the completed JSON at the well-known assetlinks URL. Never commit a
    guessed or temporary fingerprint.

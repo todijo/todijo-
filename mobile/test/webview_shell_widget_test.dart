@@ -167,6 +167,61 @@ void main() {
     },
   );
 
+  testWidgets('cold-start HTTPS link reaches the existing WebView', (
+    tester,
+  ) async {
+    initialLink = 'https://todijo.com/en/account?tab=orders#history';
+    await tester.pumpWidget(const TodijoShellApp());
+    await tester.pump();
+    expect(platform.controller.loads.map((uri) => uri.toString()), [
+      initialLink,
+    ]);
+    platform.delegate.finish(initialLink!);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('untrusted initial HTTPS link preserves the /fr default', (
+    tester,
+  ) async {
+    initialLink = 'https://evil.test/fr';
+    await tester.pumpWidget(const TodijoShellApp());
+    await tester.pump();
+    expect(platform.controller.loads.single.toString(), '$todijoWebUrl/fr');
+    platform.delegate.finish('$todijoWebUrl/fr');
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'warm HTTPS links reuse the controller and reject untrusted URLs',
+    (tester) async {
+      await tester.pumpWidget(const TodijoShellApp());
+      await tester.pump();
+      final controller = platform.controller;
+      platform.delegate.finish('$todijoWebUrl/fr');
+      Future<void> deliver(String link) async {
+        await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+          'com.llfbandit.app_links/events',
+          const StandardMethodCodec().encodeSuccessEnvelope(link),
+          (_) {},
+        );
+        await tester.pump();
+      }
+
+      await deliver('https://todijo.com/fr/account?tab=orders#history');
+      expect(
+        controller.loads.last.toString(),
+        'https://todijo.com/fr/account?tab=orders#history',
+      );
+      expect(identical(platform.controller, controller), isTrue);
+      final count = controller.loads.length;
+      await deliver('https://evil.test/fr');
+      await deliver('https://www.todijo.com/fr');
+      expect(controller.loads.length, count);
+      platform.delegate.finish(controller.loads.last.toString());
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets(
     'JS enabled, stable controller, delayed loading and timeout recovery',
     (tester) async {
