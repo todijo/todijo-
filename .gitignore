@@ -10,3 +10,9 @@ test-results/
 android/local.properties
 *.jks
 *.keystore
+*.p12
+*.pfx
+# Never version local Android signing credentials or private handoff files.
+**/credentials.private.json
+**/key.properties
+**/signing.private.*

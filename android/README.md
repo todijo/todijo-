@@ -4,8 +4,10 @@ This is an unpublished legacy TWA project, not the current mobile release target
 The authoritative Flutter project is `mobile`, with application ID
 `com.todijo.app`. Do not publish the legacy `com.todijo.marketplace` identity.
 The shared `assetlinks.template.json` now targets only the Flutter application.
-Its empty `sha256_cert_fingerprints` array is deliberately incomplete: do not
-deploy it until the real release/distribution signing fingerprint is supplied.
+It records the real local Flutter upload-key certificate fingerprint. This is
+not yet the Google Play distribution signing identity. Do not deploy it as a
+final Play association until the Play app-signing certificate is confirmed.
+See `mobile/ANDROID_SIGNING.md` for the current signing and backup procedure.
 The public association remains `[]`; production App Links are not verified.
 The TWA instructions below are historical and must not be used for Flutter.
 
