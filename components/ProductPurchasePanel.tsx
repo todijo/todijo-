@@ -63,7 +63,8 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const selectedPrice = dropshippingEligible&&activePricing?Number(activePricing.buyerUnitPrice):marketplacePricing?Number(marketplacePricing.amount):selectedVariant?.priceOverride ?? product.price;
   const selectedCurrency = dropshippingEligible&&activePricing?activePricing.buyerCurrency:marketplacePricing?.currency??product.currency;
   const stock = isVariantProduct ? selectedVariant?.stock ?? 0 : product.stock;
-  useEffect(()=>{if(!dropshippingEligible)setMarketplacePricing(null)},[dropshippingEligible,selectedVariant?.id]);
+  // Clear the previous marketplace price before the child resolves this variant in its passive effect.
+  useLayoutEffect(()=>{if(!dropshippingEligible)setMarketplacePricing(null)},[dropshippingEligible,selectedVariant?.id]);
 
   useLayoutEffect(() => {
     window.dispatchEvent(new CustomEvent("todijo:variant-price", { detail: activePricing||!requiresAuthoritativePrice?{price:selectedPrice,currency:selectedCurrency,verified:true}:{verified:false} }));

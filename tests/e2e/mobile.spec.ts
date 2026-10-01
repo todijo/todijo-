@@ -1,6 +1,24 @@
 import { expect, test } from "@playwright/test";
 import { collectRuntimeErrors, dismissCookieConsent, expectNoDocumentOverflow, expectWithinViewport } from "./helpers";
 
+test("mobile startup image stays inside the viewport before styles and hydration", async ({ browser, baseURL }) => {
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,javaScriptEnabled:false});
+  try {
+    const page=await context.newPage();
+    await page.route("**/*.css**",route=>route.fulfill({contentType:"text/css",body:""}));
+    await page.goto(`${baseURL}/en/login`);
+    const image=page.locator(".mobileStartupArtwork img");
+    await expect(image).toBeVisible();
+    const bounds=await image.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBe(0);
+    expect(bounds!.width).toBe(390);
+    expect(bounds!.height).toBe(844);
+  } finally {
+    await context.close();
+  }
+});
+
 test("mobile authentication entry keeps critical controls usable", async ({ page }) => {
   const assertNoRuntimeErrors = collectRuntimeErrors(page);
   const response = await page.goto("/en/login");
@@ -8,6 +26,7 @@ test("mobile authentication entry keeps critical controls usable", async ({ page
   expect(response?.ok()).toBeTruthy();
   await dismissCookieConsent(page);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.locator(".mobileStartupArtwork")).toHaveCount(0);
   await expectWithinViewport(page.getByLabel("Email address"), page);
   await expectWithinViewport(page.getByLabel("Password"), page);
   await expectWithinViewport(page.getByRole("button", { name: "Sign in" }), page);
@@ -16,6 +35,7 @@ test("mobile authentication entry keeps critical controls usable", async ({ page
   await page.getByRole("link", { name: "Forgot password?" }).click();
   await expect(page).toHaveURL(/\/en\/forgot-password$/);
   await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
+  await expect(page.locator(".mobileStartupArtwork")).toHaveCount(0);
   await expectNoDocumentOverflow(page);
   assertNoRuntimeErrors();
 });
@@ -69,6 +89,7 @@ test("mobile protected route redirects safely", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/en\/login$/);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.locator(".mobileStartupArtwork")).toHaveCount(0);
   await expectNoDocumentOverflow(page);
   assertNoRuntimeErrors();
 });

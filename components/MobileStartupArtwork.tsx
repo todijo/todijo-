@@ -32,13 +32,14 @@ export default function MobileStartupArtwork() {
 
   if (!visible) return null;
   return (
-    <div className="mobileStartupArtwork" aria-hidden="true">
+    <div className="mobileStartupArtwork" aria-hidden="true" style={{position:"fixed",inset:0,overflow:"hidden"}}>
       <img
         ref={imageRef}
         src="/images/brand/todijo-pwa-startup.png?v=1"
         alt=""
         width="941"
         height="1672"
+        style={{width:"100%",height:"100%",objectFit:"contain"}}
         draggable="false"
       />
     </div>
