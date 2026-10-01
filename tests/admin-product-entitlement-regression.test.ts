@@ -30,9 +30,9 @@ test("admin entitlement and subscription copy covers every supported locale with
 });
 
 test("ordinary seller product limits remain enforced", () => {
-  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 49 }), { productLimit: 50, blocked: false });
-  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 50 }), { productLimit: 50, blocked: true });
-  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 264 }), { productLimit: 50, blocked: true });
+  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 9 }), { productLimit: 10, blocked: false });
+  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 10 }), { productLimit: 10, blocked: true });
+  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 264 }), { productLimit: 10, blocked: true });
   assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "pro", productCount: 264 }), { productLimit: null, blocked: false });
 });
 
