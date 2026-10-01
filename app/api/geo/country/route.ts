@@ -1,9 +1,7 @@
 import {NextResponse} from "next/server";
-import {normalizeShoppingCountry} from "@/lib/suppliers/buyer-pricing";
+import {detectRequestCountry} from "@/lib/geo-country";
 
 export async function GET(request:Request){
-  const headers=request.headers;
-  const candidates=[headers.get("cf-ipcountry"),headers.get("x-vercel-ip-country"),headers.get("x-country-code"),headers.get("x-forwarded-country")];
-  const country=candidates.map(normalizeShoppingCountry).find(Boolean)??null;
+  const country=detectRequestCountry(request.headers);
   return NextResponse.json({country},{headers:{"Cache-Control":"private, no-store"}});
 }

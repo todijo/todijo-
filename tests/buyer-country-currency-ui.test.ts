@@ -14,6 +14,7 @@ test("marketplace exposes a persisted country selector and safe proxy country de
   const selector=readFileSync("components/ShoppingCountrySwitcher.tsx","utf8");
   const provider=readFileSync("components/BuyerMarketProvider.tsx","utf8");
   const geo=readFileSync("app/api/geo/country/route.ts","utf8");
+  const detection=readFileSync("lib/geo-country.ts","utf8");
   assert.match(header,/ShoppingCountrySwitcher/);
   assert.match(selector,/useBuyerMarket/);
   assert.match(selector,/selectCountry/);
@@ -23,8 +24,9 @@ test("marketplace exposes a persisted country selector and safe proxy country de
   assert.match(provider,/explicitCurrency:saved\.currency/);
   assert.match(provider,/user:\$\{session\.userId\}/);
   assert.match(provider,/\/api\/geo\/country/);
-  assert.match(geo,/cf-ipcountry/);
-  assert.match(geo,/x-vercel-ip-country/);
-  assert.match(geo,/normalizeShoppingCountry/);
+  assert.match(geo,/detectRequestCountry\(request.headers\)/);
+  assert.match(detection,/cf-ipcountry/);
+  assert.match(detection,/x-vercel-ip-country/);
+  assert.match(detection,/normalizeShoppingCountry/);
   assert.doesNotMatch(geo,/fetch\(/);
 });
