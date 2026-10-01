@@ -22,12 +22,19 @@ export async function dismissCookieConsent(page: Page) {
 }
 
 export async function expectNoDocumentOverflow(page: Page, tolerance = 1) {
-  const overflow = await page.evaluate(() => {
+  const layout = await page.evaluate(() => {
     const root = document.documentElement;
     const body = document.body;
-    return Math.max(root.scrollWidth, body?.scrollWidth ?? 0) - root.clientWidth;
+    const overflow=Math.max(root.scrollWidth, body?.scrollWidth ?? 0) - root.clientWidth;
+    return {overflow,width:root.clientWidth,readyState:document.readyState,
+      elements:overflow>1?Array.from(document.querySelectorAll("body *")).flatMap(element=>{
+        const rect=element.getBoundingClientRect();
+        if(rect.right<=root.clientWidth+1&&rect.left>=-1)return [];
+        const style=getComputedStyle(element);
+        return [{tag:element.tagName,className:element.getAttribute("class"),parentClass:element.parentElement?.className,src:element.getAttribute("src"),left:rect.left,right:rect.right,width:rect.width,position:style.position,display:style.display}];
+      }).slice(0,15):[]};
   });
-  expect(overflow, "document should not overflow the viewport horizontally").toBeLessThanOrEqual(tolerance);
+  expect(layout.overflow, `document should not overflow the viewport horizontally: ${JSON.stringify(layout)}`).toBeLessThanOrEqual(tolerance);
 }
 
 export async function expectWithinViewport(locator: Locator, page: Page, tolerance = 1) {

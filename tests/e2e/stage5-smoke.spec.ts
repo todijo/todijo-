@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { dismissCookieConsent } from "./helpers";
 
 test("buyer selects an exact variant, adds it to cart, and reaches safe checkout initiation", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) => route.fulfill({json:{authenticated:false}}));
+  await page.route("**/api/geo/country", (route) => route.fulfill({json:{country:"FR"}}));
   await page.route("**/api/products/buyer-pricing", (route) => route.fulfill({ json: { prices: [{ productId: "stage5-variant-product", variantId: "variant-blue-m", kind: "productPrice", amount: "24", currency: "EUR" }, { productId: "stage5-variant-product", variantId: "variant-black-s", kind: "productPrice", amount: "21", currency: "EUR" }] } }));
   await page.route("**/api/products?ids=**", (route) => route.fulfill({ json: { products: [{ id: "stage5-variant-product", sellerType: "PRIVATE" }] } }));
   await page.route("**/api/account/addresses", (route) => route.fulfill({ json: { addresses: [] } }));
@@ -10,7 +12,13 @@ test("buyer selects an exact variant, adds it to cart, and reaches safe checkout
   await page.getByRole("button", { name: "Blue" }).click();
   await page.getByRole("button", { name: "M", exact: true }).click();
   await expect(page.getByText("Color: Blue · Size: M")).toBeVisible();
-  await page.getByRole("button", { name: "Add to cart" }).first().click();
+  const purchase=page.locator(".variantPurchasePanel");
+  await expect(purchase.locator(".srOnly[aria-busy]")).toHaveAttribute("aria-busy","false");
+  await expect(purchase.locator(".srOnly[aria-busy]")).toContainText("24.00");
+  const addToCart=purchase.locator(".addCartButton");
+  await expect(addToCart).toBeEnabled();
+  await expect(addToCart).toHaveAccessibleName("Add to cart");
+  await addToCart.click();
   await page.goto("/en/cart");
   await expect(page.getByText("Stage 5 variant product")).toBeVisible();
   await expect(page.getByText("Color: Blue · Size: M")).toBeVisible();
