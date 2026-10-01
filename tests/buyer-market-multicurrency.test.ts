@@ -7,12 +7,12 @@ import {preferredCurrencyForCountry} from "../lib/currency";
 import {convertMarketplacePrice,memoizeFxResolver} from "../lib/marketplace-presentment";
 import {readFileSync} from "node:fs";
 
-test("buyer markets resolve independently from locale with safe USD fallback",()=>{
+test("buyer markets resolve independently from locale with France/EUR fallback",()=>{
  assert.equal(resolveBuyerMarket({explicitCountry:"IQ"}).currency,"IQD");
  assert.equal(resolveBuyerMarket({explicitCountry:"FR"}).currency,"EUR");
  assert.equal(resolveBuyerMarket({explicitCountry:"GB"}).currency,"GBP");
  assert.equal(resolveBuyerMarket({explicitCountry:"US"}).currency,"USD");
- assert.equal(resolveBuyerMarket({detectedCountry:"XX"}).currency,"USD");
+ assert.equal(resolveBuyerMarket({detectedCountry:"XX"}).currency,"EUR");
  assert.equal(resolveBuyerMarket({explicitCountry:"FR",explicitCurrency:"USD"}).currency,"USD");
  assert.equal(resolveBuyerMarket({explicitCountry:"FR",explicitCurrency:"BTC"}).currency,"EUR");
 });
