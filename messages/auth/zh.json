@@ -113,5 +113,9 @@
     "facebook": "Continue with Facebook"
   },
   "saveDraft": "Save and continue later",
-  "draftSaved": "Draft saved."
+  "draftSaved": "Draft saved.",
+  "sameAsPersonalAddress":"我的店铺地址与个人地址相同",
+  "sameAsPersonalAddressHelp":"将已保存的个人地址一次性复制到店铺资料。之后的修改互不影响。",
+  "noPersonalAddress":"没有已保存的个人地址。你可以填写单独的店铺地址，或在账户中添加地址。",
+  "managePersonalAddress":"管理个人地址"
 }

@@ -113,5 +113,9 @@
     "facebook": "Continue with Facebook"
   },
   "saveDraft": "Save and continue later",
-  "draftSaved": "Draft saved."
+  "draftSaved": "Draft saved.",
+  "sameAsPersonalAddress":"O endereço da minha loja é igual ao meu endereço pessoal",
+  "sameAsPersonalAddressHelp":"Copie uma vez o endereço pessoal guardado para os dados da loja. Alterações futuras permanecem independentes.",
+  "noPersonalAddress":"Não existe um endereço pessoal guardado. Pode inserir um endereço de loja separado ou adicionar um à sua conta.",
+  "managePersonalAddress":"Gerir endereços pessoais"
 }

@@ -113,5 +113,9 @@
     "facebook": "Continue with Facebook"
   },
   "saveDraft": "Save and continue later",
-  "draftSaved": "Draft saved."
+  "draftSaved": "Draft saved.",
+  "sameAsPersonalAddress":"نشانی فروشگاه من با نشانی شخصی من یکسان است",
+  "sameAsPersonalAddressHelp":"نشانی شخصی ذخیره‌شده را یک‌بار در اطلاعات فروشگاه کپی کنید. تغییرات بعدی مستقل خواهند ماند.",
+  "noPersonalAddress":"نشانی شخصی ذخیره‌شده‌ای وجود ندارد. می‌توانید نشانی جداگانه فروشگاه را وارد کنید یا نشانی‌ای به حساب خود بیفزایید.",
+  "managePersonalAddress":"مدیریت نشانی‌های شخصی"
 }

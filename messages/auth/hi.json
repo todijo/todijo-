@@ -113,5 +113,9 @@
     "facebook": "Continue with Facebook"
   },
   "saveDraft": "Save and continue later",
-  "draftSaved": "Draft saved."
+  "draftSaved": "Draft saved.",
+  "sameAsPersonalAddress":"मेरी दुकान का पता मेरे व्यक्तिगत पते के समान है",
+  "sameAsPersonalAddressHelp":"सहेजे गए व्यक्तिगत पते को एक बार दुकान के विवरण में कॉपी करें। बाद के बदलाव स्वतंत्र रहेंगे।",
+  "noPersonalAddress":"कोई सहेजा गया व्यक्तिगत पता उपलब्ध नहीं है। आप दुकान का अलग पता दर्ज कर सकते हैं या अपने खाते में पता जोड़ सकते हैं।",
+  "managePersonalAddress":"व्यक्तिगत पते प्रबंधित करें"
 }

@@ -113,5 +113,9 @@
     "facebook": "Continue with Facebook"
   },
   "saveDraft": "Save and continue later",
-  "draftSaved": "Draft saved."
+  "draftSaved": "Draft saved.",
+  "sameAsPersonalAddress":"Адрес моего магазина совпадает с моим личным адресом",
+  "sameAsPersonalAddressHelp":"Однократно скопируйте сохранённый личный адрес в данные магазина. Последующие изменения останутся независимыми.",
+  "noPersonalAddress":"Сохранённый личный адрес отсутствует. Можно указать отдельный адрес магазина или добавить адрес в аккаунт.",
+  "managePersonalAddress":"Управление личными адресами"
 }
