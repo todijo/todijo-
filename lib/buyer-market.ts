@@ -6,13 +6,27 @@ export const BUYER_MARKET_COOKIE="todijo-shopping-country-v1";
 export const BUYER_CURRENCY_COOKIE="todijo-buyer-currency-v1";
 export const BUYER_MARKET_EVENT="todijo:buyer-market-change";
 export const BUYER_MARKET_GUEST_SCOPE="guest";
+export const BUYER_MARKET_SCOPE_COOKIE="todijo-buyer-market-scope-v1";
 
 export type BuyerMarket={country:string;currency:SupportedBuyerCurrency;source:"EXPLICIT"|"DETECTED"|"FALLBACK"};
 
-export function resolveBuyerMarket(input:{explicitCountry?:unknown;explicitCurrency?:unknown;detectedCountry?:unknown}):BuyerMarket{
-  const explicitCountry=normalizeShoppingCountry(input.explicitCountry),detectedCountry=normalizeShoppingCountry(input.detectedCountry);
-  const country=explicitCountry??detectedCountry??"US";
-  return{country,currency:supportedBuyerCurrency(input.explicitCurrency)??preferredCurrencyForCountry(country),source:explicitCountry||supportedBuyerCurrency(input.explicitCurrency)?"EXPLICIT":detectedCountry?"DETECTED":"FALLBACK"};
+export function resolveBuyerMarket(input:{explicitCountry?:unknown;explicitCurrency?:unknown;accountCountry?:unknown;accountCurrency?:unknown;sessionCountry?:unknown;sessionCurrency?:unknown;detectedCountry?:unknown}):BuyerMarket{
+  const explicitCountry=normalizeShoppingCountry(input.explicitCountry),accountCountry=normalizeShoppingCountry(input.accountCountry),sessionCountry=normalizeShoppingCountry(input.sessionCountry),detectedCountry=normalizeShoppingCountry(input.detectedCountry);
+  const explicitCurrency=supportedBuyerCurrency(input.explicitCurrency),accountCurrency=supportedBuyerCurrency(input.accountCurrency),sessionCurrency=supportedBuyerCurrency(input.sessionCurrency);
+  const country=explicitCountry??accountCountry??sessionCountry??detectedCountry??"FR";
+  return{country,currency:explicitCurrency??accountCurrency??sessionCurrency??preferredCurrencyForCountry(country),source:explicitCountry||explicitCurrency||accountCountry||accountCurrency||sessionCountry||sessionCurrency?"EXPLICIT":detectedCountry?"DETECTED":"FALLBACK"};
+}
+
+export function readBuyerMarketCookies(cookieHeader:string,scope:string){
+  const values=new Map<string,string>();
+  for(const cookie of cookieHeader.split(";")){
+    const separator=cookie.indexOf("=");if(separator<0)continue;
+    try{values.set(cookie.slice(0,separator).trim(),decodeURIComponent(cookie.slice(separator+1).trim()));}catch{}
+  }
+  // Do not inherit another signed-in account's browsing preferences.
+  const owner=values.get(BUYER_MARKET_SCOPE_COOKIE);
+  if(owner&&owner!==scope)return{country:null,currency:null};
+  return{country:normalizeShoppingCountry(values.get(BUYER_MARKET_COOKIE)),currency:supportedBuyerCurrency(values.get(BUYER_CURRENCY_COOKIE))};
 }
 
 export function readBuyerCurrency(storage:Pick<Storage,"getItem">){try{return supportedBuyerCurrency(storage.getItem(BUYER_CURRENCY_STORAGE_KEY));}catch{return null;}}
