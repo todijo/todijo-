@@ -55,6 +55,6 @@ test("Chinese namespaces, selector label, and document direction use the existin
   assert.match(switcher, /zh: "简体中文"/);
   assert.match(footer, /`\/\$\{locale\}\/sell#plans`/);
   assert.match(footer, /`\/\$\{locale\}\/dashboard`/);
-  assert.equal((footer.match(/`\/\$\{locale\}\/sell#plans`/g) ?? []).length, 2);
+  assert.equal((footer.match(/`\/\$\{locale\}\/sell#plans`/g) ?? []).length, 1);
   assert.match(layout, /<html lang=\{locale\} dir=\{rtlLocales\.has\(locale\) \? "rtl" : "ltr"\} suppressHydrationWarning>/);
 });
