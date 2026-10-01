@@ -9,7 +9,7 @@ import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 import SocialLoginButtons from "@/components/SocialLoginButtons";
 import Image from "next/image";
 import TodijoLogo from "@/components/TodijoLogo";
-import { sellerRegistrationIntent } from "@/lib/seller-registration-intent";
+import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 
 export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const params = useSearchParams();
@@ -28,11 +28,12 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   const t = useTranslations("Auth");
   const footer = useTranslations("HomeFooter");
 
-  useEffect(() => {
-    if (params?.get("role") === "seller") setRole("seller");
-  }, [params]);
+  const sellerIntent = explicitSellerRegistrationIntent(params?.get("plan"), params?.get("interval"));
+  const sellerNext = sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : null;
 
-  const sellerIntent = sellerRegistrationIntent(params?.get("plan"), params?.get("interval"));
+  useEffect(() => {
+    if (params?.get("role") === "seller" && sellerIntent) setRole("seller");
+  }, [params, sellerIntent]);
 
   const updateTurnstileToken = useCallback((token: string) => {
     tokenRef.current = token;
@@ -105,11 +106,11 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
     </section>
     <section className="authPanel"><div className="authBox">
       <a className="authBack" href={localizedHome(locale)}>← {t("back")}</a><h2>{t("create")}</h2>
-      <SocialLoginButtons/>
+      <SocialLoginButtons next={role === "seller" ? sellerNext ?? undefined : undefined}/>
       <form className="authForm" onSubmit={submit} aria-busy={loading}>
         <div className="roleOptions">
           <label className="roleCard"><input type="radio" name="role" checked={role === "customer"} onChange={() => setRole("customer")} /><strong>🛍️ {t("buyer")}</strong><span>{t("buyerHelp")}</span></label>
-          <label className="roleCard"><input type="radio" name="role" checked={role === "seller"} onChange={() => setRole("seller")} /><strong>🏪 {t("seller")}</strong><span>{t("sellerHelp")}</span></label>
+          <label className="roleCard"><input type="radio" name="role" checked={role === "seller"} onChange={() => sellerIntent ? setRole("seller") : router.push(`/${locale}/sell#plans`)} /><strong>🏪 {t("seller")}</strong><span>{t("sellerHelp")}</span></label>
         </div>
         <div className="formRow"><div className="formField"><label htmlFor="firstName">{t("firstName")}</label><input id="firstName" name="firstName" autoComplete="given-name" required /></div><div className="formField"><label htmlFor="lastName">{t("lastName")}</label><input id="lastName" name="lastName" autoComplete="family-name" required /></div></div>
         <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" aria-describedby="email-security-guidance" required /><small id="email-security-guidance">{t("emailSecurityGuidance")}</small></div>
@@ -131,7 +132,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
         {message && <p className="authMessage" role="alert">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading || !turnstileToken} aria-busy={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
       </form>
-      <p className="authSwitch">{t("hasAccount")} <a href={`${localizedHome(locale)}/login`}>{t("login")}</a></p>
+      <p className="authSwitch">{t("hasAccount")} <a href={sellerNext ? `/${locale}/login?next=${encodeURIComponent(sellerNext)}` : `${localizedHome(locale)}/login`}>{t("login")}</a></p>
     </div></section>
   </main>;
 }

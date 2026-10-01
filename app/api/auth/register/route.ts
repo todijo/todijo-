@@ -11,7 +11,7 @@ import { defaultLocale, isLocale } from "@/i18n/config";
 import { createBuyerAddress } from "@/lib/buyer-addresses";
 import { anonymizedEmailHash } from "@/lib/account-status";
 import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
-import { sellerOnboardingPath } from "@/lib/seller-registration-intent";
+import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 import { localizedHome } from "@/lib/auth-redirects";
 
 export async function POST(request: Request) {
@@ -31,6 +31,10 @@ export async function POST(request: Request) {
     }
 
     const input = validation.value;
+    const explicitSellerIntent = input.role === "SELLER" ? explicitSellerRegistrationIntent(body?.plan, body?.interval) : null;
+    if (input.role === "SELLER" && !explicitSellerIntent) {
+      return NextResponse.json({ error: "Choisissez une formule vendeur et une période de facturation valides.", code: "INVALID_SELLER_PLAN" }, { status: 400 });
+    }
     if (!await allowAuthRequest(authRequestKey("register", input.email, request))) {
       return NextResponse.json({ error: "Veuillez réessayer plus tard.", code: "RATE_LIMITED" }, { status: 429 });
     }
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
 
     const existing = await prisma.user.findFirst({ where: { OR:[{email: input.email},{anonymizedEmailHash:anonymizedEmailHash(input.email)}] } });
     if (existing) {
-      const next = input.role === "SELLER" ? sellerOnboardingPath(locale, Boolean(await prisma.store.findUnique({ where: { ownerId: existing.id }, select: { id: true } })), input.sellerIntent) : localizedHome(locale);
+      const next = input.role === "SELLER" ? sellerOnboardingPath(locale, Boolean(await prisma.store.findUnique({ where: { ownerId: existing.id }, select: { id: true } })), explicitSellerIntent) : localizedHome(locale);
       return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail.", code: "ACCOUNT_EXISTS", next: `/${locale}/login?next=${encodeURIComponent(next)}` }, { status: 409 });
     }
 
@@ -66,7 +70,7 @@ export async function POST(request: Request) {
     }
 
     await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
-    const next = user.role === "SELLER" ? sellerOnboardingPath(locale, false, input.sellerIntent) : localizedHome(locale);
+    const next = user.role === "SELLER" ? sellerOnboardingPath(locale, false, explicitSellerIntent) : localizedHome(locale);
     return NextResponse.json({ ok: true, role: user.role, next });
   } catch (error) {
     console.error(error);

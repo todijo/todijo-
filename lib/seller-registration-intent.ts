@@ -11,6 +11,11 @@ export function sellerRegistrationIntent(plan: unknown, interval: unknown): Sell
   return { plan, interval: isSellerBillingInterval(interval) ? interval : "monthly" };
 }
 
+export function explicitSellerRegistrationIntent(plan: unknown, interval: unknown): SellerRegistrationIntent | null {
+  if (!isSellerPlanId(plan) || !isSellerBillingInterval(interval)) return null;
+  return { plan, interval };
+}
+
 export function sellerRegistrationIntentQuery(intent: SellerRegistrationIntent | null) {
   if (!intent) return "";
   return `?plan=${encodeURIComponent(intent.plan)}&interval=${encodeURIComponent(intent.interval)}`;

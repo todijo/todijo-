@@ -4,7 +4,7 @@ import test from "node:test";
 import { adminEntryPath, localeFromReferer, localizedHome, postLoginDestination, safeLoginDestination } from "../lib/auth-redirects";
 import { registrationPersistenceData, validateRegistrationInput } from "../lib/auth-registration";
 import { verifyTurnstileTokenWith } from "../lib/turnstile-verification";
-import { sellerOnboardingPath, sellerRegistrationIntent, sellerRegistrationIntentQuery } from "../lib/seller-registration-intent";
+import { explicitSellerRegistrationIntent, sellerOnboardingPath, sellerRegistrationIntent, sellerRegistrationIntentQuery } from "../lib/seller-registration-intent";
 
 const validInput = { firstName: "Ada", lastName: "Lovelace", email: "ADA@EXAMPLE.COM", password: "password-123", confirmPassword: "password-123", role: "buyer", turnstileToken: "token", shippingAddress:{recipientName:"Ada Lovelace",addressLine1:"1 Computing Way",addressLine2:"",postalCode:"59000",city:"Lille",country:"fr",state:"",phone:""} };
 
@@ -55,6 +55,8 @@ test("registration consumes a Turnstile token once and keeps the server verifica
 test("seller registration intent is canonical, localized, and fails closed for forged values", () => {
   assert.deepEqual(sellerRegistrationIntent("pro", undefined), { plan: "pro", interval: "monthly" });
   assert.deepEqual(sellerRegistrationIntent("plus", "annual"), { plan: "plus", interval: "annual" });
+  assert.equal(explicitSellerRegistrationIntent("pro", undefined), null);
+  assert.deepEqual(explicitSellerRegistrationIntent("plus", "annual"), { plan: "plus", interval: "annual" });
   assert.equal(sellerRegistrationIntent("enterprise", "monthly"), null);
   assert.equal(sellerRegistrationIntent("pro", "weekly"), null);
   assert.equal(sellerRegistrationIntentQuery(null), "");
@@ -77,9 +79,9 @@ test("seller intent survives registration and onboarding without granting an ent
   assert.match(form, /plan: role === "seller" \? params\?\.get\("plan"\)/);
   assert.match(route, /code: "ACCOUNT_EXISTS"/);
   assert.match(route, /sellerOnboardingPath\(locale, Boolean\(/);
-  assert.match(route, /sellerOnboardingPath\(locale, false, input\.sellerIntent\)/);
+  assert.match(route, /sellerOnboardingPath\(locale, false, explicitSellerIntent\)/);
   assert.match(registerPage, /session\.role !== "ADMIN"/);
-  assert.match(createPage, /sellerRegistrationIntent\(query\.plan, query\.interval\)/);
+  assert.match(createPage, /explicitSellerRegistrationIntent\(query\.plan, query\.interval\)/);
   assert.match(createForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(subscriptionPage, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);
   assert.match(checkout, /configuredSellerPlan\(body\.planId, body\.interval\)/);

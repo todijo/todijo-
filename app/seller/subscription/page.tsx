@@ -2,31 +2,36 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { canonicalActiveSellerPlanId, sellerPlans } from "@/lib/seller-plans";
-import { sellerRegistrationIntent } from "@/lib/seller-registration-intent";
+import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 import SubscriptionPlans from "./SubscriptionPlans";
 import ActivatingSubscription from "./ActivatingSubscription";
 import { getLocale } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
+import { sellerPlanSelectionMessages } from "@/i18n/seller-plan-selection";
 
 export const dynamic = "force-dynamic";
 
 export default async function SellerSubscriptionPage({ searchParams }: { searchParams: Promise<{ checkout?: string; plan?: string; interval?: string }> }) {
   const [query, locale] = await Promise.all([searchParams, getLocale()]);
+  const sellerIntent = explicitSellerRegistrationIntent(query.plan, query.interval);
   const session = await readSession();
-  if (!session) redirect(`/${locale}/login`);
+  if (!session) {
+    const next = sellerIntent ? sellerOnboardingPath(locale, true, sellerIntent) : `/${locale}/seller/subscription`;
+    redirect(`/${locale}/login?next=${encodeURIComponent(next)}`);
+  }
   const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { name: true, owner: { select: { role: true } }, subscription: true } });
-  if (!store) redirect(`/${locale}/seller/create-store`);
+  if (!store) redirect(sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : `/${locale}/sell#plans`);
   const active = ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
   if (query.checkout === "success" && active) redirect(`/${locale}/seller/products/new`);
-  const copy=sellerEntitlementSubscriptionMessages[isLocale(locale)?locale:"en"];
+  const resolvedLocale=isLocale(locale)?locale:"en";
+  const copy={...sellerEntitlementSubscriptionMessages[resolvedLocale],...sellerPlanSelectionMessages[resolvedLocale]};
   const plans = sellerPlans().map(({ priceIds, ...plan }) => ({
     ...plan,
     features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue],
     available: { monthly: Boolean(priceIds.monthly), annual: Boolean(priceIds.annual) },
   }));
   const activePlanId = canonicalActiveSellerPlanId(store.subscription);
-  const sellerIntent = sellerRegistrationIntent(query.plan, query.interval);
   return <main className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
     <a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><p className="dashboardBadge">{store.name}</p>
     <h1>{copy.title}</h1><p className="storeSetupIntro">{copy.intro}</p>

@@ -3,15 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import CreateStoreForm from "./CreateStoreForm";
 import { getLocale, getTranslations } from "next-intl/server";
-import { sellerOnboardingPath, sellerRegistrationIntent } from "@/lib/seller-registration-intent";
+import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateStorePage({ searchParams }: { searchParams: Promise<{ plan?: string; interval?: string }> }) {
   const [locale, t, query] = await Promise.all([getLocale(), getTranslations("Seller"), searchParams]);
-  const intent = sellerRegistrationIntent(query.plan, query.interval);
+  const intent = explicitSellerRegistrationIntent(query.plan, query.interval);
   const session = await readSession();
-  if (!session) redirect(`/${locale}/login`);
+  if (!session) {
+    if (!intent) redirect(`/${locale}/sell#plans`);
+    redirect(`/${locale}/login?next=${encodeURIComponent(sellerOnboardingPath(locale, false, intent))}`);
+  }
 
   const store = await prisma.store.findUnique({
     where: { ownerId: session.userId },
@@ -19,6 +22,7 @@ export default async function CreateStorePage({ searchParams }: { searchParams: 
   });
 
   if (store) redirect(sellerOnboardingPath(locale, true, intent));
+  if (!intent) redirect(`/${locale}/sell#plans`);
 
   return (
     <main className="storeSetupPage">

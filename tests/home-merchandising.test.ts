@@ -34,8 +34,9 @@ test("seller discovery routes through public seller information and store direct
 test("dedicated best seller and seller introduction pages exist", () => {
   const best = readFileSync("app/best-sellers/page.tsx", "utf8");
   const sell = readFileSync("app/sell/page.tsx", "utf8");
+  const chooser = readFileSync("app/sell/SellerPlanChooser.tsx", "utf8");
   assert.match(best, /orderItem\.groupBy/);
   assert.match(best, /take: LIMIT/);
   assert.match(sell, /sellerPlans\(\)/);
-  assert.match(sell, /register\?role=seller&plan=/);
+  assert.match(chooser, /register\?role=seller&plan=.*&interval=/);
 });

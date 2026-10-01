@@ -5,12 +5,13 @@ import RegisterForm from "./RegisterForm";
 import { localizedHome } from "@/lib/auth-redirects";
 import { readSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { sellerOnboardingPath, sellerRegistrationIntent } from "@/lib/seller-registration-intent";
+import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 
 export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ role?: string; plan?: string; interval?: string }> }) {
   const [session, locale, query] = await Promise.all([readSession(), getLocale(), searchParams]);
+  const intent = query.role === "seller" ? explicitSellerRegistrationIntent(query.plan, query.interval) : null;
+  if (query.role === "seller" && !intent) redirect(`/${locale}/sell#plans`);
   if (session) {
-    const intent = query.role === "seller" ? sellerRegistrationIntent(query.plan, query.interval) : null;
     if (intent && session.role !== "ADMIN") {
       const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { id: true } });
       redirect(sellerOnboardingPath(locale, Boolean(store), intent));

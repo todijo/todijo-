@@ -23,7 +23,7 @@ export function sellerDashboardNavItems({ locale, storeSlug, labels, accountLabe
     { label: labels.statistics, href: `/${locale}/dashboard#analytics`, icon: BarChart3 },
     { label: labels.revenue, href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign },
     { label: labels.reviews, href: `/${locale}/seller/reviews`, icon: Star, active: active === "reviews" },
-    { label: labels.store, href: storeSlug ? `/${locale}/store/${storeSlug}` : `/${locale}/seller/create-store`, icon: Store },
+    { label: labels.store, href: storeSlug ? `/${locale}/store/${storeSlug}` : `/${locale}/sell#plans`, icon: Store },
     { label: labels.settings, href: `/${locale}/seller/store-settings`, icon: Settings, active: active === "settings" },
     { label: loyaltyMessages[isLocale(locale) ? locale : "fr"].title, href: `/${locale}/seller/loyalty`, icon: Gift, active: active === "loyalty" },
     { label: accountLabel, href: `/${locale}/account`, icon: UserRound, active: active === "account" },
