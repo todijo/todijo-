@@ -17,8 +17,10 @@ test("all OAuth providers remain code-ready and fail closed without credentials"
 test("social identity cannot infer roles or unsafe duplicate linking", () => {
   assert.deepEqual(decideSocialIdentity({ email: "admin@example.com", emailVerified: false, emailUserId: "admin" }), { action: "reject", code: "VERIFIED_EMAIL_REQUIRED" });
   assert.deepEqual(decideSocialIdentity({ email: "seller@example.com", emailVerified: true, providerIdentityInUse: true }), { action: "reject", code: "ACCOUNT_ALREADY_LINKED" });
+  assert.deepEqual(decideSocialIdentity({ currentUserId: "buyer", currentUserEmail: "buyer@example.com", currentUserEmailVerified: true, email: "seller@example.com", emailVerified: true, emailUserId: "seller" }), { action: "reject", code: "EMAIL_MISMATCH" });
   const callback = source("app/api/auth/social/[provider]/callback/route.ts");
   assert.doesNotMatch(callback, /role:\s*["']ADMIN["']|sellerVerified:\s*true|dropshippingEnabled:\s*true/);
+  assert.match(callback, /current\?prisma\.user\.findUnique\(\{where:\{id:current\.userId\},select:\{email:true,emailVerified:true\}\}\):null/);
 });
 
 test("all social providers preserve localized validated login destinations",()=>{

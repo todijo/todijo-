@@ -23,21 +23,32 @@ export type SocialIdentityDecision =
   | { action: "login"; userId: string }
   | { action: "link"; userId: string }
   | { action: "create"; email: string }
-  | { action: "reject"; code: "EMAIL_REQUIRED" | "VERIFIED_EMAIL_REQUIRED" | "ACCOUNT_ALREADY_LINKED" };
+  | { action: "reject"; code: "EMAIL_REQUIRED" | "VERIFIED_EMAIL_REQUIRED" | "EMAIL_MISMATCH" | "ACCOUNT_ALREADY_LINKED" };
 
 export function decideSocialIdentity(input: {
   linkedUserId?: string | null;
   currentUserId?: string | null;
+  currentUserEmail?: string | null;
+  currentUserEmailVerified?: boolean;
   email?: string | null;
   emailVerified: boolean;
   emailUserId?: string | null;
   providerIdentityInUse?: boolean;
 }): SocialIdentityDecision {
-  if (input.linkedUserId) return { action: "login", userId: input.linkedUserId };
+  if (input.linkedUserId) {
+    if (input.currentUserId && input.linkedUserId !== input.currentUserId) return { action: "reject", code: "ACCOUNT_ALREADY_LINKED" };
+    return { action: "login", userId: input.linkedUserId };
+  }
   if (input.providerIdentityInUse) return { action: "reject", code: "ACCOUNT_ALREADY_LINKED" };
-  if (input.currentUserId) return { action: "link", userId: input.currentUserId };
   const email = input.email?.trim().toLowerCase();
   if (!email) return { action: "reject", code: "EMAIL_REQUIRED" };
   if (!input.emailVerified) return { action: "reject", code: "VERIFIED_EMAIL_REQUIRED" };
+  if (input.currentUserId) {
+    const currentEmail = input.currentUserEmail?.trim().toLowerCase();
+    if (!input.currentUserEmailVerified || !currentEmail) return { action: "reject", code: "VERIFIED_EMAIL_REQUIRED" };
+    if (email !== currentEmail) return { action: "reject", code: "EMAIL_MISMATCH" };
+    if (input.emailUserId && input.emailUserId !== input.currentUserId) return { action: "reject", code: "ACCOUNT_ALREADY_LINKED" };
+    return { action: "link", userId: input.currentUserId };
+  }
   return input.emailUserId ? { action: "link", userId: input.emailUserId } : { action: "create", email };
 }

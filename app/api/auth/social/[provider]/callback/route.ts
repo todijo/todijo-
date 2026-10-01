@@ -22,12 +22,13 @@ async function callback(request:Request,provider:string,values:URLSearchParams){
   const code=values.get("code");if(!code)return failure("INVALID_CALLBACK");
   try{
     const profile=await exchangeSocialCode(config,code);if(!profile.accountId)return failure("INVALID_IDENTITY");
-    const [linked,emailUser,current]=await Promise.all([
+    const current=await readSession();
+    const [linked,emailUser,currentUser]=await Promise.all([
       prisma.oAuthAccount.findUnique({where:{provider_providerAccountId:{provider:config.prismaProvider,providerAccountId:profile.accountId}},select:{userId:true}}),
       profile.email?prisma.user.findUnique({where:{email:profile.email},select:{id:true}}):null,
-      readSession(),
+      current?prisma.user.findUnique({where:{id:current.userId},select:{email:true,emailVerified:true}}):null,
     ]);
-    const decision=decideSocialIdentity({linkedUserId:linked?.userId,currentUserId:current?.userId,email:profile.email,emailVerified:profile.emailVerified,emailUserId:emailUser?.id});
+    const decision=decideSocialIdentity({linkedUserId:linked?.userId,currentUserId:current?.userId,currentUserEmail:currentUser?.email,currentUserEmailVerified:currentUser?.emailVerified,email:profile.email,emailVerified:profile.emailVerified,emailUserId:emailUser?.id});
     if(decision.action==="reject")return failure(decision.code);
     if(decision.action==="create"&&profile.email){const tombstone=await prisma.user.findUnique({where:{anonymizedEmailHash:anonymizedEmailHash(profile.email)},select:{id:true}});if(tombstone)return failure("ACCOUNT_UNAVAILABLE");}
     if(decision.action!=="create"){const existing=await prisma.user.findUnique({where:{id:decision.userId},select:{blockedAt:true,blockExpiresAt:true,deactivatedAt:true}});if(!existing||existing.deactivatedAt||isEffectiveBlock(existing))return failure("ACCOUNT_UNAVAILABLE");}
