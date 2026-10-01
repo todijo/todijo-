@@ -9,6 +9,7 @@ import { getLocale } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 import { sellerPlanSelectionMessages } from "@/i18n/seller-plan-selection";
+import { activeAccessSource } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,11 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     const next = sellerIntent ? sellerOnboardingPath(locale, true, sellerIntent) : `/${locale}/seller/subscription`;
     redirect(`/${locale}/login?next=${encodeURIComponent(next)}`);
   }
-  const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { name: true, owner: { select: { role: true } }, subscription: true } });
+  const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { name: true, owner: { select: { role: true } }, subscription: true, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } });
   if (!store) redirect(sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : `/${locale}/sell#plans`);
   const active = ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
+  const accessSource = activeAccessSource(store).source;
+  const hasActiveEntitlement = accessSource !== "NONE";
   if (query.checkout === "success" && active) redirect(`/${locale}/seller/products/new`);
   const resolvedLocale=isLocale(locale)?locale:"en";
   const copy={...sellerEntitlementSubscriptionMessages[resolvedLocale],...sellerPlanSelectionMessages[resolvedLocale]};
@@ -37,8 +40,8 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     <h1>{copy.title}</h1><p className="storeSetupIntro">{copy.intro}</p>
     {query.checkout === "success" && !active ? <ActivatingSubscription /> : <>
       {store.subscription && <div className={`subscriptionStatus ${active ? "isActive" : ""}`}>{copy.currentStatus} <strong>{store.subscription.status}</strong>{store.subscription.cancelAtPeriodEnd && ` · ${copy.cancels}`}</div>}
-      {store.owner.role==="ADMIN"&&<div className="subscriptionStatus isActive">{copy.adminAccess}</div>}
-      <SubscriptionPlans plans={plans} activePlanId={activePlanId} hasActiveSubscription={active} copy={copy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
+      {(store.owner.role==="ADMIN"||accessSource==="ADMIN_GRANTED"||accessSource==="ADMIN_EXEMPT")&&<div className="subscriptionStatus isActive">{copy.adminAccess}</div>}
+      <SubscriptionPlans plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={copy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
     </>}
   </section></main>;
 }

@@ -5,11 +5,12 @@ import { FormEvent, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 import { sellerRegistrationRequirements } from "@/lib/seller-registration-requirements";
+import { sellerOnboardingPath, type SellerRegistrationIntent } from "@/lib/seller-registration-intent";
 
 type Address = { address: string; postalCode: string; city: string; country: string; phone: string };
 type Initial = Address & { storeName: string; sellerType: "PRIVATE" | "PROFESSIONAL"; legalForm: string; businessRegistrationNumber: string; legalBusinessName: string; vatStatus: string; vatNumber: string };
 
-export default function SellerOnboardingForm({ initial, buyerAddress }: { initial: Initial; buyerAddress: Address | null }) {
+export default function SellerOnboardingForm({ initial, buyerAddress, sellerIntent }: { initial: Initial; buyerAddress: Address | null; sellerIntent: SellerRegistrationIntent | null }) {
   const t = useTranslations("Auth"), locale = useLocale();
   const [sellerType, setSellerType] = useState<"PRIVATE" | "PROFESSIONAL">(initial.sellerType);
   const [vatStatus, setVatStatus] = useState(initial.vatStatus), [message, setMessage] = useState("");
@@ -28,7 +29,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress }: { initia
     event.preventDefault();
     const response = await fetch("/api/seller/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload(event.currentTarget)) });
     const data = await response.json().catch(() => ({}));
-    if (response.ok) location.assign(`/${locale}/dashboard`); else setMessage(t(data.error === "EMAIL_VERIFICATION_REQUIRED" ? "verifyBeforeSelling" : "error"));
+    if (response.ok) location.assign(sellerOnboardingPath(locale, true, sellerIntent)); else setMessage(t(data.error === "EMAIL_VERIFICATION_REQUIRED" ? "verifyBeforeSelling" : "error"));
   }
 
   return <main className="sellerOnboardingPage"><form className="sellerOnboardingCard authForm" onSubmit={submit}>

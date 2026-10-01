@@ -1,43 +1,27 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import CreateStoreForm from "./CreateStoreForm";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getLocale } from "next-intl/server";
 import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
+import { sellerOnboardingDestination } from "@/lib/seller-onboarding-flow";
+import { activeAccessSource } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateStorePage({ searchParams }: { searchParams: Promise<{ plan?: string; interval?: string }> }) {
-  const [locale, t, query] = await Promise.all([getLocale(), getTranslations("Seller"), searchParams]);
+  const [locale, query] = await Promise.all([getLocale(), searchParams]);
   const intent = explicitSellerRegistrationIntent(query.plan, query.interval);
   const session = await readSession();
   if (!session) {
     if (!intent) redirect(`/${locale}/sell#plans`);
     redirect(`/${locale}/login?next=${encodeURIComponent(sellerOnboardingPath(locale, false, intent))}`);
   }
+  if (session.role === "ADMIN") redirect(`/${locale}/dashboard`);
 
-  const store = await prisma.store.findUnique({
-    where: { ownerId: session.userId },
-    select: { id: true },
-  });
-
-  if (store) redirect(sellerOnboardingPath(locale, true, intent));
-  if (!intent) redirect(`/${locale}/sell#plans`);
-
-  return (
-    <main className="storeSetupPage">
-      <section className="storeSetupCard">
-        <a className="authLogo dashboardLogo" href={`/${locale}`}>
-          Todijo<span>.</span>
-        </a>
-        <p className="dashboardBadge">{t("sellerArea")}</p>
-        <h1>{t("createShop")}</h1>
-        <p className="storeSetupIntro">
-          Configurez votre espace vendeur. Vous pourrez ensuite ajouter vos
-          produits et recevoir vos premières commandes.
-        </p>
-        <CreateStoreForm locale={locale} sellerIntent={intent} />
-      </section>
-    </main>
-  );
+  const [store, draft] = await Promise.all([
+    prisma.store.findUnique({ where: { ownerId: session.userId }, select: { onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }),
+    prisma.sellerOnboardingDraft.findUnique({ where: { userId: session.userId }, select: { userId: true } }),
+  ]);
+  const entitlementSource = store ? activeAccessSource(store).source : "NONE";
+  redirect(sellerOnboardingDestination({ locale, intent, hasStore: Boolean(store), hasDraft: Boolean(draft), onboardingStatus: store?.onboardingStatus, onboardingStep: store?.onboardingStep, entitlementSource }));
 }

@@ -52,25 +52,27 @@ test("canonical seller intent survives password and social auth, store creation,
   const social = source("components/SocialLoginButtons.tsx");
   const route = source("app/api/auth/register/route.ts");
   const createStore = source("app/seller/create-store/page.tsx");
-  const createForm = source("app/seller/create-store/CreateStoreForm.tsx");
+  const onboardingForm = source("app/seller/onboarding/SellerAddressOnboardingForm.tsx");
   const subscription = source("app/seller/subscription/page.tsx");
   assert.match(form, /sellerOnboardingPath\(locale, false, sellerIntent\)/);
   assert.match(form, /<SocialLoginButtons next=/);
   assert.match(social, /explicitNext\?\?params\?\.get\("next"\)/);
   assert.match(route, /code: "ACCOUNT_EXISTS"/);
   assert.match(route, /explicitSellerRegistrationIntent\(body\?\.plan, body\?\.interval\)/);
-  assert.match(createStore, /sellerOnboardingPath\(locale, false, intent\)/);
-  assert.match(createForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
+  assert.match(createStore, /sellerOnboardingDestination/);
+  assert.match(onboardingForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(subscription, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);
-  assert.equal(sellerOnboardingPath("fr", false, { plan: "basic", interval: "annual" }), "/fr/seller/create-store?plan=basic&interval=annual");
+  assert.equal(sellerOnboardingPath("fr", false, { plan: "basic", interval: "annual" }), "/fr/seller/onboarding?plan=basic&interval=annual");
 });
 
 test("legacy onboarding converges new sellers while preserving existing resumable records", () => {
-  const legacy = source("app/seller/onboarding/page.tsx");
-  assert.match(legacy, /explicitSellerRegistrationIntent\(query\.plan, query\.interval\)/);
-  assert.match(legacy, /if \(intent\) redirect\(sellerOnboardingPath\(locale, Boolean\(user\.store\), intent\)\)/);
-  assert.match(legacy, /!user\.store && !user\.sellerOnboardingDraft/);
-  assert.match(legacy, /<SellerOnboardingForm/);
+  const onboarding = source("app/seller/onboarding/page.tsx");
+  const legacy = source("app/seller/create-store/page.tsx");
+  assert.match(onboarding, /explicitSellerRegistrationIntent\(query\.plan, query\.interval\)/);
+  assert.match(onboarding, /sellerOnboardingDestination/);
+  assert.match(onboarding, /<SellerOnboardingForm/);
+  assert.match(legacy, /sellerOnboardingDestination/);
+  assert.doesNotMatch(legacy, /CreateStoreForm|<form/);
 });
 
 test("seller selection copy exists for every supported locale including RTL", () => {

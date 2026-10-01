@@ -22,6 +22,6 @@ export function sellerRegistrationIntentQuery(intent: SellerRegistrationIntent |
 }
 
 export function sellerOnboardingPath(locale: string, hasStore: boolean, intent: SellerRegistrationIntent | null) {
-  const destination = hasStore ? "seller/subscription" : "seller/create-store";
+  const destination = hasStore ? "seller/subscription" : "seller/onboarding";
   return `/${locale}/${destination}${sellerRegistrationIntentQuery(intent)}`;
 }

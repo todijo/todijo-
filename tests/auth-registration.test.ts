@@ -60,7 +60,7 @@ test("seller registration intent is canonical, localized, and fails closed for f
   assert.equal(sellerRegistrationIntent("enterprise", "monthly"), null);
   assert.equal(sellerRegistrationIntent("pro", "weekly"), null);
   assert.equal(sellerRegistrationIntentQuery(null), "");
-  assert.equal(sellerOnboardingPath("fr", false, { plan: "pro", interval: "annual" }), "/fr/seller/create-store?plan=pro&interval=annual");
+  assert.equal(sellerOnboardingPath("fr", false, { plan: "pro", interval: "annual" }), "/fr/seller/onboarding?plan=pro&interval=annual");
   assert.equal(sellerOnboardingPath("ku", true, { plan: "pro", interval: "monthly" }), "/ku/seller/subscription?plan=pro&interval=monthly");
   assert.equal(validationCode({ ...validInput, role: "seller", storeName: "Ada Shop", plan: "forged", interval: "monthly", shippingAddress: undefined }), "INVALID_SELLER_PLAN");
   const accepted = validateRegistrationInput({ ...validInput, role: "seller", storeName: "Ada Shop", plan: "pro", interval: "annual", shippingAddress: undefined });
