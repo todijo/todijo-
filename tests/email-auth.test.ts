@@ -63,7 +63,7 @@ test("registration remains successful when email preparation or SMTP delivery fa
   assert.match(source, /Registration email delivery failed/);
   assert.match(source, /Registration email preparation failed/);
   assert.ok(source.indexOf("await createSession") > source.indexOf("Registration email preparation failed"));
-  assert.match(source, /return NextResponse\.json\(\{ ok: true, role: user\.role \}\)/);
+  assert.match(source, /return NextResponse\.json\(\{ ok: true, role: user\.role, next \}\)/);
 });
 
 test("shared Todijo email template escapes names and URLs and includes text fallback", () => {

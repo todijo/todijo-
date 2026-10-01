@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import CreateStoreForm from "./CreateStoreForm";
 import { getLocale, getTranslations } from "next-intl/server";
+import { sellerOnboardingPath, sellerRegistrationIntent } from "@/lib/seller-registration-intent";
 
 export const dynamic = "force-dynamic";
 
-export default async function CreateStorePage() {
-  const [locale, t] = await Promise.all([getLocale(), getTranslations("Seller")]);
+export default async function CreateStorePage({ searchParams }: { searchParams: Promise<{ plan?: string; interval?: string }> }) {
+  const [locale, t, query] = await Promise.all([getLocale(), getTranslations("Seller"), searchParams]);
+  const intent = sellerRegistrationIntent(query.plan, query.interval);
   const session = await readSession();
   if (!session) redirect(`/${locale}/login`);
 
@@ -16,7 +18,7 @@ export default async function CreateStorePage() {
     select: { id: true },
   });
 
-  if (store) redirect(`/${locale}/dashboard`);
+  if (store) redirect(sellerOnboardingPath(locale, true, intent));
 
   return (
     <main className="storeSetupPage">
@@ -30,7 +32,7 @@ export default async function CreateStorePage() {
           Configurez votre espace vendeur. Vous pourrez ensuite ajouter vos
           produits et recevoir vos premières commandes.
         </p>
-        <CreateStoreForm locale={locale} />
+        <CreateStoreForm locale={locale} sellerIntent={intent} />
       </section>
     </main>
   );

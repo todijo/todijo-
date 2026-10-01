@@ -1,4 +1,5 @@
 import { validateAddressInput, type AddressInput } from "./buyer-addresses";
+import { sellerRegistrationIntent, type SellerRegistrationIntent } from "./seller-registration-intent";
 
 export const MIN_PASSWORD_LENGTH = 10;
 
@@ -12,16 +13,19 @@ export type RegistrationInput = {
   storeName: string | null;
   turnstileToken: string;
   shippingAddress: AddressInput | null;
+  sellerIntent: SellerRegistrationIntent | null;
 };
 
 export type RegistrationValidation =
   | { ok: true; value: RegistrationInput }
-  | { ok: false; code: "INVALID_FIELDS" | "PASSWORD_MISMATCH" | "STORE_NAME_REQUIRED" | "INVALID_ADDRESS" };
+  | { ok: false; code: "INVALID_FIELDS" | "PASSWORD_MISMATCH" | "STORE_NAME_REQUIRED" | "INVALID_ADDRESS" | "INVALID_SELLER_PLAN" };
 
 export function validateRegistrationInput(body: unknown): RegistrationValidation {
   const value = typeof body === "object" && body !== null ? body as Record<string, unknown> : {};
   const role = value.role === "seller" ? "SELLER" : "CUSTOMER";
   const addressValidation = role === "CUSTOMER" ? validateAddressInput(value.shippingAddress) : null;
+  const requestedPlan = value.plan;
+  const sellerIntent = role === "SELLER" ? sellerRegistrationIntent(requestedPlan, value.interval) : null;
   const parsed: RegistrationInput = {
     firstName: String(value.firstName ?? "").trim(),
     lastName: String(value.lastName ?? "").trim(),
@@ -32,11 +36,13 @@ export function validateRegistrationInput(body: unknown): RegistrationValidation
     storeName: role === "SELLER" ? String(value.storeName ?? "").trim() : null,
     turnstileToken: String(value.turnstileToken ?? "").trim(),
     shippingAddress: addressValidation?.ok ? addressValidation.value : null,
+    sellerIntent,
   };
 
   if (!parsed.firstName || !parsed.lastName || !parsed.email || parsed.password.length < MIN_PASSWORD_LENGTH || !parsed.confirmPassword) return { ok: false, code: "INVALID_FIELDS" };
   if (parsed.password !== parsed.confirmPassword) return { ok: false, code: "PASSWORD_MISMATCH" };
   if (parsed.role === "SELLER" && !parsed.storeName) return { ok: false, code: "STORE_NAME_REQUIRED" };
+  if (parsed.role === "SELLER" && (requestedPlan !== undefined && requestedPlan !== "" || value.interval !== undefined && value.interval !== "") && !parsed.sellerIntent) return { ok: false, code: "INVALID_SELLER_PLAN" };
   if (parsed.role === "CUSTOMER" && !parsed.shippingAddress) return { ok: false, code: "INVALID_ADDRESS" };
   return { ok: true, value: parsed };
 }

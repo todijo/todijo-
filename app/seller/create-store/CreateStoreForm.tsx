@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import SellerTypeFields from "@/components/SellerTypeFields";
+import { sellerOnboardingPath, type SellerRegistrationIntent } from "@/lib/seller-registration-intent";
 
 function slugify(value: string) {
   return value
@@ -16,7 +17,7 @@ function slugify(value: string) {
     .slice(0, 60);
 }
 
-export default function CreateStoreForm({ locale }: { locale: string }) {
+export default function CreateStoreForm({ locale, sellerIntent }: { locale: string; sellerIntent: SellerRegistrationIntent | null }) {
   const router = useRouter();
   const t = useTranslations("Seller");
   const [name, setName] = useState("");
@@ -40,7 +41,7 @@ export default function CreateStoreForm({ locale }: { locale: string }) {
       const response = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug: displayedSlug, description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo: form.get("logo"), country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus") }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { setMessage(data.error ?? "Une erreur est survenue. Please try again."); return; }
-      router.push(`/${locale}/seller/subscription`); router.refresh();
+      router.push(sellerOnboardingPath(locale, true, sellerIntent)); router.refresh();
     } catch { setMessage("The shop could not be created. Check your connection and try again."); }
     finally { setSubmitting(false); }
   }

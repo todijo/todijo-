@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
@@ -9,6 +9,7 @@ import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 import SocialLoginButtons from "@/components/SocialLoginButtons";
 import Image from "next/image";
 import TodijoLogo from "@/components/TodijoLogo";
+import { sellerRegistrationIntent } from "@/lib/seller-registration-intent";
 
 export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const params = useSearchParams();
@@ -21,6 +22,8 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [country, setCountry] = useState("");
+  const tokenRef = useRef("");
+  const submissionRef = useRef(false);
   const locale = useLocale();
   const t = useTranslations("Auth");
   const footer = useTranslations("HomeFooter");
@@ -29,7 +32,15 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
     if (params?.get("role") === "seller") setRole("seller");
   }, [params]);
 
+  const sellerIntent = sellerRegistrationIntent(params?.get("plan"), params?.get("interval"));
+
+  const updateTurnstileToken = useCallback((token: string) => {
+    tokenRef.current = token;
+    setTurnstileToken(token);
+  }, []);
+
   const resetVerification = useCallback((error: string) => {
+    tokenRef.current = "";
     setTurnstileToken("");
     setTurnstileResetKey((current) => current + 1);
     setMessage(error);
@@ -37,9 +48,14 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionRef.current) return;
     if (password !== confirmPassword) { setMessage(t("passwordMismatch")); document.getElementById("confirmPassword")?.focus(); return; }
-    if (!turnstileToken) { setMessage(t("verificationRequired")); document.querySelector<HTMLElement>(".turnstileField")?.focus(); return; }
+    const verificationToken = tokenRef.current;
+    if (!verificationToken) { setMessage(t("verificationRequired")); document.querySelector<HTMLElement>(".turnstileField")?.focus(); return; }
 
+    submissionRef.current = true;
+    tokenRef.current = "";
+    setTurnstileToken("");
     setLoading(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
@@ -55,24 +71,28 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
           storeName: form.get("storeName"),
           password,
           confirmPassword,
-          turnstileToken,
+          turnstileToken: verificationToken,
+          plan: role === "seller" ? params?.get("plan") ?? undefined : undefined,
+          interval: role === "seller" ? params?.get("interval") ?? sellerIntent?.interval : undefined,
           locale,
           shippingAddress: role === "customer" ? { recipientName: form.get("recipientName"), addressLine1: form.get("addressLine1"), addressLine2: form.get("addressLine2"), postalCode: form.get("postalCode"), city: form.get("city"), country, state: form.get("state"), phone: form.get("phone") } : undefined,
         }),
       });
-      const data: { error?: string; code?: string; role?: "CUSTOMER" | "SELLER" } = await response.json().catch(() => ({}));
+      const data: { error?: string; code?: string; role?: "CUSTOMER" | "SELLER"; next?: string } = await response.json().catch(() => ({}));
       if (!response.ok) {
         if (data.code === "PASSWORD_MISMATCH") setMessage(t("passwordMismatch"));
         else if (data.code === "TURNSTILE_REQUIRED") resetVerification(t("verificationRequired"));
         else if (data.code === "TURNSTILE_FAILED") resetVerification(t("verificationFailed"));
+        else if (data.code === "ACCOUNT_EXISTS" && data.next) router.push(data.next);
         else setMessage(data.error ?? t("error"));
         return;
       }
-      router.push(localizedHome(locale));
+      router.push(data.next ?? localizedHome(locale));
       router.refresh();
     } catch {
       resetVerification(t("registrationRetry"));
     } finally {
+      submissionRef.current = false;
       setLoading(false);
     }
   }
@@ -106,10 +126,10 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
         <div className="formField"><label htmlFor="password">{t("password")}</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={10} value={password} onChange={(event) => setPassword(event.target.value)} required /><small>{t("passwordGuidance")}</small></div>
         <div className="formField"><label htmlFor="confirmPassword">{t("confirmPassword")}</label><input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={10} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && password !== confirmPassword)} aria-describedby={confirmPassword && password !== confirmPassword ? "password-mismatch" : undefined} required /></div>
         {confirmPassword && password !== confirmPassword && <p className="authMessage" id="password-mismatch" role="alert">{t("passwordMismatch")}</p>}
-        <div className="turnstileField" tabIndex={-1}><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} onExpired={() => setMessage(t("verificationExpired"))} onError={() => setMessage(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
+        <div className="turnstileField" tabIndex={-1}><span>{t("humanVerification")}</span><small>{t("humanVerificationHelp")}</small><TurnstileWidget siteKey={turnstileSiteKey} onTokenChange={updateTurnstileToken} onExpired={() => resetVerification(t("verificationExpired"))} onError={() => resetVerification(t("verificationFailed"))} resetKey={turnstileResetKey} /></div>
         <label className="terms"><input type="checkbox" required /><span>{t("terms")} <a href={`/${locale}/info/terms`}>{footer("terms")}</a>{" / "}<a href={`/${locale}/info/privacy`}>{footer("privacy")}</a></span></label>
         {message && <p className="authMessage" role="alert">{message}</p>}
-        <button className="authSubmit" type="submit" disabled={loading} aria-busy={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
+        <button className="authSubmit" type="submit" disabled={loading || !turnstileToken} aria-busy={loading}>{loading ? t("creating") : role === "seller" ? t("createShop") : t("createAccount")}</button>
       </form>
       <p className="authSwitch">{t("hasAccount")} <a href={`${localizedHome(locale)}/login`}>{t("login")}</a></p>
     </div></section>

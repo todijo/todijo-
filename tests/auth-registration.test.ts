@@ -4,6 +4,7 @@ import test from "node:test";
 import { adminEntryPath, localeFromReferer, localizedHome, postLoginDestination, safeLoginDestination } from "../lib/auth-redirects";
 import { registrationPersistenceData, validateRegistrationInput } from "../lib/auth-registration";
 import { verifyTurnstileTokenWith } from "../lib/turnstile-verification";
+import { sellerOnboardingPath, sellerRegistrationIntent, sellerRegistrationIntentQuery } from "../lib/seller-registration-intent";
 
 const validInput = { firstName: "Ada", lastName: "Lovelace", email: "ADA@EXAMPLE.COM", password: "password-123", confirmPassword: "password-123", role: "buyer", turnstileToken: "token", shippingAddress:{recipientName:"Ada Lovelace",addressLine1:"1 Computing Way",addressLine2:"",postalCode:"59000",city:"Lille",country:"fr",state:"",phone:""} };
 
@@ -39,6 +40,52 @@ test("Turnstile verification fails closed for missing, rejected, malformed, and 
   assert.equal(await verifyTurnstileTokenWith("token", "secret", async () => { throw new DOMException("timeout", "AbortError"); }), "failed");
 });
 
+test("registration consumes a Turnstile token once and keeps the server verification authoritative", () => {
+  const form = readFileSync("app/register/RegisterForm.tsx", "utf8");
+  const route = readFileSync("app/api/auth/register/route.ts", "utf8");
+  assert.match(form, /if \(submissionRef\.current\) return/);
+  assert.match(form, /const verificationToken = tokenRef\.current/);
+  assert.match(form, /tokenRef\.current = "";[\s\S]*turnstileToken: verificationToken/);
+  assert.match(form, /resetVerification\(t\("verificationFailed"\)\)/);
+  assert.match(route, /verifyTurnstileToken\(input\.turnstileToken\)/);
+  assert.match(route, /if \(turnstile !== "success"\)/);
+  assert.ok(route.indexOf("verifyTurnstileToken(input.turnstileToken)") < route.indexOf("prisma.user.findFirst"));
+});
+
+test("seller registration intent is canonical, localized, and fails closed for forged values", () => {
+  assert.deepEqual(sellerRegistrationIntent("pro", undefined), { plan: "pro", interval: "monthly" });
+  assert.deepEqual(sellerRegistrationIntent("plus", "annual"), { plan: "plus", interval: "annual" });
+  assert.equal(sellerRegistrationIntent("enterprise", "monthly"), null);
+  assert.equal(sellerRegistrationIntent("pro", "weekly"), null);
+  assert.equal(sellerRegistrationIntentQuery(null), "");
+  assert.equal(sellerOnboardingPath("fr", false, { plan: "pro", interval: "annual" }), "/fr/seller/create-store?plan=pro&interval=annual");
+  assert.equal(sellerOnboardingPath("ku", true, { plan: "pro", interval: "monthly" }), "/ku/seller/subscription?plan=pro&interval=monthly");
+  assert.equal(validationCode({ ...validInput, role: "seller", storeName: "Ada Shop", plan: "forged", interval: "monthly", shippingAddress: undefined }), "INVALID_SELLER_PLAN");
+  const accepted = validateRegistrationInput({ ...validInput, role: "seller", storeName: "Ada Shop", plan: "pro", interval: "annual", shippingAddress: undefined });
+  assert.equal(accepted.ok, true);
+  if (accepted.ok) assert.deepEqual(accepted.value.sellerIntent, { plan: "pro", interval: "annual" });
+});
+
+test("seller intent survives registration and onboarding without granting an entitlement", () => {
+  const form = readFileSync("app/register/RegisterForm.tsx", "utf8");
+  const route = readFileSync("app/api/auth/register/route.ts", "utf8");
+  const registerPage = readFileSync("app/register/page.tsx", "utf8");
+  const createPage = readFileSync("app/seller/create-store/page.tsx", "utf8");
+  const createForm = readFileSync("app/seller/create-store/CreateStoreForm.tsx", "utf8");
+  const subscriptionPage = readFileSync("app/seller/subscription/page.tsx", "utf8");
+  const checkout = readFileSync("app/api/seller/subscription/checkout/route.ts", "utf8");
+  assert.match(form, /plan: role === "seller" \? params\?\.get\("plan"\)/);
+  assert.match(route, /code: "ACCOUNT_EXISTS"/);
+  assert.match(route, /sellerOnboardingPath\(locale, Boolean\(/);
+  assert.match(route, /sellerOnboardingPath\(locale, false, input\.sellerIntent\)/);
+  assert.match(registerPage, /session\.role !== "ADMIN"/);
+  assert.match(createPage, /sellerRegistrationIntent\(query\.plan, query\.interval\)/);
+  assert.match(createForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
+  assert.match(subscriptionPage, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);
+  assert.match(checkout, /configuredSellerPlan\(body\.planId, body\.interval\)/);
+  assert.doesNotMatch(route, /SellerSubscription|sellerSubscription|entitlement/);
+});
+
 test("buyer and seller login destinations are localized and reject open redirects while admin uses the private route", () => {
   assert.equal(safeLoginDestination(null, "fr"), "/fr");
   assert.equal(safeLoginDestination("/messages?tab=all", "ku"), "/ku/messages?tab=all");
@@ -54,7 +101,7 @@ test("buyer and seller login destinations are localized and reject open redirect
   assert.equal(localizedHome(localeFromReferer("not a URL")), "/en");
 });
 
-test("login and registration entry points send buyer and seller sessions to localized Home", () => {
+test("login and registration entry points preserve localized defaults and canonical seller onboarding", () => {
   const loginPage = readFileSync("app/login/page.tsx", "utf8");
   const loginLayout = readFileSync("app/login/layout.tsx", "utf8");
   const registerForm = readFileSync("app/register/RegisterForm.tsx", "utf8");
@@ -62,8 +109,9 @@ test("login and registration entry points send buyer and seller sessions to loca
 
   assert.match(loginPage, /postLoginDestination\(data\.role, params\?\.get\("next"\) \?\? null, locale as Locale\)/);
   assert.match(loginLayout, /redirect\(localizedHome\(await getLocale\(\)\)\)/);
-  assert.match(registerForm, /router\.push\(localizedHome\(locale\)\)/);
-  assert.match(registerPage, /redirect\(localizedHome\(await getLocale\(\)\)\)/);
+  assert.match(registerForm, /router\.push\(data\.next \?\? localizedHome\(locale\)\)/);
+  assert.match(registerPage, /redirect\(localizedHome\(locale\)\)/);
+  assert.match(registerPage, /redirect\(sellerOnboardingPath\(locale, Boolean\(store\), intent\)\)/);
   assert.doesNotMatch(loginLayout, /redirect\("\/dashboard"\)/);
   assert.doesNotMatch(registerPage, /redirect\("\/dashboard"\)/);
 });
