@@ -41,7 +41,7 @@ test("seller entry points cannot silently bypass explicit plan selection", () =>
   assert.match(sell, /className="primary" href="#plans"/);
   assert.doesNotMatch(sell, /register\?role=seller`/);
   assert.equal((dashboard.match(/sell#plans/g) ?? []).length, 2);
-  assert.equal((footer.match(/sell#plans/g) ?? []).length, 2);
+  assert.equal((footer.match(/sell#plans/g) ?? []).length, 1);
   assert.match(sellerLayout, /storeSlug \?[^:]+: `\/\$\{locale\}\/sell#plans`/);
   assert.match(register, /query\.role === "seller" && !intent/);
   assert.match(createStore, /if \(!intent\) redirect\(`\/\$\{locale\}\/sell#plans`\)/);

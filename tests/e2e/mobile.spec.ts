@@ -79,6 +79,7 @@ test("mobile public information page and footer stay responsive", async ({ page 
   const footer = page.locator("footer.marketplaceFooter");
   await footer.scrollIntoViewIfNeeded();
   await expect(footer).toBeVisible();
+  await expect(footer.locator('a[href="/en/sell#plans"]')).toHaveCount(2);
   await expectNoDocumentOverflow(page);
   assertNoRuntimeErrors();
 });
@@ -110,6 +111,7 @@ test("mobile RTL information page preserves direction and layout", async ({ page
   await expect(page.locator("html")).toHaveAttribute("lang", "ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.locator('footer.marketplaceFooter a[href="/ar/sell#plans"]')).toHaveCount(2);
   await expectNoDocumentOverflow(page);
   assertNoRuntimeErrors();
 });

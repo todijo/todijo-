@@ -37,7 +37,6 @@ export default function MarketplaceFooter() {
     { title: t("sellTitle"), links: [
       { label: t("becomeSeller"), href: `/${locale}/sell#plans` },
       { label: t("sellerDashboard"), href: `/${locale}/dashboard` },
-      { label: t("createStore"), href: `/${locale}/sell#plans` },
       { label: t("sellerGuide"), href: info("seller-guide") },
     ] },
     { title: t("contactTitle"), links: [
