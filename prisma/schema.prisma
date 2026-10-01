@@ -224,6 +224,22 @@ enum SellerLegalForm {
   OTHER
 }
 
+enum SellerCompanySubtype {
+  SAS
+  SASU
+  SARL
+  EURL
+  SA
+  SNC
+  SCS
+  SCA
+  SOCIETE_CIVILE
+  SOCIETE_EXERCICE_LIBERAL
+  SOCIETE_COOPERATIVE
+  SOCIETE_EUROPEENNE
+  OTHER_COMPANY
+}
+
 enum SellerRiskPolicy {
  AUTOMATIC
  HIGH_RISK_HOLD
@@ -630,6 +646,7 @@ model SellerOnboardingDraft {
   postalCode                 String?         @db.VarChar(32)
   sellerType                 SellerType      @default(UNKNOWN)
   legalForm                  SellerLegalForm?
+  companySubtype             SellerCompanySubtype?
   businessRegistrationNumber String?         @db.VarChar(80)
   legalBusinessName          String?         @db.VarChar(160)
   vatStatus                  SellerVatStatus @default(UNKNOWN)
@@ -777,6 +794,7 @@ model Store {
   onboardingStatus SellerOnboardingStatus @default(NOT_STARTED)
   onboardingStep Int @default(0)
   sellerLegalForm SellerLegalForm?
+  companySubtype  SellerCompanySubtype?
 
   ownerId String @unique
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
