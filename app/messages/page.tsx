@@ -1,15 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import SiteHeader from "@/components/SiteHeader";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { getLocale, getTranslations } from "next-intl/server";
-import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { EmptyState } from "@/components/FeedbackState";
 import { MessageCircle } from "lucide-react";
 import DashboardReturnLink from "@/components/DashboardReturnLink";
 import SellerRouteShell from "@/components/SellerRouteShell";
+import BuyerDashboardLayout from "@/components/BuyerDashboardLayout";
 
 export const dynamic = "force-dynamic";
 export default async function MessagesPage() {
@@ -27,5 +26,5 @@ export default async function MessagesPage() {
     <div className="conversationList">{conversations.length===0 ? <EmptyState icon={MessageCircle} title={dashboard("myConversations")} description={dashboard("conversations")} action={<Link className="primary" href={`/${locale}`}>{dashboard("discover")}</Link>}/> : conversations.map(c=>{const other=c.buyerId===session.userId?c.seller:c.buyer; const last=c.messages[0]; const unread=last && last.senderId!==session.userId && !last.readAt; return <Link className={`conversationCard ${unread?"isUnread":""}`} href={`/${locale}/messages/${c.id}`} key={c.id}><div className="conversationImage">{c.product.images[0]?<Image src={c.product.images[0]} alt="" width={68} height={68} unoptimized/>:<span>📦</span>}</div><div><div className="conversationMeta"><strong>{other.firstName} {other.lastName}</strong><time>{c.lastMessageAt.toLocaleDateString(locale)}</time></div><h2>{c.product.name}</h2><p>{last?.body || common("messages")}</p><small>{c.store.name}</small></div>{unread&&<span className="unreadDot" aria-label={market("newest")}/>}</Link>})}</div>
   </section>;
   if(session.role==="SELLER")return <SellerRouteShell userId={session.userId} locale={locale} active="messages">{content}</SellerRouteShell>;
-  return <main className="messagesPage scopedPublicPage"><SiteHeader/>{content}<MarketplaceFooter /></main>;
+  return <BuyerDashboardLayout locale={locale} active="messages"><div className="messagesPage scopedPublicPage">{content}</div></BuyerDashboardLayout>;
 }

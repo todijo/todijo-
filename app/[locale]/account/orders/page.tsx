@@ -4,8 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { buyerPaymentState, listBuyerOrders } from "@/lib/buyer-orders";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import SiteHeader from "@/components/SiteHeader";
-import MarketplaceFooter from "@/components/MarketplaceFooter";
+import BuyerDashboardLayout from "@/components/BuyerDashboardLayout";
 import { fulfillmentStepFor } from "@/lib/order-status";
 import {canonicalOrderShipments} from "@/lib/tracking";
 import {trackingUi} from "@/i18n/tracking-ui";
@@ -27,8 +26,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
   const trackingText=trackingUi[isLocale(locale)?locale:"en"];
 
   return (
-    <main className="buyerOrdersPage scopedPublicPage">
-      <SiteHeader />
+    <BuyerDashboardLayout locale={locale} active="orders"><section className="buyerOrdersPage scopedPublicPage">
       <div className="buyerOrdersShell">
         <section className="buyerOrdersHeading">
           <p className="dashboardBadge">{t("badge")}</p>
@@ -85,7 +83,6 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
           </section>
         )}
       </div>
-      <MarketplaceFooter />
-    </main>
+    </section></BuyerDashboardLayout>
   );
 }

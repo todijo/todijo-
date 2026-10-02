@@ -10,6 +10,7 @@ import { isLocale } from "@/i18n/config";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 import { sellerPlanSelectionMessages } from "@/i18n/seller-plan-selection";
 import { activeAccessSource } from "@/lib/admin-access";
+import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     const next = sellerIntent ? sellerOnboardingPath(locale, true, sellerIntent) : `/${locale}/seller/subscription`;
     redirect(`/${locale}/login?next=${encodeURIComponent(next)}`);
   }
-  const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { name: true, owner: { select: { role: true } }, subscription: true, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } });
+  const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { name: true, slug:true, owner: { select: { role: true, firstName:true, lastName:true } }, subscription: true, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } });
   if (!store) redirect(sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : `/${locale}/sell#plans`);
   const active = ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
   const accessSource = activeAccessSource(store).source;
@@ -35,7 +36,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     available: { monthly: Boolean(priceIds.monthly), annual: Boolean(priceIds.annual) },
   }));
   const activePlanId = canonicalActiveSellerPlanId(store.subscription);
-  return <main className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
+  return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} active="subscription"><div className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
     <a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><p className="dashboardBadge">{store.name}</p>
     <h1>{copy.title}</h1><p className="storeSetupIntro">{copy.intro}</p>
     {query.checkout === "success" && !active ? <ActivatingSubscription /> : <>
@@ -43,5 +44,5 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
       {(store.owner.role==="ADMIN"||accessSource==="ADMIN_GRANTED"||accessSource==="ADMIN_EXEMPT")&&<div className="subscriptionStatus isActive">{copy.adminAccess}</div>}
       <SubscriptionPlans plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={copy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
     </>}
-  </section></main>;
+  </section></div></SellerDashboardLayout>;
 }

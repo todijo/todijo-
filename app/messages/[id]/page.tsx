@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import SiteHeader from "@/components/SiteHeader";
-import MarketplaceFooter from "@/components/MarketplaceFooter";
 import MessageComposer from "@/components/MessageComposer";
 import SellerRouteShell from "@/components/SellerRouteShell";
+import BuyerDashboardLayout from "@/components/BuyerDashboardLayout";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 
@@ -50,5 +49,5 @@ export default async function ConversationPage({ params }: Props) {
       <MessageComposer conversationId={id}/>
     </section>;
   if(session.role==="SELLER")return <SellerRouteShell userId={session.userId} locale={locale} active="messages">{content}</SellerRouteShell>;
-  return <main className="conversationPage scopedPublicPage"><SiteHeader storeName={conversation.store.name} storeSlug={conversation.store.slug}/>{content}<MarketplaceFooter /></main>;
+  return <BuyerDashboardLayout locale={locale} active="messages"><div className="conversationPage scopedPublicPage">{content}</div></BuyerDashboardLayout>;
 }

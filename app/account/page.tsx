@@ -1,9 +1,8 @@
 import {redirect} from "next/navigation";
 import {getLocale} from "next-intl/server";
 import AccountSettings from "./AccountSettings";
-import MarketplaceFooter from "@/components/MarketplaceFooter";
+import BuyerDashboardLayout from "@/components/BuyerDashboardLayout";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
-import SiteHeader from "@/components/SiteHeader";
 import {prisma} from "@/lib/prisma";
 import {readSession} from "@/lib/session";
 
@@ -14,5 +13,5 @@ export default async function AccountPage(){
  const {shippingAddresses,...account}=user;
  const profile=<AccountSettings isBuyer={user.role==="CUSTOMER"} defaultAddress={shippingAddresses[0]??null} profile={{...account,hasPassword:Boolean(user.passwordHash),providers:user.oauthAccounts.map(item=>item.provider)}}/>;
  if(user.role==="SELLER")return <SellerDashboardLayout locale={locale} storeSlug={user.store?.slug} firstName={user.firstName} lastName={user.lastName} active="account">{profile}</SellerDashboardLayout>;
- return <main className="accountMarketplacePage"><SiteHeader/><div className="accountMarketplaceContent">{profile}</div><MarketplaceFooter/></main>;
+ return <BuyerDashboardLayout locale={locale} active="account">{profile}</BuyerDashboardLayout>;
 }

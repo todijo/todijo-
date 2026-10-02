@@ -4,8 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { buyerPaymentState, getBuyerOrder } from "@/lib/buyer-orders";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import SiteHeader from "@/components/SiteHeader";
-import MarketplaceFooter from "@/components/MarketplaceFooter";
+import BuyerDashboardLayout from "@/components/BuyerDashboardLayout";
 import { fulfillmentStepFor, fulfillmentStepIndex } from "@/lib/order-status";
 import { BuyerRefundRequest } from "@/components/BuyerRefundRequest";
 import OrderCommercialDocuments from "@/components/OrderCommercialDocuments";
@@ -50,8 +49,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
   const shipments=canonicalOrderShipments(order),trackingLocale=isLocale(locale)?locale:"en";
 
   return (
-    <main className="buyerOrdersPage scopedPublicPage">
-      <SiteHeader />
+    <BuyerDashboardLayout locale={locale} active="orders"><section className="buyerOrdersPage scopedPublicPage">
       <div className="buyerOrdersShell">
         <section className="buyerOrdersHeading buyerOrderDetailsHeading">
           <p className="dashboardBadge">{t("detailsBadge")}</p>
@@ -117,7 +115,6 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
 
         <Link className="quickActionLink secondary buyerOrdersBack" href={`/${locale}/account/orders`}>← {t("backOrders")}</Link>
       </div>
-      <MarketplaceFooter />
-    </main>
+    </section></BuyerDashboardLayout>
   );
 }

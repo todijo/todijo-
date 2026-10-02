@@ -17,6 +17,7 @@ import { localizedFurnitureCategoryLabel } from "@/i18n/furniture-taxonomy";
 import type { Locale } from "@/i18n/config";
 import Image from "next/image";
 import { localizedCategoryGroupLabel, localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
+import { emailVerificationCopy } from "@/i18n/email-verification";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
   const locale = useLocale() as Locale;
@@ -81,11 +82,12 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
   const notificationsHref = localizedPath(locale, "/notifications");
   const sellerHref = `${localizedPath(locale, "/register")}?role=seller`;
   const activeCategory = DESKTOP_CATEGORY_TAXONOMY.find((category) => category.id === activeCategoryId) ?? DESKTOP_CATEGORY_TAXONOMY[0];
+  const accountLabel = accountName ? emailVerificationCopy[locale].me : emailVerificationCopy[locale].guest;
 
   const drawer = open && typeof document !== "undefined" ? createPortal(<div className="buyerMobileDrawerLayer">
     <button className="buyerMobileDrawerBackdrop" type="button" onClick={closeDrawer} aria-label={product("close")} />
     <aside id="buyer-mobile-drawer" className={`buyerMobileDrawer${categoriesOpen ? " showingCategoryBrowser" : ""}`} ref={drawerRef} role="dialog" aria-modal="true" aria-label={header("mobileNavigation")}>
-      <div className="buyerMobileDrawerHeader"><div>{categoriesOpen ? <button className="buyerMobileCategoryBack" type="button" onClick={() => setCategoriesOpen(false)} aria-label={common("back")}><ChevronLeft size={22} aria-hidden="true"/></button> : <UserRound size={22} aria-hidden="true"/>}<span><small>{categoriesOpen ? common("categories") : header("hello")}</small><strong>{categoriesOpen ? categoryTitle(activeCategory.id) : accountName ?? common("account")}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
+      <div className="buyerMobileDrawerHeader"><div>{categoriesOpen ? <button className="buyerMobileCategoryBack" type="button" onClick={() => setCategoriesOpen(false)} aria-label={common("back")}><ChevronLeft size={22} aria-hidden="true"/></button> : <UserRound size={22} aria-hidden="true"/>}<span><small>{categoriesOpen ? common("categories") : header("hello")}</small><strong>{categoriesOpen ? categoryTitle(activeCategory.id) : accountLabel}</strong></span></div><button ref={closeRef} type="button" onClick={closeDrawer} aria-label={product("close")}><X size={23} aria-hidden="true"/></button></div>
       {categoriesOpen ? <section className="buyerMobileCategoryBrowser" aria-label={common("categories")}>
         <div className="buyerMobileCategoryParents" role="tablist" aria-orientation="vertical">
           {DESKTOP_CATEGORY_TAXONOMY.map((category) => <button key={category.id} type="button" role="tab" aria-selected={activeCategory.id === category.id} className={activeCategory.id === category.id ? "active" : ""} onClick={() => setActiveCategoryId(category.id)}><SemanticCategoryIcon category={category.id} size={24} className="buyerMobileCategoryParentIcon"/><span>{categoryTitle(category.id)}</span></button>)}
