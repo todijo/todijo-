@@ -6,12 +6,15 @@ import { ChevronDown, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId } from "@/lib/desktop-category-taxonomy";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
+import CategoryGroupImage from "@/components/CategoryGroupImage";
+import { localizedFurnitureCategoryLabel } from "@/i18n/furniture-taxonomy";
+import type { Locale } from "@/i18n/config";
 import { localizedCategoryGroupLabel, localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
 import { newsMessages } from "@/i18n/news";
 import { isLocale } from "@/i18n/config";
 
 export default function MarketplaceCategoryNavigation({ className = "", compactHomepage = false, showStores = true }: { className?: string; compactHomepage?: boolean; showStores?: boolean }) {
-  const locale = useLocale();
+  const locale = useLocale() as Locale;
   const common = useTranslations("Common");
   const header = useTranslations("HomeHeader");
   const categoryTitle = useTranslations("CategoryNavigation");
@@ -67,7 +70,7 @@ export default function MarketplaceCategoryNavigation({ className = "", compactH
       </div>
       <div className="marketQuickMegaContent" ref={contentRef}>
         <header><div><strong>{activeLabel}</strong><small>{header("discoverCategories")}</small></div><Link href={categoryHref(active.label)} onClick={() => setOpen(false)}>{header("viewAll")}</Link></header>
-        <div className="marketQuickMegaColumns">{active.groups.map((group) => <section key={group.id}><h3>{localizedCategoryGroupLabel(locale, active.id, group.id, group.label)}</h3>{group.items.map((item) => <Link className="marketQuickMegaSubcategoryLink" key={item} href={categoryHref(subcategoryId(active.id, group.id, item))} onClick={() => setOpen(false)}>{localizedCategoryLeafLabel(locale, active.id, group.id, item)}</Link>)}</section>)}</div>
+        <div className="marketQuickMegaColumns">{active.groups.map((group) => <section key={group.id}><h3><CategoryGroupImage categoryId={active.id} groupId={group.id}/><span>{localizedFurnitureCategoryLabel(group.label, locale) ?? localizedCategoryGroupLabel(locale, active.id, group.id, group.label)}</span></h3>{group.items.map((item) => <Link className="marketQuickMegaSubcategoryLink" key={item} href={categoryHref(subcategoryId(active.id, group.id, item))} onClick={() => setOpen(false)}>{localizedFurnitureCategoryLabel(subcategoryId(active.id, group.id, item), locale) ?? localizedCategoryLeafLabel(locale, active.id, group.id, item)}</Link>)}</section>)}</div>
       </div>
     </section> : null}
   </div>;

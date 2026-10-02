@@ -7,8 +7,8 @@ const source=(file:string)=>readFileSync(file,"utf8");
 
 test("seller category flow exposes the complete immutable marketplace taxonomy",()=>{
   assert.equal(DESKTOP_CATEGORY_TAXONOMY.length,14);
-  assert.equal(CANONICAL_LEAF_CATEGORIES.length,447);
-  assert.equal(new Set(CANONICAL_LEAF_CATEGORIES.map(leaf=>leaf.id)).size,447);
+  assert.equal(CANONICAL_LEAF_CATEGORIES.length,465);
+  assert.equal(new Set(CANONICAL_LEAF_CATEGORIES.map(leaf=>leaf.id)).size,465);
   assert.equal(CANONICAL_LEAF_CATEGORIES.every(leaf=>isCanonicalLeafCategoryId(leaf.id)),true);
   const selector=source("components/SellerCategorySelector.tsx");
   assert.match(selector,/DESKTOP_CATEGORY_TAXONOMY/);

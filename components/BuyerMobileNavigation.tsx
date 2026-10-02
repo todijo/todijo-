@@ -12,11 +12,14 @@ import { useCart } from "@/components/CartProvider";
 import { isNavigationActive, localizedPath, pathWithoutLocale } from "@/lib/navigation";
 import { DESKTOP_CATEGORY_TAXONOMY, categorySearchHref, subcategoryId, subcategoryImagePath } from "@/lib/desktop-category-taxonomy";
 import SemanticCategoryIcon from "@/components/SemanticCategoryIcon";
+import CategoryGroupImage from "@/components/CategoryGroupImage";
+import { localizedFurnitureCategoryLabel } from "@/i18n/furniture-taxonomy";
+import type { Locale } from "@/i18n/config";
 import Image from "next/image";
 import { localizedCategoryGroupLabel, localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
 
 export default function BuyerMobileNavigation({ accountName }: { accountName: string | null }) {
-  const locale = useLocale();
+  const locale = useLocale() as Locale;
   const pathname = usePathname() ?? "/";
   const common = useTranslations("Common");
   const header = useTranslations("HomeHeader");
@@ -90,7 +93,7 @@ export default function BuyerMobileNavigation({ accountName }: { accountName: st
         <div className="buyerMobileCategoryChildren" role="tabpanel">
           <a className="buyerMobileBoutiquesLink" href={localizedPath(locale, "/store")} onClick={closeDrawer}><Store size={20} aria-hidden="true"/><strong>{footer("stores")}</strong><ChevronRight size={16} aria-hidden="true"/></a>
           <a className="buyerMobileCategoryAll" href={categorySearchHref(locale, activeCategory.label)} onClick={closeDrawer}><strong>{categoryTitle(activeCategory.id)}</strong><span>{header("viewAll")} <ChevronRight size={15} aria-hidden="true"/></span></a>
-          {activeCategory.groups.map((group) => <section key={group.id} className="buyerMobileCategoryGroup"><h3>{localizedCategoryGroupLabel(locale, activeCategory.id, group.id, group.label)}</h3><div>{group.items.map((item) => { const id = subcategoryId(activeCategory.id, group.id, item); return <a key={id} href={categorySearchHref(locale, id)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={subcategoryImagePath(activeCategory.id, group.id, item)} alt="" width={84} height={84}/></span><span>{localizedCategoryLeafLabel(locale, activeCategory.id, group.id, item)}</span></a>; })}</div></section>)}
+          {activeCategory.groups.map((group) => <section key={group.id} className="buyerMobileCategoryGroup" data-furniture={activeCategory.id === "home" && group.id === "furniture" ? "" : undefined}><h3><CategoryGroupImage categoryId={activeCategory.id} groupId={group.id}/><span>{localizedFurnitureCategoryLabel(group.label, locale) ?? localizedCategoryGroupLabel(locale, activeCategory.id, group.id, group.label)}</span></h3><div>{group.items.map((item) => { const id = subcategoryId(activeCategory.id, group.id, item); return <a key={id} href={categorySearchHref(locale, id)} onClick={closeDrawer}><span className="buyerMobileCategoryTileImage"><Image src={subcategoryImagePath(activeCategory.id, group.id, item)} alt="" width={84} height={84}/></span><span>{localizedFurnitureCategoryLabel(id, locale) ?? localizedCategoryLeafLabel(locale, activeCategory.id, group.id, item)}</span></a>; })}</div></section>)}
         </div>
       </section> : <><nav aria-label={header("mobileNavigation")}>
         <a href={homeHref} onClick={closeDrawer} className={isHome ? "active" : ""} aria-current={isHome ? "page" : undefined}><Home size={20} aria-hidden="true"/>{common("home")}</a>

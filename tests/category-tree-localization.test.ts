@@ -55,14 +55,14 @@ test("every canonical leaf has a non-French English display label and shared val
   }
 });
 
-test("every non-French locale has an explicit label for all 75 groups and 447 leaves", () => {
+test("every non-French locale has an explicit label for all 76 groups and 465 leaves", () => {
   const expectedKeys = new Set<string>();
   for (const category of DESKTOP_CATEGORY_TAXONOMY) for (const group of category.groups) {
     expectedKeys.add(categoryGroupTranslationKey(category.id, group.id));
     for (const leaf of group.items) expectedKeys.add(categoryLeafTranslationKey(subcategoryId(category.id, group.id, leaf)));
   }
-  assert.equal([...expectedKeys].filter((key) => key.startsWith("group:")).length, 75);
-  assert.equal([...expectedKeys].filter((key) => key.startsWith("leaf:")).length, 447);
+  assert.equal([...expectedKeys].filter((key) => key.startsWith("group:")).length, 76);
+  assert.equal([...expectedKeys].filter((key) => key.startsWith("leaf:")).length, 465);
 
   for (const locale of locales.filter((item) => item !== "fr")) {
     const corpus = CATEGORY_LABELS[locale];
