@@ -21,8 +21,9 @@ export function parseSellerProductsQuery(params: URLSearchParams): SellerProduct
   };
 }
 
-export function sellerProductsHref(locale: string, query: SellerProductsQuery, page: number) {
+export function sellerProductsHref(locale: string, query: SellerProductsQuery, page: number, storeId?: string) {
   const params = new URLSearchParams();
+  if(storeId)params.set("store",storeId);
   if (query.q) params.set("q", query.q);
   if (query.status !== "all") params.set("status", query.status);
   if (query.sort !== "newest") params.set("sort", query.sort);

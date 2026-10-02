@@ -5,17 +5,19 @@ import { configuredSellerPlan } from "@/lib/seller-plans";
 import { createSellerSubscriptionCheckout, createStripeCustomer } from "@/lib/stripe";
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
+import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
 
 export async function POST(request: Request) {
   try {
     const session = await readSession();
     if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    const principal=await requireBusinessOwner(prisma,session.userId);
     await assertSellerActivity(prisma,session.userId);
     const body = await request.json();
     const plan = configuredSellerPlan(body.planId, body.interval);
     if (!plan) return NextResponse.json({ error: "Invalid or unavailable subscription plan." }, { status: 400 });
-    const store = await prisma.store.findUnique({
-      where: { ownerId: session.userId },
+    const store = await prisma.store.findFirst({
+      where: { id:(await prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{billingStoreId:true}}))?.billingStoreId??undefined,ownerId:session.userId },
       select: { id: true, name: true, contactEmail: true, stripeCustomerId: true, subscription: { select: { status: true, stripePriceId: true } } },
     });
     if (!store) return NextResponse.json({ error: "Create your store first." }, { status: 403 });
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
     console.info(`[Seller subscription] Created Checkout session ${checkout.id} for store ${store.id}.`);
     return NextResponse.json({ url: checkout.url });
   } catch (error) {
+    if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     console.error("Seller subscription checkout failed", error);
     return NextResponse.json({ error: "Unable to start subscription checkout." }, { status: 500 });

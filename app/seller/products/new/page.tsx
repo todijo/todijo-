@@ -5,13 +5,15 @@ import { readSession } from "@/lib/session";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
 import NewProductForm from "./NewProductForm";
-import { canPublish, sellerProductQuota } from "@/lib/seller-subscription";
+import { requireStorePublishingAccess, sellerProductQuota } from "@/lib/seller-subscription";
 import { isLocale } from "@/i18n/config";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
+import { resolveSellerStoreContext } from "@/lib/seller-business-access";
+import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewProductPage() {
+export default async function NewProductPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
   const t = await getTranslations("SellerControl");
   const p = await getTranslations("DashboardPremium");
   const common = await getTranslations("Common");
@@ -22,8 +24,9 @@ export default async function NewProductPage() {
   const session = await readSession();
   if (!session) redirect("/login");
 
+  let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"PRODUCT_CREATE");await requireStorePublishingAccess(prisma,session.userId,storeContext.selected.id,"PRODUCT_CREATE")}catch{redirect(`/${locale}/seller/products`)}
   const store = await prisma.store.findUnique({
-    where: { ownerId: session.userId },
+    where: { id:storeContext.selected.id },
     select: {
       name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true, shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,
       owner: { select: { firstName: true, lastName: true, role: true } },
@@ -35,9 +38,8 @@ export default async function NewProductPage() {
   if (!store) redirect("/seller/create-store");
   if (store.sellerType === "UNKNOWN") redirect("/seller/store-settings");
   if (store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") redirect("/seller/store-settings");
-  if (!canPublish(store)) redirect("/seller/subscription");
-
-  const quota = sellerProductQuota({ role: store.owner.role, plan: store.subscription?.plan, productCount: store._count.products });
+  const businessPlan=storeContext.selected.businessId?await sellerBusinessCommercialPlan(prisma,storeContext.selected.businessId):null;
+  const quota = sellerProductQuota({ role: businessPlan==="admin-exempt"?"ADMIN":store.owner.role, plan: businessPlan, productCount: store._count.products });
   const productLimit = quota.productLimit;
   const labels = {
     dashboard: p("nav.dashboard"), products: p("nav.products"), orders: p("nav.orders"), messages: p("nav.messages"),
@@ -61,6 +63,6 @@ export default async function NewProductPage() {
         </SellerStatusBadge>
       </>}
     />
-    <NewProductForm currency={store.currency} productCount={store._count.products} productLimit={productLimit} storeShippingSummary={store.shippingEnabled?`${store.shippingMethodName??""} · ${store.shippingWorldwide?"Worldwide":store.shippingCountries.map(code=>countryNames.of(code)??code).join(", ")} · ${store.shippingFree?"Free":store.shippingPrice?.toString()??""} · ${store.shippingMinDays??"?"}–${store.shippingMaxDays??"?"} days`:undefined}/>
+    <NewProductForm storeId={storeContext.selected.id} currency={store.currency} productCount={store._count.products} productLimit={productLimit} storeShippingSummary={store.shippingEnabled?`${store.shippingMethodName??""} · ${store.shippingWorldwide?"Worldwide":store.shippingCountries.map(code=>countryNames.of(code)??code).join(", ")} · ${store.shippingFree?"Free":store.shippingPrice?.toString()??""} · ${store.shippingMinDays??"?"}–${store.shippingMaxDays??"?"} days`:undefined}/>
   </SellerDashboardLayout>;
 }

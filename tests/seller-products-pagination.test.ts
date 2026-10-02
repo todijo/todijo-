@@ -48,8 +48,8 @@ test("seller status and search filters are applied to counts and bounded rows", 
 test("mobile continuation endpoint scopes queries to the signed-in store", () => {
   const route = readFileSync("app/api/seller/products/page/route.ts", "utf8");
   assert.match(route, /readSession\(\)/);
-  assert.match(route, /ownerId: session\.userId/);
-  assert.match(route, /listSellerProducts\(prisma, store\.id, query\)/);
+  assert.match(route, /resolveSellerStoreContext\(prisma,session\.userId/);
+  assert.match(route, /listSellerProducts\(prisma,\s*context\.selected\.id,\s*query\)/);
   assert.match(route, /private, no-store/);
 });
 

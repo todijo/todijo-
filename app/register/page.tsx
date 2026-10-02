@@ -13,7 +13,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
   if (query.role === "seller" && !intent) redirect(`/${locale}/sell#plans`);
   if (session) {
     if (intent && session.role !== "ADMIN") {
-      const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { id: true } });
+      const store = await prisma.store.findFirst({ where: { ownerId: session.userId }, select: { id: true } });
       redirect(sellerOnboardingPath(locale, Boolean(store), intent));
     }
     redirect(localizedHome(locale));

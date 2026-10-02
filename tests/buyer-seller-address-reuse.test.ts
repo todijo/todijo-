@@ -29,8 +29,8 @@ test("seller address persists independently without mutating or duplicating buye
   assert.match(route, /tx\.user\.update\(\{where:\{id:user\.id\},data:\{role:"SELLER"\}\}\)/);
   assert.doesNotMatch(route, /profileAddress|profilePostalCode|profileCity|profileCountry/);
   assert.doesNotMatch(route, /buyerShippingAddress\.(create|update|upsert|delete)/);
-  assert.match(route, /if\(user\.store\)await tx\.store\.update/);
-  assert.match(route, /else await tx\.store\.create/);
+  assert.match(route, /const store=user\.store\?await tx\.store\.update/);
+  assert.match(route, /:await tx\.store\.create/);
 });
 
 test("address reuse copy remains separate from seller plan continuity and checkout", () => {

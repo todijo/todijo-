@@ -303,6 +303,53 @@ enum SellerSaleEmailStatus {
   FAILED
 }
 
+enum TeamMembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum TeamRoleTemplate {
+  STORE_MANAGER
+  ORDER_MANAGER
+  PRODUCT_MANAGER
+  CUSTOMER_SUPPORT
+  CUSTOM
+}
+
+enum TeamPermission {
+  PRODUCT_VIEW
+  PRODUCT_CREATE
+  PRODUCT_EDIT_CONTENT
+  PRODUCT_CHANGE_PRICE
+  PRODUCT_CHANGE_STOCK
+  PRODUCT_MANAGE_VARIANTS
+  PRODUCT_ADD_MEDIA
+  PRODUCT_REMOVE_MEDIA
+  PRODUCT_PUBLISH
+  PRODUCT_DELETE
+  ORDER_VIEW
+  ORDER_FULFILL
+  ORDER_UPDATE_TRACKING
+  ORDER_UPDATE_STATUS
+  REFUND_REQUEST
+  REFUND_DECIDE
+  MESSAGE_VIEW
+  MESSAGE_REPLY
+  STORE_VIEW_SETTINGS
+  STORE_EDIT_DESCRIPTION
+  STORE_EDIT_MEDIA
+  STORE_EDIT_SETTINGS
+  STORE_EDIT_SHIPPING
+  DROPSHIPPING_VIEW
+  DROPSHIPPING_IMPORT
+  DROPSHIPPING_CREATE
+  DROPSHIPPING_MANAGE
+  DROPSHIPPING_FULFILL
+  ANALYTICS_VIEW
+  SALES_VIEW
+}
+
 enum ReviewStatus {
   PUBLISHED
   PENDING
@@ -376,12 +423,19 @@ model User {
   anonymizedAt             DateTime?
   anonymizedEmailHash      String?  @unique @db.Char(64)
 
-  store               Store?
+  primaryStoreId      String?  @unique
+  store               Store?   @relation("UserPrimaryStore", fields: [primaryStoreId], references: [id], onDelete: SetNull)
+  stores              Store[]  @relation("StoreOwner")
+  ownedBusiness       SellerBusiness?
+  teamMemberships     SellerTeamMembership[]
+  acceptedTeamInvitations SellerTeamInvitation[] @relation("AcceptedTeamInvitationUser")
+  sellerBusinessAuditEvents SellerBusinessAuditEvent[] @relation("SellerBusinessAuditActor")
   buyerConversations  Conversation[] @relation("ConversationBuyer")
   sellerConversations Conversation[] @relation("ConversationSeller")
   sentMessages        Message[]
   notifications       Notification[]
   sellerSaleDeliveries SellerSaleDelivery[]
+  sellerSaleRecipientDeliveries SellerSaleRecipientDelivery[]
   pushSubscriptions   PushSubscription[]
   mobileSessions      MobileSession[]
   mobileOAuthAttempts MobileOAuthAttempt[]
@@ -805,8 +859,12 @@ model Store {
   sellerLegalForm SellerLegalForm?
   companySubtype  SellerCompanySubtype?
 
-  ownerId String @unique
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId String
+  owner   User   @relation("StoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  primaryForOwner User? @relation("UserPrimaryStore")
+  businessId String?
+  business SellerBusiness? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  billingForBusiness SellerBusiness? @relation("SellerBusinessBillingStore")
 
   products      Product[]
   conversations Conversation[]
@@ -815,6 +873,9 @@ model Store {
   supplierConnections SupplierConnection[]
   supplierCatalogJobs SupplierCatalogImportJob[]
   orderGroups OrderGroup[]
+  teamAssignments SellerTeamStoreAssignment[]
+  invitationAssignments SellerTeamInvitationStore[]
+  businessAuditEvents SellerBusinessAuditEvent[]
   loyaltyAccounts LoyaltyAccount[]
   loyaltyChanges LoyaltyStoreChange[]
 
@@ -822,6 +883,119 @@ model Store {
   updatedAt DateTime @updatedAt
 
   @@index([dataClass, status])
+  @@index([ownerId])
+  @@index([businessId, createdAt])
+}
+
+model SellerBusiness {
+  id             String   @id @default(cuid())
+  ownerId        String   @unique
+  billingStoreId String?  @unique
+  maxStores      Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner        User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  billingStore Store? @relation("SellerBusinessBillingStore", fields: [billingStoreId], references: [id], onDelete: SetNull)
+  stores       Store[]
+  memberships  SellerTeamMembership[]
+  invitations  SellerTeamInvitation[]
+  auditEvents  SellerBusinessAuditEvent[]
+
+  @@index([maxStores])
+}
+
+model SellerTeamMembership {
+  id           String               @id @default(cuid())
+  businessId   String
+  userId       String
+  status       TeamMembershipStatus @default(ACTIVE)
+  roleTemplate TeamRoleTemplate     @default(CUSTOM)
+  permissions  TeamPermission[]     @default([])
+  suspendedAt  DateTime?
+  removedAt    DateTime?
+  lastActiveAt DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  business   SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments SellerTeamStoreAssignment[]
+
+  @@unique([businessId, userId])
+  @@index([userId, status])
+  @@index([businessId, status, createdAt])
+}
+
+model SellerTeamStoreAssignment {
+  id           String   @id @default(cuid())
+  membershipId String
+  storeId      String
+  createdAt    DateTime @default(now())
+
+  membership SellerTeamMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  store      Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, storeId])
+  @@index([storeId, membershipId])
+}
+
+model SellerTeamInvitation {
+  id             String           @id @default(cuid())
+  businessId     String
+  email          String           @db.VarChar(320)
+  tokenHash      String           @unique @db.Char(64)
+  locale         String           @db.VarChar(8)
+  roleTemplate   TeamRoleTemplate @default(CUSTOM)
+  permissions    TeamPermission[] @default([])
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   String?
+  revokedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  business  SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  acceptedBy User?          @relation("AcceptedTeamInvitationUser", fields: [acceptedById], references: [id], onDelete: SetNull)
+  stores     SellerTeamInvitationStore[]
+
+  @@unique([businessId, email])
+  @@index([businessId, acceptedAt, revokedAt, expiresAt])
+}
+
+model SellerTeamInvitationStore {
+  id           String   @id @default(cuid())
+  invitationId String
+  storeId      String
+  createdAt    DateTime @default(now())
+
+  invitation SellerTeamInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  store      Store                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, storeId])
+  @@index([storeId, invitationId])
+}
+
+model SellerBusinessAuditEvent {
+  id          String   @id @default(cuid())
+  businessId  String
+  storeId     String?
+  actorId     String
+  category    String   @db.VarChar(40)
+  action      String   @db.VarChar(80)
+  targetType  String?  @db.VarChar(60)
+  targetId    String?  @db.VarChar(200)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  business SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  store    Store?         @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  actor    User           @relation("SellerBusinessAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, storeId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([category, createdAt])
 }
 
 enum OrderSnapshotSource {
@@ -1311,6 +1485,7 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   sellerSaleDelivery SellerSaleDelivery?
+  sellerSaleRecipientDelivery SellerSaleRecipientDelivery?
 
   @@index([userId, readAt, createdAt])
 }
@@ -1493,6 +1668,7 @@ model OrderGroup {
   loyaltyRedeemedMinor Int @default(0)
   loyaltyReserveReversedMinor Int @default(0)
   sellerSaleDelivery SellerSaleDelivery?
+  sellerSaleRecipientDeliveries SellerSaleRecipientDelivery[]
   @@unique([orderId,groupKey])
   @@index([storeId,transferStatus])
   @@index([transferStatus,nextTransferAttemptAt])
@@ -1531,6 +1707,39 @@ model SellerSaleDelivery {
   @@index([status, nextAttemptAt, createdAt])
   @@index([sellerId, createdAt])
   @@index([orderId])
+}
+
+model SellerSaleRecipientDelivery {
+  id                String                @id @default(cuid())
+  orderGroupId      String
+  recipientId       String
+  notificationId    String                @unique
+  locale            String                @db.VarChar(8)
+  recipientEmail    String                @db.VarChar(320)
+  recipientName     String                @db.VarChar(200)
+  orderReference    String                @db.VarChar(200)
+  currency          String                @db.VarChar(3)
+  sellerAmountMinor Int
+  totalQuantity     Int
+  items             Json
+  status            SellerSaleEmailStatus @default(QUEUED)
+  attemptCount      Int                   @default(0)
+  nextAttemptAt     DateTime?
+  claimToken        String?               @unique
+  claimedAt         DateTime?
+  sentAt            DateTime?
+  errorCode         String?               @db.VarChar(120)
+  errorMessage      String?               @db.VarChar(500)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  orderGroup   OrderGroup   @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  recipient    User         @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([orderGroupId, recipientId])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([recipientId, createdAt])
 }
 
 model ProductReport {

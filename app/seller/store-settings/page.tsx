@@ -8,10 +8,14 @@ import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerSection, SellerStatusBadge } from "@/components/SellerControlPanel";
 import StoreSettingsForm from "./StoreSettingsForm";
 import { canPublish } from "@/lib/seller-subscription";
+import { requireStoreCapability, resolveSellerStoreContext } from "@/lib/seller-business-access";
+import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
+import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
+import { sellerTeamCopy } from "@/i18n/seller-team";
 
 export const dynamic = "force-dynamic";
 
-export default async function StoreSettingsPage() {
+export default async function StoreSettingsPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
   const session = await readSession();
   if (!session) redirect("/login");
   const t = await getTranslations("SellerControl");
@@ -20,9 +24,17 @@ export default async function StoreSettingsPage() {
   const dashboardText = await getTranslations("SellerDashboard");
   const shippingText = await getTranslations("Shipping");
   const locale = await getLocale();
+  const teamCopy = sellerTeamCopy(locale);
 
+  let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"STORE_VIEW_SETTINGS")}catch{redirect(`/${locale}/dashboard`)}
+  const principal=await requireStoreCapability(prisma,session.userId,storeContext.selected.id,"STORE_VIEW_SETTINGS");
+  const [businessCapacity, commercialPlan] = principal.owner ? await Promise.all([
+    prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { maxStores: true, _count: { select: { stores: true } } } }),
+    sellerBusinessCommercialPlan(prisma, principal.businessId),
+  ]) : [null, null];
+  const canCreateStore = Boolean(businessCapacity && commercialPlan === "pro" && businessCapacity._count.stores < businessCapacity.maxStores);
   const store = await prisma.store.findUnique({
-    where: { ownerId: session.userId },
+    where: { id:storeContext.selected.id },
     select: {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true,
@@ -43,21 +55,22 @@ export default async function StoreSettingsPage() {
   };
 
   return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} labels={labels} active="settings" canAddProduct={canPublish(store)}>
+    <SellerStoreSwitcher stores={storeContext.stores} selectedId={storeContext.selected.id} allStoresLabel="All stores" storeLabel={p("nav.store")}/>
     <SellerPageHeader
       eyebrow={t("sellerWorkspace")}
       title={t("settingsTitle")}
       description={t("settingsDescription")}
       backHref={`/${locale}/dashboard`}
       backLabel={t("backDashboard")}
-      actions={<Link className="sellerControlButton light" href={`/${locale}/store/${store.slug}`}>{t("viewStore")}</Link>}
+      actions={<><Link className="sellerControlButton light" href={`/${locale}/store/${store.slug}`}>{t("viewStore")}</Link>{canCreateStore&&<Link className="sellerControlButton" href={`/${locale}/seller/stores/new`}>{teamCopy.createStore}</Link>}</>}
       badges={<><SellerStatusBadge tone="accent">{store.name}</SellerStatusBadge><SellerStatusBadge tone={["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "") ? "success" : "warning"}>{t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</SellerStatusBadge></>}
     />
 
     <nav className="sellerSettingsTabs" aria-label={t("settingsTitle")}>
-      <a href="#profile">{t("storeProfile")}</a><a href="#shipping">{shippingText("settingsTitle")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a>
+      <a href="#profile">{t("storeProfile")}</a><a href="#shipping">{shippingText("settingsTitle")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a>{principal.owner&&<><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a></>}
     </nav>
 
-    <StoreSettingsForm initialValues={{
+    <StoreSettingsForm storeId={storeContext.selected.id} owner={principal.owner} initialValues={{
       name: store.name, description: store.description ?? "", contactEmail: store.contactEmail, phone: store.phone ?? "",
       logo: store.logo ?? "", banner: store.banner ?? "", country: store.country, city: store.city,
       currency: store.currency, language: store.language,
@@ -66,12 +79,12 @@ export default async function StoreSettingsPage() {
       shippingEnabled: store.shippingEnabled, shippingMethodName: store.shippingMethodName ?? "", shippingPrice: store.shippingPrice?.toString() ?? "", shippingFree: store.shippingFree, shippingFreeThreshold:store.shippingFreeThreshold?.toString()??"", shippingMinDays: store.shippingMinDays, shippingMaxDays: store.shippingMaxDays, shippingCountries: store.shippingCountries, shippingWorldwide:store.shippingWorldwide, shippingPostalCodes:store.shippingPostalCodes, shippingCarrier: store.shippingCarrier ?? "",
     }} />
 
-    <div className="sellerSettingsSupportGrid">
+    {principal.owner&&<div className="sellerSettingsSupportGrid">
       <SellerSection id="notifications" icon={BellRing} title={t("notifications")} description={t("notificationsHelp")}><p className="sellerSettingsInfo"><BellRing size={18}/>{t("notificationsStatus")}</p></SellerSection>
       <SellerSection id="billing" icon={CreditCard} title={t("billing")} description={t("billingHelp")}>
         <div className="sellerBillingCard"><div><span>{t("currentPlan")}</span><strong>{store.subscription?.plan?.toUpperCase() ?? "—"}</strong><small>{t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</small></div><Link href={`/${locale}/seller/subscription`}>{t("managePlan")}</Link></div>
       </SellerSection>
       <SellerSection id="security" icon={ShieldCheck} title={t("security")} description={t("securityHelp")}><p className="sellerSettingsInfo"><ShieldCheck size={18}/>{t("securityStatus")}</p></SellerSection>
-    </div>
+    </div>}
   </SellerDashboardLayout>;
 }

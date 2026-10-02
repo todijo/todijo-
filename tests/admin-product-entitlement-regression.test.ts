@@ -39,7 +39,7 @@ test("ordinary seller product limits remain enforced", () => {
 function entitlementDb(role: "ADMIN" | "SELLER", productCount: number) {
   return {
     user: { findUnique: async () => ({ sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null }) },
-    store: { findUnique: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: null, plan: "basic" }, accessGrants: [], _count: { products: productCount } }) },
+    store: { findFirst: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: null, plan: "basic" }, accessGrants: [], _count: { products: productCount } }) },
   };
 }
 
@@ -49,8 +49,9 @@ test("the creation gate allows the database admin and rejects the database selle
 });
 
 test("draft and published creation share the database-authoritative quota gate", () => {
-  assert.match(productRoute, /requireProductCreationAccess\(prisma, session\.userId\)/);
-  assert.ok(productRoute.indexOf("requireProductCreationAccess") < productRoute.indexOf("await request.json()"), "payload cannot request or spoof the admin role");
+  assert.match(productRoute, /requireStorePublishingAccess\(prisma, session\.userId,storeId,"PRODUCT_CREATE"\)/);
+  assert.match(productRoute, /requestedStoreId/);
+  assert.match(productRoute, /requireStoreCapability\(prisma,session\.userId,store\.id,"PRODUCT_CREATE"\)/);
   assert.match(productRoute, /body\.status === "DRAFT" \? "DRAFT" : "PUBLISHED"/);
 });
 

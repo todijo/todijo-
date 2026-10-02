@@ -6,6 +6,7 @@ import { refundEvidenceContentDisposition } from "@/lib/refund-evidence-headers"
 import { prisma } from "@/lib/prisma";
 import { r2ObjectStore } from "@/lib/r2";
 import { readSession } from "@/lib/session";
+import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
 
 export async function GET(_request: Request, context: { params: Promise<{ orderId: string; evidenceId: string }> }) {
   const session = await readSession();
@@ -24,16 +25,19 @@ export async function GET(_request: Request, context: { params: Promise<{ orderI
       evidence = await prisma.refundEvidence.findFirst({ where: { id: evidenceId, refundRequestId: refund.id }, select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true, storageKey: true, contentHash: true } });
       if (!evidence) throw new RefundEvidenceError("Refund request not found.", 404);
     } else {
-      const refund = await prisma.refundRequest.findFirst({ where: { orderId }, select: { id: true } });
+      const refund = await prisma.refundRequest.findFirst({ where: { orderId }, select: { id: true,order:{select:{storeIdSnapshot:true,items:{take:1,select:{product:{select:{storeId:true}}}}}} } });
       if (!refund) throw new RefundEvidenceError("Refund request not found.", 404);
-      await getSellerRefundRequest(prisma, session.userId, refund.id);
-      evidence = await getSellerRefundEvidence(prisma, session.userId, orderId, evidenceId);
+      const storeId=refund.order.storeIdSnapshot??refund.order.items[0]?.product.storeId;
+      if(!storeId)throw new RefundEvidenceError("Refund request not found.",404);
+      await requireStoreCapability(prisma,session.userId,storeId,"ORDER_VIEW");
+      await getSellerRefundRequest(prisma, session.userId, refund.id,storeId);
+      evidence = await getSellerRefundEvidence(prisma, session.userId, orderId, evidenceId,storeId);
     }
     const response = await r2ObjectStore().get(evidence.storageKey);
     const body = await response.arrayBuffer();
     return new NextResponse(body, { headers: { "Content-Type": evidence.mimeType, "Content-Disposition": refundEvidenceContentDisposition(evidence.originalFilename), "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
   } catch (error) {
-    const known = error instanceof RefundEvidenceError || error instanceof RefundRequestError || error instanceof AdminAccessError;
+    const known = error instanceof RefundEvidenceError || error instanceof RefundRequestError || error instanceof AdminAccessError || error instanceof SellerCapabilityError;
     return NextResponse.json({ error: known ? error.message : "Unable to load refund evidence." }, { status: known ? error.status : 500 });
   }
 }

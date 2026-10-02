@@ -76,6 +76,7 @@ function referenceFilter(query: string): Prisma.OrderWhereInput {
 }
 
 export function sellerOrderHistoryWhere(sellerId: string, storeId: string, query: string): Prisma.OrderWhereInput {
+  void sellerId;
   return {
     AND: [
       { OR: [
@@ -83,8 +84,8 @@ export function sellerOrderHistoryWhere(sellerId: string, storeId: string, query
         {
           storeIdSnapshot: null,
           items: {
-            some: { product: { store: { ownerId: sellerId } } },
-            every: { product: { store: { ownerId: sellerId } } },
+            some: { product: { storeId } },
+            every: { product: { storeId } },
           },
         },
       ] },

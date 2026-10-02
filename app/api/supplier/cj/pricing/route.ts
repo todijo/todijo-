@@ -15,7 +15,7 @@ export async function POST(request:Request){
     const session=await readSession();
     const admin=await requirePlatformSupplierAdmin(prisma,session);
     const body=await request.json() as {supplierProductId?:unknown;destinationCountry?:unknown;originCountry?:unknown;supplierVariantId?:unknown;quantity?:unknown;shippingMethod?:unknown;buyerCurrency?:unknown};
-    const store=await prisma.store.findUnique({where:{ownerId:admin.id},select:{currency:true}});
+    const store=await prisma.store.findFirst({where:{ownerId:admin.id},orderBy:{createdAt:"asc"},select:{currency:true}});
     if(!store)return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
     const provider=new CjCatalogProvider(),snapshot=await provider.getProduct(String(body.supplierProductId??"")),targetMargin=await readGlobalDropshippingMargin(prisma);
     const variants=snapshot.variants.map((variant)=>({supplierVariantId:variant.supplierVariantId,title:variant.title,sku:variant.sku,originCountryCodes:variant.originCountryCodes}));

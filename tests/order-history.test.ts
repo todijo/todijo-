@@ -27,7 +27,7 @@ test("seller reference search accepts the displayed optional hash prefix without
   await listSellerOrderHistory(db, "seller_1", "store_1", " #cms1n7dy20001p801f3igscyx ", "1");
   assert.equal(findCalls[0].where.AND[1].id.contains, "cms1n7dy20001p801f3igscyx");
   assert.equal(findCalls[0].where.AND[0].OR[0].storeIdSnapshot, "store_1");
-  assert.equal(findCalls[0].where.AND[0].OR[1].items.every.product.store.ownerId, "seller_1");
+  assert.equal(findCalls[0].where.AND[0].OR[1].items.every.product.storeId, "store_1");
 });
 
 test("seller includes a legacy order only when all items belong to its store", async () => {
@@ -37,15 +37,15 @@ test("seller includes a legacy order only when all items belong to its store", a
   assert.equal(findCalls[0].where.AND[1].id.contains, "85vbi");
   assert.equal(ownership[0].storeIdSnapshot, "store_1");
   assert.equal(ownership[1].storeIdSnapshot, null);
-  assert.equal(ownership[1].items.some.product.store.ownerId, "seller_1");
-  assert.equal(ownership[1].items.every.product.store.ownerId, "seller_1");
+  assert.equal(ownership[1].items.some.product.storeId, "store_1");
+  assert.equal(ownership[1].items.every.product.storeId, "store_1");
 });
 
 test("seller excludes a legacy multi-store order", async () => {
   const { db, findCalls } = database();
   await listSellerOrderHistory(db, "seller_1", "store_1", "85vbi", "1");
   const legacyItems = findCalls[0].where.AND[0].OR[1].items;
-  assert.deepEqual(legacyItems.every, { product: { store: { ownerId: "seller_1" } } });
+  assert.deepEqual(legacyItems.every, { product: { storeId: "store_1" } });
 });
 
 test("admin can search marketplace-wide by reference", async () => {

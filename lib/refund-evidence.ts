@@ -27,7 +27,7 @@ type EvidenceDelegate = {
 };
 type EvidenceTx = { refundEvidence: { count: (args: { where: { refundRequestId: string } }) => Promise<number>; create: (args: { data: { refundRequestId: string; uploadedByUserId: string; uploaderRole: "BUYER"; storageKey: string; contentHash: string; originalFilename: string; mimeType: EvidenceMimeType; sizeBytes: number } }) => Promise<EvidenceRow> } };
 type SellerEvidenceDb = {
-  store: { findUnique: (args: { where: { ownerId: string }; select: { id: true } }) => Promise<{ id: string } | null> };
+  store: { findFirst: (args: { where: { ownerId: string }; orderBy: { createdAt: "asc" }; select: { id: true } }) => Promise<{ id: string } | null> };
   refundEvidence: {
     findMany: (args: { where: { refundRequestId: string; refundRequest: { order: Prisma.OrderWhereInput } }; select: { id: true; originalFilename: true; mimeType: true; sizeBytes: true; createdAt: true }; orderBy: { createdAt: "asc" } }) => Promise<EvidenceMetadata[]>;
     findFirst: (args: { where: { id: string; refundRequest: { order: Prisma.OrderWhereInput } }; select: EvidenceSelect }) => Promise<EvidenceRow | null>;
@@ -140,20 +140,20 @@ export async function getBuyerRefundEvidence(db: RefundEvidenceDb, authenticated
   return evidence;
 }
 
-async function sellerEvidenceWhere(db: SellerEvidenceDb, authenticatedSellerId: string | null | undefined) {
+async function sellerEvidenceWhere(db: SellerEvidenceDb, authenticatedSellerId: string | null | undefined, authorizedStoreId?: string) {
   if (!authenticatedSellerId) throw notFound();
-  const store = await db.store.findUnique({ where: { ownerId: authenticatedSellerId }, select: { id: true } });
+  const store = authorizedStoreId ? { id: authorizedStoreId } : await db.store.findFirst({ where: { ownerId: authenticatedSellerId }, orderBy: { createdAt: "asc" }, select: { id: true } });
   if (!store) throw notFound();
   return sellerOrderHistoryWhere(authenticatedSellerId, store.id, "");
 }
 
-export async function listSellerRefundEvidence(db: SellerEvidenceDb, authenticatedSellerId: string | null | undefined, orderId: string, refundRequestId: string) {
-  const order = { AND: [{ id: orderId }, await sellerEvidenceWhere(db, authenticatedSellerId)] };
+export async function listSellerRefundEvidence(db: SellerEvidenceDb, authenticatedSellerId: string | null | undefined, orderId: string, refundRequestId: string, authorizedStoreId?: string) {
+  const order = { AND: [{ id: orderId }, await sellerEvidenceWhere(db, authenticatedSellerId, authorizedStoreId)] };
   return db.refundEvidence.findMany({ where: { refundRequestId, refundRequest: { order } }, select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true }, orderBy: { createdAt: "asc" } });
 }
 
-export async function getSellerRefundEvidence(db: SellerEvidenceDb, authenticatedSellerId: string | null | undefined, orderId: string, evidenceId: string) {
-  const order = { AND: [{ id: orderId }, await sellerEvidenceWhere(db, authenticatedSellerId)] };
+export async function getSellerRefundEvidence(db: SellerEvidenceDb, authenticatedSellerId: string | null | undefined, orderId: string, evidenceId: string, authorizedStoreId?: string) {
+  const order = { AND: [{ id: orderId }, await sellerEvidenceWhere(db, authenticatedSellerId, authorizedStoreId)] };
   const evidence = await db.refundEvidence.findFirst({ where: { id: evidenceId, refundRequest: { order } }, select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true, storageKey: true, contentHash: true } });
   if (!evidence) throw notFound();
   return evidence;

@@ -112,7 +112,7 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
   }
 }
 
-export default function StoreSettingsForm({ initialValues }: { initialValues: StoreValues }) {
+export default function StoreSettingsForm({ initialValues,storeId="",owner=true }: { initialValues: StoreValues;storeId?:string;owner?:boolean }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const shipping = useTranslations("Shipping");
@@ -214,7 +214,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
     setSaving(true);
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus"), ...shippingDraftPayload(shippingRule) }) });
+      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId,name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: owner?form.get("sellerType"):initialValues.sellerType, legalBusinessName: owner?form.get("legalBusinessName"):initialValues.legalBusinessName, businessRegistrationId: owner?form.get("businessRegistrationId"):initialValues.businessRegistrationId, businessAddress: owner?form.get("businessAddress"):initialValues.businessAddress, businessPostalCode: owner?form.get("businessPostalCode"):initialValues.businessPostalCode, vatNumber: owner?form.get("vatNumber"):initialValues.vatNumber, vatStatus: owner?form.get("vatStatus"):initialValues.vatStatus, ...shippingDraftPayload(shippingRule) }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); setMessageError(true); showToast({ message: text, tone: "error" }); return; }
       setMessage(t("settingsSaved")); setMessageError(false); showToast({ message: t("settingsSaved"), tone: "success" }); router.refresh();
@@ -281,7 +281,7 @@ export default function StoreSettingsForm({ initialValues }: { initialValues: St
 
   return (
     <form className="storeForm storeSettingsForm" onSubmit={submit}>
-      <SellerTypeFields initial={initialValues}/>
+      {owner&&<SellerTypeFields initial={initialValues}/>}
       <SellerSection id="profile" icon={Store} title={t("storeProfile")} description={t("storeProfileHelp")}>
         <div className="sellerControlFieldGrid">
           <SellerFormField label={t("storeName")} htmlFor="name" required><input id="name" name="name" required minLength={2} maxLength={80} defaultValue={initialValues.name} /></SellerFormField>

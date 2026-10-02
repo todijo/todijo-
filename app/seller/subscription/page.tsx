@@ -11,6 +11,7 @@ import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement
 import { sellerPlanSelectionMessages } from "@/i18n/seller-plan-selection";
 import { activeAccessSource } from "@/lib/admin-access";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
+import { requireBusinessOwner } from "@/lib/seller-business-access";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,11 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     const next = sellerIntent ? sellerOnboardingPath(locale, true, sellerIntent) : `/${locale}/seller/subscription`;
     redirect(`/${locale}/login?next=${encodeURIComponent(next)}`);
   }
-  const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: { name: true, slug:true, owner: { select: { role: true, firstName:true, lastName:true } }, subscription: true, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } });
+  let principal;
+  try { principal = await requireBusinessOwner(prisma, session.userId); }
+  catch { redirect(`/${locale}/dashboard`); }
+  const business = await prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { billingStoreId: true } });
+  const store = business?.billingStoreId ? await prisma.store.findFirst({ where: { id: business.billingStoreId, ownerId: session.userId }, select: { name: true, slug:true, owner: { select: { role: true, firstName:true, lastName:true } }, subscription: true, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }) : null;
   if (!store) redirect(sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : `/${locale}/sell#plans`);
   const active = ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
   const accessSource = activeAccessSource(store).source;

@@ -4,6 +4,7 @@ import { readSession } from "@/lib/session";
 import { ProductVariantError, saveProductVariants, type ProductVariantsInput } from "@/lib/product-variants";
 import {assertSellerActivity}from"@/lib/account-status";
 import {AdminAccessError}from"@/lib/admin-access";
+import {SellerCapabilityError}from"@/lib/seller-business-access";
 
 const MAX_VARIANT_REQUEST_BYTES = 256 * 1024;
 
@@ -39,6 +40,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   } catch (error) {
     if (error instanceof ProductVariantError) return NextResponse.json({ error: error.message }, { status: error.status });
     if(error instanceof AdminAccessError)return NextResponse.json({error:error.code},{status:error.status});
+    if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     console.error("Update product variants error:", error);
     return NextResponse.json({ error: "Unable to update product variants." }, { status: 500 });
   }

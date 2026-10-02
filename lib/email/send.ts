@@ -6,6 +6,7 @@ import { emailCopy, emailGreeting } from "./messages";
 import { todijoEmailTemplate } from "./template";
 import { sendTodijoMail } from "./transport";
 import { formatSellerSaleCopy, sellerSaleCopy } from "../../i18n/seller-sale-notifications";
+import { sellerTeamCopy } from "../../i18n/seller-team";
 
 function layout(locale: string, firstName: string, values: { preview: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }) {
   const common = emailCopy(locale);
@@ -45,4 +46,10 @@ export async function sendSellerSaleEmail(input:{to:string;firstName:string;loca
   const copy=sellerSaleCopy(input.locale),values={order:input.orderReference,items:input.items.join(", "),quantity:input.quantity,amount:input.amount};
   const message=layout(input.locale,input.firstName,{preview:formatSellerSaleCopy(copy.subject,values),heading:copy.heading,body:formatSellerSaleCopy(copy.body,values),ctaLabel:copy.cta,ctaUrl:`${publicAppUrl()}${localizedHome(input.locale)}/seller/orders`});
   await sendTodijoMail({to:input.to,subject:formatSellerSaleCopy(copy.subject,values),...message});
+}
+
+export async function sendSellerTeamInvitationEmail(input:{to:string;locale:string;rawToken:string}){
+  const copy=sellerTeamCopy(input.locale),url=new URL(`${localizedHome(input.locale)}/team-invitation`,publicAppUrl());url.searchParams.set("token",input.rawToken);
+  const message=layout(input.locale,input.to.split("@")[0]??"",{preview:copy.invitationSubject,heading:copy.invitationHeading,body:copy.invitationBody,ctaLabel:copy.invitationCta,ctaUrl:url.toString()});
+  await sendTodijoMail({to:input.to,subject:copy.invitationSubject,...message});
 }

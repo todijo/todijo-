@@ -94,7 +94,7 @@ test("owning seller can list and preview evidence without receiving private R2 f
   const createdAt = new Date();
   const row = { id: "evidence-1", originalFilename: "proof.jpg", mimeType: "image/jpeg", sizeBytes: jpeg.length, createdAt, storageKey: "refund-evidence/request/private.jpg", contentHash: "a".repeat(64) };
   const db = {
-    store: { findUnique: async ({ where }: { where: { ownerId: string } }) => where.ownerId === "seller-a" ? { id: "store-a" } : null },
+    store: { findFirst: async ({ where }: { where: { ownerId: string } }) => where.ownerId === "seller-a" ? { id: "store-a" } : null },
     refundEvidence: {
       findMany: async () => [{ id: row.id, originalFilename: row.originalFilename, mimeType: row.mimeType, sizeBytes: row.sizeBytes, createdAt: row.createdAt }],
       findFirst: async () => row,

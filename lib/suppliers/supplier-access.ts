@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { requireAdmin } from "../admin-access";
 import { effectiveSellerPlan } from "../seller-subscription";
+import { requireStoreCapability } from "../seller-business-access";
+import { sellerBusinessCommercialPlan } from "../seller-business";
 
 type Database = PrismaClient | Prisma.TransactionClient;
 export const PLATFORM_CJ_CONNECTION_ID = "platform-cj";
@@ -23,17 +25,19 @@ export async function setSellerDropshippingPermission(db: Database, session: { u
   return { storeId: store.id, dropshippingEnabled: enabled };
 }
 
-export async function requireSellerSupplierAccess(db: Database, session: { userId: string; role?: string } | null) {
+export async function requireSellerSupplierAccess(db: Database, session: { userId: string; role?: string } | null,requestedStoreId?:string,permission:"DROPSHIPPING_VIEW"|"DROPSHIPPING_IMPORT"|"DROPSHIPPING_CREATE"|"DROPSHIPPING_MANAGE"|"DROPSHIPPING_FULFILL"="DROPSHIPPING_VIEW") {
   if (!session) throw new SupplierAccessError("AUTH_REQUIRED", 401);
-  const store = await db.store.findFirst({ where: { ownerId: session.userId, owner:{sellerSuspendedAt:null,deactivatedAt:null} }, select: {
+  const store = await db.store.findFirst({ where: { ...(requestedStoreId?{id:requestedStoreId}:{ownerId:session.userId}), owner:{sellerSuspendedAt:null,deactivatedAt:null} }, select: {
     id: true,
+    ownerId:true,businessId:true,
     dropshippingEnabled: true,
     owner: { select: { role: true } },
     subscription: { select: { status: true, plan: true } },
     accessGrants: { select: { source: true, plan: true, startsAt: true, endsAt: true } },
   } });
   if (!store || !store.dropshippingEnabled) throw new SupplierAccessError("DROPSHIPPING_PERMISSION_DENIED");
-  const plan = effectiveSellerPlan({ role: store.owner.role, subscription: store.subscription, accessGrants: store.accessGrants });
+  if(requestedStoreId&&store.ownerId!==session.userId)await requireStoreCapability(db,session.userId,store.id,permission);
+  const plan = store.businessId?await sellerBusinessCommercialPlan(db,store.businessId):effectiveSellerPlan({ role: store.owner.role, subscription: store.subscription, accessGrants: store.accessGrants });
   if (plan !== "pro" && plan !== "admin-exempt") throw new SupplierAccessError("DROPSHIPPING_PRO_PLAN_REQUIRED");
   return store;
 }

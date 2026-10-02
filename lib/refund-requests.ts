@@ -17,7 +17,7 @@ type BuyerOrderFindFirstArgs = { where: { id: string; buyerId: string }; select:
 type RefundRequestCreateArgs = { data: { orderId: string; buyerId: string; reason: string; status: "PENDING" } };
 type RefundRequestFindByOrderArgs = { where: { orderId: string } };
 type BuyerRefundRequestFindFirstArgs = { where: { orderId: string; order: { buyerId: string } }; select: { id: true; orderId: true; reason: true; status: true; decisionNote: true; reviewedAt: true; createdAt: true; updatedAt: true } };
-type StoreFindByOwnerArgs = { where: { ownerId: string }; select: { id: true } };
+type StoreFindByOwnerArgs = { where: { ownerId: string }; orderBy:{createdAt:"asc"}; select: { id: true } };
 type SellerRefundRequestFindFirstArgs = { where: { id: string; order: Prisma.OrderWhereInput }; select: { id: true; reason: true; status: true; createdAt: true; decisionNote: true; reviewedAt: true; order: { select: { id: true; status: true; createdAt: true } } } };
 type SellerRefundRequestUpdateArgs = { where: { id: string; status: "PENDING"; order: Prisma.OrderWhereInput }; data: { status: "SELLER_APPROVED" | "SELLER_REJECTED"; reviewedById: string; reviewedAt: Date; decisionNote: string | null } };
 type AdminUserFindUniqueArgs = { where: { id: string }; select: { id: true; role: true } };
@@ -25,7 +25,7 @@ type AdminRefundRequestFindUniqueArgs = { where: { id: string }; select: { id: t
 type AdminRefundRequestUpdateArgs = { where: { id: string; status: { in: Array<"PENDING" | "SELLER_APPROVED" | "SELLER_REJECTED"> } }; data: { status: "ADMIN_APPROVED" | "ADMIN_REJECTED"; reviewedById: string; reviewedAt: Date; decisionNote: string | null } };
 
 type BuyerRefundDb = { order: { findFirst: (args: BuyerOrderFindFirstArgs) => Promise<BuyerOrder | null> }; refundRequest: { create: (args: RefundRequestCreateArgs) => Promise<RefundRequest>; findUnique: (args: RefundRequestFindByOrderArgs) => Promise<RefundRequest | null> } };
-type SellerRefundDb = { store: { findUnique: (args: StoreFindByOwnerArgs) => Promise<{ id: string } | null> }; refundRequest: { findFirst: (args: SellerRefundRequestFindFirstArgs) => Promise<SellerRefundRequest | null> } };
+type SellerRefundDb = { store: { findFirst: (args: StoreFindByOwnerArgs) => Promise<{ id: string } | null> }; refundRequest: { findFirst: (args: SellerRefundRequestFindFirstArgs) => Promise<SellerRefundRequest | null> } };
 type AdminUserDb = { user: { findUnique: (args: AdminUserFindUniqueArgs) => Promise<{ id: string; role: UserRole | string } | null> } };
 type AdminSession = { userId: string; role?: UserRole | string } | null;
 type AdminRefundDb = AdminUserDb & { refundRequest: { findUnique: (args: AdminRefundRequestFindUniqueArgs) => Promise<AdminRefundRequest | null> } };
@@ -69,9 +69,9 @@ export async function getBuyerRefundRequest(db: { refundRequest: { findFirst: (a
   return request;
 }
 
-export async function getSellerRefundRequest(db: SellerRefundDb, authenticatedSellerId: string | null | undefined, requestId: string) {
+export async function getSellerRefundRequest(db: SellerRefundDb, authenticatedSellerId: string | null | undefined, requestId: string,authorizedStoreId?:string) {
   if (!authenticatedSellerId) throw new RefundRequestError("Refund request not found.", 404);
-  const store = await db.store.findUnique({ where: { ownerId: authenticatedSellerId }, select: { id: true } });
+  const store = authorizedStoreId?{id:authorizedStoreId}:await db.store.findFirst({ where: { ownerId: authenticatedSellerId }, orderBy:{createdAt:"asc"}, select: { id: true } });
   if (!store) throw new RefundRequestError("Refund request not found.", 404);
   const request = await db.refundRequest.findFirst({
     where: { id: requestId, order: sellerOrderHistoryWhere(authenticatedSellerId, store.id, "") },
@@ -89,16 +89,16 @@ function normalizedDecisionNote(value: unknown) {
   return note || null;
 }
 
-export async function decideSellerRefundRequest(db: SellerRefundDb & { refundRequest: SellerRefundDb["refundRequest"] & { updateMany: (args: SellerRefundRequestUpdateArgs) => Promise<{ count: number }> } }, authenticatedSellerId: string | null | undefined, requestId: string, decision: unknown, input: { decisionNote?: unknown } = {}) {
+export async function decideSellerRefundRequest(db: SellerRefundDb & { refundRequest: SellerRefundDb["refundRequest"] & { updateMany: (args: SellerRefundRequestUpdateArgs) => Promise<{ count: number }> } }, authenticatedSellerId: string | null | undefined, requestId: string, decision: unknown, input: { decisionNote?: unknown } = {},authorizedStoreId?:string) {
   if (!authenticatedSellerId) throw new RefundRequestError("Refund request not found.", 404);
   if (decision !== "approve" && decision !== "reject") throw new RefundRequestError("Invalid refund decision.", 400);
-  const store = await db.store.findUnique({ where: { ownerId: authenticatedSellerId }, select: { id: true } });
+  const store = authorizedStoreId?{id:authorizedStoreId}:await db.store.findFirst({ where: { ownerId: authenticatedSellerId }, orderBy:{createdAt:"asc"}, select: { id: true } });
   if (!store) throw new RefundRequestError("Refund request not found.", 404);
   const note = normalizedDecisionNote(input.decisionNote);
   const now = new Date();
   const result = await db.refundRequest.updateMany({ where: { id: requestId, status: "PENDING", order: sellerOrderHistoryWhere(authenticatedSellerId, store.id, "") }, data: { status: decision === "approve" ? "SELLER_APPROVED" : "SELLER_REJECTED", reviewedById: authenticatedSellerId, reviewedAt: now, decisionNote: note } });
   if (result.count === 1) return { decided: true };
-  const existing = await getSellerRefundRequest(db, authenticatedSellerId, requestId);
+  const existing = await getSellerRefundRequest(db, authenticatedSellerId, requestId,store.id);
   if (existing.status !== "PENDING") return { decided: false, request: existing };
   throw new RefundRequestError("Refund request not found.", 404);
 }

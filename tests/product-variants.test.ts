@@ -93,7 +93,9 @@ test("variant configuration rejects duplicate names and variant explosions befor
 test("foreign option and option-value identifiers are rejected inside the owned product transaction", async () => {
   let optionWrites = 0;
   const tx = {
-    product: { findFirst: async () => ({ id: "product_a", options: [], variants: [] }) },
+    product: { findFirst: async () => ({ id: "product_a", storeId:"store_a", price:10, options: [], variants: [] }) },
+    store:{findUnique:async()=>({businessId:"business_a",ownerId:"seller_a"})},
+    sellerTeamMembership:{findFirst:async()=>null},
     productOption: { updateMany: async () => { optionWrites += 1; return { count: 0 }; } },
   };
   const db = { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) } as unknown as PrismaClient;

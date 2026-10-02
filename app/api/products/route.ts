@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { requireProductCreationAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
+import { requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
 import { ProductVariantImageError } from "@/lib/product-variant-images";
@@ -20,6 +20,8 @@ import { LoyaltySettingsError } from "@/lib/loyalty-settings";
 import {resolveBuyerProductContent} from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
 import {resolveProductPriceInput} from "@/lib/product-price-input";
+import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
+import { requireStoreCapability } from "@/lib/seller-business-access";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -49,9 +51,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }
 
-    const store = await requireProductCreationAccess(prisma, session.userId);
-
     const body = await request.json();
+    const requestedStoreId=typeof body.storeId==="string"?body.storeId:null;
+    const availableStores=await prisma.store.findMany({where:{OR:[{ownerId:session.userId},{teamAssignments:{some:{membership:{userId:session.userId,status:"ACTIVE"}}}}]},orderBy:{createdAt:"asc"},select:{id:true}});
+    const storeId=requestedStoreId??availableStores[0]?.id;
+    if(!storeId)return NextResponse.json({error:"STORE_REQUIRED"},{status:403});
+    const store = await requireStorePublishingAccess(prisma, session.userId,storeId,"PRODUCT_CREATE");
     const name = String(body.name ?? "").trim();
     const description = String(body.description ?? "").trim();
     const category = String(body.category ?? "").trim();
@@ -124,6 +129,8 @@ export async function POST(request: Request) {
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
       }, variantInput, body.variantImages);
     await prisma.$transaction((tx)=>replaceProductVideo(tx,product.id,body.video));
+    const principal=await requireStoreCapability(prisma,session.userId,store.id,"PRODUCT_CREATE");
+    await appendSellerBusinessAudit(prisma,{businessId:principal.businessId,storeId:store.id,actorId:session.userId,category:"PRODUCT",action:"PRODUCT_CREATED",targetType:"Product",targetId:product.id,metadata:{status}});
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, product });

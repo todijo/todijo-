@@ -17,7 +17,7 @@ export default async function MessagesPage() {
   const [, conversations] = await Promise.all([
     prisma.notification.updateMany({ where: { userId: session.userId, type: "NEW_MESSAGE", readAt: null }, data: { readAt: new Date() } }),
     prisma.conversation.findMany({
-      where: { OR: [{ buyerId: session.userId }, { sellerId: session.userId }] },
+      where: { OR: [{ buyerId: session.userId }, { sellerId: session.userId },{store:{teamAssignments:{some:{membership:{userId:session.userId,status:"ACTIVE",permissions:{has:"MESSAGE_VIEW"}}}}}}] },
       orderBy: { lastMessageAt: "desc" },
       select: { id:true, buyerId:true, lastMessageAt:true, product:{select:{name:true,images:true}}, store:{select:{name:true}}, buyer:{select:{firstName:true,lastName:true}}, seller:{select:{firstName:true,lastName:true}}, messages:{take:1,orderBy:{createdAt:"desc"},select:{body:true,senderId:true,readAt:true}} }
     }),

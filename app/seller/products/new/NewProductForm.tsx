@@ -20,7 +20,7 @@ import {resolveProductPriceInput} from "@/lib/product-price-input";
 import {isLocale} from "@/i18n/config";
 import {loyaltyMessages} from "@/i18n/loyalty";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
-export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string }) {
+export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="" }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const requestedLocale = useLocale();
@@ -110,6 +110,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     try { const response = await fetch("/api/products", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        storeId,
         name: form.get("name"), description: form.get("description"), price: form.get("price"), compareAtPrice: form.get("compareAtPrice"),
         colors: String(form.get("colors") || "").split(",").map((value) => value.trim()).filter(Boolean),
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),

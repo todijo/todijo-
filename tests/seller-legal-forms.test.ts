@@ -66,5 +66,5 @@ test("Phase 3, Phase 4, Phase 5 and Admin authority remain wired", () => {
   assert.match(source("app/seller/onboarding/page.tsx"), /defaultBuyerAddress\(prisma, session\.userId\)/);
   assert.match(source("app/seller/onboarding/page.tsx"), /sellerOnboardingDestination/);
   assert.match(source("app/seller/subscription/page.tsx"), /activeAccessSource/);
-  assert.match(source("app/api/seller/onboarding/route.ts"), /if\(user\.store\)await tx\.store\.update/);
+  assert.match(source("app/api/seller/onboarding/route.ts"), /const store=user\.store\?await tx\.store\.update/);
 });

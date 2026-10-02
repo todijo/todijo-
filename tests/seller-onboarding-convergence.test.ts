@@ -26,7 +26,8 @@ test("legacy create-store is redirect-only and cannot create a competing store",
   const page = source("app/seller/create-store/page.tsx");
   assert.match(page, /sellerOnboardingDestination/);
   assert.doesNotMatch(page, /CreateStoreForm|<form|store\.create/);
-  assert.match(source("app/api/store/route.ts"), /if \(existingStore\)/);
+  assert.match(source("app/api/store/route.ts"), /STORE_LIMIT_REACHED/);
+  assert.match(source("app/api/store/route.ts"), /MULTI_STORE_PRO_REQUIRED/);
 });
 
 test("canonical onboarding preserves identity, Phase 4 address reuse, and plan continuity", () => {
@@ -35,7 +36,7 @@ test("canonical onboarding preserves identity, Phase 4 address reuse, and plan c
   assert.match(page, /sellerIntent=\{intent\}/);
   assert.match(form, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(route, /where:\{id:user\.id\},data:\{role:"SELLER"\}/);
-  assert.match(route, /if\(user\.store\)await tx\.store\.update/);
+  assert.match(route, /const store=user\.store\?await tx\.store\.update/);
   assert.doesNotMatch(route, /buyerShippingAddress\.(create|update|delete)|tx\.user\.create/);
 });
 

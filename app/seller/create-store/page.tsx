@@ -19,7 +19,7 @@ export default async function CreateStorePage({ searchParams }: { searchParams: 
   if (session.role === "ADMIN") redirect(`/${locale}/dashboard`);
 
   const [store, draft] = await Promise.all([
-    prisma.store.findUnique({ where: { ownerId: session.userId }, select: { onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }),
+    prisma.store.findFirst({ where: { ownerId: session.userId }, orderBy:{createdAt:"asc"}, select: { onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }),
     prisma.sellerOnboardingDraft.findUnique({ where: { userId: session.userId }, select: { userId: true } }),
   ]);
   const entitlementSource = store ? activeAccessSource(store).source : "NONE";

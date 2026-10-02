@@ -1,47 +1,25 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { replaceProductVariantImages } from "./product-variant-images";
+import { requireStoreCapability } from "./seller-business-access";
+import { appendSellerBusinessAudit } from "./seller-business-audit";
+import {
+  MAX_OPTION_VALUES,
+  MAX_PRODUCT_OPTIONS,
+  MAX_PRODUCT_VARIANTS,
+  productVariantCombinationKey,
+  productVariantDraftKey,
+  type ProductVariantDraft,
+  type ProductVariantsInput,
+  type VariantOptionInput,
+} from "./product-variant-shared";
 
-export const MAX_PRODUCT_OPTIONS = 3;
-export const MAX_OPTION_VALUES = 50;
-export const MAX_PRODUCT_VARIANTS = 500;
+export * from "./product-variant-shared";
 
 export class ProductVariantError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 
-export type VariantOptionInput = {
-  id?: string;
-  name: unknown;
-  values: Array<{ id?: string; value: unknown }>;
-};
-
-export type VariantUpdateInput = {
-  combinationKey: unknown;
-  sku?: unknown;
-  barcode?: unknown;
-  priceOverride?: unknown;
-  compareAtPrice?: unknown;
-  stock?: unknown;
-  active?: unknown;
-};
-
-export type ProductVariantsInput = {
-  options: VariantOptionInput[];
-  generate?: boolean;
-  variants?: VariantUpdateInput[];
-};
-
 type NormalizedOption = { id?: string; name: string; values: Array<{ id?: string; value: string }> };
-export type ProductVariantDraft = {
-  combinationKey: string;
-  values: Array<{ optionValue: { value: string } }>;
-  sku: string | null;
-  barcode: string | null;
-  priceOverride: string | null;
-  compareAtPrice: string | null;
-  stock: number;
-  active: boolean;
-};
 
 type DecimalLike = { toString(): string };
 
@@ -99,10 +77,6 @@ function nonNegativeInteger(value: unknown, label: string) {
   return result;
 }
 
-export function productVariantCombinationKey(valueIds: readonly string[]) {
-  return [...valueIds].sort().join(":");
-}
-
 function normalizeOptions(input: unknown): NormalizedOption[] {
   if (!Array.isArray(input) || input.length > MAX_PRODUCT_OPTIONS) throw new ProductVariantError(`A product can have at most ${MAX_PRODUCT_OPTIONS} options.`);
   const names = new Set<string>();
@@ -127,10 +101,6 @@ function normalizeOptions(input: unknown): NormalizedOption[] {
 
 function combinations(optionValues: readonly string[][]) {
   return optionValues.reduce<string[][]>((current, values) => current.flatMap((combination) => values.map((value) => [...combination, value])), [[]]);
-}
-
-export function productVariantDraftKey(values: readonly string[]) {
-  return values.join("\u001f");
 }
 
 function assertValidCompareAtPrice(compareAtPrice: Prisma.Decimal | null | undefined, effectivePrice: Prisma.Decimal) {
@@ -201,10 +171,20 @@ export async function saveProductVariants(db: PrismaClient, sellerId: string, pr
 
   return db.$transaction(async (tx) => {
     const product = await tx.product.findFirst({
-      where: { id: productId, store: { ownerId: sellerId } },
-      select: { id: true, price: true, options: { include: { values: true } }, variants: { include: { values: true } } },
+      where: { id: productId },
+      select: { id: true, storeId: true, price: true, options: { include: { values: true } }, variants: { include: { values: true } } },
     });
     if (!product) throw new ProductVariantError("Product not found.", 404);
+    const principal=await requireStoreCapability(tx, sellerId, product.storeId, "PRODUCT_MANAGE_VARIANTS");
+    const variantPermissions=new Set<"PRODUCT_CHANGE_PRICE"|"PRODUCT_CHANGE_STOCK">();
+    if(Array.isArray(input.variants))for(const rawVariant of input.variants){
+      const existing=product.variants.find(variant=>variant.combinationKey===String(rawVariant.combinationKey??""));
+      if(!existing)continue;
+      const nextPrice=decimal(rawVariant.priceOverride,"Variant price"),hasCompare=Object.hasOwn(rawVariant,"compareAtPrice"),nextCompare=hasCompare?decimal(rawVariant.compareAtPrice,"Variant compare-at price"):existing.compareAtPrice;
+      if((existing.priceOverride?.toString()??null)!==(nextPrice?.toString()??null)||(existing.compareAtPrice?.toString()??null)!==(nextCompare?.toString()??null))variantPermissions.add("PRODUCT_CHANGE_PRICE");
+      if(existing.stock!==nonNegativeInteger(rawVariant.stock,"Variant stock"))variantPermissions.add("PRODUCT_CHANGE_STOCK");
+    }
+    for(const permission of variantPermissions)await requireStoreCapability(tx,sellerId,product.storeId,permission);
 
     const existingOptions = new Map(product.options.map((option) => [option.id, option]));
     const selectedValueIds = new Set<string>();
@@ -265,6 +245,7 @@ export async function saveProductVariants(db: PrismaClient, sellerId: string, pr
         } });
       }
     }
+    await appendSellerBusinessAudit(tx,{businessId:principal.businessId,storeId:product.storeId,actorId:sellerId,category:"PRODUCT",action:"PRODUCT_VARIANTS_UPDATED",targetType:"Product",targetId:productId,metadata:{optionCount:options.length}});
     return { options: options.length };
   });
 }

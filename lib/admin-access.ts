@@ -141,7 +141,7 @@ export async function createManagedStore(db: Database, adminId: string, input: M
 }
 
 export async function exemptExistingAdminStore(db: Database, adminId: string, now = new Date()) {
-  const store = await db.store.findUnique({
+  const store = await db.store.findFirst({
     where: { ownerId: adminId },
     select: {
       id: true,
