@@ -202,7 +202,7 @@ test("marketplace routes render one shared header with core navigation", async (
   await expect(homeHeader.getByRole("link", { name: "Todijo" })).toBeVisible();
   await expect(homeHeader.getByRole("link", { name: "My favorites" })).toBeVisible();
   await expect(homeHeader.getByRole("link", { name: /Cart/ })).toBeVisible();
-  await expect(homeHeader.getByRole("link", { name: /Header Buyer/ })).toHaveAttribute("href", "/en/dashboard");
+  await expect(homeHeader.getByRole("link", { name: /Me$/ })).toHaveAttribute("href", "/en/dashboard");
   await expect(homeHeader.getByRole("combobox", { name: "Language" })).toBeVisible();
   await expect(homeHeader.getByRole("button", { name: /Change country and currency/ })).toBeVisible();
 
