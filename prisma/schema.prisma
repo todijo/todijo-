@@ -295,6 +295,14 @@ enum RestockStatus {
  NON_RESTOCKABLE
 }
 
+enum SellerSaleEmailStatus {
+  QUEUED
+  PROCESSING
+  RETRYABLE
+  SENT
+  FAILED
+}
+
 enum ReviewStatus {
   PUBLISHED
   PENDING
@@ -373,6 +381,7 @@ model User {
   sellerConversations Conversation[] @relation("ConversationSeller")
   sentMessages        Message[]
   notifications       Notification[]
+  sellerSaleDeliveries SellerSaleDelivery[]
   pushSubscriptions   PushSubscription[]
   mobileSessions      MobileSession[]
   mobileOAuthAttempts MobileOAuthAttempt[]
@@ -1301,6 +1310,7 @@ model Notification {
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sellerSaleDelivery SellerSaleDelivery?
 
   @@index([userId, readAt, createdAt])
 }
@@ -1390,6 +1400,7 @@ model Order {
 
   buyer User        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   items             OrderItem[]
+  sellerSaleDeliveries SellerSaleDelivery[]
   fulfillmentEvents OrderFulfillmentEvent[]
   refundRequest      RefundRequest?
   issues             OrderIssue[]
@@ -1481,9 +1492,45 @@ model OrderGroup {
   loyaltyReserveMinor Int @default(0)
   loyaltyRedeemedMinor Int @default(0)
   loyaltyReserveReversedMinor Int @default(0)
+  sellerSaleDelivery SellerSaleDelivery?
   @@unique([orderId,groupKey])
   @@index([storeId,transferStatus])
   @@index([transferStatus,nextTransferAttemptAt])
+}
+
+model SellerSaleDelivery {
+  id                String                @id @default(cuid())
+  orderId           String
+  orderGroupId      String                @unique
+  sellerId          String
+  notificationId    String                @unique
+  locale            String                @db.VarChar(8)
+  recipientEmail    String                @db.VarChar(320)
+  recipientName     String                @db.VarChar(200)
+  orderReference    String                @db.VarChar(200)
+  currency          String                @db.VarChar(3)
+  sellerAmountMinor Int
+  totalQuantity     Int
+  items             Json
+  status            SellerSaleEmailStatus @default(QUEUED)
+  attemptCount      Int                   @default(0)
+  nextAttemptAt     DateTime?
+  claimToken        String?               @unique
+  claimedAt         DateTime?
+  sentAt            DateTime?
+  errorCode         String?               @db.VarChar(120)
+  errorMessage      String?               @db.VarChar(500)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderGroup   OrderGroup   @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  seller       User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([orderId])
 }
 
 model ProductReport {

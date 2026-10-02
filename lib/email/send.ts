@@ -5,6 +5,7 @@ import { publicAppUrl } from "./config";
 import { emailCopy, emailGreeting } from "./messages";
 import { todijoEmailTemplate } from "./template";
 import { sendTodijoMail } from "./transport";
+import { formatSellerSaleCopy, sellerSaleCopy } from "../../i18n/seller-sale-notifications";
 
 function layout(locale: string, firstName: string, values: { preview: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }) {
   const common = emailCopy(locale);
@@ -38,4 +39,10 @@ export async function sendEmailChangeVerification(input:{to:string;firstName:str
   const copy=emailCopy(input.locale),url=new URL("/api/account/email/confirm",publicAppUrl());url.searchParams.set("token",input.rawToken);url.searchParams.set("locale",input.locale);
   const message=layout(input.locale,input.firstName,{preview:copy.verifySubject,heading:copy.verifyHeading,body:copy.verifyBody,ctaLabel:copy.verifyCta,ctaUrl:url.toString()});
   await sendTodijoMail({to:input.to,subject:copy.verifySubject,...message});
+}
+
+export async function sendSellerSaleEmail(input:{to:string;firstName:string;locale:string;orderReference:string;items:string[];quantity:number;amount:string}){
+  const copy=sellerSaleCopy(input.locale),values={order:input.orderReference,items:input.items.join(", "),quantity:input.quantity,amount:input.amount};
+  const message=layout(input.locale,input.firstName,{preview:formatSellerSaleCopy(copy.subject,values),heading:copy.heading,body:formatSellerSaleCopy(copy.body,values),ctaLabel:copy.cta,ctaUrl:`${publicAppUrl()}${localizedHome(input.locale)}/seller/orders`});
+  await sendTodijoMail({to:input.to,subject:formatSellerSaleCopy(copy.subject,values),...message});
 }

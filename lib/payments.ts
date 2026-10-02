@@ -10,6 +10,7 @@ import { defaultBuyerAddress } from "./buyer-addresses";
 import { resolveSellerMaturity } from "./seller-maturity";
 import {convertMarketplacePrice} from "./marketplace-presentment";
 import {readGlobalDropshippingMargin} from "./suppliers/global-margin";
+import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -282,9 +283,8 @@ export async function processStripeEvent(
         if (order.shippingCost && session.total_details?.amount_shipping != null && session.total_details.amount_shipping!==exactMinorAmount(order.shippingCost,orderCurrency)) throw new Error("Stripe shipping amount does not match the order.");
         await tx.order.update({ where: { id: order.id }, data: { status: "PAID", paidAt: new Date(), stripeCheckoutSessionId: session.id, stripePaymentIntentId: session.payment_intent, stripePaymentMode: event.livemode === true ? "LIVE" : "TEST", recipientName: shipping?.name ?? session.customer_details?.name ?? null, recipientEmail: session.customer_details?.email ?? null, recipientPhone: shipping?.phone ?? session.customer_details?.phone ?? null, shippingAddressLine1: address?.line1 ?? null, shippingAddressLine2: address?.line2 ?? null, shippingCity: address?.city ?? null, shippingPostalCode: address?.postal_code ?? null, shippingState: address?.state ?? null, shippingCountry: address?.country?.toUpperCase() ?? order.shippingCountry, shippingCapturedAt: new Date(), taxTotal: new Prisma.Decimal(session.total_details?.amount_tax ?? 0).div(100) } });
         await prepareSupplierFulfillments(tx, { ...order, shippingCountry: address?.country?.toUpperCase() ?? order.shippingCountry });
-        const paidStore = order.storeIdSnapshot ? await tx.store.findUnique({ where: { id: order.storeIdSnapshot }, select: { ownerId: true } }) : null;
         await tx.notification.create({ data: { userId: order.buyerId, type: "ORDER_PAID", title: "Order confirmed", body: `Payment for order ${order.id} was confirmed.`, href: `/account/orders/${order.id}` } });
-        if (paidStore) await tx.notification.create({ data: { userId: paidStore.ownerId, type: "NEW_ORDER", title: "New paid order", body: `Order ${order.id} is ready for fulfilment.`, href: "/seller/orders" } });
+        await enqueueSellerSaleNotifications(tx,{orderId:order.id,currency:order.currency});
         return { paid: true };
       }
       if (event.type === "checkout.session.expired" || event.type === "payment_intent.payment_failed") {
