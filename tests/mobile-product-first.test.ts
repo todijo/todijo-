@@ -15,7 +15,7 @@ test("mobile home incrementally loads deduplicated product batches", () => {
   assert.match(route, /const PAGE_SIZE = 24/);
   assert.match(route, /hasMore: offset \+ rows\.length < total/);
   assert.match(route, /nextOffset: offset \+ rows\.length/);
-  assert.match(home, /products\.filter\(\(product\) => !seen\.has\(product\.id\)\)/);
+  assert.match(home, /incoming\.filter\(\(product\) => !seen\.has\(product\.id\)\)/);
 });
 
 test("desktop keeps its hundred-product server pagination while mobile starts from server-rendered products", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, ArrowRight, BadgeCheck, Headphones, LockKeyhole, MapPin, Package, SearchX, ShieldCheck, ShoppingBag, Sparkles, Store, Truck, X } from "lucide-react";
 import { rtlLocales, type Locale } from "@/i18n/config";
@@ -20,6 +20,7 @@ import {productPath} from "@/lib/product-seo";
 import PremiumHeroSlider from "@/components/PremiumHeroSlider";
 import { localizedCategoryTreeValue } from "@/lib/category-tree-localization";
 import { selectDistinctHeroProducts, shouldShowHomepageStores } from "@/lib/homepage-merchandising";
+import { pageNumbers } from "@/lib/pagination";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -29,6 +30,9 @@ type MarketplaceProduct = MarketplaceCardProduct & {
 
 type MarketplaceStore = { id: string; name: string; slug: string; description: string | null; logo: string | null; city: string; country: string; products: Array<{ id: string; name: string; image: string | null }> };
 const MOBILE_BATCH_SIZE = 24;
+const MARKETPLACE_RETURN_KEY = "todijo-marketplace-return-v1";
+
+type MarketplaceReturnState = { url: string; productId: string; page: number; nextOffset: number; scrollY: number };
 
 function uniqueProductsById<T extends { id: string }>(products: readonly T[]) {
   const seen = new Set<string>();
@@ -68,8 +72,13 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const [nextOffset, setNextOffset] = useState(MOBILE_BATCH_SIZE);
   const [hasMore, setHasMore] = useState(page * pageSize < total);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const inFlightOffsetRef = useRef<number | null>(null);
+  const listingKeyRef = useRef("");
+  const restorationAppliedRef = useRef(false);
   const activeLocale = useLocale();
   const m = useTranslations("Marketplace");
   const c = useTranslations("Common");
@@ -81,6 +90,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const displayCategory = (value: string) => localizedCategoryTreeValue(activeLocale, value) ?? categoryLabel(value, (key) => categoryText(key));
   const t = { dir: rtlLocales.has(activeLocale as Locale) ? "rtl" : "ltr", title:m("title"), subtitle:m("subtitle"), search:c("searchPlaceholder"), searchButton:c("search"), categories:c("categories"), products:m("products"), account:c("account"), cart:c("cart"), empty:m("empty"), stock:c("available"), soldOut:c("soldOut"), all:m("all"), filters:m("filters"), min:m("min"), max:m("max"), country:m("country"), condition:m("condition"), sort:m("sort"), newest:m("newest"), best:h("bestSellers"), low:m("low"), high:m("high"), reviews:dashboard("reviews"), availability:c("available"), season:m("season"), apply:m("apply"), reset:m("reset"), results:m("results"), previous:m("previous"), next:m("next"), sell:c("sell") };
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const numberedPages = pageNumbers(page, totalPages);
   const buildUrl = (nextFilters: MarketplaceFilters, nextPage = 1) => marketplaceUrl(activeLocale, nextFilters, nextPage);
 
   const activeCount = useMemo(() => [filters.category, filters.condition, filters.country, filters.rating, filters.minPrice, filters.maxPrice, filters.availability, filters.color, filters.size, filters.season].filter(Boolean).length, [filters]);
@@ -91,41 +101,104 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const featuredRailIds = useMemo(() => new Set([...distinctBestSellers, ...distinctNewArrivals.slice(0,10)].map((product) => product.id)), [distinctBestSellers, distinctNewArrivals]);
   const distinctVisibleProducts = useMemo(() => resultsOnly ? visibleProducts : visibleProducts.filter((product) => !featuredRailIds.has(product.id)), [featuredRailIds, resultsOnly, visibleProducts]);
   const featuredCategories = categories.slice(0, 4);
+  const listingKey = useMemo(() => JSON.stringify(filters), [filters]);
+  const incrementalUrl = useCallback((offset: number) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
+    query.set("offset", String(offset));
+    return `/api/marketplace/products?${query.toString()}`;
+  }, [filters]);
+
+  const appendUnique = useCallback((current: MarketplaceProduct[], incoming: MarketplaceProduct[]) => {
+    const seen = new Set(current.map((product) => product.id));
+    return [...current, ...incoming.filter((product) => !seen.has(product.id))];
+  }, []);
+
+  const loadMobileBatch = useCallback(async (offset: number) => {
+    if (inFlightOffsetRef.current !== null) return false;
+    const requestListingKey = listingKeyRef.current;
+    inFlightOffsetRef.current = offset;
+    setLoadingMore(true);
+    setLoadError(false);
+    try {
+      const response = await fetch(incrementalUrl(offset), { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Unable to load products");
+      const payload = await response.json() as { products: MarketplaceProduct[]; hasMore: boolean; nextOffset: number };
+      if (listingKeyRef.current !== requestListingKey || inFlightOffsetRef.current !== offset) return false;
+      setVisibleProducts((current) => appendUnique(current, payload.products));
+      setHasMore(payload.hasMore);
+      setNextOffset(payload.nextOffset);
+      return true;
+    } catch {
+      if (listingKeyRef.current === requestListingKey) setLoadError(true);
+      return false;
+    } finally {
+      if (inFlightOffsetRef.current === offset) inFlightOffsetRef.current = null;
+      setLoadingMore(false);
+    }
+  }, [appendUnique, incrementalUrl]);
+
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 860px)").matches;
+    listingKeyRef.current = listingKey;
+    inFlightOffsetRef.current = null;
+    setLoadError(false);
     setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
     setNextOffset(page === 1 ? Math.min(MOBILE_BATCH_SIZE, products.length) : page * pageSize);
     setHasMore(page === 1 && mobile ? Math.min(MOBILE_BATCH_SIZE, products.length) < total : page * pageSize < total);
-  }, [page, pageSize, products, total]);
+    if (restorationAppliedRef.current) return;
+    restorationAppliedRef.current = true;
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (navigation?.type !== "back_forward") return;
+    const raw = sessionStorage.getItem(MARKETPLACE_RETURN_KEY);
+    if (!raw) return;
+    let saved: MarketplaceReturnState;
+    try { saved = JSON.parse(raw) as MarketplaceReturnState; } catch { return; }
+    if (saved.url !== `${window.location.pathname}${window.location.search}` || saved.page !== page) return;
+    const restore = async () => {
+      setRestoring(true);
+      try {
+        if (mobile && page === 1) {
+          let restored = products.slice(0, Math.min(saved.nextOffset, products.length));
+          let offset = restored.length;
+          while (offset < saved.nextOffset) {
+            const response = await fetch(incrementalUrl(offset), { credentials: "same-origin" });
+            if (!response.ok) break;
+            const payload = await response.json() as { products: MarketplaceProduct[]; hasMore: boolean; nextOffset: number };
+            restored = appendUnique(restored, payload.products);
+            if (payload.nextOffset <= offset) break;
+            offset = payload.nextOffset;
+            setHasMore(payload.hasMore);
+          }
+          setVisibleProducts(restored);
+          setNextOffset(offset);
+          setHasMore(offset < total);
+        }
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          document.getElementById(`marketplace-product-${saved.productId}`)?.scrollIntoView({ block: "center" });
+          if (!document.getElementById(`marketplace-product-${saved.productId}`)) window.scrollTo({ top: saved.scrollY });
+        }));
+      } finally {
+        setRestoring(false);
+      }
+    };
+    void restore();
+  }, [appendUnique, incrementalUrl, listingKey, page, pageSize, products, total]);
 
   useEffect(() => {
     const sentinel = loadMoreRef.current;
-    if (!sentinel || !hasMore || loadingMore || !window.matchMedia("(max-width: 860px)").matches) return;
-    const observer = new IntersectionObserver(async ([entry]) => {
-      if (!entry.isIntersecting || loadingMore) return;
-      setLoadingMore(true);
-      try {
-        const query = new URLSearchParams();
-        Object.entries(filters).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
-        query.set("offset", String(nextOffset));
-        const response = await fetch(`/api/marketplace/products?${query.toString()}`, { credentials: "same-origin" });
-        if (!response.ok) throw new Error("Unable to load products");
-        const payload = await response.json() as { products: MarketplaceProduct[]; hasMore: boolean; nextOffset: number };
-        setVisibleProducts((current) => {
-          const seen = new Set(current.map((product) => product.id));
-          return [...current, ...payload.products.filter((product) => !seen.has(product.id))];
-        });
-        setHasMore(payload.hasMore);
-        setNextOffset(payload.nextOffset);
-      } catch {
-        setHasMore(false);
-      } finally {
-        setLoadingMore(false);
-      }
+    if (!sentinel || !hasMore || loadingMore || restoring || loadError || !window.matchMedia("(max-width: 860px)").matches) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || inFlightOffsetRef.current !== null) return;
+      void loadMobileBatch(nextOffset);
     }, { rootMargin: "700px 0px" });
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [filters, hasMore, loadingMore, nextOffset]);
+  }, [hasMore, loadError, loadMobileBatch, loadingMore, nextOffset, restoring]);
+
+  function rememberProductPosition(productId: string) {
+    sessionStorage.setItem(MARKETPLACE_RETURN_KEY, JSON.stringify({ url: `${window.location.pathname}${window.location.search}`, productId, page, nextOffset, scrollY: window.scrollY } satisfies MarketplaceReturnState));
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -195,15 +268,15 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
           </div>
 
           {visibleProducts.length === 0 ? <EmptyState icon={SearchX} title={t.empty} description={filters.q ? `“${filters.q}” · ${t.subtitle}` : t.subtitle} action={<a className="primary" href={activeCount > 0 ? buildUrl(clearMarketplaceFilters(filters)) : `/${activeLocale}#products`}>{t.reset}</a>}/> : <div className="discoveryProductGrid">
-            {distinctVisibleProducts.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut}/>) }
+            {distinctVisibleProducts.map((product) => <MarketplaceProductCard key={product.id} product={product} soldOut={t.soldOut} onProductNavigate={rememberProductPosition}/>) }
           </div>}
 
-          <div ref={loadMoreRef} className="mobileInfiniteSentinel" aria-live="polite">{loadingMore ? <span>…</span> : null}</div>
+          <div ref={loadMoreRef} className="mobileInfiniteSentinel" aria-live="polite">{loadingMore ? <span>…</span> : loadError ? <button type="button" onClick={() => void loadMobileBatch(nextOffset)}>{t.next}</button> : null}</div>
 
-          {totalPages > 1 && <nav className={`pagination${page === 1 ? " firstPagePagination" : ""}`} aria-label={t.products}>
-            {page > 1 ? <a href={buildUrl(filters, page - 1)}>← {t.previous}</a> : <span />}
-            {page > 1 ? <strong>{page} / {totalPages}</strong> : <span />}
-            {page < totalPages ? <a className={page === 1 ? "moreProductsLink" : undefined} href={buildUrl(filters, page + 1)}>{page === 1 ? h("exploreProducts") : t.next} →</a> : <span />}
+          {totalPages > 1 && <nav className="pagination" aria-label={t.products}>
+            {page > 1 ? <a className="paginationDirection" href={buildUrl(filters, page - 1)}>{t.dir === "rtl" ? "→" : "←"} {t.previous}</a> : <span className="paginationDirection" aria-disabled="true">{t.dir === "rtl" ? "→" : "←"} {t.previous}</span>}
+            <div className="paginationPages">{numberedPages.map((number, index) => <Fragment key={number}>{index > 0 && number - numberedPages[index - 1] > 1 && <span className="paginationEllipsis" aria-hidden="true">…</span>}{number === page ? <span className="isCurrent" aria-current="page">{number}</span> : <a href={buildUrl(filters, number)} aria-label={`${t.products} ${number}`}>{number}</a>}</Fragment>)}</div>
+            {page < totalPages ? <a className="paginationDirection" href={buildUrl(filters, page + 1)}>{t.next} {t.dir === "rtl" ? "←" : "→"}</a> : <span className="paginationDirection" aria-disabled="true">{t.next} {t.dir === "rtl" ? "←" : "→"}</span>}
           </nav>}
         </div>
       </section>

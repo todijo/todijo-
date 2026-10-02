@@ -5,15 +5,18 @@ import { pageNumbers } from "../lib/pagination";
 
 const source = (path: string) => readFileSync(path, "utf8");
 
-test("homepage more-products CTA stays localized, centered, prominent, and keeps its page destination", () => {
+test("homepage pagination stays localized, centered, accessible, and keeps its page destinations", () => {
   const home = source("app/HomeClient.tsx");
   const css = source("app/globals.css");
-  assert.match(home, /className=\{page === 1 \? "moreProductsLink"/);
+  assert.match(home, /className="pagination"/);
   assert.match(home, /href=\{buildUrl\(filters, page \+ 1\)\}/);
-  assert.match(home, /page === 1 \? h\("exploreProducts"\) : t\.next/);
+  assert.match(home, /href=\{buildUrl\(filters, number\)\}/);
+  assert.match(home, /aria-current="page"/);
+  assert.match(home, /aria-disabled="true"/);
   assert.doesNotMatch(home, /activeLocale === "fr" \? "Voir plus de produits"/);
-  assert.match(css, /\.firstPagePagination\{grid-template-columns:1fr;justify-items:center\}/);
-  assert.match(css, /\.moreProductsLink\{[^}]*border:1px solid #b99338[^}]*linear-gradient[^}]*color:#173d31/);
+  assert.match(css, /\.pagination\{[^}]*justify-content:center/);
+  assert.match(css, /\.pagination \.isCurrent\{[^}]*background:var\(--green-dark\)[^}]*color:#fff/);
+  assert.match(css, /\.pagination a:focus-visible\{outline:3px solid/);
 });
 
 test("public store pagination reuses the seller window and preserves locale, filters, and product anchor", () => {
