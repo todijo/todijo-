@@ -4,25 +4,24 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { advanceSellerFulfillment, FulfillmentError } from "../lib/fulfillment";
 
-function database(order: any, stores = [{ id: "store_1" }]) {
+function database(order: any, stores = [{ id: "store_1" }], ownerId = "seller_1") {
   if(order&&!Object.hasOwn(order,"paidAt")&&!Object.hasOwn(order,"stripePaymentIntentId"))order={paidAt:new Date("2026-01-01T00:00:00Z"),...order};
+  if(order)order={storeIdSnapshot:stores[0]?.id??null,items:stores[0]?[{product:{storeId:stores[0].id}}]:[],fulfillmentStatus:null,processingAt:null,shippedAt:null,deliveredAt:null,trackingCarrier:null,trackingNumber:null,trackingUrl:null,...order};
   const updates: any[] = [];
   const events: any[] = [];
   const notifications: any[] = [];
   const storeOwners: string[] = [];
   const tx = {
-    store: { findMany: async ({ where }: any) => { storeOwners.push(where.ownerId); return stores; } },
+    store: { findUnique: async ({ where }: any) => { const store=stores.find((item)=>item.id===where.id);if(!store)return null;storeOwners.push(ownerId);return{businessId:"business_1",ownerId}; } },
     order: {
-      findFirst: async ({ where }: any) => {
-        assert.equal(where.id, "order_1");
-        assert.deepEqual(where.OR[0], { storeIdSnapshot: { in: stores.map((store) => store.id) } });
-        return order;
-      },
+      findUnique: async ({ where }: any) => { assert.equal(where.id, "order_1"); return order; },
       update: async ({ data }: any) => { updates.push(data); return { ...order, ...data, id: "order_1" }; },
     },
     orderGroup: { findUnique: async () => null },
     orderFulfillmentEvent: { create: async ({ data }: any) => { events.push(data); return data; } }, orderLifecycleEvent: { create: async ({ data }: any) => { events.push(data); return data; } },
     notification: { create: async ({ data }: any) => { notifications.push(data); return data; } },
+    sellerBusinessAuditEvent: { create: async ({ data }: any) => data },
+    sellerTeamMembership: { findFirst: async () => null },
   };
   return { db: { $transaction: async (callback: any) => callback(tx) } as any, updates, events, notifications, storeOwners };
 }
@@ -44,7 +43,7 @@ test("seller with an owned order can advance only the next forward fulfillment t
 });
 
 test("admin with an owned store can use the same owned-order transition", async () => {
-  const { db, updates, storeOwners } = database({ id: "order_1", status: "PAID" });
+  const { db, updates, storeOwners } = database({ id: "order_1", status: "PAID" },[{id:"store_1"}],"admin_owner");
   await advanceSellerFulfillment(db, "admin_owner", "order_1", "PAID");
   assert.equal(updates[0].status, "PROCESSING");
   assert.deepEqual(storeOwners, ["admin_owner"]);

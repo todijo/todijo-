@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { requirePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
+import { requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
@@ -20,6 +20,9 @@ import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/cata
 import { Prisma } from "@prisma/client";
 import { readProductContentMetadata } from "@/lib/product-content";
 import {contentSourceLocale} from "@/lib/content-source-locale";
+import { productUpdatePermissions, requireProductPermissions } from "@/lib/seller-product-authorization";
+import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
+import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -34,9 +37,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const { id } = await context.params;
     const product = await prisma.product.findFirst({
-      where: { id, removedAt:null, store: { ownerId: session.userId } },
+      where: { id, removedAt:null },
       select: {
-        id: true,name:true,description:true,sourceLocale:true, complianceDeclaredAt: true, deactivationReason: true, loyaltyEligible: true,
+        id: true,storeId:true,name:true,description:true,sourceLocale:true,category:true,condition:true,status:true,price:true,compareAtPrice:true,stock:true,colors:true,sizes:true,images:true,allowPrepurchaseQuestions:true,complianceDeclaredAt: true, deactivationReason: true, loyaltyEligible: true,
+        productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
+        media:{where:{type:"VIDEO"},take:1,select:{url:true}},
         supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
         variants: { select: { active: true, supplierConnectionId: true, supplierVariantId: true, supplierAvailable: true } },
       },
@@ -44,6 +49,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!product) return NextResponse.json({ error: "Produit introuvable ou accès refusé." }, { status: 404 });
 
     const body = await request.json();
+    const requiredPermissions=productUpdatePermissions(product,body);
+    await requireProductPermissions(prisma,session.userId,product.id,requiredPermissions.length?requiredPermissions:["PRODUCT_EDIT_CONTENT"]);
     const name = String(body.name ?? "").trim();
     const description = String(body.description ?? "").trim();
     const category = String(body.category ?? "").trim();
@@ -54,7 +61,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (status === "PUBLISHED" && !product.complianceDeclaredAt && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
     if(status==="PUBLISHED"&&product.supplierLink?.classificationStatus==="QUARANTINED")return NextResponse.json({error:"SUPPLIER_CLASSIFICATION_REVIEW_REQUIRED"},{status:400});
     if (status === "PUBLISHED") {
-      await requirePublishingAccess(prisma, session.userId);
+      await requireStorePublishingAccess(prisma, session.userId,product.storeId,"PRODUCT_PUBLISH");
       assertProductPublicationEligible(product);
     }
     const price = Number(body.price);
@@ -93,6 +100,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       }
       await replaceProductVariantImages(tx, id, images, body.variantImages);
       await replaceProductVideo(tx,id,body.video);
+      await requireProductPermissions(tx,session.userId,product.id,requiredPermissions.length?requiredPermissions:["PRODUCT_EDIT_CONTENT"]);
+      const principal=await requireStoreCapability(tx,session.userId,product.storeId,requiredPermissions[0]??"PRODUCT_EDIT_CONTENT");
+      await appendSellerBusinessAudit(tx,{businessId:principal.businessId,storeId:product.storeId,actorId:session.userId,category:"PRODUCT",action:"PRODUCT_UPDATED",targetType:"Product",targetId:id,metadata:{permissions:requiredPermissions}});
     });
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
@@ -105,6 +115,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (error instanceof ShippingError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
+    if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     if (error instanceof Error && ["PRODUCT_ADMIN_BLOCKED", "SUPPLIER_PRODUCT_REQUIRES_REVIEW"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Update product error:", error);
     return NextResponse.json({ error: "Impossible de modifier le produit pour le moment." }, { status: 500 });

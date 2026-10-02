@@ -117,7 +117,7 @@ test("existing admin store exemption is permanent, idempotent, and does not touc
   let subscriptionTouched = false;
   const store = { id: "store-admin", owner: { role: "ADMIN" }, accessGrants: [] as Array<{ id: string; endsAt: Date | null }> };
   const db = {
-    store: { findUnique: async () => store },
+    store: { findFirst: async () => store },
     storeAccessGrant: {
       create: async (input: { data: Record<string, unknown> }) => {
         created.push(input.data);

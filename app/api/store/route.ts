@@ -9,6 +9,9 @@ import { parseShippingSettings, ShippingError } from "@/lib/shipping";
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
+import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
+import { ensureSellerBusiness, lockSellerBusiness, sellerBusinessCommercialPlan, SellerBusinessError } from "@/lib/seller-business";
+import { requireStoreCapability, resolveSellerStoreContext, SellerCapabilityError } from "@/lib/seller-business-access";
 
 function makeSlug(value: string) {
   return value
@@ -28,18 +31,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Vous devez vous connecter." }, { status: 401 });
     }
     await assertSellerActivity(prisma,session.userId);
-
-    const existingStore = await prisma.store.findUnique({
-      where: { ownerId: session.userId },
-      select: { id: true },
-    });
-
-    if (existingStore) {
-      return NextResponse.json(
-        { error: "Vous avez déjà créé une boutique." },
-        { status: 409 },
-      );
-    }
+    const [ownedBusiness,teamMembership]=await Promise.all([
+      prisma.sellerBusiness.findUnique({where:{ownerId:session.userId},select:{id:true}}),
+      prisma.sellerTeamMembership.findFirst({where:{userId:session.userId,status:{in:["ACTIVE","SUSPENDED"]}},select:{id:true}}),
+    ]);
+    if(!ownedBusiness&&teamMembership)throw new SellerCapabilityError("OWNER_REQUIRED",403);
 
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -96,6 +92,12 @@ export async function POST(request: Request) {
     }
 
     const store = await prisma.$transaction(async (tx) => {
+      const firstStore = await tx.store.findFirst({ where: { ownerId: session.userId }, orderBy: { createdAt: "asc" }, select: { id: true } });
+      const business = await ensureSellerBusiness(tx, session.userId, firstStore?.id);
+      const locked = await lockSellerBusiness(tx, business.id);
+      const storeCount = await tx.store.count({ where: { businessId: business.id } });
+      if (storeCount >= locked.maxStores) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
+      if (storeCount > 0 && await sellerBusinessCommercialPlan(tx, business.id) !== "pro") throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
       const created = await tx.store.create({
         data: {
           name,
@@ -111,22 +113,26 @@ export async function POST(request: Request) {
           sellerType,
           ...sellerIdentity,
           ownerId: session.userId,
+          businessId: business.id,
         },
         select: { id: true, slug: true },
       });
 
       await tx.user.update({
         where: { id: session.userId },
-        data: { role: "SELLER", storeName: name },
+        data: { role: "SELLER", storeName: storeCount === 0 ? name : undefined, primaryStoreId: storeCount === 0 ? created.id : undefined },
       });
+      if (storeCount === 0) await tx.sellerBusiness.update({ where: { id: business.id }, data: { billingStoreId: created.id } });
+      await appendSellerBusinessAudit(tx,{businessId:business.id,storeId:created.id,actorId:session.userId,category:"STORE",action:"STORE_CREATED",targetType:"STORE",targetId:created.id,metadata:{name,slug}});
 
       return created;
-    });
+    },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
+    if (error instanceof SellerBusinessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -208,8 +214,22 @@ export async function PATCH(request: Request) {
       }
     }
 
+    const requestedStoreId=typeof body.storeId==="string"?body.storeId:"";
+    const context=await resolveSellerStoreContext(prisma,session.userId,requestedStoreId||null,"STORE_VIEW_SETTINGS");
+    const currentStore=await prisma.store.findUnique({where:{id:context.selected.id},select:{id:true,businessId:true,ownerId:true,name:true,description:true,contactEmail:true,phone:true,logo:true,banner:true,country:true,city:true,currency:true,language:true,sellerType:true,legalBusinessName:true,businessRegistrationId:true,businessAddress:true,businessPostalCode:true,vatNumber:true,vatStatus:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true}});
+    if(!currentStore)return NextResponse.json({error:"Boutique introuvable."},{status:404});
+    const principal=await requireStoreCapability(prisma,session.userId,currentStore.id,"STORE_VIEW_SETTINGS");
+    const needed=[] as Array<"STORE_EDIT_DESCRIPTION"|"STORE_EDIT_MEDIA"|"STORE_EDIT_SETTINGS"|"STORE_EDIT_SHIPPING">;
+    if((currentStore.description??"")!==description)needed.push("STORE_EDIT_DESCRIPTION");
+    if((currentStore.logo??"")!==logo||(currentStore.banner??"")!==banner)needed.push("STORE_EDIT_MEDIA");
+    if([currentStore.name,currentStore.contactEmail,currentStore.phone??"",currentStore.country,currentStore.city,currentStore.currency,currentStore.language].join("\0")!==[name,contactEmail,phone,country,city,currency,language].join("\0"))needed.push("STORE_EDIT_SETTINGS");
+    const shippingChanged=JSON.stringify([currentStore.shippingEnabled,currentStore.shippingMethodName,currentStore.shippingPrice?.toString()??null,currentStore.shippingFree,currentStore.shippingFreeThreshold?.toString()??null,currentStore.shippingMinDays,currentStore.shippingMaxDays,currentStore.shippingCountries,currentStore.shippingWorldwide,currentStore.shippingPostalCodes,currentStore.shippingCarrier])!==JSON.stringify([shippingSettings.shippingEnabled,shippingSettings.shippingMethodName,shippingSettings.shippingPrice?.toString()??null,shippingSettings.shippingFree,shippingSettings.shippingFreeThreshold?.toString()??null,shippingSettings.shippingMinDays,shippingSettings.shippingMaxDays,shippingSettings.shippingCountries,shippingSettings.shippingWorldwide,shippingSettings.shippingPostalCodes,shippingSettings.shippingCarrier]);
+    if(shippingChanged)needed.push("STORE_EDIT_SHIPPING");
+    const legalChanged=JSON.stringify([currentStore.sellerType,currentStore.legalBusinessName,currentStore.businessRegistrationId,currentStore.businessAddress,currentStore.businessPostalCode,currentStore.vatNumber,currentStore.vatStatus])!==JSON.stringify([sellerType,sellerIdentity.legalBusinessName,sellerIdentity.businessRegistrationId,sellerIdentity.businessAddress,sellerIdentity.businessPostalCode,sellerIdentity.vatNumber,sellerIdentity.vatStatus]);
+    if(legalChanged&&!principal.owner)throw new SellerCapabilityError("OWNER_REQUIRED",403);
+    for(const permission of new Set(needed))await requireStoreCapability(prisma,session.userId,currentStore.id,permission);
     const store = await prisma.store.update({
-      where: { ownerId: session.userId },
+      where: { id: currentStore.id },
       data: {
         name,
         description: description || null,
@@ -228,16 +248,14 @@ export async function PATCH(request: Request) {
       select: { slug: true },
     });
 
-    await prisma.user.update({
-      where: { id: session.userId },
-      data: { storeName: name },
-    });
+    if(currentStore.businessId)await appendSellerBusinessAudit(prisma,{businessId:currentStore.businessId,storeId:currentStore.id,actorId:session.userId,category:"STORE",action:"STORE_SETTINGS_UPDATED",targetType:"STORE",targetId:currentStore.id,metadata:{name}});
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store });
   } catch (error) {
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });
+    if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
         return NextResponse.json({ error: "Ce nom de boutique est déjà utilisé." }, { status: 409 });

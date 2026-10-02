@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { createConnectedAccount, createConnectedAccountLink } from "@/lib/stripe";
+import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,7 @@ export async function POST() {
   const session = await readSession();
   if (!session || !["SELLER", "ADMIN"].includes(session.role)) return NextResponse.json({ error: "Seller authentication required." }, { status: 403 });
   try {
+    await requireBusinessOwner(prisma,session.userId);
     const seller = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, email: true, role: true, stripeAccountId: true } });
     if (!seller || !["SELLER", "ADMIN"].includes(seller.role)) return NextResponse.json({ error: "Seller authentication required." }, { status: 403 });
     let accountId = seller.stripeAccountId;
@@ -20,6 +22,7 @@ export async function POST() {
     const url = await createConnectedAccountLink(accountId);
     return NextResponse.json({ url });
   } catch (error) {
+    if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     console.error("Stripe Connect onboarding failed", error);
     return NextResponse.json({ error: "Unable to start Stripe onboarding." }, { status: 502 });
   }

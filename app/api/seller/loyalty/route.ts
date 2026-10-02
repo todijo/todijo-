@@ -5,6 +5,7 @@ import { assertSellerActivity } from "@/lib/account-status";
 import { LoyaltySettingsError, readLoyaltySettings, setStoreLoyaltyParticipation } from "@/lib/loyalty-settings";
 import { sellerLoyaltyAccounting } from "@/lib/loyalty-analytics";
 import { orderLoyaltyFundingTrace } from "@/lib/loyalty-order-reconciliation";
+import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
 
 const headers = { "Cache-Control": "private, no-store" };
 function isTrustedMutationRequest(request: Request) {
@@ -13,11 +14,13 @@ function isTrustedMutationRequest(request: Request) {
   const origin = request.headers.get("origin");
   return !origin || origin === new URL(request.url).origin;
 }
-async function sellerStore(_request: Request) {
+async function sellerStore(request: Request) {
   const session = await readSession();
   if (!session) throw new LoyaltySettingsError("AUTH_REQUIRED", 401);
   await assertSellerActivity(prisma, session.userId);
-  const store = await prisma.store.findUnique({ where: { ownerId: session.userId }, select: {
+  await requireBusinessOwner(prisma,session.userId);
+  const requestedStoreId=new URL(request.url).searchParams.get("store");
+  const store = await prisma.store.findFirst({ where: { ownerId: session.userId,...(requestedStoreId?{id:requestedStoreId}:{}) }, orderBy:{createdAt:"asc"}, select: {
     id: true, loyaltyEnabled: true, loyaltyBlockedAt: true,
   } });
   if (!store) throw new LoyaltySettingsError("STORE_NOT_FOUND", 404);
@@ -25,6 +28,7 @@ async function sellerStore(_request: Request) {
 }
 function failure(error: unknown) {
   if (error instanceof LoyaltySettingsError) return NextResponse.json({ error: error.code }, { status: error.status, headers });
+  if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status,headers});
   return NextResponse.json({ error: "LOYALTY_UNAVAILABLE" }, { status: 503, headers });
 }
 export async function GET(request: Request) {

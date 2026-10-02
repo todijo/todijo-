@@ -13,27 +13,33 @@ import { isLocale, rtlLocales } from "@/i18n/config";
 import { loyaltyMessages } from "@/i18n/loyalty";
 import { loyaltyAccountingMessages } from "@/i18n/loyalty-accounting";
 import SellerLoyaltyToggle from "./SellerLoyaltyToggle";
+import { requireBusinessOwner } from "@/lib/seller-business-access";
+import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
 
 export const dynamic = "force-dynamic";
 
 export default async function SellerLoyaltyPage({ searchParams }: {
-  searchParams: Promise<{ orderId?: string }> }) {
+  searchParams: Promise<{ orderId?: string;store?:string }> }) {
   const session = await readSession();
   if (!session) redirect("/login");
   await assertSellerActivity(prisma, session.userId);
+  let principal;try{principal=await requireBusinessOwner(prisma,session.userId)}catch{redirect("/dashboard")}
   const requestedLocale = await getLocale();
   const locale = isLocale(requestedLocale) ? requestedLocale : "fr";
   const copy = loyaltyMessages[locale];
   const financeCopy = loyaltyAccountingMessages[locale];
-  const store = await prisma.store.findUnique({ where: { ownerId: session.userId },
+  const query=await searchParams;
+  const stores=await prisma.store.findMany({where:{businessId:principal.businessId},orderBy:{createdAt:"asc"},select:{id:true,name:true,slug:true}});
+  const selectedStoreId=query.store&&stores.some(store=>store.id===query.store)?query.store:stores[0]?.id;
+  const store = selectedStoreId?await prisma.store.findFirst({ where: { id:selectedStoreId,ownerId: session.userId }, orderBy:{createdAt:"asc"},
     select: { id: true, slug: true, name: true, loyaltyEnabled: true, loyaltyBlockedAt: true,
       owner: { select: { firstName: true, lastName: true } },
-      _count: { select: { products: { where: { loyaltyEligible: true, supplierLink: null } } } } } });
+      _count: { select: { products: { where: { loyaltyEligible: true, supplierLink: null } } } } } }):null;
   if (!store) redirect(`/${locale}/seller/create-store`);
   const [settings, accounting] = await Promise.all([
     readLoyaltySettings(prisma), sellerLoyaltyAccounting(prisma, store.id),
   ]);
-  const orderId = (await searchParams).orderId?.trim() ?? "";
+  const orderId = query.orderId?.trim() ?? "";
   const order = orderId && orderId.length <= 100
     ? await orderLoyaltyFundingTrace(prisma, orderId, store.id) : [];
   const money = (minor: number) => new Intl.NumberFormat(locale, {
@@ -43,6 +49,7 @@ export default async function SellerLoyaltyPage({ searchParams }: {
   return <SellerDashboardLayout locale={locale} storeSlug={store.slug}
     firstName={store.owner.firstName} lastName={store.owner.lastName} active="loyalty">
     <div dir={rtlLocales.has(locale) ? "rtl" : "ltr"}>
+      <SellerStoreSwitcher stores={stores} selectedId={store.id} allStoresLabel="" storeLabel={copy.store}/>
       <SellerPageHeader eyebrow={store.name} title={copy.title} description={copy.intro}
         backHref={`/${locale}/seller/store-settings`} backLabel={copy.store} />
       <SellerSection icon={Gift} title={copy.participation} description={copy.globalRate}>

@@ -120,10 +120,10 @@ test("publication requires one exact available supplier variant and respects adm
   assert.throws(() => assertProductPublicationEligible({ deactivationReason: "ADMIN", supplierLink, variants: [{ active: true, supplierConnectionId: PLATFORM_CJ_CONNECTION_ID, supplierVariantId: "VID", supplierAvailable: true }] }), /PRODUCT_ADMIN_BLOCKED/);
 });
 
-test("product update publication remains owner-authorized and server validated", () => {
+test("product update publication remains capability-authorized and server validated", () => {
   const source = readFileSync(resolve(__dirname, "../../app/api/products/[id]/route.ts"), "utf8");
-  assert.match(source, /store:\s*\{ ownerId: session\.userId \}/);
-  assert.match(source, /status === "PUBLISHED"[\s\S]+requirePublishingAccess[\s\S]+assertProductPublicationEligible/);
+  assert.match(source, /requireProductPermissions\(prisma,session\.userId,product\.id/);
+  assert.match(source, /status === "PUBLISHED"[\s\S]+requireStorePublishingAccess[\s\S]+assertProductPublicationEligible/);
   assert.match(source, /COMPLIANCE_DECLARATION_REQUIRED/);
   assert.doesNotMatch(source, /request[^\n]+update\([^\n]+status/);
 });

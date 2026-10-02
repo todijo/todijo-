@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Check, Plus, Trash2 } from "lucide-react";
-import { MAX_PRODUCT_VARIANTS, productVariantDraftKey, type ProductVariantDraft, type VariantOptionInput } from "@/lib/product-variants";
+import { MAX_PRODUCT_VARIANTS, productVariantDraftKey, type ProductVariantDraft, type VariantOptionInput } from "@/lib/product-variant-shared";
 
 type Value = { id?: string; value: string };
 type Preset = "color" | "size" | "material" | "storage" | "capacity" | "style";

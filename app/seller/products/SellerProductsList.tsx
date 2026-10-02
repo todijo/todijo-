@@ -8,11 +8,11 @@ import { useTranslations } from "next-intl";
 import { feedbackCopy } from "@/lib/feedback-copy";
 import { appendUniqueSellerProducts, sellerPageNumbers, sellerProductsHref, type SellerProductCardData, type SellerProductsQuery } from "@/lib/seller-products-pagination";
 
-type Props = { initialProducts: SellerProductCardData[]; total: number; page: number; pages: number; locale: string; query: SellerProductsQuery };
+type Props = { initialProducts: SellerProductCardData[]; total: number; page: number; pages: number; locale: string; query: SellerProductsQuery; storeId?:string };
 type PageResponse = { products: SellerProductCardData[]; page: number; pages: number };
 const dynamicPriceLabel: Record<string, string> = { en: "Final price depends on destination and live delivery", fr: "Prix final selon la destination et la livraison en direct", ku: "نرخی کۆتایی بە شوێنی گەیاندن و گەیاندنی ڕاستەوخۆ پەیوەستە", de: "Endpreis abhängig von Zielort und Live-Versand", es: "Precio final según destino y envío en vivo", it: "Prezzo finale in base a destinazione e spedizione in tempo reale", nl: "Eindprijs volgens bestemming en live verzending", pt: "Preço final conforme destino e envio em tempo real", tr: "Nihai fiyat varış noktası ve canlı gönderime göre", ru: "Итоговая цена зависит от адреса и актуальной доставки", ar: "السعر النهائي حسب الوجهة والشحن المباشر", fa: "قیمت نهایی بر اساس مقصد و ارسال زنده", hi: "अंतिम कीमत गंतव्य और लाइव डिलीवरी पर निर्भर है", zh: "最终价格取决于目的地和实时配送" };
 
-export default function SellerProductsList({ initialProducts, total, page, pages, locale, query }: Props) {
+export default function SellerProductsList({ initialProducts, total, page, pages, locale, query,storeId }: Props) {
   const seller = useTranslations("Seller");
   const control = useTranslations("SellerControl");
   const common = useTranslations("Common");
@@ -41,6 +41,7 @@ export default function SellerProductsList({ initialProducts, total, page, pages
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(loadedPage + 1) });
+      if(storeId)params.set("store",storeId);
       if (query.q) params.set("q", query.q);
       if (query.status !== "all") params.set("status", query.status);
       if (query.sort !== "newest") params.set("sort", query.sort);
@@ -56,7 +57,7 @@ export default function SellerProductsList({ initialProducts, total, page, pages
       busy.current = false;
       setLoading(false);
     }
-  }, [error, loadedPage, pages, query.q, query.sort, query.status]);
+  }, [error, loadedPage, pages, query.q, query.sort, query.status,storeId]);
 
   useEffect(() => {
     if (!mobile || error || loadedPage >= pages || !sentinel.current) return;
@@ -72,7 +73,7 @@ export default function SellerProductsList({ initialProducts, total, page, pages
       <Link className="sellerProductVisual" href={`/${locale}/seller/products/${product.id}/edit`}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="(max-width: 620px) 46vw, (max-width: 1100px) 50vw, 340px" unoptimized/> : <span className="sellerProductPlaceholder"><Package size={48}/></span>}</Link>
       <div className="sellerProductBody"><div className="productStatusLine"><span className={product.status === "PUBLISHED" ? "statusPublished" : "statusDraft"}>{product.status === "PUBLISHED" ? control("published") : control("draftStatus")}</span><span>{control("stockCount", { count: product.stock })}</span></div><h2>{product.name}</h2><strong>{product.automaticCjPrice ? dynamicPriceLabel[locale] ?? dynamicPriceLabel.en : `${product.price} ${product.currency}`}</strong><div className="sellerProductActions"><Link href={`/${locale}/seller/products/${product.id}/edit`}><Pencil size={16} aria-hidden="true"/>{common("edit")}</Link>{product.status === "PUBLISHED" ? <Link href={`/${locale}/product/${product.id}`}><Eye size={16} aria-hidden="true"/>{seller("viewListing")}</Link> : <span className="draftHint">{seller("draft")}</span>}</div></div>
     </article>)}</section>
-    <nav className="sellerProductsPagination" aria-label={orders("history.pagination")}><span>{page > 1 ? <Link href={sellerProductsHref(locale, query, page - 1)}>{market("previous")}</Link> : <span aria-disabled="true">{market("previous")}</span>}</span><div>{sellerPageNumbers(page, pages).map((number) => <Link key={number} href={sellerProductsHref(locale, query, number)} aria-current={number === page ? "page" : undefined}>{number}</Link>)}</div><span>{page < pages ? <Link href={sellerProductsHref(locale, query, page + 1)}>{market("next")}</Link> : <span aria-disabled="true">{market("next")}</span>}</span><small>{orders("history.page", { page, pages })}</small></nav>
+    <nav className="sellerProductsPagination" aria-label={orders("history.pagination")}><span>{page > 1 ? <Link href={sellerProductsHref(locale, query, page - 1,storeId)}>{market("previous")}</Link> : <span aria-disabled="true">{market("previous")}</span>}</span><div>{sellerPageNumbers(page, pages).map((number) => <Link key={number} href={sellerProductsHref(locale, query, number,storeId)} aria-current={number === page ? "page" : undefined}>{number}</Link>)}</div><span>{page < pages ? <Link href={sellerProductsHref(locale, query, page + 1,storeId)}>{market("next")}</Link> : <span aria-disabled="true">{market("next")}</span>}</span><small>{orders("history.page", { page, pages })}</small></nav>
     <div className="sellerProductsInfiniteStatus" aria-live="polite"><div ref={sentinel}/>{loading && <p>{common("loading")}</p>}{error && <p role="alert">{feedback.errorText} <button type="button" onClick={() => setError(false)}>{feedback.retry}</button></p>}</div>
   </>;
 }

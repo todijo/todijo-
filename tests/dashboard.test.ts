@@ -2,8 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const messages = ["en", "fr", "de", "es", "it", "nl", "pt", "tr", "ru", "ar", "fa", "hi", "zh", "ku"].map((locale) => JSON.parse(readFileSync(`messages/dashboard-premium/${locale}.json`, "utf8")));
-
 test("dashboard actions remain localized and avoid unavailable buyer placeholders", () => {
   const ui = readFileSync("components/DashboardUI.tsx", "utf8");
   const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
@@ -18,13 +16,14 @@ test("dashboard actions remain localized and avoid unavailable buyer placeholder
   assert.match(productsList, /`\/\$\{locale\}\/product\/\$\{product\.id\}`/);
 });
 
-test("seller product actions keep the existing subscription gate", () => {
+test("seller product actions keep the subscription and team capability gates", () => {
   const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
   const productsPage = readFileSync("app/seller/products/page.tsx", "utf8");
 
-  assert.match(dashboardPage, /subscriptionActive\s*\?\s*<DashboardQuickAction[^>]+seller\/products\/new/);
-  assert.match(dashboardPage, /subscriptionActive\s*\?\s*<DashboardQuickAction[^>]+seller\/products\/new[^:]+:\s*<DashboardQuickAction label=\{readinessAction\} href=\{readinessHref\}/);
-  assert.match(productsPage, /href=\{subscriptionActive\s*\?\s*`\/\$\{locale\}\/seller\/products\/new`\s*:\s*readinessHref\}/);
+  assert.match(dashboardPage, /sellerCanAddProduct\s*=\s*Boolean\(activeStore\s*&&\s*canCreateProducts\s*&&\s*canPublish\(activeStore\)\)/);
+  assert.match(dashboardPage, /sellerCanAddProduct&&<DashboardQuickAction[^>]+seller\/products\/new/);
+  assert.match(dashboardPage, /selectedPrincipal\?\.owner&&!subscriptionActive&&<DashboardQuickAction label=\{readinessAction\} href=\{readinessHref\}/);
+  assert.match(productsPage, /href=\{subscriptionActive\s*\?\s*`\/\$\{locale\}\/seller\/products\/new\?store=\$\{store\.id\}`\s*:\s*readinessHref\}/);
   assert.doesNotMatch(dashboardPage, /Status: \{user\.store\.subscription/);
   assert.doesNotMatch(productsPage, /store\.subscription\?\.status \?\? "NOT_STARTED"/);
 });

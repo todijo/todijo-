@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     const existing = await prisma.user.findFirst({ where: { OR:[{email: input.email},{anonymizedEmailHash:anonymizedEmailHash(input.email)}] } });
     if (existing) {
-      const next = input.role === "SELLER" ? sellerOnboardingPath(locale, Boolean(await prisma.store.findUnique({ where: { ownerId: existing.id }, select: { id: true } })), explicitSellerIntent) : localizedHome(locale);
+      const next = input.role === "SELLER" ? sellerOnboardingPath(locale, Boolean(await prisma.store.findFirst({ where: { ownerId: existing.id }, select: { id: true } })), explicitSellerIntent) : localizedHome(locale);
       return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail.", code: "ACCOUNT_EXISTS", next: `/${locale}/login?next=${encodeURIComponent(next)}` }, { status: 409 });
     }
 

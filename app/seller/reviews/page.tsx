@@ -14,7 +14,7 @@ export default async function SellerReviewsPage() {
   const session = await readSession();
   if (!session) redirect("/login");
   const [locale, p, common, sellerDashboard] = await Promise.all([getLocale(), getTranslations("DashboardPremium"), getTranslations("Common"), getTranslations("SellerDashboard")]);
-  const store = await prisma.store.findUnique({
+  const store = await prisma.store.findFirst({
     where: { ownerId: session.userId },
     select: { slug: true, name: true, owner: { select: { firstName: true, lastName: true } }, products: { select: { id: true, name: true, images: true, reviews: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "desc" }, select: { id: true, rating: true, title: true, body: true, sellerReply: true, createdAt: true, author: { select: { firstName: true } } } } } } },
   });

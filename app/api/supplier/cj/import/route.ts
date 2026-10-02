@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const session = await readSession();
     const admin = await requirePlatformSupplierAdmin(prisma, session);
     const body = await request.json() as {supplierProductId?:unknown;sellingPrice?:unknown;pricingMode?:unknown;category?:unknown;quarantine?:unknown};
-    const store = await prisma.store.findUnique({where:{ownerId:admin.id},select:{id:true,currency:true}});
+    const store = await prisma.store.findFirst({where:{ownerId:admin.id},orderBy:{createdAt:"asc"},select:{id:true,currency:true}});
     if (!store) return NextResponse.json({error:"STORE_NOT_FOUND"},{status:404});
     const manual = body.pricingMode === "MANUAL";
     const category=String(body.category??"");if(!isCanonicalLeafCategoryId(category))return NextResponse.json({error:"CANONICAL_CATEGORY_INVALID"},{status:400});

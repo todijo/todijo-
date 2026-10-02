@@ -6,9 +6,10 @@ import { parseEvidenceMultipart } from "@/lib/refund-evidence-multipart";
 import { prisma } from "@/lib/prisma";
 import { r2ObjectStore } from "@/lib/r2";
 import { readSession } from "@/lib/session";
+import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
 
 function errorResponse(error: unknown, fallback: string) {
-  const known = error instanceof RefundEvidenceError || error instanceof RefundRequestError || error instanceof AdminAccessError;
+  const known = error instanceof RefundEvidenceError || error instanceof RefundRequestError || error instanceof AdminAccessError || error instanceof SellerCapabilityError;
   return NextResponse.json({ error: known ? error.message : fallback }, { status: known ? error.status : 500 });
 }
 
@@ -22,14 +23,17 @@ export async function GET(_request: Request, context: { params: Promise<{ orderI
       if (!request) throw new RefundEvidenceError("Refund request not found.", 404);
       return NextResponse.json(await listBuyerRefundEvidence(prisma, session.userId, request.id));
     }
-    const request = await prisma.refundRequest.findFirst({ where: { orderId }, select: { id: true } });
+    const request = await prisma.refundRequest.findFirst({ where: { orderId }, select: { id: true,order:{select:{storeIdSnapshot:true,items:{take:1,select:{product:{select:{storeId:true}}}}}} } });
     if (!request) throw new RefundEvidenceError("Refund request not found.", 404);
     if (session.role === "ADMIN") {
       await getAdminRefundRequest(prisma, session, request.id);
       return NextResponse.json(await prisma.refundEvidence.findMany({ where: { refundRequestId: request.id }, select: { id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true }, orderBy: { createdAt: "asc" } }));
     }
-    await getSellerRefundRequest(prisma, session.userId, request.id);
-    return NextResponse.json(await listSellerRefundEvidence(prisma, session.userId, orderId, request.id));
+    const storeId=request.order.storeIdSnapshot??request.order.items[0]?.product.storeId;
+    if(!storeId)throw new RefundEvidenceError("Refund request not found.",404);
+    await requireStoreCapability(prisma,session.userId,storeId,"ORDER_VIEW");
+    await getSellerRefundRequest(prisma, session.userId, request.id,storeId);
+    return NextResponse.json(await listSellerRefundEvidence(prisma, session.userId, orderId, request.id,storeId));
   } catch (error) {
     return errorResponse(error, "Unable to load refund evidence.");
   }
