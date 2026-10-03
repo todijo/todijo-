@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient, StoreAccessSource, UserRole } from "@prisma/client";
 import { isSellerPlanId, type SellerPlanId } from "./seller-plans";
+import { appendSellerBusinessAudit } from "./seller-business-audit";
 
 export const adminGrantMonths = [1, 3, 6, 12] as const;
 export type AdminGrantMonths = (typeof adminGrantMonths)[number];
@@ -71,6 +72,11 @@ export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput
       { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
       { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
       { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+      { business: { is: { billingStore: { is: { OR: [
+        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+        { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
+        { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+      ] } } } } },
     ],
   };
 }
@@ -182,24 +188,27 @@ export async function extendManagedAccess(
       id: true,
       accessGrants: { where: { source: "ADMIN_GRANTED" }, orderBy: { endsAt: "desc" }, take: 1, select: { endsAt: true } },
       subscription: { select: { status: true, currentPeriodEnd: true } },
+      business: { select: { id:true,billingStoreId:true,billingStore:{select:{accessGrants:{where:{source:"ADMIN_GRANTED"},orderBy:{endsAt:"desc"},take:1,select:{endsAt:true}},subscription:{select:{status:true,currentPeriodEnd:true}}}} } },
     },
   });
   if (stores.length !== ids.length) throw new AdminAccessError("One or more selected stores are not eligible.", 400, "STORE_INELIGIBLE");
   const results = [];
-  for (const store of stores) {
-    const stripeEnd = store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status) ? store.subscription.currentPeriodEnd : null;
-    const currentEnd = [store.accessGrants[0]?.endsAt, stripeEnd]
+  const targets=new Map(stores.map(store=>[store.business?.billingStoreId??store.id,{storeId:store.business?.billingStoreId??store.id,businessId:store.business?.id??null,accessGrants:store.business?.billingStore?.accessGrants??store.accessGrants,subscription:store.business?.billingStore?.subscription??store.subscription}]));
+  for (const target of targets.values()) {
+    const stripeEnd = target.subscription && ["ACTIVE", "TRIALING"].includes(target.subscription.status) ? target.subscription.currentPeriodEnd : null;
+    const currentEnd = [target.accessGrants[0]?.endsAt, stripeEnd]
       .filter((value): value is Date => Boolean(value))
       .sort((a, b) => b.getTime() - a.getTime())[0];
     const period = calculateGrantPeriod(now, months, currentEnd);
     results.push(await db.storeAccessGrant.create({
-      data: { storeId: store.id, grantedById: adminId, source: "ADMIN_GRANTED", plan, ...period },
+      data: { storeId: target.storeId, grantedById: adminId, source: "ADMIN_GRANTED", plan, ...period },
       select: { storeId: true, endsAt: true },
     }));
     await db.product.updateMany({
-      where: { storeId: store.id, removedAt:null, status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" },
+      where: { ...(target.businessId?{store:{businessId:target.businessId}}:{storeId:target.storeId}), removedAt:null, status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" },
       data: { status: "PUBLISHED", deactivationReason: "NONE" },
     });
+    if(target.businessId)await appendSellerBusinessAudit(db,{businessId:target.businessId,storeId:target.storeId,actorId:adminId,category:"ENTITLEMENT",action:"ADMIN_GRANT_CREATED",targetType:"STORE_ACCESS_GRANT",targetId:target.storeId,metadata:{plan,startsAt:period.startsAt.toISOString(),endsAt:period.endsAt.toISOString()}});
   }
   return results;
 }

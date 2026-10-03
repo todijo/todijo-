@@ -87,7 +87,17 @@ function stripeSecret() {
 }
 
 export class StripeTransportError extends Error {}
-export class StripeApiError extends Error {}
+export class StripeApiError extends Error {
+  constructor(message: string, readonly code?: string, readonly statusCode?: number) {
+    super(message);
+  }
+}
+
+export function stripeErrorDiagnostic(error: unknown) {
+  if (error instanceof StripeApiError) return { category: "provider", code: error.code ?? "unknown", statusCode: error.statusCode ?? null };
+  if (error instanceof StripeTransportError) return { category: "transport", code: "unreachable", statusCode: null };
+  return { category: "internal", code: "unexpected", statusCode: null };
+}
 
 async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; body?: URLSearchParams; idempotencyKey?: string } = {}) {
   let response: Response;
@@ -105,8 +115,8 @@ async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; b
   } catch (error) {
     throw new StripeTransportError(error instanceof Error ? error.message : "Stripe request transport failed.");
   }
-  const json = (await response.json()) as T & { error?: { message?: string } };
-  if (!response.ok) throw new StripeApiError(json.error?.message ?? `Stripe request failed (${response.status}).`);
+  const json = (await response.json()) as T & { error?: { message?: string; code?: string; type?: string } };
+  if (!response.ok) throw new StripeApiError(json.error?.message ?? `Stripe request failed (${response.status}).`, json.error?.code ?? json.error?.type, response.status);
   return json;
 }
 

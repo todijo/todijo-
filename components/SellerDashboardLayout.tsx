@@ -20,7 +20,7 @@ type Labels = {
 
 export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "orders" | "messages" | "notifications" | "settings" | "subscription" | "loyalty" | "reviews" | "account";
 
-export function sellerDashboardNavItems({ locale, storeSlug, labels, accountLabel, privacyLabel, active, unreadMessages = 0,ownerTools=false,permissions }: { locale: string; storeSlug?: string; labels: Labels; accountLabel: string; privacyLabel: string; active: SellerNavigationActive; unreadMessages?: number;ownerTools?:boolean;permissions?:TeamPermission[] }): DashboardNavItem[] {
+export function sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable=true, labels, accountLabel, privacyLabel, active, unreadMessages = 0,ownerTools=false,permissions }: { locale: string; storeSlug?: string; publicStoreAvailable?: boolean; labels: Labels; accountLabel: string; privacyLabel: string; active: SellerNavigationActive; unreadMessages?: number;ownerTools?:boolean;permissions?:TeamPermission[] }): DashboardNavItem[] {
   const team=sellerTeamCopy(locale);
   const unrestricted=permissions===undefined;
   const can=(permission:TeamPermission)=>ownerTools||unrestricted||permissions.includes(permission);
@@ -34,7 +34,7 @@ export function sellerDashboardNavItems({ locale, storeSlug, labels, accountLabe
     ...(can("ANALYTICS_VIEW")?[{ label: labels.statistics, href: `/${locale}/dashboard#analytics`, icon: BarChart3 }]:[]),
     ...(can("SALES_VIEW")?[{ label: labels.revenue, href: `/${locale}/dashboard#analytics`, icon: CircleDollarSign }]:[]),
     ...(ownerTools?[{ label: labels.reviews, href: `/${locale}/seller/reviews`, icon: Star, active: active === "reviews" }]:[]),
-    { label: labels.store, href: storeSlug ? `/${locale}/store/${storeSlug}` : `/${locale}/sell#plans`, icon: Store },
+    { label: labels.store, href: storeSlug ? publicStoreAvailable ? `/${locale}/store/${storeSlug}` : `/${locale}/seller/store-settings` : `/${locale}/sell#plans`, icon: Store },
     ...(can("STORE_VIEW_SETTINGS")?[{ label: labels.settings, href: `/${locale}/seller/store-settings`, icon: Settings, active: active === "settings" }]:[]),
     ...(ownerTools?[{ label: sellerEntitlementSubscriptionMessages[isLocale(locale) ? locale : "en"].title, href: `/${locale}/seller/subscription`, icon: CreditCard, active: active === "subscription" },
     { label: loyaltyMessages[isLocale(locale) ? locale : "fr"].title, href: `/${locale}/seller/loyalty`, icon: Gift, active: active === "loyalty" }]:[]),
@@ -44,14 +44,14 @@ export function sellerDashboardNavItems({ locale, storeSlug, labels, accountLabe
   ];
 }
 
-export default async function SellerDashboardLayout({ children, locale, storeSlug, firstName, lastName, labels, active, unreadMessages = 0 }: { children: ReactNode; locale: string; storeSlug?: string; firstName: string; lastName: string; labels?: Labels; active: SellerNavigationActive; canAddProduct?: boolean; unreadMessages?: number }) {
+export default async function SellerDashboardLayout({ children, locale, storeSlug, firstName, lastName, labels, active, canAddProduct, unreadMessages = 0 }: { children: ReactNode; locale: string; storeSlug?: string; firstName: string; lastName: string; labels?: Labels; active: SellerNavigationActive; canAddProduct?: boolean; unreadMessages?: number }) {
   const [p,s,common,privacy]=await Promise.all([getTranslations("DashboardPremium"),getTranslations("SellerDashboard"),getTranslations("Common"),getTranslations("Privacy")]);
   const text=labels??{dashboard:p("nav.dashboard"),products:p("nav.products"),orders:p("nav.orders"),messages:p("nav.messages"),statistics:p("nav.statistics"),revenue:p("nav.revenue"),reviews:p("nav.reviews"),store:p("nav.store"),settings:p("nav.settings"),notifications:p("notifications"),eyebrow:p("seller.eyebrow"),logout:common("logout"),menu:s("menu"),collapse:s("collapse"),addProduct:p("nav.addProduct")};
   const session=await readSession();
   const principals=session?await sellerPrincipals(prisma,session.userId):[];
   const ownerTools=principals.some(principal=>principal.owner);
   const permissions=ownerTools?undefined:[...new Set(principals.flatMap(principal=>principal.permissions))];
-  const items = sellerDashboardNavItems({ locale, storeSlug, labels: text, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active, unreadMessages,ownerTools,permissions });
+  const items = sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable:canAddProduct!==false, labels: text, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active, unreadMessages,ownerTools,permissions });
   const mobileMenuItems = items;
   const verification=session?await prisma.user.findUnique({where:{id:session.userId},select:{email:true,emailVerified:true}}):null;
   return <main className="premiumDashboard premiumSellerDashboard">

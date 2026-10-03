@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { connectedAccountStatus, retrieveConnectedAccount } from "@/lib/stripe";
+import { connectedAccountStatus, retrieveConnectedAccount, stripeErrorDiagnostic } from "@/lib/stripe";
 import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ export async function GET() {
     return NextResponse.json({ connected: true, accountId: account.id, onboardingComplete: status.stripeOnboardingComplete, chargesEnabled: status.stripeChargesEnabled, payoutsEnabled: status.stripePayoutsEnabled });
   } catch (error) {
     if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
-    console.error("Stripe Connect status failed", error);
-    return NextResponse.json({ error: "Unable to refresh Stripe status." }, { status: 502 });
+    console.error("Stripe Connect status failed", stripeErrorDiagnostic(error));
+    return NextResponse.json({ error: "STRIPE_CONNECT_UNAVAILABLE" }, { status: 502 });
   }
 }

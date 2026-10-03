@@ -13,6 +13,7 @@ import { isLocale } from "@/i18n/config";
 import { siteContentMessages } from "@/i18n/site-content";
 import { loyaltyMessages } from "@/i18n/loyalty";
 import { readGlobalDropshippingMargin } from "@/lib/suppliers/global-margin";
+import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ export default async function AdminPage() {
   const locale = await getLocale();
   const userManagementText = adminUserManagementMessages[isLocale(locale) ? locale : "en"];
   const contentText = siteContentMessages[isLocale(locale) ? locale : "en"];
-  const [t, ordersText, trustText, supplierText] = await Promise.all([getTranslations("Admin"), getTranslations("Orders"), getTranslations("TrustSafety"), getTranslations("Supplier")]);
+  const [t, ordersText, trustText, supplierText, authText] = await Promise.all([getTranslations("Admin"), getTranslations("Orders"), getTranslations("TrustSafety"), getTranslations("Supplier"), getTranslations("Auth")]);
   const session = await readSession();
   if (!session) redirect(`/${locale}/login`);
   try {
@@ -39,7 +40,7 @@ export default async function AdminPage() {
   const [users, stores, pendingFinalRefundCount, globalDropshippingMargin] = await Promise.all([
     prisma.user.findMany({
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
-      select: { id: true, firstName: true, lastName: true, email: true, role: true, store: { select: { id: true } } },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true, store: { select: { id: true } }, ownedBusiness: { select: { id: true, maxStores: true, _count: { select: { stores: true } } } } },
     }),
     prisma.store.findMany({
       orderBy: { createdAt: "desc" },
@@ -63,19 +64,26 @@ export default async function AdminPage() {
       stripeStatus: store.subscription?.status ?? null, dropshippingEnabled: store.dropshippingEnabled,
     };
   });
+  const managedOwnerEligibility = new Map(await Promise.all(users.map(async (user) => {
+    if (user.id === session.userId) return [user.id, !user.store] as const;
+    if (user.role !== "SELLER" || user.sellerSuspendedAt || user.deactivatedAt || user.blockedAt && (!user.blockExpiresAt || user.blockExpiresAt > now)) return [user.id, false] as const;
+    if (!user.ownedBusiness || user.ownedBusiness._count.stores === 0) return [user.id, true] as const;
+    const plan = await sellerBusinessCommercialPlan(prisma, user.ownedBusiness.id, now);
+    return [user.id, plan === "pro" && user.ownedBusiness._count.stores < user.ownedBusiness.maxStores] as const;
+  })));
 
   return <main className="adminPage">
     <SiteHeader />
     <section className="adminShell">
       <header className="adminHero">
         <div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{t("intro")}</p></div>
-        <nav className="adminHeroActions" aria-label={t("actions")}><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/products">Product catalog</Link><Link href="/adm-barewbar-182203/catalog-data">Test/demo catalog audit</Link><Link href="/adm-barewbar-182203/content">{contentText.title}</Link><Link href="/adm-barewbar-182203/news">Todijo Actualités</Link><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/connect-readiness">Stripe Connect readiness</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link><Link href="/adm-barewbar-182203/loyalty">{loyaltyMessages[isLocale(locale) ? locale : "fr"].title}</Link></nav>
+        <nav className="adminHeroActions" aria-label={t("actions")}><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/seller-review">{authText("sellerReview")}</Link><Link href="/adm-barewbar-182203/products">Product catalog</Link><Link href="/adm-barewbar-182203/catalog-data">Test/demo catalog audit</Link><Link href="/adm-barewbar-182203/content">{contentText.title}</Link><Link href="/adm-barewbar-182203/news">Todijo Actualités</Link><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/connect-readiness">Stripe Connect readiness</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link><Link href="/adm-barewbar-182203/loyalty">{loyaltyMessages[isLocale(locale) ? locale : "fr"].title}</Link></nav>
       </header>
       {pendingFinalRefundCount > 0 && <section className="subscriptionWarning adminRefundAlert" role="alert"><strong>{t(pendingFinalRefundCount === 1 ? "pendingFinalRefundSingular" : "pendingFinalRefundPlural", { count: pendingFinalRefundCount })}</strong><Link href="/adm-barewbar-182203/orders?view=refund">{t("reviewRefundRequests")}</Link></section>}
       <AdminDashboard
         adminId={session.userId}
         locale={locale}
-        users={users.map((user) => ({ ...user, hasStore: Boolean(user.store), store: undefined }))}
+        users={users.map((user) => ({ id:user.id,firstName:user.firstName,lastName:user.lastName,email:user.email,role:user.role,hasStore:Boolean(user.store),managedStoreEligible:managedOwnerEligibility.get(user.id)===true }))}
         stores={serializedStores}
         globalDropshippingMarginPercent={globalDropshippingMargin.mul(100).toString()}
       />

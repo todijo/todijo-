@@ -37,9 +37,11 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
   const copy={...sellerEntitlementSubscriptionMessages[resolvedLocale],...sellerPlanSelectionMessages[resolvedLocale]};
   const plans = sellerPlans().map(({ priceIds, ...plan }) => ({
     ...plan,
+    productLimitLabel:plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,
     features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue],
     available: { monthly: Boolean(priceIds.monthly), annual: Boolean(priceIds.annual) },
   }));
+  const clientCopy={monthly:copy.monthly,annual:copy.annual,save20:copy.save20,perMonth:copy.perMonth,perYear:copy.perYear,opening:copy.opening,active:copy.active,anotherActive:copy.anotherActive,subscribe:copy.subscribe,unavailable:copy.unavailable,checkoutError:copy.checkoutError};
   const activePlanId = canonicalActiveSellerPlanId(store.subscription);
   return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} active="subscription"><div className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
     <a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><p className="dashboardBadge">{store.name}</p>
@@ -47,7 +49,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     {query.checkout === "success" && !active ? <ActivatingSubscription /> : <>
       {store.subscription && <div className={`subscriptionStatus ${active ? "isActive" : ""}`}>{copy.currentStatus} <strong>{store.subscription.status}</strong>{store.subscription.cancelAtPeriodEnd && ` · ${copy.cancels}`}</div>}
       {(store.owner.role==="ADMIN"||accessSource==="ADMIN_GRANTED"||accessSource==="ADMIN_EXEMPT")&&<div className="subscriptionStatus isActive">{copy.adminAccess}</div>}
-      <SubscriptionPlans plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={copy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
+      <SubscriptionPlans plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={clientCopy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
     </>}
   </section></div></SellerDashboardLayout>;
 }

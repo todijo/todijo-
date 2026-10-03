@@ -10,6 +10,7 @@ import {
   publicProductAccessWhere,
   requireAdmin,
 } from "../lib/admin-access";
+import { createAdditionalAdminManagedStore } from "../lib/admin-managed-store";
 
 type Db = Parameters<typeof requireAdmin>[0];
 
@@ -53,6 +54,41 @@ test("admin creates an eligible seller store with timed access and no Stripe dat
   assert.equal("subscription" in (data ?? {}), false);
 });
 
+test("admin creates an additional PRO Store inside the existing business without duplicating commercial identity", async () => {
+  let created: Record<string, unknown> | undefined;
+  const audits: Array<Record<string, unknown>> = [];
+  const db = {
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1" } }) },
+    $queryRaw: async () => [{ id: "business-1", maxStores: 3 }],
+    store: {
+      count: async () => 1,
+      create: async ({ data }: { data: Record<string, unknown> }) => { created = data; return { id: "store-2", slug: "second-shop" }; },
+    },
+    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "pro" }, accessGrants: [] } }) },
+    sellerBusinessAuditEvent: { create: async ({ data }: { data: Record<string, unknown> }) => { audits.push(data); return data; } },
+  } as never;
+  const store = await createAdditionalAdminManagedStore(db, "admin", { ownerId: "seller", name: "Second Shop", slug: "second-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" }, "business-1", new Date("2026-01-01T00:00:00Z"));
+  assert.deepEqual(store, { id: "store-2", slug: "second-shop" });
+  assert.equal(created?.ownerId, "seller");
+  assert.equal(created?.businessId, "business-1");
+  assert.equal("subscription" in (created ?? {}), false);
+  assert.equal("accessGrants" in (created ?? {}), false);
+  assert.equal(audits[0].action, "ADMIN_MANAGED_STORE_CREATED");
+});
+
+test("additional managed Store fails closed for non-PRO and at capacity", async () => {
+  const database = (plan: string, count: number) => ({
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1" } }) },
+    $queryRaw: async () => [{ id: "business-1", maxStores: 2 }],
+    store: { count: async () => count, create: async () => { throw new Error("must not create"); } },
+    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan }, accessGrants: [] } }) },
+  }) as never;
+  const input = { ownerId: "seller", name: "Second", slug: "second", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" };
+  await assert.rejects(() => createAdditionalAdminManagedStore(database("basic", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
+  await assert.rejects(() => createAdditionalAdminManagedStore(database("plus", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
+  await assert.rejects(() => createAdditionalAdminManagedStore(database("pro", 2), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "STORE_LIMIT_REACHED");
+});
+
 test("normal customer cannot receive an admin-created seller store", async () => {
   const db = { user: { findUnique: async () => ({ id: "buyer", role: "CUSTOMER", store: null }) } } as unknown as Db;
   await assert.rejects(() => createManagedStore(db, "admin", { ownerId: "buyer", name: "Shop", slug: "shop", contactEmail: "buyer@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr", months: 1 }));
@@ -86,6 +122,17 @@ test("bulk extension creates one audit grant per store and leaves Stripe untouch
   assert.equal(subscriptionTouched, false);
 });
 
+test("Admin grant targets the one business billing Store and is audited once",async()=>{
+  const grants:any[]=[],audits:any[]=[];
+  const billing={accessGrants:[],subscription:null};
+  const db={store:{findMany:async()=>[
+    {id:"store-1",accessGrants:[],subscription:null,business:{id:"business",billingStoreId:"billing",billingStore:billing}},
+    {id:"store-2",accessGrants:[],subscription:null,business:{id:"business",billingStoreId:"billing",billingStore:billing}},
+  ]},storeAccessGrant:{create:async({data}:any)=>{grants.push(data);return{storeId:data.storeId,endsAt:data.endsAt};}},product:{updateMany:async()=>({count:0})},sellerBusinessAuditEvent:{create:async({data}:any)=>{audits.push(data);return data;}}}as never;
+  await extendManagedAccess(db,"admin",["store-1","store-2"],3,new Date("2026-01-01T00:00:00Z"),"pro");
+  assert.equal(grants.length,1);assert.equal(grants[0].storeId,"billing");assert.equal(audits.length,1);assert.equal(audits[0].action,"ADMIN_GRANT_CREATED");
+});
+
 test("invalid duration is rejected", () => {
   assert.throws(() => calculateGrantPeriod(new Date(), 2 as 1), (error: unknown) => error instanceof AdminAccessError && error.code === "INVALID_DURATION");
 });
@@ -103,6 +150,11 @@ test("public product visibility requires Stripe, a live admin grant, or admin ex
         { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
         { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
         { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+        { business: { is: { billingStore: { is: { OR: [
+          { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+          { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
+          { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+        ] } } } } },
       ],
     },
     OR: [

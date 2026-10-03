@@ -42,7 +42,7 @@ test("seller entry points cannot silently bypass explicit plan selection", () =>
   assert.doesNotMatch(sell, /register\?role=seller`/);
   assert.equal((dashboard.match(/sell#plans/g) ?? []).length, 2);
   assert.equal((footer.match(/sell#plans/g) ?? []).length, 1);
-  assert.match(sellerLayout, /storeSlug \?[^:]+: `\/\$\{locale\}\/sell#plans`/);
+  assert.match(sellerLayout, /storeSlug \? publicStoreAvailable \? `\/\$\{locale\}\/store\/\$\{storeSlug\}` : `\/\$\{locale\}\/seller\/store-settings` : `\/\$\{locale\}\/sell#plans`/);
   assert.match(register, /query\.role === "seller" && !intent/);
   assert.match(createStore, /if \(!intent\) redirect\(`\/\$\{locale\}\/sell#plans`\)/);
 });
@@ -63,6 +63,15 @@ test("canonical seller intent survives password and social auth, store creation,
   assert.match(onboardingForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(subscription, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);
   assert.equal(sellerOnboardingPath("fr", false, { plan: "basic", interval: "annual" }), "/fr/seller/onboarding?plan=basic&interval=annual");
+});
+
+test("seller subscription serializes only resolved strings into its Client Component", () => {
+  const page = source("app/seller/subscription/page.tsx");
+  const plans = source("app/seller/subscription/SubscriptionPlans.tsx");
+  assert.match(page, /productLimitLabel:plan\.productLimit\?copy\.upTo\(plan\.productLimit\):copy\.unlimited/);
+  assert.match(page, /copy=\{clientCopy\}/);
+  assert.doesNotMatch(plans, /upTo:\s*\(limit:/);
+  assert.match(plans, /<p>\{plan\.productLimitLabel\}<\/p>/);
 });
 
 test("legacy onboarding converges new sellers while preserving existing resumable records", () => {

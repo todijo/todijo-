@@ -4,6 +4,7 @@ import { AdminAccessError, createManagedStore, exemptExistingAdminStore, extendM
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { isSellerPlanId } from "@/lib/seller-plans";
+import { createAdditionalAdminManagedStore } from "@/lib/admin-managed-store";
 
 function slugify(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) throw new AdminAccessError("Enter a valid contact email.");
     if (!String(body.country ?? "").trim() || !String(body.city ?? "").trim()) throw new AdminAccessError("Country and city are required.");
     if (!/^[A-Z]{3}$/.test(currency) || !/^[a-z]{2}(-[a-z]{2})?$/.test(language)) throw new AdminAccessError("Currency or language is invalid.");
-    const store = await prisma.$transaction((tx) => createManagedStore(tx, admin.id, {
+    const input = {
       ownerId: String(body.ownerId ?? ""),
       name,
       slug,
@@ -47,7 +48,14 @@ export async function POST(request: Request) {
       language,
       months: validGrantMonths(months) ? months : undefined,
       plan: isSellerPlanId(body.plan) ? body.plan : undefined,
-    }));
+    };
+    const ownerBusiness = await prisma.sellerBusiness.findUnique({ where: { ownerId: input.ownerId }, select: { id: true, _count: { select: { stores: true } } } });
+    const store = await prisma.$transaction(
+      (tx) => ownerBusiness?._count.stores
+        ? createAdditionalAdminManagedStore(tx, admin.id, input, ownerBusiness.id)
+        : createManagedStore(tx, admin.id, input),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return NextResponse.json({ ok: true, store });
   } catch (error) {
     return errorResponse(error);

@@ -39,10 +39,7 @@ export default function StripeConnectSection({ initialStatus }: { initialStatus:
       const response = await fetch("/api/stripe/connect/status", { cache: "no-store", signal });
       const result = await responseBody(response);
       if (!response.ok) {
-        const message = result && typeof result === "object" && typeof (result as { error?: unknown }).error === "string"
-          ? (result as { error: string }).error
-          : t("error");
-        throw new Error(message);
+        throw new Error(t("error"));
       }
       if (!isStatusResponse(result)) throw new Error(t("error"));
       if (requestId === latestRefresh.current) {

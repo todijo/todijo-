@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { createConnectedAccount, createConnectedAccountLink } from "@/lib/stripe";
+import { createConnectedAccount, createConnectedAccountLink, stripeErrorDiagnostic } from "@/lib/stripe";
+import { startStripeConnectOnboarding } from "@/lib/stripe-connect-onboarding";
+import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
 
 export const runtime = "nodejs";
 
@@ -21,15 +23,15 @@ export default async function ConnectRefreshPage({ params }: { params: Promise<{
 
   let onboardingUrl: string | null = null;
   try {
-    let accountId = seller.stripeAccountId;
-    if (!accountId) {
-      const account = await createConnectedAccount({ userId: seller.id, email: seller.email });
-      accountId = account.id;
-      await prisma.user.update({ where: { id: seller.id }, data: { stripeAccountId: accountId } });
-    }
-    onboardingUrl = await createConnectedAccountLink(accountId);
+    await requireBusinessOwner(prisma, session.userId);
+    onboardingUrl = await startStripeConnectOnboarding(prisma, seller, {
+      createAccount: createConnectedAccount,
+      createAccountLink: createConnectedAccountLink,
+    });
   } catch (error) {
-    console.error("Stripe Connect onboarding restart failed", error);
+    if (!(error instanceof SellerCapabilityError)) {
+      console.error("Stripe Connect onboarding restart failed", stripeErrorDiagnostic(error));
+    }
   }
 
   if (onboardingUrl) redirect(onboardingUrl);

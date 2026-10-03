@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canPublish, effectiveSellerPlan, sellerProductQuota } from "../lib/seller-subscription";
+import { sellerBusinessCommercialEntitlement } from "../lib/seller-business";
 
 test("publishing requires both an active seller and active or trialing subscription", () => {
   assert.equal(canPublish({ status: "ACTIVE", subscription: { status: "ACTIVE" } }), true);
@@ -34,4 +35,13 @@ test("authoritative active Stripe plan wins and plan-level Admin grants work wit
   assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: { status: "ACTIVE", plan: "plus" }, accessGrants: [{ source: "ADMIN_GRANTED", plan: "pro", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), "plus");
   assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: null, accessGrants: [{ source: "ADMIN_GRANTED", plan: "basic", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), "basic");
   assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: null, accessGrants: [{ source: "ADMIN_GRANTED", plan: "forged", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), null);
+});
+
+test("every Store resolves the one billing Store commercial entitlement", async () => {
+  const stripeDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:{status:"ACTIVE",plan:"pro",currentPeriodEnd:null},accessGrants:[]}})}} as never;
+  assert.deepEqual(await sellerBusinessCommercialEntitlement(stripeDb,"business"),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"STRIPE",expiresAt:null});
+  const expires=new Date("2026-02-01T00:00:00Z"),now=new Date("2026-01-01T00:00:00Z");
+  const grantDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:null,accessGrants:[{source:"ADMIN_GRANTED",plan:"pro",startsAt:now,endsAt:expires}]}})}} as never;
+  assert.deepEqual(await sellerBusinessCommercialEntitlement(grantDb,"business",now),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"ADMIN_GRANTED",expiresAt:expires});
+  assert.equal((await sellerBusinessCommercialEntitlement(grantDb,"business",expires)).active,false);
 });
