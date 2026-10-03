@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { configuredSellerPlan } from "@/lib/seller-plans";
-import { createSellerSubscriptionCheckout, createStripeCustomer } from "@/lib/stripe";
+import { createStripeCustomer } from "@/lib/stripe";
+import {createOrReuseSellerSubscriptionCheckout,hasCurrentSellerSubscriptionEntitlement,SellerSubscriptionCheckoutError} from "@/lib/seller-subscription-checkout";
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
 import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
@@ -20,10 +21,10 @@ export async function POST(request: Request) {
     if (!plan) return NextResponse.json({ error: "Invalid or unavailable subscription plan." }, { status: 400 });
     const store = await prisma.store.findFirst({
       where: { id:(await prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{billingStoreId:true}}))?.billingStoreId??undefined,ownerId:session.userId },
-      select: { id: true, name: true, contactEmail: true, stripeCustomerId: true, subscription: { select: { status: true, stripePriceId: true } } },
+      select: { id: true, name: true, contactEmail: true, stripeCustomerId: true, subscription: { select: { status: true, plan:true,currentPeriodEnd:true } } },
     });
     if (!store) return NextResponse.json({ error: "Create your store first." }, { status: 403 });
-    if (store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status)) {
+    if (hasCurrentSellerSubscriptionEntitlement(store.subscription)) {
       return NextResponse.json({ error: "This store already has an active subscription." }, { status: 409 });
     }
     let customerId = store.stripeCustomerId;
@@ -33,16 +34,11 @@ export async function POST(request: Request) {
       await prisma.store.update({ where: { id: store.id }, data: { stripeCustomerId: customerId } });
       console.info(`[Seller subscription] Saved Stripe customer ${customerId} for store ${store.id}.`);
     }
-    await prisma.sellerSubscription.upsert({
-      where: { storeId: store.id },
-      create: { storeId: store.id, stripePriceId: plan.priceId, plan: plan.id, billingInterval: plan.interval, status: "INCOMPLETE" },
-      update: { stripePriceId: plan.priceId, plan: plan.id, billingInterval: plan.interval, status: "INCOMPLETE" },
-    });
-    console.info(`[Seller subscription] Prepared ${plan.id} subscription record for store ${store.id} with price ${plan.priceId}.`);
-    const checkout = await createSellerSubscriptionCheckout({ storeId: store.id, userId: session.userId, customerId, priceId: plan.priceId, plan: plan.id,interval:plan.interval,locale });
+    const checkout=await createOrReuseSellerSubscriptionCheckout({db:prisma,storeId:store.id,userId:session.userId,customerId,locale,plan:{id:plan.id,interval:plan.interval,priceId:plan.priceId}});
     console.info(`[Seller subscription] Created Checkout session ${checkout.id} for store ${store.id}.`);
     return NextResponse.json({ url: checkout.url });
   } catch (error) {
+    if(error instanceof SellerSubscriptionCheckoutError)return NextResponse.json({error:error.code},{status:error.status});
     if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     console.error("Seller subscription checkout failed", error);

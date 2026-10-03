@@ -12,6 +12,7 @@ import {convertMarketplacePrice} from "./marketplace-presentment";
 import {readGlobalDropshippingMargin} from "./suppliers/global-margin";
 import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
 import { sellerBusinessCommercialEntitlement } from "./seller-business";
+import {configuredSellerPlanForPriceId} from "./seller-plans";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -193,6 +194,7 @@ export async function processStripeEvent(
   const sellerCheckout = event.type === "checkout.session.completed"
     && (checkoutSession.mode === "subscription" || checkoutSession.metadata?.kind === "seller_subscription");
   let checkoutSubscription: StripeSubscription | null = null;
+  let paidInvoiceSubscription: StripeSubscription | null = null;
   if (sellerCheckout) {
     const subscriptionId = stripeObjectId(checkoutSession.subscription);
     if (!subscriptionId) throw new Error(`[Stripe webhook ${event.id}] Subscription Checkout session ${checkoutSession.id} has no subscription ID.`);
@@ -216,6 +218,13 @@ export async function processStripeEvent(
   if (previouslyProcessed && sellerCheckout) {
     console.warn(`[Stripe webhook ${event.id}] Replaying an existing subscription Checkout event to repair local subscription state.`);
   }
+  if(event.type==="invoice.paid"){
+    const invoice=event.data.object as StripeInvoice;
+    const subscriptionId=invoice.subscription??invoice.parent?.subscription_details?.subscription;
+    if(invoice.object!=="invoice"||!subscriptionId)throw new Error(`[Stripe webhook ${event.id}] Invoice event has no subscription ID.`);
+    paidInvoiceSubscription=await retrieveSubscription(subscriptionId);
+    if(!paidInvoiceSubscription?.id)throw new Error(`[Stripe webhook ${event.id}] Stripe returned no subscription for ${subscriptionId}.`);
+  }
 
   try {
     return await db.$transaction(async (tx) => {
@@ -233,20 +242,20 @@ export async function processStripeEvent(
         const synced = await syncSellerSubscription(tx, subscription, event.type, event.id);
         return { subscriptionUpdated: true, storeId: synced.storeId, status: synced.status };
       }
-      if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+      if(event.type==="invoice.paid"){
+        if(!paidInvoiceSubscription)throw new Error(`[Stripe webhook ${event.id}] Retrieved subscription is unavailable.`);
+        const synced=await syncSellerSubscription(tx,paidInvoiceSubscription,event.type,event.id);
+        return{subscriptionUpdated:true,storeId:synced.storeId,status:synced.status};
+      }
+      if (event.type === "invoice.payment_failed") {
         const invoice = event.data.object as StripeInvoice;
         const invoiceSubscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
         if (invoice.object !== "invoice" || !invoiceSubscriptionId) throw new Error(`[Stripe webhook ${event.id}] Invoice event has no subscription ID.`);
-        const status = event.type === "invoice.paid" ? "ACTIVE" : "PAST_DUE";
+        const status = "PAST_DUE";
         const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true, currentPeriodEnd:true, store: { select: { sellerType: true, businessId:true } } } });
         if (!existing) throw new Error(`[Stripe webhook ${event.id}] No local seller subscription matches invoice subscription ${invoiceSubscriptionId}.`);
         await tx.sellerSubscription.update({ where: { stripeSubscriptionId: invoiceSubscriptionId }, data: { status } });
-        const commerciallyActive=status==="ACTIVE"&&Boolean(existing.currentPeriodEnd&&existing.currentPeriodEnd>new Date());
-        if (commerciallyActive && existing.store.sellerType !== "UNKNOWN") {
-          await tx.store.update({ where: { id: existing.storeId }, data: { status: "ACTIVE" } });
-        } else {
-          await tx.product.updateMany({ where: { ...(existing.store.businessId?{store:{businessId:existing.store.businessId}}:{storeId:existing.storeId}), status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
-        }
+        await tx.product.updateMany({ where: { ...(existing.store.businessId?{store:{businessId:existing.store.businessId}}:{storeId:existing.storeId}), status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
         console.info(`[Stripe webhook ${event.id}] Invoice updated a seller subscription to ${status}.`);
         return { subscriptionUpdated: true, storeId: existing.storeId, status };
       }
@@ -324,8 +333,10 @@ async function syncSellerSubscription(
   if (!store) throw new Error(`[Stripe webhook ${eventId}] Store ${storeId} does not exist.`);
   if (hint.userId && store.ownerId !== hint.userId) throw new Error(`[Stripe webhook ${eventId}] Checkout user does not own store ${storeId}.`);
   if (store.stripeCustomerId && store.stripeCustomerId !== customerId) throw new Error(`[Stripe webhook ${eventId}] Stripe customer does not match store ${storeId}.`);
-  const priceId = subscription.items?.data?.[0]?.price?.id ?? existing?.stripePriceId;
+  const priceId = subscription.items?.data?.[0]?.price?.id;
   if (!priceId) throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} has no Stripe Price ID.`);
+  const configuredPlan=configuredSellerPlanForPriceId(priceId);
+  if(!configuredPlan)throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} uses unrecognized seller Price ${priceId}.`);
   const status = localSubscriptionStatus(subscription.status, eventType);
   const active = status === "ACTIVE" || status === "TRIALING";
   const item = subscription.items?.data?.[0];
@@ -339,8 +350,8 @@ async function syncSellerSubscription(
   console.info(`[Stripe webhook ${eventId}] Store subscription state updated (status=${storeUpdate.status}).`);
   const subscriptionUpdate = await tx.sellerSubscription.upsert({
     where: { storeId },
-    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan ?? "seller", status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
-    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan, status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
   });
   console.info(`[Stripe webhook ${eventId}] Seller subscription record updated (status=${subscriptionUpdate.status}).`);
   const products = commerciallyActive

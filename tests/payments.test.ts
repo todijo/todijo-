@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { Prisma } from "@prisma/client";
+
+process.env.STRIPE_SELLER_BASIC_MONTHLY_PRICE_ID ??= "price_basic";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckoutGroups, processStripeEvent } from "../lib/payments";
 import { assertStripeCheckoutSessionMode, assertStripeWebhookMode, configuredStripeMode, stripeCheckoutSessionMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 

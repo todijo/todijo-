@@ -276,7 +276,7 @@ export async function createStripeCustomer(input: { storeId: string; userId: str
   });
 }
 
-export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string;interval:string;locale:string }) {
+export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string;interval:string;locale:string;idempotencyKey:string }) {
   const origin = appUrl();
   const body = new URLSearchParams({
     mode: "subscription",
@@ -297,11 +297,11 @@ export async function createSellerSubscriptionCheckout(input: { storeId: string;
     "subscription_data[metadata][plan]": input.plan,
     "subscription_data[metadata][interval]": input.interval,
   });
-  const session = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", {
-    method: "POST", idempotencyKey: `seller-subscription:${input.storeId}:${input.priceId}`, body,
+  const session = await stripeRequest<{ id: string; url: string; expires_at?:number }>("/checkout/sessions", {
+    method: "POST", idempotencyKey: input.idempotencyKey, body,
   });
-  if (!session.id || !session.url) throw new Error("Stripe subscription Checkout session creation failed.");
-  return session;
+  if (!session.id || !session.url || !session.expires_at) throw new Error("Stripe subscription Checkout session creation failed.");
+  return {id:session.id,url:session.url,expiresAt:new Date(session.expires_at*1000)};
 }
 
 export function verifyStripeWebhook(rawBody: string, signatureHeader: string | null, secret: string, now = Date.now()): StripeEvent {

@@ -58,5 +58,5 @@ test("existing activity restrictions and subscription authority stay unchanged",
   const onboarding = source("app/api/seller/onboarding/route.ts"), checkout = source("app/api/seller/subscription/checkout/route.ts");
   assert.match(onboarding, /assertSellerActivity\(prisma,session\.userId\)/);
   assert.match(checkout, /assertSellerActivity/);
-  assert.match(checkout, /createSellerSubscriptionCheckout/);
+  assert.match(checkout, /createOrReuseSellerSubscriptionCheckout/);
 });

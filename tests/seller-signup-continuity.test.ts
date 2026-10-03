@@ -49,15 +49,16 @@ test("subscription review uses canonical server plan amounts and checkout price 
   assert.match(page,/sellerSubscriptionReview/);
   assert.match(api,/configuredSellerPlan\(body\.planId, body\.interval\)/);
   assert.match(stripe,/metadata\[interval\]/);
-  assert.match(stripe,/seller-subscription:\$\{input\.storeId\}:\$\{input\.priceId\}/);
+  assert.match(stripe,/idempotencyKey: input\.idempotencyKey/);
 });
 
 test("authoritative post-payment state resumes Connect and avoids duplicate checkout",()=>{
-  const page=source("app/seller/subscription/page.tsx"),activation=source("app/seller/subscription/ActivatingSubscription.tsx"),setup=source("app/seller/payment-setup/page.tsx"),api=source("app/api/seller/subscription/checkout/route.ts");
+  const page=source("app/seller/subscription/page.tsx"),activation=source("app/seller/subscription/ActivatingSubscription.tsx"),setup=source("app/seller/payment-setup/page.tsx"),api=source("app/api/seller/subscription/checkout/route.ts"),checkout=source("lib/seller-subscription-checkout.ts");
   assert.match(page,/connectReady\?`\/\$\{locale\}\/dashboard`:`\/\$\{locale\}\/seller\/payment-setup`/);
   assert.match(activation,/seller\/payment-setup/);
   assert.match(setup,/sellerBusinessCommercialEntitlement/);
   assert.match(setup,/if\(ready\)redirect\(`\/\$\{locale\}\/dashboard`\)/);
   assert.match(api,/already has an active subscription/);
-  assert.match(api,/sellerSubscription\.upsert/);
+  assert.match(api,/createOrReuseSellerSubscriptionCheckout/);
+  assert.match(checkout,/sellerSubscription\.upsert/);
 });

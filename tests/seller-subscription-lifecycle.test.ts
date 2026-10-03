@@ -47,6 +47,16 @@ test("subscription reminder queue is durable and duplicate-safe and expiry prese
   assert.deepEqual(demotedWhere,{store:{businessId:"business"},status:"PUBLISHED",deactivationReason:"NONE"});
 });
 
+test("a renewed annual period receives a fresh reminder identity",async()=>{
+  const keys=new Set<string>();
+  const row={id:"sub",status:"ACTIVE",plan:"pro",billingInterval:"annual",currentPeriodEnd:after(30),store:{id:"billing",businessId:"business",language:"fr",owner:{email:"seller@example.test",firstName:"Vendeur"}}};
+  const db:any={sellerSubscription:{findMany:async()=>[row]},product:{updateMany:async()=>({count:0})},sellerSubscriptionReminderDelivery:{createMany:async({data}:any)=>{const key=`${data[0].subscriptionId}:${data[0].periodEnd.toISOString()}:${data[0].kind}`;if(keys.has(key))return{count:0};keys.add(key);return{count:1}}}};
+  assert.equal((await enqueueDueSellerSubscriptionReminders(db,now)).queued,1);
+  row.currentPeriodEnd=after(395);
+  assert.equal((await enqueueDueSellerSubscriptionReminders(db,after(365))).queued,1);
+  assert.equal(keys.size,2);
+});
+
 test("only one concurrent worker claims a reminder and retry state remains durable",async()=>{
   let status="QUEUED",attemptCount=0,sends=0,claimToken:string|null=null;
   const db:any={sellerSubscriptionReminderDelivery:{
@@ -76,5 +86,14 @@ test("migration is additive and enforces one reminder per subscription period an
   const sql=readFileSync(join(process.cwd(),"prisma/migrations/20261003200000_add_seller_subscription_reminders/migration.sql"),"utf8");
   assert.match(sql,/CREATE TABLE "SellerSubscriptionReminderDelivery"/);
   assert.match(sql,/"subscriptionId", "periodEnd", "kind"/);
+  assert.doesNotMatch(sql,/^\s*(?:DROP|TRUNCATE|DELETE|UPDATE)\s/m);
+});
+
+test("Checkout-attempt migration is additive, nullable, and uniquely identifies durable Stripe attempts",()=>{
+  const sql=readFileSync(join(process.cwd(),"prisma/migrations/20261003213000_add_seller_subscription_checkout_attempt/migration.sql"),"utf8");
+  for(const column of ["stripeCheckoutSessionId","stripeCheckoutUrl","stripeCheckoutExpiresAt","stripeCheckoutIdempotencyKey","stripeCheckoutAttemptGeneration"])assert.match(sql,new RegExp(`ADD COLUMN "${column}"`));
+  assert.match(sql,/"stripeCheckoutAttemptGeneration" INTEGER NOT NULL DEFAULT 0/);
+  assert.match(sql,/SellerSubscription_stripeCheckoutSessionId_key/);
+  assert.match(sql,/SellerSubscription_stripeCheckoutIdempotencyKey_key/);
   assert.doesNotMatch(sql,/^\s*(?:DROP|TRUNCATE|DELETE|UPDATE)\s/m);
 });
