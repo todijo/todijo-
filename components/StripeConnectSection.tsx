@@ -6,6 +6,8 @@ import {connectPaymentCopy} from "@/i18n/connect-payment";
 
 type Status = { connected: boolean; onboardingComplete: boolean; chargesEnabled: boolean; payoutsEnabled: boolean };
 
+export function isStripeConnectReady(status:Status){return status.connected && status.onboardingComplete && status.chargesEnabled && status.payoutsEnabled;}
+
 function isStatusResponse(value: unknown): value is Status {
   if (!value || typeof value !== "object") return false;
   const status = value as Record<string, unknown>;
@@ -31,7 +33,7 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const latestRefresh = useRef(0);
-  const ready = status.connected && status.onboardingComplete && status.chargesEnabled && status.payoutsEnabled;
+  const ready = isStripeConnectReady(status);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++latestRefresh.current;
@@ -46,6 +48,7 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
       if (!isStatusResponse(result)) throw new Error(t("error"));
       if (requestId === latestRefresh.current) {
         setStatus(result);
+        if(isStripeConnectReady(result))setError("");
       }
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -64,6 +67,8 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
     };
   }, [refresh]);
 
+  useEffect(()=>{if(ready){setError("");setBusy(false)}},[ready]);
+
   async function onboard() {
     setBusy(true); setError("");
     try {
@@ -80,7 +85,7 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
   }
 
   return <section className="dashboardQuickActions stripeConnectSection">
-    <h2>{t("title")}</h2><p>{paymentCopy.explanation}</p><p><strong>{ready ? `✓ ${t("complete")}` : `✕ ${t("pending")}`}</strong></p>
+    <h2>{t("title")}</h2><p>{paymentCopy.explanation}</p><p><strong>{ready ? `✓ ${paymentCopy.ready}` : `✕ ${t("pending")}`}</strong></p>
     <div className="stripeStatusGrid">
       <span className={status.connected ? "isReady" : ""}>{status.connected ? "✓ Stripe" : t("notConnected")}</span>
       <span className={status.onboardingComplete ? "isReady" : ""}>{status.onboardingComplete ? `✓ ${t("complete")}` : `✕ ${t("pending")}`}</span>
@@ -88,7 +93,7 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
       <span className={status.payoutsEnabled ? "isReady" : ""}>{status.payoutsEnabled ? "✓ " : "✕ "}{t("payoutsEnabled")}</span>
     </div>
     {ready&&!commercialEntitlementActive&&<p className="subscriptionWarning" role="status">{paymentCopy.readyNoPlan}</p>}
-    {error && <p className="formError" role="alert">{error}</p>}
-    <div><button className="quickActionLink primary" type="button" onClick={onboard} disabled={busy}>{busy ? t("loading") : status.connected ? t("resume") : paymentCopy.configure}</button><button className="quickActionLink secondary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? t("refreshing") : t("refresh")}</button></div><small>{paymentCopy.secure}</small>
+    {!ready&&error && <p className="formError" role="alert">{error}</p>}
+    <div>{!ready&&<button className="quickActionLink primary" type="button" onClick={onboard} disabled={busy}>{busy ? t("loading") : status.connected ? t("resume") : paymentCopy.configure}</button>}<button className="quickActionLink secondary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? t("refreshing") : t("refresh")}</button></div><small>{paymentCopy.secure}</small>
   </section>;
 }
