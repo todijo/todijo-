@@ -133,7 +133,7 @@ fi
 test "$(docker inspect --format '{{.State.Status}}' "${valid_app_container}")" = "running"
 wait_for_health "${valid_app_container}"
 docker exec "${postgres_container}" psql -U todijo -d valid_startup -v ON_ERROR_STOP=1 -Atc \
-  "SELECT to_regclass('\"DeploymentPipelineProbe\"') IS NOT NULL;" | grep -Fx true
+  "SELECT to_regclass('\"DeploymentPipelineProbe\"') IS NOT NULL;" | grep -Fx t
 docker exec "${postgres_container}" psql -U todijo -d valid_startup -v ON_ERROR_STOP=1 -Atc \
   "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${valid_migration}' AND finished_at IS NOT NULL;" | grep -Fx 1
 
