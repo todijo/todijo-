@@ -2,7 +2,11 @@ import type { Locale } from "./config";
 
 type SellerReviewCopy = { reason: string; verify: string; needsInformation: string; reject: string; working: string; failed: string; saved: string; backAdmin: string };
 
-export const sellerReviewMessages: Record<Locale, SellerReviewCopy> = {
+const reviewDetails = {
+  en: { access: "Store access", subscription: "Subscription", connect: "Stripe account", onboarding: "Stripe onboarding", charges: "Charges", payouts: "Payouts", incomplete: "Seller onboarding is incomplete. Approval requires submission and verification.", awaitingReview: "Submitted; awaiting Admin verification." },
+  fr: { access: "Accès boutique", subscription: "Abonnement", connect: "Compte Stripe", onboarding: "Inscription Stripe", charges: "Paiements", payouts: "Versements", incomplete: "Inscription vendeur incomplète. La validation nécessite une soumission et une vérification.", awaitingReview: "Dossier soumis ; en attente de vérification Admin." },
+};
+const baseSellerReviewMessages: Record<Locale, SellerReviewCopy> = {
   en: { reason: "Review reason", verify: "Verify", needsInformation: "Needs information", reject: "Reject", working: "Saving…", failed: "The review could not be saved.", saved: "Review saved.", backAdmin: "Back to admin" },
   fr: { reason: "Motif de la décision", verify: "Vérifier", needsInformation: "Informations requises", reject: "Refuser", working: "Enregistrement…", failed: "La décision n’a pas pu être enregistrée.", saved: "Décision enregistrée.", backAdmin: "Retour à l’administration" },
   ar: { reason: "سبب القرار", verify: "تحقق", needsInformation: "معلومات مطلوبة", reject: "رفض", working: "جارٍ الحفظ…", failed: "تعذر حفظ القرار.", saved: "تم حفظ القرار.", backAdmin: "العودة إلى الإدارة" },
@@ -18,3 +22,4 @@ export const sellerReviewMessages: Record<Locale, SellerReviewCopy> = {
   pt: { reason: "Motivo da análise", verify: "Verificar", needsInformation: "Informações necessárias", reject: "Rejeitar", working: "A guardar…", failed: "Não foi possível guardar a análise.", saved: "Análise guardada.", backAdmin: "Voltar à administração" },
   ru: { reason: "Причина решения", verify: "Подтвердить", needsInformation: "Нужна информация", reject: "Отклонить", working: "Сохранение…", failed: "Не удалось сохранить решение.", saved: "Решение сохранено.", backAdmin: "Назад в панель администратора" },
 };
+export const sellerReviewMessages = Object.fromEntries(Object.entries(baseSellerReviewMessages).map(([locale, copy]) => [locale, { ...copy, ...(locale === "fr" ? reviewDetails.fr : reviewDetails.en) }])) as Record<Locale, SellerReviewCopy & typeof reviewDetails.en>;
