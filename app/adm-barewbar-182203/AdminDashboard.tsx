@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { BadgeCheck, CalendarPlus, PackagePlus, ShieldCheck, Store, Users } from "lucide-react";
 import GlobalDropshippingMarginForm from "@/components/GlobalDropshippingMarginForm";
+import { adminStoreOwnerCopy } from "@/i18n/admin-store-owners";
 
 type AdminUser = { id: string; firstName: string; lastName: string; email: string; role: string; hasStore: boolean; managedStoreEligible: boolean };
 type AdminStore = {
@@ -24,8 +25,32 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const currentAdmin = users.find((user) => user.id === adminId && user.managedStoreEligible);
-  const eligibleUsers = users.filter((user) => user.managedStoreEligible);
+  const ownerCopy = adminStoreOwnerCopy(locale);
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [ownerReload, setOwnerReload] = useState(0);
+  const [ownerState, setOwnerState] = useState<"ready" | "loading" | "error">("ready");
+  const [ownerOptions, setOwnerOptions] = useState(() => users.filter(user => user.managedStoreEligible));
+  const [selectedOwner, setSelectedOwner] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    setOwnerState("loading");
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/admin/store-owners?q=${encodeURIComponent(ownerSearch)}`, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("OWNER_LIST_UNAVAILABLE");
+        const data = await response.json() as { owners: AdminUser[] };
+        if (controller.signal.aborted) return;
+        const options = [...new Map(data.owners.map(owner => [owner.id, owner])).values()];
+        setOwnerOptions(options);
+        setSelectedOwner(current => options.some(owner => owner.id === current) ? current : "");
+        setOwnerState("ready");
+      } catch {
+        if (!controller.signal.aborted) { setOwnerOptions([]); setSelectedOwner(""); setOwnerState("error"); }
+      }
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [ownerSearch, ownerReload]);
+  const eligibleUsers = ownerOptions;
   const sellerStores = stores.filter((store) => store.owner.role === "SELLER");
   const adminStore = stores.find((store) => store.owner.id === adminId);
   const activeCount = stores.filter((store) => store.accessSource !== "NONE").length;
@@ -35,7 +60,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
     setBusy(true);
     setMessage("");
     const response = await fetch("/api/admin/stores", {
-      method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      method, headers: { "Content-Type": "application/json", "x-todijo-admin-action": "1" }, body: JSON.stringify(body),
     });
     const data = await response.json() as { error?: string };
     setBusy(false);
@@ -44,6 +69,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
       return false;
     }
     setMessage(t("operationSucceeded"));
+    if (method === "POST") { setSelectedOwner(""); setOwnerReload(value => value + 1); }
     router.refresh();
     return true;
   }
@@ -94,7 +120,12 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
         <div className="adminPanelHeading"><Store/><div><h2>{t("createStore")}</h2><p>{t("createStoreHelp")}</p></div></div>
         {adminStore && <div className="adminOwnStoreAction"><p>{adminStore.name} · {t("createStoreHelp")}</p><button type="button" onClick={exemptMyStore} disabled={busy || adminStore.accessSource === "ADMIN_EXEMPT"}>{t("source.ADMIN_EXEMPT")}</button></div>}
         <form className="adminForm" onSubmit={createStore}>
-          <label>{t("owner")}<select name="ownerId" required defaultValue={currentAdmin?.id ?? ""}><option value="" disabled>{t("selectOwner")}</option>{eligibleUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.role}</option>)}</select></label>
+          <label>{ownerCopy.search}<input type="search" value={ownerSearch} maxLength={100} onChange={event => setOwnerSearch(event.target.value)}/></label>
+          <button type="button" onClick={() => setOwnerReload(value => value + 1)} disabled={ownerState === "loading"}>{ownerCopy.refresh}</button>
+          {ownerState === "loading" && <p role="status">{ownerCopy.loading}</p>}
+          {ownerState === "error" && <p role="alert">{ownerCopy.error}</p>}
+          {ownerState === "ready" && !eligibleUsers.length && <p role="status">{ownerCopy.empty}</p>}
+          <label>{t("owner")}<select name="ownerId" required value={selectedOwner} disabled={ownerState !== "ready"} onChange={event => setSelectedOwner(event.target.value)}><option value="" disabled>{t("selectOwner")}</option>{eligibleUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.email} · {user.role}</option>)}</select></label>
           <div><label>{t("storeName")}<input name="name" minLength={2} maxLength={80} required/></label><label>{t("storeAddress")}<input name="slug" minLength={3} maxLength={60}/></label></div>
           <label>{t("description")}<textarea name="description" maxLength={1000} rows={3}/></label>
           <div><label>{t("email")}<input name="contactEmail" type="email" required/></label><label>{t("phone")}<input name="phone" maxLength={30}/></label></div>
@@ -102,7 +133,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
           <div><label>{t("currency")}<select name="currency" defaultValue="EUR"><option>EUR</option><option>USD</option><option>GBP</option></select></label><label>{t("language")}<select name="language" defaultValue={locale}>{["en","fr","ar","ku","tr","de","es","it","nl","fa","hi","pt","ru"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
           <label>{t("initialAccess")}<select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
           <label>{t("subscription")}<select name="plan" defaultValue="basic"><option value="basic">BASIC</option><option value="plus">PLUS</option><option value="pro">PRO</option></select></label>
-          <button disabled={busy || !eligibleUsers.length}>{busy ? t("working") : t("createStoreAction")}</button>
+          <button disabled={busy || ownerState !== "ready" || !selectedOwner}>{busy ? t("working") : t("createStoreAction")}</button>
         </form>
       </section>
 

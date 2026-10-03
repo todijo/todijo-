@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { AdminAccessError, type ManagedStoreInput } from "./admin-access";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
 import { lockSellerBusiness, sellerBusinessCommercialPlan } from "./seller-business";
+import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
 
 export async function createAdditionalAdminManagedStore(
   tx: Prisma.TransactionClient,
@@ -10,12 +11,9 @@ export async function createAdditionalAdminManagedStore(
   businessId: string,
   now = new Date(),
 ) {
-  const owner = await tx.user.findUnique({
-    where: { id: input.ownerId },
-    select: { id: true, role: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true, ownedBusiness: { select: { id: true } } },
-  });
-  if (!owner || owner.role !== "SELLER" || owner.ownedBusiness?.id !== businessId) throw new AdminAccessError("Selected owner is not eligible.", 400, "OWNER_INELIGIBLE");
-  if (owner.sellerSuspendedAt || owner.deactivatedAt || owner.blockedAt && (!owner.blockExpiresAt || owner.blockExpiresAt > now)) throw new AdminAccessError("Selected owner is restricted.", 403, "OWNER_RESTRICTED");
+  await lockManagedOwner(tx, input.ownerId);
+  const { owner, mode, businessId: eligibleBusinessId } = await requireManagedOwner(tx, input.ownerId, adminId, now);
+  if (mode !== "ADDITIONAL" || eligibleBusinessId !== businessId) throw new AdminAccessError("Selected owner state changed.", 409, "OWNER_STATE_CHANGED");
   const locked = await lockSellerBusiness(tx, businessId);
   const storeCount = await tx.store.count({ where: { businessId } });
   if (storeCount >= locked.maxStores) throw new AdminAccessError("The Store limit has been reached.", 409, "STORE_LIMIT_REACHED");

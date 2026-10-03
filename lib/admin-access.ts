@@ -1,16 +1,14 @@
 import type { Prisma, PrismaClient, StoreAccessSource, UserRole } from "@prisma/client";
 import { isSellerPlanId, type SellerPlanId } from "./seller-plans";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
+import { AdminAccessError } from "./admin-access-error";
+import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
+export { AdminAccessError } from "./admin-access-error";
 
 export const adminGrantMonths = [1, 3, 6, 12] as const;
 export type AdminGrantMonths = (typeof adminGrantMonths)[number];
 type Database = PrismaClient | Prisma.TransactionClient;
 
-export class AdminAccessError extends Error {
-  constructor(message: string, public status = 400, public code = "ADMIN_ACCESS_ERROR") {
-    super(message);
-  }
-}
 
 export function isAdminRole(role: UserRole | string | null | undefined) {
   return role === "ADMIN";
@@ -108,10 +106,11 @@ export type ManagedStoreInput = {
   plan?: SellerPlanId;
 };
 
-export async function createManagedStore(db: Database, adminId: string, input: ManagedStoreInput, now = new Date()) {
-  const owner = await db.user.findUnique({ where: { id: input.ownerId }, select: { id: true, role: true, store: { select: { id: true } } } });
-  if (!owner) throw new AdminAccessError("Selected user was not found.", 404, "OWNER_NOT_FOUND");
-  if (owner.store) throw new AdminAccessError("Selected user already owns a store.", 409, "STORE_EXISTS");
+export async function createManagedStore(db: Database, adminId: string, input: ManagedStoreInput, now = new Date()): Promise<{ id: string; slug: string }> {
+  if ("$transaction" in db) return db.$transaction(tx => createManagedStore(tx, adminId, input, now), { isolationLevel: "Serializable" });
+  await lockManagedOwner(db, input.ownerId);
+  const { owner, mode } = await requireManagedOwner(db, input.ownerId, adminId, now);
+  if (mode !== "FIRST") throw new AdminAccessError("Selected owner requires the additional-store flow.", 409, "OWNER_STATE_CHANGED");
   const ownStore = owner.id === adminId;
   if (ownStore && owner.role !== "ADMIN") throw new AdminAccessError("Administrator store ownership is invalid.", 403, "ADMIN_REQUIRED");
   if (!ownStore && owner.role !== "SELLER") throw new AdminAccessError("Only an existing seller can receive a managed store.", 400, "OWNER_INELIGIBLE");

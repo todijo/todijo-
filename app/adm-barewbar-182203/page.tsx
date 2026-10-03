@@ -13,7 +13,7 @@ import { isLocale } from "@/i18n/config";
 import { siteContentMessages } from "@/i18n/site-content";
 import { loyaltyMessages } from "@/i18n/loyalty";
 import { readGlobalDropshippingMargin } from "@/lib/suppliers/global-margin";
-import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
+import { managedOwnerEligibility as ownerEligibility, managedOwnerSelect } from "@/lib/admin-store-owner-eligibility";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -40,7 +40,7 @@ export default async function AdminPage() {
   const [users, stores, pendingFinalRefundCount, globalDropshippingMargin] = await Promise.all([
     prisma.user.findMany({
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
-      select: { id: true, firstName: true, lastName: true, email: true, role: true, sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true, store: { select: { id: true } }, ownedBusiness: { select: { id: true, maxStores: true, _count: { select: { stores: true } } } } },
+      select: { ...managedOwnerSelect, store: { select: { id: true } } },
     }),
     prisma.store.findMany({
       orderBy: { createdAt: "desc" },
@@ -65,11 +65,7 @@ export default async function AdminPage() {
     };
   });
   const managedOwnerEligibility = new Map(await Promise.all(users.map(async (user) => {
-    if (user.id === session.userId) return [user.id, !user.store] as const;
-    if (user.role !== "SELLER" || user.sellerSuspendedAt || user.deactivatedAt || user.blockedAt && (!user.blockExpiresAt || user.blockExpiresAt > now)) return [user.id, false] as const;
-    if (!user.ownedBusiness || user.ownedBusiness._count.stores === 0) return [user.id, true] as const;
-    const plan = await sellerBusinessCommercialPlan(prisma, user.ownedBusiness.id, now);
-    return [user.id, plan === "pro" && user.ownedBusiness._count.stores < user.ownedBusiness.maxStores] as const;
+    return [user.id, (await ownerEligibility(prisma, user, session.userId, now)).eligible] as const;
   })));
 
   return <main className="adminPage">

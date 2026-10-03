@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { isSellerPlanId } from "@/lib/seller-plans";
 import { createAdditionalAdminManagedStore } from "@/lib/admin-managed-store";
+import { lockManagedOwner, requireManagedOwner } from "@/lib/admin-store-owner-eligibility";
+import { assertAdminMutationRequest, MutationOriginError } from "@/lib/request-security";
 
 function slugify(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
@@ -12,6 +14,8 @@ function slugify(value: string) {
 }
 
 function errorResponse(error: unknown) {
+  if (error instanceof MutationOriginError) return NextResponse.json({ error: error.message }, { status: 403 });
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") return NextResponse.json({ error: "Owner state changed. Refresh the owner list and retry." }, { status: 409 });
   if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return NextResponse.json({ error: "A store already uses this name or address." }, { status: 409 });
@@ -24,6 +28,7 @@ export async function POST(request: Request) {
   try {
     const session = await readSession();
     const admin = await requireAdmin(prisma, session);
+    assertAdminMutationRequest(request);
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const slug = slugify(String(body.slug || name));
@@ -36,7 +41,7 @@ export async function POST(request: Request) {
     if (!String(body.country ?? "").trim() || !String(body.city ?? "").trim()) throw new AdminAccessError("Country and city are required.");
     if (!/^[A-Z]{3}$/.test(currency) || !/^[a-z]{2}(-[a-z]{2})?$/.test(language)) throw new AdminAccessError("Currency or language is invalid.");
     const input = {
-      ownerId: String(body.ownerId ?? ""),
+      ownerId: typeof body.ownerId === "string" ? body.ownerId.trim() : "",
       name,
       slug,
       description: String(body.description ?? "").trim() || null,
@@ -49,11 +54,15 @@ export async function POST(request: Request) {
       months: validGrantMonths(months) ? months : undefined,
       plan: isSellerPlanId(body.plan) ? body.plan : undefined,
     };
-    const ownerBusiness = await prisma.sellerBusiness.findUnique({ where: { ownerId: input.ownerId }, select: { id: true, _count: { select: { stores: true } } } });
+    if (!input.ownerId) throw new AdminAccessError("Select an eligible owner.", 400, "OWNER_REQUIRED");
     const store = await prisma.$transaction(
-      (tx) => ownerBusiness?._count.stores
-        ? createAdditionalAdminManagedStore(tx, admin.id, input, ownerBusiness.id)
-        : createManagedStore(tx, admin.id, input),
+      async (tx) => {
+        await lockManagedOwner(tx, input.ownerId);
+        const eligibility = await requireManagedOwner(tx, input.ownerId, admin.id);
+        return eligibility.mode === "ADDITIONAL"
+          ? createAdditionalAdminManagedStore(tx, admin.id, input, eligibility.businessId!)
+          : createManagedStore(tx, admin.id, input);
+      },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
     return NextResponse.json({ ok: true, store });

@@ -29,7 +29,8 @@ test("admin authorization uses the current database role instead of a stale JWT 
 test("admin creates an own permanent store without payment", async () => {
   let data: Record<string, unknown> | undefined;
   const db = {
-    user: { findUnique: async () => ({ id: "admin", role: "ADMIN", store: null }) },
+    $queryRaw: async () => [],
+    user: { findUnique: async () => ({ id: "admin", role: "ADMIN", primaryStoreId: null, _count: { stores: 0 } }) },
     store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-admin", slug: "admin-shop" }; } },
   } as unknown as Db;
   await createManagedStore(db, "admin", { ownerId: "admin", name: "Admin Shop", slug: "admin-shop", contactEmail: "admin@example.com", country: "FR", city: "Paris", currency: "EUR", language: "fr" });
@@ -42,7 +43,8 @@ test("admin creates an own permanent store without payment", async () => {
 test("admin creates an eligible seller store with timed access and no Stripe data", async () => {
   let data: Record<string, unknown> | undefined;
   const db = {
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", store: null }) },
+    $queryRaw: async () => [],
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, _count: { stores: 0 } }) },
     store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; } },
   } as unknown as Db;
   const now = new Date("2026-01-15T12:00:00Z");
@@ -58,7 +60,7 @@ test("admin creates an additional PRO Store inside the existing business without
   let created: Record<string, unknown> | undefined;
   const audits: Array<Record<string, unknown>> = [];
   const db = {
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1" } }) },
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, _count: { stores: 1 }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1", maxStores: 3, _count: { stores: 1 } } }) },
     $queryRaw: async () => [{ id: "business-1", maxStores: 3 }],
     store: {
       count: async () => 1,
@@ -78,7 +80,7 @@ test("admin creates an additional PRO Store inside the existing business without
 
 test("additional managed Store fails closed for non-PRO and at capacity", async () => {
   const database = (plan: string, count: number) => ({
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1" } }) },
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, _count: { stores: count }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1", maxStores: 2, _count: { stores: count } } }) },
     $queryRaw: async () => [{ id: "business-1", maxStores: 2 }],
     store: { count: async () => count, create: async () => { throw new Error("must not create"); } },
     sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan,currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] } }) },
@@ -90,7 +92,7 @@ test("additional managed Store fails closed for non-PRO and at capacity", async 
 });
 
 test("normal customer cannot receive an admin-created seller store", async () => {
-  const db = { user: { findUnique: async () => ({ id: "buyer", role: "CUSTOMER", store: null }) } } as unknown as Db;
+  const db = { $queryRaw: async () => [], user: { findUnique: async () => ({ id: "buyer", role: "CUSTOMER", primaryStoreId: null, _count: { stores: 0 } }) } } as unknown as Db;
   await assert.rejects(() => createManagedStore(db, "admin", { ownerId: "buyer", name: "Shop", slug: "shop", contactEmail: "buyer@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr", months: 1 }));
 });
 
