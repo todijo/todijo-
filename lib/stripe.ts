@@ -276,24 +276,26 @@ export async function createStripeCustomer(input: { storeId: string; userId: str
   });
 }
 
-export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string }) {
+export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string;interval:string;locale:string }) {
   const origin = appUrl();
   const body = new URLSearchParams({
     mode: "subscription",
     customer: input.customerId,
     client_reference_id: input.storeId,
-    success_url: `${origin}/seller/subscription?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/seller/subscription?checkout=cancelled`,
+    success_url: `${origin}/${input.locale}/seller/subscription?checkout=success&plan=${encodeURIComponent(input.plan)}&interval=${encodeURIComponent(input.interval)}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/${input.locale}/seller/subscription?checkout=cancelled&plan=${encodeURIComponent(input.plan)}&interval=${encodeURIComponent(input.interval)}`,
     "line_items[0][price]": input.priceId,
     "line_items[0][quantity]": "1",
     "metadata[kind]": "seller_subscription",
     "metadata[storeId]": input.storeId,
     "metadata[userId]": input.userId,
     "metadata[plan]": input.plan,
+    "metadata[interval]": input.interval,
     "subscription_data[metadata][kind]": "seller_subscription",
     "subscription_data[metadata][storeId]": input.storeId,
     "subscription_data[metadata][userId]": input.userId,
     "subscription_data[metadata][plan]": input.plan,
+    "subscription_data[metadata][interval]": input.interval,
   });
   const session = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", {
     method: "POST", idempotencyKey: `seller-subscription:${input.storeId}:${input.priceId}`, body,

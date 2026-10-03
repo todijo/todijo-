@@ -20,11 +20,12 @@ export async function sendWelcomeEmail(input: { to: string; firstName: string; l
   await sendTodijoMail({ to: input.to, subject: copy.welcomeSubject, ...message });
 }
 
-export async function sendVerificationEmail(input: { to: string; firstName: string; locale: string; rawToken: string }) {
+export async function sendVerificationEmail(input: { to: string; firstName: string; locale: string; rawToken: string;next?:string }) {
   const copy = emailCopy(input.locale);
   const url = new URL("/api/auth/verify-email", publicAppUrl());
   url.searchParams.set("token", input.rawToken);
   url.searchParams.set("locale", input.locale);
+  if(input.next)url.searchParams.set("next",input.next);
   const message = layout(input.locale, input.firstName, { preview: copy.verifySubject, heading: copy.verifyHeading, body: copy.verifyBody, ctaLabel: copy.verifyCta, ctaUrl: url.toString() });
   await sendTodijoMail({ to: input.to, subject: copy.verifySubject, ...message });
 }

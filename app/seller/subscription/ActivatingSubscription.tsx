@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function ActivatingSubscription() {
+export default function ActivatingSubscription({locale}:{locale:string}) {
   const router = useRouter();
   const [message, setMessage] = useState("Stripe confirmed your payment. Activating your seller subscription…");
   const [attempt, setAttempt] = useState(0);
@@ -17,7 +17,7 @@ export default function ActivatingSubscription() {
         const data = await response.json() as { active?: boolean; status?: string; error?: string };
         if (!response.ok) throw new Error(data.error ?? "Unable to check subscription status.");
         if (data.active) {
-          router.replace("/seller/products/new");
+          router.replace(`/${locale}/seller/payment-setup`);
           router.refresh();
           return;
         }
@@ -35,7 +35,7 @@ export default function ActivatingSubscription() {
     }
     void check();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [router]);
+  }, [router,locale]);
 
   return <section className="subscriptionActivating" role="status" aria-live="polite">
     <span className="subscriptionSpinner" aria-hidden="true" />

@@ -7,13 +7,13 @@ type Plan = { id: string; name: string; monthlyAmountMinor: number; annualAmount
 
 type Copy = { monthly: string; annual: string; save20: string; perMonth: string; perYear: string; opening: string; active: string; anotherActive: string; subscribe: string; unavailable: string; checkoutError: string };
 
-export default function SubscriptionPlans({ plans, activePlanId, hasActiveSubscription, copy, initialPlanId, initialInterval }: { plans: Plan[]; activePlanId: string | null; hasActiveSubscription: boolean; copy: Copy; initialPlanId: string | null; initialInterval: BillingInterval }) {
+export default function SubscriptionPlans({ plans, activePlanId, hasActiveSubscription, copy, initialPlanId, initialInterval,locale }: { plans: Plan[]; activePlanId: string | null; hasActiveSubscription: boolean; copy: Copy; initialPlanId: string | null; initialInterval: BillingInterval;locale:string }) {
   const [loading, setLoading] = useState<string | null>(null);
   const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const [error, setError] = useState("");
   async function subscribe(planId: string) {
     setLoading(planId); setError("");
-    const response = await fetch("/api/seller/subscription/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId, interval }) });
+    const response = await fetch("/api/seller/subscription/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planId, interval,locale }) });
     const data = await response.json() as { url?: string; error?: string };
     if (response.ok && data.url) window.location.assign(data.url);
     else { setError(data.error ?? copy.checkoutError); setLoading(null); }

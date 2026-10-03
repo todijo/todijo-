@@ -55,12 +55,13 @@ export async function POST(request: Request) {
       if (input.role === "CUSTOMER" && input.shippingAddress) await createBuyerAddress(tx, created.id, input.shippingAddress, true);
       return created;
     });
+    const next = user.role === "SELLER" ? sellerOnboardingPath(locale, false, explicitSellerIntent) : localizedHome(locale);
 
     try {
       const rawToken = await issueEmailVerificationToken(user.id);
       const deliveries = await Promise.allSettled([
         sendWelcomeEmail({ to: user.email, firstName: user.firstName, locale }),
-        ...(rawToken ? [sendVerificationEmail({ to: user.email, firstName: user.firstName, locale, rawToken })] : []),
+        ...(rawToken ? [sendVerificationEmail({ to: user.email, firstName: user.firstName, locale, rawToken,next })] : []),
       ]);
       for (const delivery of deliveries) {
         if (delivery.status === "rejected") console.error("Registration email delivery failed.", safeEmailError(delivery.reason));
@@ -70,7 +71,6 @@ export async function POST(request: Request) {
     }
 
     await createSession({ userId: user.id, role: user.role, authVersion: user.authVersion });
-    const next = user.role === "SELLER" ? sellerOnboardingPath(locale, false, explicitSellerIntent) : localizedHome(locale);
     return NextResponse.json({ ok: true, role: user.role, next });
   } catch (error) {
     console.error(error);

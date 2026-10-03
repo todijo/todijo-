@@ -5,6 +5,7 @@ import { issueEmailVerificationToken } from "@/lib/auth-tokens";
 import { safeEmailError } from "@/lib/email/config";
 import { sendVerificationEmail } from "@/lib/email/send";
 import { prisma } from "@/lib/prisma";
+import { safeLoginDestination } from "@/lib/auth-redirects";
 
 const neutral = { ok: true, code: "VERIFICATION_EMAIL_ACCEPTED" };
 
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = String(body?.email ?? "").trim().toLowerCase();
     const locale = isLocale(body?.locale) ? body.locale : defaultLocale;
+    const next=typeof body?.next==="string"?safeLoginDestination(body.next,locale):undefined;
     if (!email) return NextResponse.json(neutral);
     if (!await allowAuthRequest(authRequestKey("resend-verification", email, request))) return NextResponse.json({ ok: false, code: "RATE_LIMITED" }, { status: 429 });
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, firstName: true, emailVerified: true } });
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
     const rawToken = await issueEmailVerificationToken(user.id, new Date(), 60_000);
     if (!rawToken) return NextResponse.json(neutral);
     try {
-      await sendVerificationEmail({ to: user.email, firstName: user.firstName, locale, rawToken });
+      await sendVerificationEmail({ to: user.email, firstName: user.firstName, locale, rawToken,next });
     } catch (error) {
       console.error("Verification email delivery failed.", safeEmailError(error));
     }

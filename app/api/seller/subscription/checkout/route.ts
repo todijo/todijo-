@@ -6,6 +6,7 @@ import { createSellerSubscriptionCheckout, createStripeCustomer } from "@/lib/st
 import { assertSellerActivity } from "@/lib/account-status";
 import { AdminAccessError } from "@/lib/admin-access";
 import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
+import { defaultLocale, isLocale } from "@/i18n/config";
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     await assertSellerActivity(prisma,session.userId);
     const body = await request.json();
     const plan = configuredSellerPlan(body.planId, body.interval);
+    const locale=isLocale(body.locale)?body.locale:defaultLocale;
     if (!plan) return NextResponse.json({ error: "Invalid or unavailable subscription plan." }, { status: 400 });
     const store = await prisma.store.findFirst({
       where: { id:(await prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{billingStoreId:true}}))?.billingStoreId??undefined,ownerId:session.userId },
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
       update: { stripePriceId: plan.priceId, plan: plan.id, billingInterval: plan.interval, status: "INCOMPLETE" },
     });
     console.info(`[Seller subscription] Prepared ${plan.id} subscription record for store ${store.id} with price ${plan.priceId}.`);
-    const checkout = await createSellerSubscriptionCheckout({ storeId: store.id, userId: session.userId, customerId, priceId: plan.priceId, plan: plan.id });
+    const checkout = await createSellerSubscriptionCheckout({ storeId: store.id, userId: session.userId, customerId, priceId: plan.priceId, plan: plan.id,interval:plan.interval,locale });
     console.info(`[Seller subscription] Created Checkout session ${checkout.id} for store ${store.id}.`);
     return NextResponse.json({ url: checkout.url });
   } catch (error) {
