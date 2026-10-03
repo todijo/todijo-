@@ -8,7 +8,51 @@ The baseline represents the exact Prisma schema at Git commit
 `1167bf82c57b52d07bfc7af6273fcc1e2fa70a6a`, immediately before
 `20260721170000_add_stripe_payments`.
 
-## Existing production database
+## Normal forward production migrations
+
+The production image owns normal forward migration execution. Its checked-in
+entrypoint runs the Prisma CLI and migration files from that same image:
+
+```text
+new image -> prisma migrate deploy -> Next.js start -> healthcheck -> traffic
+```
+
+The entrypoint runs as the non-root `nextjs` user (UID/GID 1001). It uses the
+checked-in local Prisma binary, exits immediately if migration deployment fails,
+and does not start Next.js until migration deployment succeeds. Consequently a
+replacement with a failed migration cannot become healthy or receive traffic;
+the existing healthy container remains the serving release during a rolling
+deployment.
+
+Keep both Coolify lifecycle command fields empty once this entrypoint is active.
+A pre-deployment command runs from the old image and therefore cannot see a
+migration introduced by the new image. A post-deployment command runs after the
+replacement has already been accepted. Do not configure either field as a
+second independent migration runner.
+
+Prisma serializes concurrent PostgreSQL migration deployments with an advisory
+lock. During a rolling overlap, a runner that cannot obtain the lock within
+Prisma's timeout must fail the replacement rather than bypass the lock. Schema
+changes must remain backward-compatible with the still-serving prior release;
+use expand/contract migrations for breaking changes.
+
+Every pull request that changes the deployment path or Prisma migrations must
+pass the container integration test against ephemeral PostgreSQL. That test
+proves no-pending startup, new-image-only migration execution, fail-closed
+startup, concurrency safety, non-root execution, runtime Prisma contents, and
+post-migration `/api/health`.
+
+For a read-only check from the intended application image and environment, run:
+
+```bash
+./node_modules/.bin/prisma migrate status
+```
+
+For normal forward deployment, do not use manual SQL, `prisma db push`,
+`prisma migrate reset`, or `prisma migrate resolve`. Do not automatically roll
+back a migration.
+
+## One-time baseline adoption for an existing production database
 
 Do not run the baseline SQL against an existing database. Do not mark the
 baseline as applied until every verification below succeeds.
