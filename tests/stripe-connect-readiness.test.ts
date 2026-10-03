@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { connectReadinessCounts, connectReadinessState, maskedStripeAccountId } from "../lib/connect-readiness";
 import { processEligibleSellerTransfer } from "../lib/seller-transfers";
 import { connectedAccountReady } from "../lib/stripe";
+import { startStripeConnectOnboarding } from "../lib/stripe-connect-onboarding";
 
 const account = (overrides: Partial<{ id: string; details_submitted: boolean; charges_enabled: boolean; payouts_enabled: boolean }> = {}) => ({
   id: "acct_ready", object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true, ...overrides,
@@ -100,10 +101,96 @@ test("checkout covers every marketplace store while CJ remains platform-owned", 
 
 test("onboarding reuses existing accounts and account creation is idempotent, never a mass migration", () => {
   const route = readFileSync(join(process.cwd(), "app/api/stripe/connect/account/route.ts"), "utf8");
+  const onboarding = readFileSync(join(process.cwd(), "lib/stripe-connect-onboarding.ts"), "utf8");
   const stripe = readFileSync(join(process.cwd(), "lib/stripe.ts"), "utf8");
-  assert.match(route, /if \(!accountId\)/); assert.match(route, /createConnectedAccountLink\(accountId\)/);
+  assert.match(route, /startStripeConnectOnboarding/);
+  assert.match(onboarding, /if \(!accountId\)/); assert.match(onboarding, /createAccountLink\(accountId\)/);
   assert.match(stripe, /connect-account-v2:\$\{input\.userId\}/);
   assert.doesNotMatch(route, /findMany|updateMany/);
+});
+
+test("Connect onboarding persists one authoritative account and reuses it on retry", async () => {
+  let stored: string | null = null;
+  let creates = 0;
+  const links: string[] = [];
+  const db = {
+    user: {
+      updateMany: async ({ data }: any) => {
+        if (stored) return { count: 0 };
+        stored = data.stripeAccountId;
+        return { count: 1 };
+      },
+      findUnique: async () => ({ stripeAccountId: stored }),
+    },
+  };
+  const dependencies = {
+    createAccount: async () => {
+      creates += 1;
+      return account({ id: "acct_created" });
+    },
+    createAccountLink: async (accountId: string) => {
+      links.push(accountId);
+      return `https://connect.stripe.test/${accountId}`;
+    },
+  };
+
+  const first = await startStripeConnectOnboarding(db, { id: "seller_1", email: "seller@example.test", stripeAccountId: null }, dependencies);
+  const second = await startStripeConnectOnboarding(db, { id: "seller_1", email: "seller@example.test", stripeAccountId: stored }, dependencies);
+  assert.equal(first, "https://connect.stripe.test/acct_created");
+  assert.equal(second, first);
+  assert.equal(creates, 1);
+  assert.deepEqual(links, ["acct_created", "acct_created"]);
+});
+
+test("Connect onboarding resolves a concurrent account persistence race without replacing identity", async () => {
+  const db = {
+    user: {
+      updateMany: async () => ({ count: 0 }),
+      findUnique: async () => ({ stripeAccountId: "acct_authoritative" }),
+    },
+  };
+  let linked = "";
+  await startStripeConnectOnboarding(
+    db,
+    { id: "seller_1", email: "seller@example.test", stripeAccountId: null },
+    {
+      createAccount: async () => account({ id: "acct_idempotent_result" }),
+      createAccountLink: async (accountId) => {
+        linked = accountId;
+        return "https://connect.stripe.test";
+      },
+    },
+  );
+  assert.equal(linked, "acct_authoritative");
+});
+
+test("Connect failures do not synthesize readiness or expose provider errors to the localized client", async () => {
+  const db = {
+    user: {
+      updateMany: async () => ({ count: 1 }),
+      findUnique: async () => ({ stripeAccountId: null }),
+    },
+  };
+  await assert.rejects(() => startStripeConnectOnboarding(
+    db,
+    { id: "seller_1", email: "seller@example.test", stripeAccountId: null },
+    {
+      createAccount: async () => { throw new Error("provider secret detail"); },
+      createAccountLink: async () => "never",
+    },
+  ), /provider secret detail/);
+  const helper = readFileSync(join(process.cwd(), "lib/stripe-connect-onboarding.ts"), "utf8");
+  const panel = readFileSync(join(process.cwd(), "components/StripeConnectSection.tsx"), "utf8");
+  assert.doesNotMatch(helper, /stripeOnboardingComplete|stripeChargesEnabled|stripePayoutsEnabled/);
+  assert.doesNotMatch(panel, /result as \{ error: string \}/);
+  assert.match(panel, /throw new Error\(t\("error"\)\)/);
+});
+
+test("Connect restart and API routes enforce business-owner authorization", () => {
+  const api = readFileSync(join(process.cwd(), "app/api/stripe/connect/account/route.ts"), "utf8");
+  const refresh = readFileSync(join(process.cwd(), "app/[locale]/connect/refresh/page.tsx"), "utf8");
+  assert.match(api, /requireBusinessOwner/);
+  assert.match(refresh, /requireBusinessOwner/);
 });
 
 test("seller UX explicitly distinguishes pending capability states from ready", () => {

@@ -11,6 +11,7 @@ import { listSellerProducts, parseSellerProductsQuery } from "@/lib/seller-produ
 import SellerProductsList from "./SellerProductsList";
 import { resolveSellerStoreContext } from "@/lib/seller-business-access";
 import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
+import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 
 export const dynamic = "force-dynamic";
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -24,7 +25,8 @@ export default async function SellerProductsPage({ searchParams }: { searchParam
   if (!store) redirect("/seller/create-store");
   const query = parseSellerProductsQuery(new URLSearchParams({ page: one(params?.page), q: one(params?.q), status: one(params?.status), sort: one(params?.sort) }));
   const result = await listSellerProducts(prisma, store.id, query);
-  const subscriptionActive = canPublish(store), sellerTypeRequired = store.sellerType === "UNKNOWN", vatStatusRequired = store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN";
+  const commercialPlan=storeContext.selected.businessId?await sellerBusinessCommercialPlan(prisma,storeContext.selected.businessId):undefined;
+  const subscriptionActive = canPublish(store,new Date(),commercialPlan), sellerTypeRequired = store.sellerType === "UNKNOWN", vatStatusRequired = store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN";
   const readinessHref = sellerTypeRequired || vatStatusRequired ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
   const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : control("subscriptionInactive");
   const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") });

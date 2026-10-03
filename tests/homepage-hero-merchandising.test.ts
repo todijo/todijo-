@@ -60,6 +60,11 @@ test("store section renders only at the authoritative five-store threshold", () 
       { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
       { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: null } } },
       { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: { gt: new Date("2026-09-04T00:00:00Z") } } } },
+      { business: { is: { billingStore: { is: { OR: [
+        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+        { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: null } } },
+        { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: { gt: new Date("2026-09-04T00:00:00Z") } } } },
+      ] } } } } },
     ],
   });
 });

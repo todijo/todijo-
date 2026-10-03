@@ -13,8 +13,9 @@ export function canPublish(store: {
   vatStatus?: SellerVatStatus;
   subscription: { status: SubscriptionStatus; currentPeriodEnd?: Date | null } | null;
   accessGrants?: Array<{ source: "ADMIN_GRANTED" | "ADMIN_EXEMPT"; startsAt: Date; endsAt: Date | null }>;
-}, now = new Date()) {
-  return store.status === "ACTIVE" && store.sellerType !== "UNKNOWN" && !(store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") && activeAccessSource({ subscription: store.subscription, accessGrants: store.accessGrants ?? [] }, now).source !== "NONE";
+}, now = new Date(), businessPlan?: SellerPlanId | "admin-exempt" | null) {
+  const commercialAccess = businessPlan === undefined ? activeAccessSource({ subscription: store.subscription, accessGrants: store.accessGrants ?? [] }, now).source !== "NONE" : businessPlan !== null;
+  return store.status === "ACTIVE" && store.sellerType !== "UNKNOWN" && !(store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") && commercialAccess;
 }
 
 export class SellerSubscriptionError extends Error {

@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { BadgeCheck, CalendarPlus, PackagePlus, ShieldCheck, Store, Users } from "lucide-react";
 import GlobalDropshippingMarginForm from "@/components/GlobalDropshippingMarginForm";
 
-type AdminUser = { id: string; firstName: string; lastName: string; email: string; role: string; hasStore: boolean };
+type AdminUser = { id: string; firstName: string; lastName: string; email: string; role: string; hasStore: boolean; managedStoreEligible: boolean };
 type AdminStore = {
   id: string; name: string; slug: string; status: string; productCount: number;
   owner: { id: string; firstName: string; lastName: string; email: string; role: string };
@@ -24,11 +24,8 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const currentAdmin = users.find((user) => user.id === adminId && !user.hasStore);
-  const eligibleUsers = [
-    ...(currentAdmin ? [currentAdmin] : []),
-    ...users.filter((user) => !user.hasStore && user.role === "SELLER" && user.id !== adminId),
-  ];
+  const currentAdmin = users.find((user) => user.id === adminId && user.managedStoreEligible);
+  const eligibleUsers = users.filter((user) => user.managedStoreEligible);
   const sellerStores = stores.filter((store) => store.owner.role === "SELLER");
   const adminStore = stores.find((store) => store.owner.id === adminId);
   const activeCount = stores.filter((store) => store.accessSource !== "NONE").length;
@@ -113,7 +110,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
         <div className="adminPanelHeading"><CalendarPlus/><div><h2>{t("grantAccess")}</h2><p>{t("grantAccessHelp")}</p></div></div>
         <form className="adminGrantForm" onSubmit={extend}>
           <label><span>{t("duration")}</span><select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
-          <label><span>{t("subscription")}</span><select name="plan" defaultValue="basic"><option value="basic">BASIC</option><option value="plus">PLUS</option><option value="pro">PRO</option></select></label>
+          <label><span>{t("source.ADMIN_GRANTED")}</span><select name="plan" defaultValue="basic"><option value="basic">BASIC</option><option value="plus">PLUS</option><option value="pro">PRO</option></select></label>
           <button disabled={busy || !selected.length}>{t("extendSelected", { count: selected.length })}</button>
         </form>
         <div className="adminStoreList">
