@@ -102,10 +102,10 @@ test("checkout covers every marketplace store while CJ remains platform-owned", 
 test("onboarding reuses existing accounts and account creation is idempotent, never a mass migration", () => {
   const route = readFileSync(join(process.cwd(), "app/api/stripe/connect/account/route.ts"), "utf8");
   const onboarding = readFileSync(join(process.cwd(), "lib/stripe-connect-onboarding.ts"), "utf8");
-  const stripe = readFileSync(join(process.cwd(), "lib/stripe.ts"), "utf8");
   assert.match(route, /startStripeConnectOnboarding/);
   assert.match(onboarding, /if \(!accountId\)/); assert.match(onboarding, /createAccountLink\(accountId\)/);
-  assert.match(stripe, /connect-account-v2:\$\{input\.userId\}/);
+  assert.match(onboarding, /generation === 0[\s\S]*connect-account-v2:\$\{userId\}/);
+  assert.match(onboarding, /stripeAccountId: null, stripeConnectAccountAttemptGeneration: generation/);
   assert.doesNotMatch(route, /findMany|updateMany/);
 });
 
@@ -120,7 +120,7 @@ test("Connect onboarding persists one authoritative account and reuses it on ret
         stored = data.stripeAccountId;
         return { count: 1 };
       },
-      findUnique: async () => ({ stripeAccountId: stored }),
+      findUnique: async () => ({ id: "seller_1", email: "seller@example.test", stripeAccountId: stored, stripeConnectAccountAttemptGeneration: 0 }),
     },
   };
   const dependencies = {
@@ -146,7 +146,7 @@ test("Connect onboarding resolves a concurrent account persistence race without 
   const db = {
     user: {
       updateMany: async () => ({ count: 0 }),
-      findUnique: async () => ({ stripeAccountId: "acct_authoritative" }),
+      findUnique: async () => ({ id: "seller_1", email: "seller@example.test", stripeAccountId: "acct_authoritative", stripeConnectAccountAttemptGeneration: 0 }),
     },
   };
   let linked = "";
@@ -168,7 +168,7 @@ test("Connect failures do not synthesize readiness or expose provider errors to 
   const db = {
     user: {
       updateMany: async () => ({ count: 1 }),
-      findUnique: async () => ({ stripeAccountId: null }),
+      findUnique: async () => ({ id: "seller_1", email: "seller@example.test", stripeAccountId: null, stripeConnectAccountAttemptGeneration: 0 }),
     },
   };
   await assert.rejects(() => startStripeConnectOnboarding(

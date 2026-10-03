@@ -403,6 +403,7 @@ model User {
   emailVerified            Boolean  @default(false)
   emailVerifiedAt          DateTime?
   stripeAccountId          String?  @unique
+  stripeConnectAccountAttemptGeneration Int @default(0)
   stripeOnboardingComplete Boolean  @default(false)
   stripeChargesEnabled     Boolean  @default(false)
   stripePayoutsEnabled     Boolean  @default(false)
