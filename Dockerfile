@@ -46,9 +46,10 @@ COPY --chown=nextjs:nodejs --from=builder /app/node_modules ./node_modules
 COPY --chown=nextjs:nodejs --from=builder /app/.next ./.next
 COPY --chown=nextjs:nodejs --from=builder /app/public ./public
 COPY --chown=nextjs:nodejs --from=builder /app/prisma ./prisma
+COPY --chown=nextjs:nodejs --chmod=755 scripts/production-entrypoint.sh ./scripts/production-entrypoint.sh
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["./scripts/production-entrypoint.sh"]
