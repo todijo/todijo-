@@ -23,7 +23,7 @@ export async function createOrReuseSellerSubscriptionCheckout(input:{
 }){
   const now=input.now??new Date(),createCheckout=input.createCheckout??createSellerSubscriptionCheckout;
   return input.db.$transaction(async(tx)=>{
-    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`seller-subscription-checkout:${input.storeId}`}, 0))`);
+    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`seller-subscription-checkout:${input.storeId}`}, 0))::text`);
     let subscription=await tx.sellerSubscription.findUnique({where:{storeId:input.storeId}});
     if(hasCurrentSellerSubscriptionEntitlement(subscription,now))throw new SellerSubscriptionCheckoutError("SELLER_SUBSCRIPTION_ALREADY_ACTIVE");
 

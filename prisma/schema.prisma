@@ -1422,6 +1422,49 @@ model ProductMedia {
   @@index([productId, type, position])
 }
 
+enum SellerSubscriptionChangeOperation {
+  UPGRADE
+  SCHEDULE
+  CANCEL_SCHEDULE
+}
+
+enum SellerSubscriptionChangeStatus {
+  PREPARED
+  AWAITING_PAYMENT
+  SCHEDULED
+  APPLIED
+  FAILED
+  CANCELED
+  EXPIRED
+}
+
+model SellerSubscriptionChange {
+  id                       String @id @default(cuid())
+  sellerSubscriptionId     String
+  stripeSubscriptionId     String
+  stripeSubscriptionItemId String
+  operation                SellerSubscriptionChangeOperation
+  status                   SellerSubscriptionChangeStatus @default(PREPARED)
+  sourcePlan               String
+  sourceBillingInterval    String
+  sourcePriceId            String
+  targetPlan               String
+  targetBillingInterval    String
+  targetPriceId            String
+  sourcePeriodEnd          DateTime
+  prorationAt              DateTime?
+  effectiveAt              DateTime?
+  stripeInvoiceId          String? @unique
+  stripeScheduleId         String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  sellerSubscription       SellerSubscription @relation(fields: [sellerSubscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([sellerSubscriptionId, createdAt])
+  @@index([stripeSubscriptionId, status])
+  @@index([stripeScheduleId])
+}
+
 model SellerSubscription {
   id                   String             @id @default(cuid())
   storeId              String             @unique
@@ -1446,6 +1489,7 @@ model SellerSubscription {
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   reminderDeliveries SellerSubscriptionReminderDelivery[]
+  changes SellerSubscriptionChange[]
 
   @@index([status])
   @@index([scheduledChangeAt])

@@ -13,6 +13,7 @@ import {readGlobalDropshippingMargin} from "./suppliers/global-margin";
 import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
 import { sellerBusinessCommercialEntitlement } from "./seller-business";
 import {configuredSellerPlanForPriceId} from "./seller-plans";
+import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -189,6 +190,7 @@ export async function processStripeEvent(
   event: StripeEvent,
   retrieveSubscription = retrieveStripeSubscription,
   retrieveCheckoutSession = retrieveStripeCheckoutSession,
+  changeProviders = subscriptionChangeProviders,
 ) {
   let checkoutSession = event.data.object as StripeCheckoutSession;
   const sellerCheckout = event.type === "checkout.session.completed"
@@ -217,6 +219,10 @@ export async function processStripeEvent(
   }
   if (previouslyProcessed && sellerCheckout) {
     console.warn(`[Stripe webhook ${event.id}] Replaying an existing subscription Checkout event to repair local subscription state.`);
+  }
+  if (db.sellerSubscriptionChange) {
+    const transition = await processSellerSubscriptionTransitionEvent(db, event, (tx, live) => syncSellerSubscription(tx, live, "authoritative.subscription", event.id), changeProviders);
+    if (transition) return transition;
   }
   if(event.type==="invoice.paid"){
     const invoice=event.data.object as StripeInvoice;
@@ -267,6 +273,7 @@ export async function processStripeEvent(
           userId: session.metadata?.userId,
           customerId: stripeObjectId(session.customer),
           plan: session.metadata?.plan,
+          checkoutSessionId: session.id,
         });
         return { subscriptionCheckoutCompleted: true, storeId: synced.storeId, status: synced.status };
       }
@@ -318,14 +325,16 @@ async function syncSellerSubscription(
   subscription: StripeSubscription,
   eventType: string,
   eventId: string,
-  hint: { storeId?: string; userId?: string; customerId?: string; plan?: string } = {},
+  hint: { storeId?: string; userId?: string; customerId?: string; plan?: string; checkoutSessionId?: string } = {},
 ) {
   const customerId = stripeObjectId(subscription.customer) ?? hint.customerId;
   if (!customerId) throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} has no customer ID.`);
   const existing = await tx.sellerSubscription.findFirst({
     where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: customerId } }, ...(hint.storeId ? [{ storeId: hint.storeId }] : [])] },
-    select: { storeId: true, plan: true, stripePriceId: true },
+    select: { storeId: true, plan: true, stripePriceId: true, stripeSubscriptionId: true, stripeCheckoutSessionId: true, status: true },
   });
+  const authorizedCheckoutReplacement = existing?.status === "INCOMPLETE" && hint.checkoutSessionId && existing.stripeCheckoutSessionId === hint.checkoutSessionId;
+  if (existing?.stripeSubscriptionId && existing.stripeSubscriptionId !== subscription.id && !authorizedCheckoutReplacement) throw new Error(`[Stripe webhook ${eventId}] Superseded subscription cannot overwrite the current subscription.`);
   console.info(`[Stripe webhook ${eventId}] Local subscription lookup completed (found=${Boolean(existing)}).`);
   const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
   if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);

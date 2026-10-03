@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { canonicalActiveSellerPlanId, sellerPlans } from "@/lib/seller-plans";
+import { canonicalActiveSellerPlanId, sellerPlans, sellerPlanEntitlement } from "@/lib/seller-plans";
 import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 import SubscriptionPlans from "./SubscriptionPlans";
 import ActivatingSubscription from "./ActivatingSubscription";
@@ -48,6 +48,14 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
   }));
   const clientCopy={monthly:copy.monthly,annual:copy.annual,save20:copy.save20,perMonth:copy.perMonth,perYear:copy.perYear,opening:copy.opening,active:copy.active,anotherActive:copy.anotherActive,subscribe:copy.subscribe,unavailable:copy.unavailable,checkoutError:copy.checkoutError};
   const activePlanId = canonicalActiveSellerPlanId(store.subscription);
+  const pendingChange = store.subscription ? await prisma.sellerSubscriptionChange.findFirst({ where: { sellerSubscriptionId: store.subscription.id, status: { in: ["PREPARED", "AWAITING_PAYMENT"] } }, select: { operation: true, targetPlan: true, targetBillingInterval: true, status: true } }) : null;
+  const productLimit = sellerPlanEntitlement(activePlanId)?.productLimit;
+  const usage = productLimit == null ? [] : await prisma.store.findMany({ where: { businessId: principal.businessId }, select: { _count: { select: { products: true } } } });
+  const overQuota = productLimit != null && usage.some(item => item._count.products > productLimit);
+  const transition = { allowed: active && Boolean(store.subscription?.stripeSubscriptionId) && store.subscription?.status === "ACTIVE" && !store.subscription.cancelAtPeriodEnd,
+    currentInterval: store.subscription?.billingInterval ?? "monthly", periodEnd: store.subscription?.currentPeriodEnd?.toISOString() ?? null,
+    scheduledPlan: store.subscription?.scheduledPlan ?? null, scheduledInterval: store.subscription?.scheduledBillingInterval ?? null,
+    scheduledAt: store.subscription?.scheduledChangeAt?.toISOString() ?? null, pending: Boolean(pendingChange), retry: pendingChange?.status === "PREPARED" ? { planId: pendingChange.targetPlan, interval: pendingChange.targetBillingInterval, cancel: pendingChange.operation === "CANCEL_SCHEDULE" } : null, overQuota };
   return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} active="subscription"><div className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
     <a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><p className="dashboardBadge">{store.name}</p>
     <h1>{copy.title}</h1><p className="storeSetupIntro">{copy.intro}</p>
@@ -55,7 +63,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
       {store.subscription && <div className={`subscriptionStatus ${active ? "isActive" : ""}`}>{copy.currentStatus} <strong>{store.subscription.status}</strong>{store.subscription.cancelAtPeriodEnd && ` · ${copy.cancels}`}</div>}
       {(store.owner.role==="ADMIN"||accessSource==="ADMIN_GRANTED"||accessSource==="ADMIN_EXEMPT")&&<div className="subscriptionStatus isActive">{copy.adminAccess}</div>}
       {sellerIntent&&<section className="sellerSubscriptionReview"><p className="dashboardBadge">{journeyCopy.selectedPlan}</p><h2>{journeyCopy.reviewTitle}</h2><p>{journeyCopy.reviewIntro}</p><dl><div><dt>{journeyCopy.sellerIdentity}</dt><dd>{store.name}</dd></div><div><dt>{journeyCopy.selectedPlan}</dt><dd>{plans.find(plan=>plan.id===sellerIntent.plan)?.name} · {sellerIntent.interval==="monthly"?journeyCopy.monthly:journeyCopy.annual}</dd></div><div><dt>Prix</dt><dd>{((sellerIntent.interval==="monthly"?plans.find(plan=>plan.id===sellerIntent.plan)?.monthlyAmountMinor:plans.find(plan=>plan.id===sellerIntent.plan)?.annualAmountMinor)??0)/100} EUR</dd></div></dl><p className="sellerPaymentReassurance">🔒 {journeyCopy.secureStripe}</p></section>}
-      <SubscriptionPlans locale={locale} plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={clientCopy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
+      <SubscriptionPlans transition={transition} locale={locale} plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={clientCopy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"}/>
     </>}
   </section></div></SellerDashboardLayout>;
 }

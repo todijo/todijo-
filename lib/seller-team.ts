@@ -110,6 +110,10 @@ export async function updateSellerTeamMember(db: PrismaClient, input: { ownerId:
     const membership = await tx.sellerTeamMembership.findUnique({ where: { id: input.membershipId }, select: { id: true, userId: true, businessId: true, status: true, business: { select: { ownerId: true } } } });
     if (!membership || membership.business.ownerId !== input.ownerId) throw new SellerTeamError("MEMBER_NOT_FOUND", 404);
     const action = typeof input.action === "string" ? input.action : "permissions";
+    if (action === "reactivate") {
+      await lockSellerBusiness(tx, membership.businessId);
+      if (await sellerBusinessCommercialPlan(tx, membership.businessId, now) !== "pro") throw new SellerTeamError("TEAM_PRO_REQUIRED", 403);
+    }
     if (["suspend", "reactivate", "remove"].includes(action)) {
       if(action==="reactivate"&&membership.status!=="SUSPENDED")throw new SellerTeamError("INVALID_MEMBER_STATE",409);
       if(action==="suspend"&&membership.status!=="ACTIVE")throw new SellerTeamError("INVALID_MEMBER_STATE",409);

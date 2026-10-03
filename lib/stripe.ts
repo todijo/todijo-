@@ -31,7 +31,11 @@ export type StripeSubscription = {
   cancel_at_period_end?: boolean;
   current_period_start?: number;
   current_period_end?: number;
-  items?: { data?: Array<{ price?: { id?: string }; current_period_start?: number; current_period_end?: number }> };
+  collection_method?: string;
+  latest_invoice?: string | StripeInvoice | null;
+  schedule?: string | StripeSubscriptionSchedule | null;
+  pending_update?: { expires_at: number } | null;
+  items?: { data?: Array<{ id?: string; quantity?: number; price?: { id?: string }; current_period_start?: number; current_period_end?: number }> };
 };
 
 export type StripeInvoice = {
@@ -40,6 +44,31 @@ export type StripeInvoice = {
   customer?: string;
   subscription?: string | null;
   parent?: { subscription_details?: { subscription?: string | null } };
+  status?: string;
+  created?: number;
+  paid?: boolean;
+  billing_reason?: string;
+  amount_due?: number;
+  currency?: string;
+  hosted_invoice_url?: string | null;
+};
+
+export type StripeSchedulePhase = {
+  start_date: number;
+  end_date?: number;
+  items: Array<{ price: string | { id: string }; quantity?: number; [key: string]: unknown }>;
+  [key: string]: unknown;
+};
+
+export type StripeSubscriptionSchedule = {
+  id: string;
+  object: "subscription_schedule";
+  subscription?: string | { id: string } | null;
+  released_subscription?: string | null;
+  status: string;
+  metadata?: Record<string, string>;
+  current_phase?: { start_date: number; end_date: number };
+  phases?: StripeSchedulePhase[];
 };
 
 export type StripeConnectedAccount = {
@@ -54,7 +83,7 @@ export type StripeEvent = {
   id: string;
   type: string;
   livemode?: boolean;
-  data: { object: (StripeCheckoutSession & { last_payment_error?: { message?: string } }) | StripeConnectedAccount | StripeSubscription | StripeInvoice };
+  data: { object: (StripeCheckoutSession & { last_payment_error?: { message?: string } }) | StripeConnectedAccount | StripeSubscription | StripeInvoice | StripeSubscriptionSchedule };
 };
 
 export type StripeMode = "test" | "live";
@@ -156,6 +185,77 @@ export function retrieveConnectedAccount(accountId: string) {
 
 export function retrieveStripeSubscription(subscriptionId: string) {
   return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
+}
+
+export function retrieveSellerStripeSubscription(id: string) {
+  return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(id)}?expand[]=latest_invoice`);
+}
+
+export function retrieveStripeInvoice(id: string) {
+  return stripeRequest<StripeInvoice>(`/invoices/${encodeURIComponent(id)}`);
+}
+
+export function upgradeSellerStripeSubscription(input: { subscriptionId: string; itemId: string; priceId: string; prorationAt: Date; idempotencyKey: string }) {
+  return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(input.subscriptionId)}`, {
+    method: "POST", idempotencyKey: input.idempotencyKey,
+    body: new URLSearchParams({ "items[0][id]": input.itemId, "items[0][price]": input.priceId,
+      payment_behavior: "pending_if_incomplete", proration_behavior: "always_invoice",
+      proration_date: String(Math.floor(input.prorationAt.getTime() / 1000)), "expand[]": "latest_invoice" }),
+  });
+}
+
+export function retrieveSellerSubscriptionSchedule(id: string) {
+  return stripeRequest<StripeSubscriptionSchedule>(`/subscription_schedules/${encodeURIComponent(id)}`);
+}
+
+export function createSellerSubscriptionSchedule(subscriptionId: string, idempotencyKey: string) {
+  return stripeRequest<StripeSubscriptionSchedule>("/subscription_schedules", { method: "POST", idempotencyKey,
+    body: new URLSearchParams({ from_subscription: subscriptionId }) });
+}
+
+function appendStripeParameter(body: URLSearchParams, key: string, value: unknown) {
+  if (value == null) return;
+  if (Array.isArray(value)) value.forEach((entry, index) => appendStripeParameter(body, `${key}[${index}]`, entry));
+  else if (typeof value === "object") Object.entries(value).forEach(([name, entry]) => appendStripeParameter(body, `${key}[${name}]`, entry));
+  else body.set(key, String(value));
+}
+
+function preservePhaseSettings(body: URLSearchParams, prefix: string, phase: StripeSchedulePhase) {
+  // Schedule updates unset omitted phase overrides. Carry existing billing settings
+  // into both phases rather than silently dropping discounts, taxes or routing.
+  const reference = (value: unknown) => typeof value === "object" && value !== null && "id" in value ? (value as { id: string }).id : value;
+  const discounts = (value: unknown) => Array.isArray(value) ? value.map(entry => typeof entry === "string" ? { discount: entry } : typeof entry === "object" && entry !== null ? "id" in entry ? { discount: reference(entry) } : Object.fromEntries(Object.entries(entry).filter(([key]) => ["discount", "coupon", "promotion_code"].includes(key)).map(([key, val]) => [key, reference(val)])) : entry) : value;
+  for (const key of ["application_fee_percent", "automatic_tax", "billing_cycle_anchor", "billing_thresholds", "collection_method", "currency", "description", "invoice_settings", "metadata", "on_behalf_of", "default_payment_method", "transfer_data"]) {
+    let value = phase[key];
+    if (["on_behalf_of", "default_payment_method"].includes(key)) value = reference(value);
+    if (key === "transfer_data" && value && typeof value === "object") value = { ...value, destination: reference((value as { destination?: unknown }).destination) };
+    appendStripeParameter(body, `${prefix}[${key}]`, value);
+  }
+  appendStripeParameter(body, `${prefix}[discounts]`, discounts(phase.discounts));
+  if (Array.isArray(phase.default_tax_rates)) appendStripeParameter(body, `${prefix}[default_tax_rates]`, phase.default_tax_rates.map(reference));
+  const item = phase.items[0];
+  for (const key of ["metadata", "billing_thresholds"]) appendStripeParameter(body, `${prefix}[items][0][${key}]`, item[key]);
+  appendStripeParameter(body, `${prefix}[items][0][discounts]`, discounts(item.discounts));
+  if (Array.isArray(item.tax_rates)) appendStripeParameter(body, `${prefix}[items][0][tax_rates]`, item.tax_rates.map(reference));
+}
+
+export function configureSellerSubscriptionSchedule(input: { scheduleId: string; changeId: string; start: Date; boundary: Date; sourcePriceId: string; targetPriceId: string; interval: "monthly" | "annual"; idempotencyKey: string; currentPhase?: StripeSchedulePhase }) {
+  const body = new URLSearchParams({ end_behavior: "release", proration_behavior: "none", "metadata[todijoChangeId]": input.changeId,
+    "phases[0][start_date]": String(Math.floor(input.start.getTime() / 1000)), "phases[0][end_date]": String(Math.floor(input.boundary.getTime() / 1000)),
+    "phases[0][items][0][price]": input.sourcePriceId, "phases[0][items][0][quantity]": "1", "phases[0][proration_behavior]": "none",
+    "phases[1][start_date]": String(Math.floor(input.boundary.getTime() / 1000)), "phases[1][duration][interval]": input.interval === "annual" ? "year" : "month", "phases[1][duration][interval_count]": "1",
+    "phases[1][items][0][price]": input.targetPriceId, "phases[1][items][0][quantity]": "1", "phases[1][proration_behavior]": "none" });
+  if (input.currentPhase) { preservePhaseSettings(body, "phases[0]", input.currentPhase); preservePhaseSettings(body, "phases[1]", input.currentPhase); }
+  return stripeRequest<StripeSubscriptionSchedule>(`/subscription_schedules/${encodeURIComponent(input.scheduleId)}`, {
+    method: "POST", idempotencyKey: input.idempotencyKey,
+    body,
+  });
+}
+
+export function releaseSellerSubscriptionSchedule(id: string, idempotencyKey: string) {
+  return stripeRequest<StripeSubscriptionSchedule>(`/subscription_schedules/${encodeURIComponent(id)}/release`, {
+    method: "POST", idempotencyKey, body: new URLSearchParams({ preserve_cancel_date: "false" }),
+  });
 }
 
 export function retrieveStripeCheckoutSession(sessionId: string) {
