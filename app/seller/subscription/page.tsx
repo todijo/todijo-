@@ -29,8 +29,8 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
   const business = await prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { billingStoreId: true } });
   const store = business?.billingStoreId ? await prisma.store.findFirst({ where: { id: business.billingStoreId, ownerId: session.userId }, select: { name: true, slug:true, owner: { select: { role: true, firstName:true, lastName:true } }, subscription: true, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }) : null;
   if (!store) redirect(sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : `/${locale}/sell#plans`);
-  const active = ["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "");
   const accessSource = activeAccessSource(store).source;
+  const active = accessSource === "STRIPE";
   const hasActiveEntitlement = accessSource !== "NONE";
   if (query.checkout === "success" && active) redirect(`/${locale}/seller/products/new`);
   const resolvedLocale=isLocale(locale)?locale:"en";

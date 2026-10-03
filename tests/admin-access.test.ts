@@ -64,7 +64,7 @@ test("admin creates an additional PRO Store inside the existing business without
       count: async () => 1,
       create: async ({ data }: { data: Record<string, unknown> }) => { created = data; return { id: "store-2", slug: "second-shop" }; },
     },
-    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "pro" }, accessGrants: [] } }) },
+    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "pro",currentPeriodEnd:new Date("2026-02-01T00:00:00Z") }, accessGrants: [] } }) },
     sellerBusinessAuditEvent: { create: async ({ data }: { data: Record<string, unknown> }) => { audits.push(data); return data; } },
   } as never;
   const store = await createAdditionalAdminManagedStore(db, "admin", { ownerId: "seller", name: "Second Shop", slug: "second-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" }, "business-1", new Date("2026-01-01T00:00:00Z"));
@@ -81,7 +81,7 @@ test("additional managed Store fails closed for non-PRO and at capacity", async 
     user: { findUnique: async () => ({ id: "seller", role: "SELLER", sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1" } }) },
     $queryRaw: async () => [{ id: "business-1", maxStores: 2 }],
     store: { count: async () => count, create: async () => { throw new Error("must not create"); } },
-    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan }, accessGrants: [] } }) },
+    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan,currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] } }) },
   }) as never;
   const input = { ownerId: "seller", name: "Second", slug: "second", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" };
   await assert.rejects(() => createAdditionalAdminManagedStore(database("basic", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
@@ -147,11 +147,11 @@ test("public product visibility requires Stripe, a live admin grant, or admin ex
       status: "ACTIVE",
       owner: { sellerSuspendedAt: null, deactivatedAt: null },
       OR: [
-        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
         { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
         { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
         { business: { is: { billingStore: { is: { OR: [
-          { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+          { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
           { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
           { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
         ] } } } } },

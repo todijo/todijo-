@@ -53,8 +53,8 @@ export function configuredSellerPlan(planId: unknown, interval: unknown) {
   return { ...plan, interval, priceId, amountMinor: interval === "monthly" ? plan.monthlyAmountMinor : plan.annualAmountMinor };
 }
 
-export function canonicalActiveSellerPlanId(subscription: { status: string; plan: string } | null | undefined) {
-  if (!subscription || !["ACTIVE", "TRIALING"].includes(subscription.status)) return null;
+export function canonicalActiveSellerPlanId(subscription: { status: string; plan: string;currentPeriodEnd?:Date|null } | null | undefined,now=new Date()) {
+  if (!subscription || !["ACTIVE", "TRIALING"].includes(subscription.status)||!subscription.currentPeriodEnd||subscription.currentPeriodEnd<=now) return null;
   return isSellerPlanId(subscription.plan) ? subscription.plan : null;
 }
 

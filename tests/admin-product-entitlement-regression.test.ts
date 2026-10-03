@@ -39,7 +39,7 @@ test("ordinary seller product limits remain enforced", () => {
 function entitlementDb(role: "ADMIN" | "SELLER", productCount: number) {
   return {
     user: { findUnique: async () => ({ sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null }) },
-    store: { findFirst: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: null, plan: "basic" }, accessGrants: [], _count: { products: productCount } }) },
+    store: { findFirst: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2099-01-01T00:00:00Z"), plan: "basic" }, accessGrants: [], _count: { products: productCount } }) },
   };
 }
 
@@ -56,8 +56,10 @@ test("draft and published creation share the database-authoritative quota gate",
 });
 
 test("only the canonical active paid plan is active", () => {
-  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "basic" }), "basic");
-  assert.equal(canonicalActiveSellerPlanId({ status: "TRIALING", plan: "pro" }), "pro");
+  const end=new Date("2026-02-01T00:00:00Z"),now=new Date("2026-01-01T00:00:00Z");
+  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "basic",currentPeriodEnd:end },now), "basic");
+  assert.equal(canonicalActiveSellerPlanId({ status: "TRIALING", plan: "pro",currentPeriodEnd:end },now), "pro");
+  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "basic",currentPeriodEnd:now },now), null);
   assert.equal(canonicalActiveSellerPlanId({ status: "PAST_DUE", plan: "basic" }), null);
   assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "invented-admin-plan" }), null);
   assert.match(subscriptionPlans, /const isActive=activePlanId===plan\.id/);

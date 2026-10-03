@@ -57,7 +57,7 @@ export function activeAccessSource(store: {
     ))
     .sort((a, b) => (b.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (a.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER))[0];
   if (active?.source === "ADMIN_EXEMPT") return { source: active.source, expiresAt: null };
-  if (store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status)) {
+  if (store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status) && store.subscription.currentPeriodEnd && store.subscription.currentPeriodEnd > now) {
     return { source: "STRIPE" as const, expiresAt: store.subscription.currentPeriodEnd ?? null };
   }
   return active ? { source: active.source, expiresAt: active.endsAt } : { source: "NONE" as const, expiresAt: null };
@@ -69,11 +69,11 @@ export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput
     status: "ACTIVE",
     owner: { sellerSuspendedAt: null, deactivatedAt: null },
     OR: [
-      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
       { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
       { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
       { business: { is: { billingStore: { is: { OR: [
-        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
         { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
         { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
       ] } } } } },
@@ -195,7 +195,7 @@ export async function extendManagedAccess(
   const results = [];
   const targets=new Map(stores.map(store=>[store.business?.billingStoreId??store.id,{storeId:store.business?.billingStoreId??store.id,businessId:store.business?.id??null,accessGrants:store.business?.billingStore?.accessGrants??store.accessGrants,subscription:store.business?.billingStore?.subscription??store.subscription}]));
   for (const target of targets.values()) {
-    const stripeEnd = target.subscription && ["ACTIVE", "TRIALING"].includes(target.subscription.status) ? target.subscription.currentPeriodEnd : null;
+    const stripeEnd = target.subscription && ["ACTIVE", "TRIALING"].includes(target.subscription.status) && target.subscription.currentPeriodEnd && target.subscription.currentPeriodEnd > now ? target.subscription.currentPeriodEnd : null;
     const currentEnd = [target.accessGrants[0]?.endsAt, stripeEnd]
       .filter((value): value is Date => Boolean(value))
       .sort((a, b) => b.getTime() - a.getTime())[0];

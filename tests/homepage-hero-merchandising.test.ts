@@ -57,11 +57,11 @@ test("store section renders only at the authoritative five-store threshold", () 
   assert.deepEqual(publicStoreAccessWhere(new Date("2026-09-04T00:00:00Z")), {
     dataClass: "PRODUCTION", status: "ACTIVE", owner: { sellerSuspendedAt: null, deactivatedAt: null },
     OR: [
-      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: new Date("2026-09-04T00:00:00Z") } } } },
       { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: null } } },
       { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: { gt: new Date("2026-09-04T00:00:00Z") } } } },
       { business: { is: { billingStore: { is: { OR: [
-        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] } } } },
+        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: new Date("2026-09-04T00:00:00Z") } } } },
         { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: null } } },
         { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: { gt: new Date("2026-09-04T00:00:00Z") } } } },
       ] } } } } },

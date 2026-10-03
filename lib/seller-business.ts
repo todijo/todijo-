@@ -19,7 +19,7 @@ export async function sellerBusinessCommercialEntitlement(db: PrismaClient | Pri
   if (!business?.billingStore) return {businessId,billingStoreId:null,active:false,plan:null,source:"NONE" as const,expiresAt:null};
   if(business.owner.role==="ADMIN")return{businessId,billingStoreId:business.billingStore.id,active:true,plan:"admin-exempt" as const,source:"ADMIN_EXEMPT" as const,expiresAt:null};
   const subscription=business.billingStore.subscription;
-  if(subscription&&["ACTIVE","TRIALING"].includes(subscription.status)){const plan=sellerPlanEntitlement(subscription.plan)?.id??null;return{businessId,billingStoreId:business.billingStore.id,active:Boolean(plan),plan,source:plan?"STRIPE" as const:"NONE" as const,expiresAt:subscription.currentPeriodEnd};}
+  if(subscription&&["ACTIVE","TRIALING"].includes(subscription.status)&&subscription.currentPeriodEnd&&subscription.currentPeriodEnd>now){const plan=sellerPlanEntitlement(subscription.plan)?.id??null;return{businessId,billingStoreId:business.billingStore.id,active:Boolean(plan),plan,source:plan?"STRIPE" as const:"NONE" as const,expiresAt:subscription.currentPeriodEnd};}
   const grant=business.billingStore.accessGrants.filter(item=>item.source==="ADMIN_GRANTED"&&item.startsAt<=now&&item.endsAt!==null&&item.endsAt>now&&sellerPlanEntitlement(item.plan)).sort((a,b)=>b.endsAt!.getTime()-a.endsAt!.getTime())[0];
   const plan=(sellerPlanEntitlement(grant?.plan)?.id??null) as SellerPlanId|null;
   return{businessId,billingStoreId:business.billingStore.id,active:Boolean(plan),plan,source:plan?"ADMIN_GRANTED" as const:"NONE" as const,expiresAt:grant?.endsAt??null};

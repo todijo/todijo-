@@ -11,13 +11,14 @@ import { resolveSellerMaturity } from "./seller-maturity";
 import {convertMarketplacePrice} from "./marketplace-presentment";
 import {readGlobalDropshippingMargin} from "./suppliers/global-margin";
 import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
+import { sellerBusinessCommercialEntitlement } from "./seller-business";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
 }
 
 type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?: string | number | null; displayedCurrency?: string | null };
-type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount;stripeMode?:StripeMode;returnLocale?:string };
+type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount;commercialEntitlement?:typeof sellerBusinessCommercialEntitlement;stripeMode?:StripeMode;returnLocale?:string };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
 
 export function embeddedShippingQuote(lines:Array<{pricingSnapshot:DropshippingPriceSnapshot|null}>,currency:SupportedBuyerCurrency,destinationCountry:unknown){
@@ -83,9 +84,12 @@ export async function createCheckout(
   });
   const marketplaceStores=[...new Map(classifiedLines.filter(line=>!line.eligibility.eligible).map(line=>{const product=products.find(candidate=>candidate.id===line.productId)!;return[product.storeId,product.store] as const})).values()];
   for(const store of marketplaceStores){
+    const authority=await db.store.findUniqueOrThrow({where:{id:store.id},select:{status:true,businessId:true,vatStatus:true}});
+    if(authority.status!=="ACTIVE"||!authority.businessId)throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE",409);
+    const entitlement=await (pricingDependencies.commercialEntitlement??sellerBusinessCommercialEntitlement)(db,authority.businessId);
+    if(!entitlement.active||!entitlement.plan)throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE",409);
     if(store.sellerType==="UNKNOWN")throw new CheckoutError("SELLER_STATUS_REQUIRED",409);
-    const vat=await db.store.findUniqueOrThrow({where:{id:store.id},select:{vatStatus:true}});
-    if(store.sellerType==="PROFESSIONAL"&&vat.vatStatus==="UNKNOWN")throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
+    if(store.sellerType==="PROFESSIONAL"&&authority.vatStatus==="UNKNOWN")throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
     if(!store.owner.stripeAccountId)throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);
     let account:StripeConnectedAccount;
     try{account=await (pricingDependencies.retrieveConnectedAccount??retrieveConnectedAccount)(store.owner.stripeAccountId);}catch{throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);}
@@ -234,14 +238,14 @@ export async function processStripeEvent(
         const invoiceSubscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
         if (invoice.object !== "invoice" || !invoiceSubscriptionId) throw new Error(`[Stripe webhook ${event.id}] Invoice event has no subscription ID.`);
         const status = event.type === "invoice.paid" ? "ACTIVE" : "PAST_DUE";
-        const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true, store: { select: { sellerType: true } } } });
+        const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true, currentPeriodEnd:true, store: { select: { sellerType: true, businessId:true } } } });
         if (!existing) throw new Error(`[Stripe webhook ${event.id}] No local seller subscription matches invoice subscription ${invoiceSubscriptionId}.`);
         await tx.sellerSubscription.update({ where: { stripeSubscriptionId: invoiceSubscriptionId }, data: { status } });
-        if (status === "ACTIVE" && existing.store.sellerType !== "UNKNOWN") {
+        const commerciallyActive=status==="ACTIVE"&&Boolean(existing.currentPeriodEnd&&existing.currentPeriodEnd>new Date());
+        if (commerciallyActive && existing.store.sellerType !== "UNKNOWN") {
           await tx.store.update({ where: { id: existing.storeId }, data: { status: "ACTIVE" } });
-          await tx.product.updateMany({ where: { storeId: existing.storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } });
         } else {
-          await tx.product.updateMany({ where: { storeId: existing.storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+          await tx.product.updateMany({ where: { ...(existing.store.businessId?{store:{businessId:existing.store.businessId}}:{storeId:existing.storeId}), status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
         }
         console.info(`[Stripe webhook ${event.id}] Invoice updated a seller subscription to ${status}.`);
         return { subscriptionUpdated: true, storeId: existing.storeId, status };
@@ -316,7 +320,7 @@ async function syncSellerSubscription(
   console.info(`[Stripe webhook ${eventId}] Local subscription lookup completed (found=${Boolean(existing)}).`);
   const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
   if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);
-  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true } });
+  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true, businessId:true } });
   if (!store) throw new Error(`[Stripe webhook ${eventId}] Store ${storeId} does not exist.`);
   if (hint.userId && store.ownerId !== hint.userId) throw new Error(`[Stripe webhook ${eventId}] Checkout user does not own store ${storeId}.`);
   if (store.stripeCustomerId && store.stripeCustomerId !== customerId) throw new Error(`[Stripe webhook ${eventId}] Stripe customer does not match store ${storeId}.`);
@@ -328,6 +332,7 @@ async function syncSellerSubscription(
   const currentPeriodStart = stripeDate(subscription.current_period_start ?? item?.current_period_start);
   const currentPeriodEnd = stripeDate(subscription.current_period_end ?? item?.current_period_end);
   if (active && !currentPeriodEnd) throw new Error(`[Stripe webhook ${eventId}] Active subscription ${subscription.id} has no current period end.`);
+  const commerciallyActive=active&&Boolean(currentPeriodEnd&&currentPeriodEnd>new Date());
 
   console.info(`[Stripe webhook ${eventId}] Updating local seller subscription state to ${status}.`);
   const storeUpdate = await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) }, select: { id: true, status: true, stripeCustomerId: true } });
@@ -338,9 +343,9 @@ async function syncSellerSubscription(
     update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: subscription.metadata?.plan ?? hint.plan ?? existing?.plan, status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
   });
   console.info(`[Stripe webhook ${eventId}] Seller subscription record updated (status=${subscriptionUpdate.status}).`);
-  const products = active && store.sellerType !== "UNKNOWN"
-    ? await tx.product.updateMany({ where: { storeId, deactivationReason: "SUBSCRIPTION_INACTIVE" }, data: { status: "PUBLISHED", deactivationReason: "NONE" } })
-    : await tx.product.updateMany({ where: { storeId, status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+  const products = commerciallyActive
+    ? {count:0}
+    : await tx.product.updateMany({ where: { ...(store.businessId?{store:{businessId:store.businessId}}:{storeId}), status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
   console.info(`[Stripe webhook ${eventId}] Saved ${status} subscription state; updated ${products.count} product(s).`);
   return { storeId, status };
 }

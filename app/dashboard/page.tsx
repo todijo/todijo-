@@ -225,7 +225,10 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
         }
       </DashboardSection>}
       {canViewAnalytics&&<DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating > 0 && <article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{cancellationRate != null && <article><ReceiptText size={20}/><span>{s("cancellationRate")}</span><strong>{cancellationRate.toFixed(1)}%</strong></article>}{reviewStats._count.rating === 0 && cancellationRate == null && <DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>}
-      {selectedPrincipal?.owner&&<StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>}
+      {selectedPrincipal?.owner&&<StripeConnectSection
+        commercialEntitlementActive={subscriptionActive}
+        initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>
+      }
     </div></div>
   </main>;
 }

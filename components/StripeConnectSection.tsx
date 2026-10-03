@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import {connectPaymentCopy} from "@/i18n/connect-payment";
 
 type Status = { connected: boolean; onboardingComplete: boolean; chargesEnabled: boolean; payoutsEnabled: boolean };
 
@@ -22,8 +23,9 @@ async function responseBody(response: Response): Promise<unknown> {
   }
 }
 
-export default function StripeConnectSection({ initialStatus }: { initialStatus: Status }) {
+export default function StripeConnectSection({ initialStatus, commercialEntitlementActive=false }: { initialStatus: Status;commercialEntitlementActive?:boolean }) {
   const t = useTranslations("Connect");
+  const paymentCopy=connectPaymentCopy(useLocale());
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,14 +80,15 @@ export default function StripeConnectSection({ initialStatus }: { initialStatus:
   }
 
   return <section className="dashboardQuickActions stripeConnectSection">
-    <h2>{t("title")}</h2><p>{t("description")}</p><p><strong>{ready ? `✓ ${t("complete")}` : `✕ ${t("pending")}`}</strong></p>
+    <h2>{t("title")}</h2><p>{paymentCopy.explanation}</p><p><strong>{ready ? `✓ ${t("complete")}` : `✕ ${t("pending")}`}</strong></p>
     <div className="stripeStatusGrid">
       <span className={status.connected ? "isReady" : ""}>{status.connected ? "✓ Stripe" : t("notConnected")}</span>
       <span className={status.onboardingComplete ? "isReady" : ""}>{status.onboardingComplete ? `✓ ${t("complete")}` : `✕ ${t("pending")}`}</span>
       <span className={status.chargesEnabled ? "isReady" : ""}>{status.chargesEnabled ? "✓ " : "✕ "}{t("chargesEnabled")}</span>
       <span className={status.payoutsEnabled ? "isReady" : ""}>{status.payoutsEnabled ? "✓ " : "✕ "}{t("payoutsEnabled")}</span>
     </div>
+    {ready&&!commercialEntitlementActive&&<p className="subscriptionWarning" role="status">{paymentCopy.readyNoPlan}</p>}
     {error && <p className="formError" role="alert">{error}</p>}
-    <div><button className="quickActionLink primary" type="button" onClick={onboard} disabled={busy}>{busy ? t("loading") : status.connected ? t("resume") : t("start")}</button><button className="quickActionLink secondary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? t("refreshing") : t("refresh")}</button></div>
+    <div><button className="quickActionLink primary" type="button" onClick={onboard} disabled={busy}>{busy ? t("loading") : status.connected ? t("resume") : paymentCopy.configure}</button><button className="quickActionLink secondary" type="button" onClick={() => void refresh()} disabled={refreshing}>{refreshing ? t("refreshing") : t("refresh")}</button></div><small>{paymentCopy.secure}</small>
   </section>;
 }

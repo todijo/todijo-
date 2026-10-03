@@ -32,11 +32,11 @@ export function sellerProductQuota(input: { role: UserRole; plan: string | null 
 
 export function effectiveSellerPlan(input: {
   role: UserRole;
-  subscription: { status: SubscriptionStatus; plan: string } | null;
+  subscription: { status: SubscriptionStatus; plan: string; currentPeriodEnd?: Date | null } | null;
   accessGrants: Array<{ source: "ADMIN_GRANTED" | "ADMIN_EXEMPT"; plan?: string | null; startsAt: Date; endsAt: Date | null }>;
 }, now = new Date()): SellerPlanId | "admin-exempt" | null {
   if (input.role === "ADMIN") return "admin-exempt";
-  if (input.subscription && publishableSubscriptionStatuses.includes(input.subscription.status)) {
+  if (input.subscription && publishableSubscriptionStatuses.includes(input.subscription.status) && input.subscription.currentPeriodEnd && input.subscription.currentPeriodEnd > now) {
     return sellerPlanEntitlement(input.subscription.plan)?.id ?? null;
   }
   const grant = input.accessGrants

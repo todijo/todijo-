@@ -4,9 +4,10 @@ import { canPublish, effectiveSellerPlan, sellerProductQuota } from "../lib/sell
 import { sellerBusinessCommercialEntitlement } from "../lib/seller-business";
 
 test("publishing requires both an active seller and active or trialing subscription", () => {
-  assert.equal(canPublish({ status: "ACTIVE", subscription: { status: "ACTIVE" } }), true);
-  assert.equal(canPublish({ status: "ACTIVE", subscription: { status: "TRIALING" } }), true);
-  assert.equal(canPublish({ status: "PENDING", subscription: { status: "ACTIVE" } }), false);
+  const end=new Date(Date.now()+60_000);
+  assert.equal(canPublish({ status: "ACTIVE", subscription: { status: "ACTIVE",currentPeriodEnd:end } }), true);
+  assert.equal(canPublish({ status: "ACTIVE", subscription: { status: "TRIALING",currentPeriodEnd:end } }), true);
+  assert.equal(canPublish({ status: "PENDING", subscription: { status: "ACTIVE",currentPeriodEnd:end } }), false);
   assert.equal(canPublish({ status: "ACTIVE", subscription: { status: "PAST_DUE" } }), false);
   assert.equal(canPublish({ status: "ACTIVE", subscription: null }), false);
 });
@@ -32,14 +33,15 @@ test("product quotas fail closed and preserve the all-products count semantics",
 
 test("authoritative active Stripe plan wins and plan-level Admin grants work without Stripe", () => {
   const now = new Date("2026-01-01T00:00:00Z");
-  assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: { status: "ACTIVE", plan: "plus" }, accessGrants: [{ source: "ADMIN_GRANTED", plan: "pro", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), "plus");
+  assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: { status: "ACTIVE", plan: "plus",currentPeriodEnd:new Date("2026-02-01T00:00:00Z") }, accessGrants: [{ source: "ADMIN_GRANTED", plan: "pro", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), "plus");
   assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: null, accessGrants: [{ source: "ADMIN_GRANTED", plan: "basic", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), "basic");
   assert.equal(effectiveSellerPlan({ role: "SELLER", subscription: null, accessGrants: [{ source: "ADMIN_GRANTED", plan: "forged", startsAt: now, endsAt: new Date("2026-02-01T00:00:00Z") }] }, now), null);
 });
 
 test("every Store resolves the one billing Store commercial entitlement", async () => {
-  const stripeDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:{status:"ACTIVE",plan:"pro",currentPeriodEnd:null},accessGrants:[]}})}} as never;
-  assert.deepEqual(await sellerBusinessCommercialEntitlement(stripeDb,"business"),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"STRIPE",expiresAt:null});
+  const stripeEnd=new Date("2026-02-01T00:00:00Z"),stripeNow=new Date("2026-01-01T00:00:00Z"),stripeDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:{status:"ACTIVE",plan:"pro",currentPeriodEnd:stripeEnd},accessGrants:[]}})}} as never;
+  assert.deepEqual(await sellerBusinessCommercialEntitlement(stripeDb,"business",stripeNow),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"STRIPE",expiresAt:stripeEnd});
+  assert.equal((await sellerBusinessCommercialEntitlement(stripeDb,"business",stripeEnd)).active,false);
   const expires=new Date("2026-02-01T00:00:00Z"),now=new Date("2026-01-01T00:00:00Z");
   const grantDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:null,accessGrants:[{source:"ADMIN_GRANTED",plan:"pro",startsAt:now,endsAt:expires}]}})}} as never;
   assert.deepEqual(await sellerBusinessCommercialEntitlement(grantDb,"business",now),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"ADMIN_GRANTED",expiresAt:expires});

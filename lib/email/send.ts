@@ -7,6 +7,7 @@ import { todijoEmailTemplate } from "./template";
 import { sendTodijoMail } from "./transport";
 import { formatSellerSaleCopy, sellerSaleCopy } from "../../i18n/seller-sale-notifications";
 import { sellerTeamCopy } from "../../i18n/seller-team";
+import {formatSellerSubscriptionReminder,sellerSubscriptionReminderCopy,sellerSubscriptionReminderLocale} from "../../i18n/seller-subscription-reminders";
 
 function layout(locale: string, firstName: string, values: { preview: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }) {
   const common = emailCopy(locale);
@@ -52,4 +53,11 @@ export async function sendSellerTeamInvitationEmail(input:{to:string;locale:stri
   const copy=sellerTeamCopy(input.locale),url=new URL(`${localizedHome(input.locale)}/team-invitation`,publicAppUrl());url.searchParams.set("token",input.rawToken);
   const message=layout(input.locale,input.to.split("@")[0]??"",{preview:copy.invitationSubject,heading:copy.invitationHeading,body:copy.invitationBody,ctaLabel:copy.invitationCta,ctaUrl:url.toString()});
   await sendTodijoMail({to:input.to,subject:copy.invitationSubject,...message});
+}
+
+export async function sendSellerSubscriptionReminderEmail(input:{to:string;firstName:string;locale:string;plan:string;periodEnd:Date;entitlementLost:boolean}){
+  const locale=sellerSubscriptionReminderLocale(input.locale),copy=sellerSubscriptionReminderCopy(locale),values={plan:input.plan,date:new Intl.DateTimeFormat(locale,{dateStyle:"long",timeZone:"UTC"}).format(input.periodEnd)};
+  const subject=formatSellerSubscriptionReminder(copy.subject,values),body=formatSellerSubscriptionReminder(input.entitlementLost?copy.lost:copy.upcoming,values);
+  const message=layout(locale,input.firstName,{preview:subject,heading:copy.heading,body,ctaLabel:copy.cta,ctaUrl:`${publicAppUrl()}${localizedHome(locale)}/seller/subscription`});
+  await sendTodijoMail({to:input.to,subject,...message});
 }

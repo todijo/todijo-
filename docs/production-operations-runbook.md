@@ -18,11 +18,12 @@ Repository code is production-ready, but deployment is `PRODUCTION_READY_WITH_AC
 
 Required core values are `DATABASE_URL`, a 32+ character `SESSION_SECRET`, and an HTTPS `APP_URL`. Stripe commerce requires `STRIPE_MODE`, a matching `STRIPE_SECRET_KEY`, and `STRIPE_WEBHOOK_SECRET`. Connect onboarding additionally requires HTTPS `STRIPE_CONNECT_REFRESH_URL` and `STRIPE_CONNECT_RETURN_URL`; subscription plans require their Stripe price IDs.
 
-Each internal runner requires a distinct secret: `SUPPLIER_SYNC_CRON_SECRET`, `SELLER_TRANSFER_CRON_SECRET`, `REFUND_FINANCIAL_CRON_SECRET`, and—only after the French catalog pilot is approved—`CATALOG_TRANSLATION_CRON_SECRET`. Missing secrets fail closed. Schedule the existing three POST endpoints every 15 minutes with `Authorization: Bearer <secret>`:
+Each internal runner requires a distinct secret: `SUPPLIER_SYNC_CRON_SECRET`, `SELLER_TRANSFER_CRON_SECRET`, `REFUND_FINANCIAL_CRON_SECRET`, `SELLER_SALE_NOTIFICATION_CRON_SECRET`, and—only after the French catalog pilot is approved—`CATALOG_TRANSLATION_CRON_SECRET`. Missing secrets fail closed. Schedule these POST endpoints every 15 minutes with `Authorization: Bearer <secret>`:
 
 - `/api/internal/supplier-sync`
 - `/api/internal/seller-transfers`
 - `/api/internal/refund-financials`
+- `/api/internal/seller-sale-notifications` (durable seller-sale email and seller-subscription reminder delivery)
 
 Catalog translation deploys disabled. After Microsoft credentials, all character ceilings, and `CATALOG_TRANSLATION_ENABLED=true` are configured, schedule `POST /api/internal/catalog-translations` separately. Begin with an Admin-selected five-product French job, approve each stored proposal, then repeat with twenty products. Never expose the runner secret or submit arbitrary text to it.
 

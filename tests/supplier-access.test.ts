@@ -42,7 +42,7 @@ test("only an admin can grant or revoke seller dropshipping permission", async (
 });
 
 test("seller permission and connection lookup are scoped by authenticated store", async () => {
-  const db: any = { store: { findFirst: async ({ where }: any) => where.ownerId === "seller-a" && where.owner.sellerSuspendedAt === null && where.owner.deactivatedAt === null ? { id: "store-a", dropshippingEnabled: true, owner: { role: "SELLER" }, subscription: { status: "ACTIVE", plan: "pro" }, accessGrants: [] } : { id: "store-b", dropshippingEnabled: false, owner: { role: "SELLER" }, subscription: null, accessGrants: [] } } };
+  const db: any = { store: { findFirst: async ({ where }: any) => where.ownerId === "seller-a" && where.owner.sellerSuspendedAt === null && where.owner.deactivatedAt === null ? { id: "store-a", dropshippingEnabled: true, owner: { role: "SELLER" }, subscription: { status: "ACTIVE", plan: "pro",currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] } : { id: "store-b", dropshippingEnabled: false, owner: { role: "SELLER" }, subscription: null, accessGrants: [] } } };
   assert.equal((await requireSellerSupplierAccess(db, { userId: "seller-a" })).id, "store-a");
   await assert.rejects(() => requireSellerSupplierAccess(db, { userId: "seller-b" }), /DROPSHIPPING_PERMISSION_DENIED/);
   assert.deepEqual(sellerConnectionWhere("store-a", "connection-a"), { id: "connection-a", ownerType: "SELLER", storeId: "store-a" });
@@ -50,7 +50,7 @@ test("seller permission and connection lookup are scoped by authenticated store"
 
 test("dropshipping requires PRO in addition to the existing Admin permission", async () => {
   const plan = { current: "basic" };
-  const db: any = { store: { findFirst: async () => ({ id: "store-a", dropshippingEnabled: true, owner: { role: "SELLER" }, subscription: { status: "ACTIVE", plan: plan.current }, accessGrants: [] }) } };
+  const db: any = { store: { findFirst: async () => ({ id: "store-a", dropshippingEnabled: true, owner: { role: "SELLER" }, subscription: { status: "ACTIVE", plan: plan.current,currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] }) } };
   await assert.rejects(() => requireSellerSupplierAccess(db, { userId: "seller-a" }), /DROPSHIPPING_PRO_PLAN_REQUIRED/);
   plan.current = "plus";
   await assert.rejects(() => requireSellerSupplierAccess(db, { userId: "seller-a" }), /DROPSHIPPING_PRO_PLAN_REQUIRED/);

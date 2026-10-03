@@ -303,6 +303,13 @@ enum SellerSaleEmailStatus {
   FAILED
 }
 
+enum SellerSubscriptionReminderKind {
+  DAYS_30
+  DAYS_7
+  DAYS_1
+  ENTITLEMENT_LOST
+}
+
 enum TeamMembershipStatus {
   ACTIVE
   SUSPENDED
@@ -1433,9 +1440,37 @@ model SellerSubscription {
   updatedAt            DateTime           @updatedAt
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  reminderDeliveries SellerSubscriptionReminderDelivery[]
 
   @@index([status])
   @@index([scheduledChangeAt])
+}
+
+model SellerSubscriptionReminderDelivery {
+  id              String                         @id @default(cuid())
+  subscriptionId  String
+  kind            SellerSubscriptionReminderKind
+  periodEnd       DateTime
+  locale          String                         @db.VarChar(10)
+  recipientEmail  String                         @db.VarChar(320)
+  recipientName   String                         @db.VarChar(200)
+  plan            String                         @db.VarChar(40)
+  billingInterval String                         @db.VarChar(20)
+  status          SellerSaleEmailStatus          @default(QUEUED)
+  attemptCount    Int                            @default(0)
+  nextAttemptAt   DateTime?
+  claimToken      String?                        @unique
+  claimedAt       DateTime?
+  sentAt          DateTime?
+  errorCode       String?                        @db.VarChar(120)
+  errorMessage    String?                        @db.VarChar(500)
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
+  subscription SellerSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, periodEnd, kind], map: "SellerSubscriptionReminderDelivery_subscription_period_kind_key")
+  @@index([status, nextAttemptAt, createdAt], map: "SellerSubscriptionReminderDelivery_due_idx")
 }
 
 model Conversation {

@@ -32,7 +32,7 @@ export async function requireSellerSupplierAccess(db: Database, session: { userI
     ownerId:true,businessId:true,
     dropshippingEnabled: true,
     owner: { select: { role: true } },
-    subscription: { select: { status: true, plan: true } },
+    subscription: { select: { status: true, plan: true,currentPeriodEnd:true } },
     accessGrants: { select: { source: true, plan: true, startsAt: true, endsAt: true } },
   } });
   if (!store || !store.dropshippingEnabled) throw new SupplierAccessError("DROPSHIPPING_PERMISSION_DENIED");

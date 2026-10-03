@@ -6,7 +6,8 @@ import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckout
 import { assertStripeCheckoutSessionMode, assertStripeWebhookMode, configuredStripeMode, stripeCheckoutSessionMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 const readyConnectedAccount = async (id = "acct_seller") => ({ id, object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
-const connectDeps = { retrieveConnectedAccount: readyConnectedAccount };
+const activeCommercialEntitlement:any=async()=>({active:true,plan:"basic",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")});
+const connectDeps = { retrieveConnectedAccount: readyConnectedAccount,commercialEntitlement:activeCommercialEntitlement };
 
 function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
   let order: any = null;
@@ -20,7 +21,8 @@ function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROF
       update: async ({ data }: any) => { Object.assign(order, data); return order; },
     },
     product: { findMany: async () => [product] },
-    store: { findUniqueOrThrow: async () => ({ vatStatus: "REGISTERED" }) },
+    store: { findUniqueOrThrow: async () => ({ status:"ACTIVE",businessId:"business_1",vatStatus: "REGISTERED" }) },
+    sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store_1",subscription:{status:"ACTIVE",plan:"basic",currentPeriodEnd:new Date("2099-01-01T00:00:00Z")},accessGrants:[]}})},
     user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com", firstName: "Buyer", lastName: "Example" }), update: async () => ({}) },
   };
   return { db, product, getCreates: () => creates };
@@ -61,6 +63,18 @@ test("duplicate checkout request creates one order and one Stripe session", asyn
   const second = await createCheckout(fixture.db, "buyer_1", "request_123", input, stripe, "FR", undefined, connectDeps);
   assert.equal(first.orderId, second.orderId); assert.equal(second.reused, true);
   assert.equal(fixture.getCreates(), 1); assert.equal(stripeCalls, 1);
+});
+
+test("no-plan seller cannot checkout a stale published product and no order or Stripe session is created",async()=>{
+  const fixture=checkoutDb();let stripeCalls=0;
+  await assert.rejects(()=>createCheckout(fixture.db,"buyer_1","request_no_plan",[{productId:"prod_1",quantity:1}],async()=>{stripeCalls++;return{id:"cs_forbidden",url:"https://stripe.test/forbidden"}},"FR",undefined,{...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",billingStoreId:"store_1",active:false,plan:null,source:"NONE",expiresAt:null})}),(error:unknown)=>error instanceof CheckoutError&&error.message==="SELLER_SUBSCRIPTION_INACTIVE"&&error.status===409);
+  assert.equal(fixture.getCreates(),0);assert.equal(stripeCalls,0);
+});
+
+test("active Admin commercial entitlement remains accepted at checkout",async()=>{
+  const fixture=checkoutDb();let stripeCalls=0;
+  await createCheckout(fixture.db,"buyer_1","request_admin_grant",[{productId:"prod_1",quantity:1}],async()=>{stripeCalls++;return{id:"cs_grant",url:"https://stripe.test/grant"}},"FR",undefined,{...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",billingStoreId:"store_1",active:true,plan:"plus",source:"ADMIN_GRANTED",expiresAt:new Date("2099-01-01T00:00:00Z")})});
+  assert.equal(fixture.getCreates(),1);assert.equal(stripeCalls,1);
 });
 
 test("single-seller checkout uses one platform payment and defers seller payout", async () => {
@@ -153,7 +167,7 @@ test("checkout reprices an eligible supplier line once, preserves mixed shipping
   const shippingFields={shippingOverrideEnabled:false,shippingEnabled:true,shippingMethodName:"Standard",shippingPrice:new Prisma.Decimal("4.50"),shippingFree:false,shippingFreeThreshold:null,shippingMinDays:2,shippingMaxDays:5,shippingCountries:["FR"],shippingWorldwide:false,shippingPostalCodes:[],shippingCarrier:"Carrier",shippingProvider:"MANUAL",shippingExternalServiceId:null};
   const variant={id:"variant_cj",stock:10,active:true,sku:"CJ-V",priceOverride:null,values:[]};
   const products=[{id:"cj",name:"CJ",description:null,images:[],colors:[],sizes:[],price:new Prisma.Decimal("9"),currency:"USD",stock:10,storeId:"store_1",...shippingFields,variants:[variant],store},{id:"normal",name:"Normal",description:null,images:[],colors:[],sizes:[],price:new Prisma.Decimal("12.50"),currency:"EUR",stock:10,storeId:"store_1",...shippingFields,variants:[],store}];
-  const db:any={order:{findUnique:async()=>order,findUniqueOrThrow:async()=>order,create:async({data}:any)=>{order={id:"order_mix",status:"PENDING",stripeCheckoutSessionId:null,stripeCheckoutUrl:null,...data,items:data.items.create};return order;},update:async({data}:any)=>{Object.assign(order,data);return order;}},product:{findMany:async()=>products},supplierProductLink:{findMany:async()=>[{productId:"cj",provider:"CJ",sourceMetadata:{pricing:{mode:"AUTOMATIC"}},supplierAvailable:true,syncStatus:"HEALTHY",ownerType:"PLATFORM",connection:{status:"CONNECTED",store:null}}]},store:{findUniqueOrThrow:async()=>({vatStatus:"REGISTERED"})},user:{findUniqueOrThrow:async()=>({email:"buyer@example.com",firstName:"Buyer",lastName:"Example"})}};
+  const db:any={order:{findUnique:async()=>order,findUniqueOrThrow:async()=>order,create:async({data}:any)=>{order={id:"order_mix",status:"PENDING",stripeCheckoutSessionId:null,stripeCheckoutUrl:null,...data,items:data.items.create};return order;},update:async({data}:any)=>{Object.assign(order,data);return order;}},product:{findMany:async()=>products},supplierProductLink:{findMany:async()=>[{productId:"cj",provider:"CJ",sourceMetadata:{pricing:{mode:"AUTOMATIC"}},supplierAvailable:true,syncStatus:"HEALTHY",ownerType:"PLATFORM",connection:{status:"CONNECTED",store:null}}]},store:{findUniqueOrThrow:async()=>({status:"ACTIVE",businessId:"business_1",vatStatus:"REGISTERED"})},user:{findUniqueOrThrow:async()=>({email:"buyer@example.com",firstName:"Buyer",lastName:"Example"})}};
   const snapshot:any={pricingMode:"AUTOMATIC",provider:"CJ",productId:"cj",variantId:"variant_cj",supplierProductId:"supplier",supplierVariantId:"supplier-v",quantity:1,supplierCurrency:"USD",supplierUnitCost:"8.24",freightCurrency:"USD",freightTotal:"4.75",supportedFees:[],includedCost:"12.99",targetMargin:"0.2",calculatedSellingPrice:"16.24",buyerCurrency:"EUR",fx:{base:"USD",quote:"EUR",rate:"0.866341",source:"OPEN_EXCHANGE_RATES",effectiveAt:"2026-08-11T00:00:00.000Z",fetchedAt:"2026-08-11T00:00:00.000Z"},buyerUnitPrice:"14.07",buyerLineTotal:"14.07",shippingIncluded:true,freeShipping:true,shippingMethod:"CJ Standard",deliveryMinDays:8,deliveryMaxDays:15,pricedAt:"2026-08-11T00:00:00.000Z",pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"};
   const resolver:any=async()=>{pricingCalls++;return{eligibility:{eligible:true},buyer:{buyerUnitPrice:"14.07"},snapshot};};
   const items=[{productId:"cj",variantId:"variant_cj",quantity:1,displayedUnitPrice:"9",displayedCurrency:"USD"},{productId:"normal",quantity:1,displayedUnitPrice:"12.50",displayedCurrency:"EUR"}];
