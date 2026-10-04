@@ -13,16 +13,17 @@ import SellerProductsList from "./SellerProductsList";
 import { resolveSellerStoreContext } from "@/lib/seller-business-access";
 import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
 import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
+import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
 
 export const dynamic = "force-dynamic";
 type SearchParams = Record<string, string | string[] | undefined>;
 function one(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] ?? "" : value ?? ""; }
 
 export default async function SellerProductsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
-  const [t, control, p, common, dashboardText, transparency, compliance, supplierText, market, locale, session, params] = await Promise.all([getTranslations("Seller"), getTranslations("SellerControl"), getTranslations("DashboardPremium"), getTranslations("Common"), getTranslations("SellerDashboard"), getTranslations("SellerTransparency"), getTranslations("Compliance"), getTranslations("Supplier"), getTranslations("Marketplace"), getLocale(), readSession(), searchParams]);
+  const [t, control, p, common, dashboardText, transparency, compliance, verification, supplierText, market, locale, session, params] = await Promise.all([getTranslations("Seller"), getTranslations("SellerControl"), getTranslations("DashboardPremium"), getTranslations("Common"), getTranslations("SellerDashboard"), getTranslations("SellerTransparency"), getTranslations("Compliance"),getTranslations("SellerBusinessVerification"), getTranslations("Supplier"), getTranslations("Marketplace"), getLocale(), readSession(), searchParams]);
   if (!session) redirect("/login");
   let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,one(params?.store)||null,"PRODUCT_VIEW")}catch{redirect(`/${locale}/dashboard`)}
-  const store = await prisma.store.findUnique({where:{id:storeContext.selected.id}, select: { id: true, name: true, slug: true, currency: true, status: true, sellerType: true, vatStatus: true, dropshippingEnabled: true, owner: { select: { firstName: true, lastName: true } }, subscription: { select: { status: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } });
+  const store = await prisma.store.findUnique({where:{id:storeContext.selected.id}, select: { id: true, name: true, slug: true, country:true,businessRegistrationId:true,currency: true, status: true, sellerType: true, vatStatus: true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}}, dropshippingEnabled: true, owner: { select: { firstName: true, lastName: true } }, subscription: { select: { status: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } });
   if (!store) redirect("/seller/create-store");
   const query = parseSellerProductsQuery(new URLSearchParams({ page: one(params?.page), q: one(params?.q), status: one(params?.status), sort: one(params?.sort) }));
   const result = await listSellerProducts(prisma, store.id, query);
@@ -33,10 +34,11 @@ export default async function SellerProductsPage({ searchParams }: { searchParam
   const canAddProduct = subscriptionActive && !quota.blocked;
   const freeCopy = sellerFreeModelCopy(locale);
   const storeReadinessPending=store.status!=="ACTIVE";
-  const readinessHref = sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
-  const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : store.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
-  const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : store.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
-  const readinessAction = sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : commercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
+  const businessVerificationRequired=!hasVerifiedFrenchBusiness(store);
+  const readinessHref = businessVerificationRequired||sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings#location` : `/${locale}/seller/subscription`;
+  const readinessTitle = businessVerificationRequired ? verification("sectionTitle") : sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : store.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
+  const readinessHelp = businessVerificationRequired ? verification("dashboardPending") : sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : store.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
+  const readinessAction = businessVerificationRequired ? verification("verify") : sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : commercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
   const labels = { dashboard: p("nav.dashboard"), products: p("nav.products"), orders: p("nav.orders"), messages: p("nav.messages"), statistics: p("nav.statistics"), revenue: p("nav.revenue"), reviews: p("nav.reviews"), store: p("nav.store"), settings: p("nav.settings"), notifications: p("notifications"), eyebrow: p("seller.eyebrow"), logout: common("logout"), menu: dashboardText("menu"), collapse: dashboardText("collapse"), addProduct: p("nav.addProduct") };
   const listKey = `${query.q}|${query.status}|${query.sort}|${result.page}`;
   return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} labels={labels} active="products" canAddProduct={canAddProduct}>

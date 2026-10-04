@@ -42,6 +42,15 @@ enum SellerVatStatus {
   NOT_REGISTERED_OR_NOT_APPLICABLE
 }
 
+enum SellerBusinessVerificationState {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  MANUAL_REVIEW
+  REJECTED
+  REVERIFY_REQUIRED
+}
+
 enum ProductReportReason {
   ILLEGAL
   UNSAFE
@@ -720,6 +729,9 @@ model SellerOnboardingDraft {
   companySubtype             SellerCompanySubtype?
   businessRegistrationNumber String?         @db.VarChar(80)
   legalBusinessName          String?         @db.VarChar(160)
+  businessSiren              String?         @db.VarChar(9)
+  samePersonalBusinessAddress Boolean        @default(false)
+  displayBusinessAddress     Boolean         @default(false)
   vatStatus                  SellerVatStatus @default(UNKNOWN)
   vatNumber                  String?         @db.VarChar(80)
   step                       Int             @default(1)
@@ -866,12 +878,16 @@ model Store {
   onboardingStep Int @default(0)
   sellerLegalForm SellerLegalForm?
   companySubtype  SellerCompanySubtype?
+  displayBusinessAddress Boolean @default(false)
+  samePersonalBusinessAddress Boolean @default(false)
 
   ownerId String
   owner   User   @relation("StoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   primaryForOwner User? @relation("UserPrimaryStore")
   businessId String?
   business SellerBusiness? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  establishmentId String?
+  establishment SellerBusinessEstablishment? @relation(fields: [establishmentId, businessId], references: [id, businessId], onDelete: Restrict)
   billingForBusiness SellerBusiness? @relation("SellerBusinessBillingStore")
 
   products      Product[]
@@ -900,6 +916,21 @@ model SellerBusiness {
   ownerId        String   @unique
   billingStoreId String?  @unique
   maxStores      Int      @default(1)
+  siren          String?  @unique @db.VarChar(9)
+  legalBusinessName String? @db.VarChar(160)
+  sellerLegalForm SellerLegalForm?
+  companySubtype SellerCompanySubtype?
+  vatStatus      SellerVatStatus @default(UNKNOWN)
+  vatNumber      String? @db.VarChar(80)
+  inseeVerificationState SellerBusinessVerificationState @default(NOT_STARTED)
+  inseeVerifiedAt DateTime?
+  inseeVerificationSource String? @db.VarChar(40)
+  inseeLegalUnitStatus String? @db.VarChar(12)
+  inseeLegalUnitName String? @db.VarChar(200)
+  inseeVerificationReason String? @db.VarChar(500)
+  inseeVerificationSnapshot Json?
+  inseeLastAttemptAt DateTime?
+  inseeRetryAfter DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -909,8 +940,39 @@ model SellerBusiness {
   memberships  SellerTeamMembership[]
   invitations  SellerTeamInvitation[]
   auditEvents  SellerBusinessAuditEvent[]
+  establishments SellerBusinessEstablishment[]
 
   @@index([maxStores])
+}
+
+model SellerBusinessEstablishment {
+  id             String @id @default(cuid())
+  businessId     String
+  siret          String @db.VarChar(14)
+  verificationState SellerBusinessVerificationState @default(NOT_STARTED)
+  establishmentStatus String? @db.VarChar(12)
+  legalUnitSiren String @db.VarChar(9)
+  legalName      String? @db.VarChar(200)
+  address        String? @db.VarChar(240)
+  postalCode     String? @db.VarChar(32)
+  city           String? @db.VarChar(120)
+  country        String? @db.VarChar(2)
+  verificationSource String? @db.VarChar(40)
+  verifiedAt     DateTime?
+  verificationReason String? @db.VarChar(500)
+  verificationSnapshot Json?
+  lastAttemptAt  DateTime?
+  retryAfter     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  business SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stores   Store[]
+
+  @@unique([businessId, siret])
+  @@unique([id, businessId])
+  @@index([businessId, verificationState])
+  @@index([siret])
 }
 
 model SellerTeamMembership {

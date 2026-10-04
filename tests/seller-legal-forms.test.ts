@@ -13,7 +13,7 @@ test("private sellers have no company form, subtype, or registration requirement
   assert.deepEqual(sellerLegalIdentity({ sellerType: "PRIVATE", country: "FR", legalForm: null, companySubtype: null }), { identity: { legalForm: "PRIVATE", companySubtype: null }, error: null });
   assert.equal(sellerRegistrationRequirements("FR", "PRIVATE").registrationRequired, false);
   const form = source("app/seller/onboarding/SellerAddressOnboardingForm.tsx");
-  assert.match(form, /sellerType === "PROFESSIONAL" && shownAddress\.country/);
+  assert.match(form, /sellerType === "PROFESSIONAL" && Boolean\(shownAddress\.country\)/);
   assert.match(form, /professionalIdentityReady && <><div className="formField"/);
 });
 
@@ -46,7 +46,7 @@ test("private sellers reject forged professional identity fields", () => {
 test("draft and store persistence retain nullable subtype without rewriting old COMPANY rows", () => {
   const schema = source("prisma/schema.prisma"), migration = source("prisma/migrations/20261001223000_add_seller_company_subtype/migration.sql"), route = source("app/api/seller/onboarding/route.ts"), page = source("app/seller/onboarding/page.tsx");
   assert.match(schema, /enum SellerCompanySubtype/);
-  assert.equal((schema.match(/companySubtype\s+SellerCompanySubtype\?/g) ?? []).length, 2);
+  assert.equal((schema.match(/companySubtype\s+SellerCompanySubtype\?/g) ?? []).length, 3);
   assert.doesNotMatch(migration, /UPDATE|NOT NULL|DEFAULT/);
   assert.match(route, /companySubtype:\(legal\.identity\?\.companySubtype\?\?null\)/);
   assert.match(route, /companySubtype:identity\.companySubtype/);

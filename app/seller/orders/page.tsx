@@ -26,7 +26,7 @@ export default async function SellerOrdersPage({ searchParams }: { searchParams:
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { role: true, firstName: true, lastName: true } });
   if (!user || user.role === "CUSTOMER") redirect(`/${locale}/dashboard`);
   let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,one(params.store)||null,"ORDER_VIEW")}catch{redirect(`/${locale}/dashboard`)}
-  const store=await prisma.store.findUniqueOrThrow({where:{id:storeContext.selected.id},select:{id:true,slug:true,status:true,sellerType:true,subscription:{select:{status:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}}}});
+  const store=await prisma.store.findUniqueOrThrow({where:{id:storeContext.selected.id},select:{id:true,slug:true,status:true,country:true,businessRegistrationId:true,sellerType:true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},subscription:{select:{status:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}}}});
   const result = await listSellerOrderHistory(prisma, session.userId, store.id, one(params.q), one(params.page));
   const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const href = (page: number) => `/${locale}/seller/orders?${new URLSearchParams({store:store.id, ...(result.search ? { q: result.search } : {}), page: String(page) })}`;

@@ -14,6 +14,8 @@ import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/cata
 import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
 import { ensureSellerBusiness, lockSellerBusiness, sellerBusinessCommercialPlan, SellerBusinessError } from "@/lib/seller-business";
 import { requireStoreCapability, resolveSellerStoreContext, SellerCapabilityError } from "@/lib/seller-business-access";
+import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
+import { isFrenchProfessional } from "@/lib/seller-business-verification-policy";
 
 function makeSlug(value: string) {
   return value
@@ -53,9 +55,11 @@ export async function POST(request: Request) {
     const language = String(body.language ?? "fr").trim().toLowerCase();
     const sellerType = parseSellerType(body.sellerType);
     if (!sellerType) return NextResponse.json({ error: "Choose your seller status.", code: "SELLER_TYPE_REQUIRED" }, { status: 400 });
-    let sellerIdentity;
+    let sellerIdentity: ReturnType<typeof sellerIdentityInput>;
     try { sellerIdentity = sellerIdentityInput(body, sellerType); }
     catch (error) { const code = error instanceof Error ? error.message : "SELLER_IDENTITY_REQUIRED"; return NextResponse.json({ error: code, code }, { status: 400 }); }
+    let businessRegistrationId = sellerIdentity.businessRegistrationId;
+    let legalBusinessName = sellerIdentity.legalBusinessName;
 
     if (name.length < 2 || name.length > 80) {
       return NextResponse.json(
@@ -108,6 +112,17 @@ export async function POST(request: Request) {
       const storeCount = await tx.store.count({ where: { businessId: business.id } });
       if (storeCount >= locked.maxStores) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
       if (storeCount > 0 && !canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(tx, business.id))) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
+      let establishmentId:string|null=null;
+      if(isFrenchProfessional(sellerType,country)){
+        const siren=normalizeSiren(body.businessSiren),siret=normalizeSiret(sellerIdentity.businessRegistrationId);
+        if(!siren.ok||!siret.ok||sirenForSiret(siret.value)!==siren.value)throw new SellerBusinessError("BUSINESS_VERIFICATION_REQUIRED",409);
+        const verifiedBusiness=await tx.sellerBusiness.findUnique({where:{id:business.id},select:{siren:true,inseeVerificationState:true,inseeLegalUnitName:true}});
+        if(verifiedBusiness?.siren!==siren.value)throw new SellerBusinessError("BUSINESS_VERIFICATION_REQUIRED",409);
+        if(verifiedBusiness.inseeVerificationState==="VERIFIED"&&verifiedBusiness.inseeLegalUnitName){if(legalBusinessName?.trim().toLocaleLowerCase()!==verifiedBusiness.inseeLegalUnitName.trim().toLocaleLowerCase())throw new SellerBusinessError("BUSINESS_NAME_MUST_MATCH_INSEE",409);legalBusinessName=verifiedBusiness.inseeLegalUnitName;}
+        businessRegistrationId=siret.value;
+        const establishment=await tx.sellerBusinessEstablishment.findUnique({where:{businessId_siret:{businessId:business.id,siret:siret.value}},select:{id:true,legalUnitSiren:true,verificationState:true}});
+        if(verifiedBusiness.inseeVerificationState==="VERIFIED"&&establishment?.verificationState==="VERIFIED"&&establishment.legalUnitSiren===siren.value)establishmentId=establishment.id;
+      }
       const created = await tx.store.create({
         data: {
           name,
@@ -122,8 +137,11 @@ export async function POST(request: Request) {
           language,
           sellerType,
           ...sellerIdentity,
+          legalBusinessName,
+          businessRegistrationId,
           ownerId: session.userId,
           businessId: business.id,
+          establishmentId,
         },
         select: { id: true, slug: true },
       });
@@ -227,8 +245,9 @@ export async function PATCH(request: Request) {
 
     const requestedStoreId=typeof body.storeId==="string"?body.storeId:"";
     const context=await resolveSellerStoreContext(prisma,session.userId,requestedStoreId||null,"STORE_VIEW_SETTINGS");
-    const currentStore=await prisma.store.findUnique({where:{id:context.selected.id},select:{id:true,businessId:true,ownerId:true,name:true,description:true,contactEmail:true,phone:true,logo:true,banner:true,country:true,city:true,currency:true,language:true,sellerType:true,legalBusinessName:true,businessRegistrationId:true,businessAddress:true,businessPostalCode:true,vatNumber:true,vatStatus:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true}});
+    const currentStore=await prisma.store.findUnique({where:{id:context.selected.id},select:{id:true,businessId:true,establishmentId:true,ownerId:true,name:true,description:true,contactEmail:true,phone:true,logo:true,banner:true,country:true,city:true,currency:true,language:true,sellerType:true,legalBusinessName:true,businessRegistrationId:true,businessAddress:true,businessPostalCode:true,vatNumber:true,vatStatus:true,displayBusinessAddress:true,samePersonalBusinessAddress:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true}});
     if(!currentStore)return NextResponse.json({error:"Boutique introuvable."},{status:404});
+    if(isFrenchProfessional(sellerType,country)&&currentStore.businessId){const verifiedIdentity=await prisma.sellerBusiness.findUnique({where:{id:currentStore.businessId},select:{inseeVerificationState:true,inseeLegalUnitName:true}});if(verifiedIdentity?.inseeVerificationState==="VERIFIED"&&verifiedIdentity.inseeLegalUnitName){if(sellerIdentity.legalBusinessName?.trim().toLocaleLowerCase()!==verifiedIdentity.inseeLegalUnitName.trim().toLocaleLowerCase())return NextResponse.json({error:"BUSINESS_NAME_MUST_MATCH_INSEE"},{status:409});sellerIdentity={...sellerIdentity,legalBusinessName:verifiedIdentity.inseeLegalUnitName};}}
     const principal=await requireStoreCapability(prisma,session.userId,currentStore.id,"STORE_VIEW_SETTINGS");
     const needed=[] as Array<"STORE_EDIT_DESCRIPTION"|"STORE_EDIT_MEDIA"|"STORE_EDIT_SETTINGS"|"STORE_EDIT_SHIPPING">;
     if((currentStore.description??"")!==description)needed.push("STORE_EDIT_DESCRIPTION");
@@ -236,7 +255,9 @@ export async function PATCH(request: Request) {
     if([currentStore.name,currentStore.contactEmail,currentStore.phone??"",currentStore.country,currentStore.city,currentStore.currency,currentStore.language].join("\0")!==[name,contactEmail,phone,country,city,currency,language].join("\0"))needed.push("STORE_EDIT_SETTINGS");
     const shippingChanged=JSON.stringify([currentStore.shippingEnabled,currentStore.shippingMethodName,currentStore.shippingPrice?.toString()??null,currentStore.shippingFree,currentStore.shippingFreeThreshold?.toString()??null,currentStore.shippingMinDays,currentStore.shippingMaxDays,currentStore.shippingCountries,currentStore.shippingWorldwide,currentStore.shippingPostalCodes,currentStore.shippingCarrier])!==JSON.stringify([shippingSettings.shippingEnabled,shippingSettings.shippingMethodName,shippingSettings.shippingPrice?.toString()??null,shippingSettings.shippingFree,shippingSettings.shippingFreeThreshold?.toString()??null,shippingSettings.shippingMinDays,shippingSettings.shippingMaxDays,shippingSettings.shippingCountries,shippingSettings.shippingWorldwide,shippingSettings.shippingPostalCodes,shippingSettings.shippingCarrier]);
     if(shippingChanged)needed.push("STORE_EDIT_SHIPPING");
-    const legalChanged=JSON.stringify([currentStore.sellerType,currentStore.legalBusinessName,currentStore.businessRegistrationId,currentStore.businessAddress,currentStore.businessPostalCode,currentStore.vatNumber,currentStore.vatStatus])!==JSON.stringify([sellerType,sellerIdentity.legalBusinessName,sellerIdentity.businessRegistrationId,sellerIdentity.businessAddress,sellerIdentity.businessPostalCode,sellerIdentity.vatNumber,sellerIdentity.vatStatus]);
+    const displayBusinessAddress=body.displayBusinessAddress===true;
+    const samePersonalBusinessAddress=body.samePersonalBusinessAddress===true;
+    const legalChanged=JSON.stringify([currentStore.sellerType,currentStore.legalBusinessName,currentStore.businessRegistrationId,currentStore.businessAddress,currentStore.businessPostalCode,currentStore.vatNumber,currentStore.vatStatus,currentStore.displayBusinessAddress,currentStore.samePersonalBusinessAddress])!==JSON.stringify([sellerType,sellerIdentity.legalBusinessName,sellerIdentity.businessRegistrationId,sellerIdentity.businessAddress,sellerIdentity.businessPostalCode,sellerIdentity.vatNumber,sellerIdentity.vatStatus,displayBusinessAddress,samePersonalBusinessAddress]);
     if(legalChanged&&!principal.owner)throw new SellerCapabilityError("OWNER_REQUIRED",403);
     for(const permission of new Set(needed))await requireStoreCapability(prisma,session.userId,currentStore.id,permission);
     const store = await prisma.store.update({
@@ -254,6 +275,9 @@ export async function PATCH(request: Request) {
         language,
         sellerType,
         ...sellerIdentity,
+        displayBusinessAddress:sellerType==="PROFESSIONAL"&&country.toUpperCase()==="FR"&&displayBusinessAddress,
+        samePersonalBusinessAddress:sellerType==="PROFESSIONAL"&&country.toUpperCase()==="FR"&&samePersonalBusinessAddress,
+        ...(currentStore.businessRegistrationId!==sellerIdentity.businessRegistrationId?{establishmentId:null}:{}),
         ...shippingSettings,
       },
       select: { slug: true },

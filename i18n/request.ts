@@ -50,6 +50,7 @@ export default getRequestConfig(async () => {
   messages.InfoPages = { ...infoPagesEnglish, ...(await import(`../messages/info-pages/${locale}.json`)).default };
   messages.PublicStore = (await import(`../messages/public-store/${locale}.json`)).default;
   messages.SellerTransparency = (await import(`../messages/seller-transparency/${locale}.json`)).default;
+  messages.SellerBusinessVerification = { ...(await import("../messages/seller-business-verification/en.json")).default, ...((await import(`../messages/seller-business-verification/${locale === "fr" ? "fr" : "en"}.json`)).default) };
   messages.Compliance = { ...(await import("../messages/compliance/en.json")).default, ...(await import(`../messages/compliance/${locale}.json`)).default };
   messages.TrustSafety = (await import(`../messages/trust-safety/${locale}.json`)).default;
   messages.Notifications = (await import(`../messages/notifications/${locale}.json`)).default;

@@ -8,6 +8,7 @@ import { normalizeMarketplaceSearch } from "@/lib/marketplace-search";
 import { categoryFilterValues } from "@/lib/desktop-category-taxonomy";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 import { canonicalMarketplaceColor, countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplace-facets";
+import { publicStoreCity } from "@/lib/seller-business-verification-policy";
 import { getLocale } from "next-intl/server";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import{localizedSupplierContentSearch}from"@/lib/product-content-search";
@@ -22,7 +23,7 @@ const productSelect = {
   category: true, stock: true, condition: true, images: true, createdAt: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
-  store: { select: { name: true, slug: true, city: true, country: true } },
+  store: { select: { name: true, slug: true, city: true, country: true, sellerType:true, displayBusinessAddress:true } },
   supplierLink:{select:{sourceMetadata:true}},
 } satisfies Prisma.ProductSelect;
 
@@ -33,7 +34,7 @@ function serializeProduct(p: ProductRow, locale: string) {
   const content=resolveBuyerProductContent({name:p.name,description:"",sourceMetadata:p.supplierLink?.sourceMetadata,locale,sourceLocale:p.sourceLocale,translations:p.translations});
   return { id: p.id, name: content.title, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
     currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
-    storeName: p.store.name, storeSlug: p.store.slug, city: p.store.city, country: p.store.country, createdAt: p.createdAt.toISOString(),requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(p.supplierLink?.sourceMetadata) };
+    storeName: p.store.name, storeSlug: p.store.slug, city: publicStoreCity({ sellerType:p.store.sellerType,country:p.store.country,displayBusinessAddress:p.store.displayBusinessAddress,city:p.store.city }), country: p.store.country, createdAt: p.createdAt.toISOString(),requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(p.supplierLink?.sourceMetadata) };
 }
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -162,7 +163,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       where: { ...publicStoreAccess, products: { some: { status: "PUBLISHED", ...publicProductAccess } } },
       orderBy: { updatedAt: "desc" },
       take: 5,
-      select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
+      select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, sellerType:true, displayBusinessAddress:true,
         products: { where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
@@ -212,7 +213,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       newArrivals={newArrivalRows.map(product=>serializeProduct(product,locale))}
       bestSellers={bestSellers}
       proDiscovery={proDiscovery.map(product => serializeProduct(product, locale))}
-      stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: product.images[0] ?? null })) }))}
+      stores={storeRows.map((store) => ({id:store.id,name:store.name,slug:store.slug,description:store.description,logo:store.logo,city:publicStoreCity({sellerType:store.sellerType,country:store.country,displayBusinessAddress:store.displayBusinessAddress,city:store.city}),country:store.country,products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
       page={normalizedPage}

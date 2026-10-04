@@ -8,6 +8,7 @@ import { effectiveShippingRule } from "@/lib/shipping";
 import { mobileBuyerLocale } from "@/lib/mobile-buyer-context";
 import { serializeBuyerMedia, serializeBuyerStore } from "@/lib/buyer-product-detail";
 import type { BuyerProductDetailResponse } from "@todijo/contracts";
+import { publicStoreCity } from "@/lib/seller-business-verification-policy";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const locale = mobileBuyerLocale(request);
@@ -39,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       } },
       supplierLink: { select: { sourceMetadata: true } },
       store: { select: {
-        id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, sellerType: true, currency: true,
+        id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, sellerType: true, displayBusinessAddress:true, currency: true,
         shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true,
         shippingFreeThreshold: true, shippingMinDays: true, shippingMaxDays: true,
         shippingCountries: true, shippingWorldwide: true, shippingPostalCodes: true, shippingCarrier: true, shippingProvider: true, shippingExternalServiceId: true,
@@ -84,7 +85,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       media: publicMedia,
       options: product.options.map((option) => ({ id: option.id, name: option.name, position: option.position, values: option.values.map((value) => ({ id: value.id, value: value.value, position: value.position, images: value.imageAssignments.map((assignment) => ({ id: assignment.image.id, url: assignment.image.url, position: assignment.image.position, isPrimary: assignment.isPrimary })) })) })),
       variants,
-      store: serializeBuyerStore(product.store),
+      store: serializeBuyerStore({ ...product.store, city: publicStoreCity(product.store) }),
       shipping: { enabled: shipping.shippingEnabled, methodName: shipping.shippingMethodName, price: shipping.shippingPrice?.toString() ?? null, free: shipping.shippingFree, freeThreshold: shipping.shippingFreeThreshold?.toString() ?? null, minDays: shipping.shippingMinDays, maxDays: shipping.shippingMaxDays, countries: shipping.shippingCountries, worldwide: shipping.shippingWorldwide, postalCodes: shipping.shippingPostalCodes, carrier: shipping.shippingCarrier },
       reviews: { summary: { count: reviewCount, averageRating }, items: product.reviews.map((review) => ({ ...review, createdAt: review.createdAt.toISOString(), repliedAt: review.repliedAt?.toISOString() ?? null, authorName: review.author.firstName })) },
       compliance: { productIdentifier: product.productIdentifier, manufacturerName: product.manufacturerName, manufacturerContact: product.manufacturerContact, responsiblePerson: product.responsiblePerson, safetyInformation: product.safetyInformation, complianceInformation: product.complianceInformation },

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import StoreExperience from "./StoreExperience";
 import { getLocale } from "next-intl/server";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
+import { isFrenchProfessional, publicStoreCity } from "@/lib/seller-business-verification-policy";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
@@ -22,10 +23,11 @@ export async function generateMetadata({ params }: Pick<Props, "params">): Promi
   const [{ slug }, locale] = await Promise.all([params, getLocale() as Promise<Locale>]);
   const store = await prisma.store.findFirst({
     where: { slug, ...publicStoreAccessWhere() },
-    select: { name: true, description: true, logo: true, banner: true, city: true, country: true },
+    select: { name: true, description: true, logo: true, banner: true, city: true, country: true, sellerType:true, displayBusinessAddress: true, businessAddress: true, businessPostalCode: true, establishment: { select: { verificationState: true, address: true, postalCode: true, city: true } } },
   });
   if (!store) return { title: "Todijo", robots: { index: false, follow: false } };
-  const description = concise(store.description || `${store.name} · ${store.city}, ${store.country}`);
+  const publicLocation = publicStoreLocation(store);
+  const description = concise(store.description || `${store.name} · ${publicLocation}`);
   const pathname = `store/${slug}`;
   const canonical = localizedPath(locale, pathname);
   const image = store.banner || store.logo;
@@ -42,6 +44,15 @@ function initials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
+function publicStoreLocation(store: { sellerType: string; country: string; city: string; displayBusinessAddress: boolean; businessAddress?: string | null; businessPostalCode?: string | null; establishment?: { verificationState: string; address: string | null; postalCode: string | null; city: string | null } | null }) {
+  if (isFrenchProfessional(store.sellerType, store.country)) {
+    if (!store.displayBusinessAddress) return store.country;
+    const establishment = store.establishment?.verificationState === "VERIFIED" ? store.establishment : null;
+    return [establishment?.address ?? store.businessAddress, establishment?.postalCode ?? store.businessPostalCode, establishment?.city ?? store.city, store.country].filter(Boolean).join(", ");
+  }
+  return [publicStoreCity(store), store.country].filter(Boolean).join(", ");
+}
+
 export default async function StorePage({ params, searchParams }: Props) {
   const [locale, { slug }, query, session, requestHeaders] = await Promise.all([getLocale(), params, searchParams, readSession(), headers()]);
   const pageSize = publicStorePageSize(requestHeaders.get("user-agent"), requestHeaders.get("sec-ch-ua-mobile"));
@@ -50,8 +61,9 @@ export default async function StorePage({ params, searchParams }: Props) {
   const store = await prisma.store.findFirst({
     where: { slug, ...publicStoreAccessWhere() },
     select: {
-      id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, createdAt: true, sellerType: true,
+      id: true, name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, displayBusinessAddress: true, createdAt: true, sellerType: true,
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true,
+      establishment: { select: { verificationState: true, address: true, postalCode: true, city: true } },
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
       _count: { select: { products: { where: { status: "PUBLISHED", ...publicProductAccessWhere() } } } },
       products: { where: { status: "PUBLISHED", ...publicProductAccessWhere() }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize, select: { id: true, name: true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
@@ -71,7 +83,9 @@ export default async function StorePage({ params, searchParams }: Props) {
     logo: store.logo,
     banner: store.banner,
     country: store.country,
-    city: store.city,
+    city: publicStoreCity(store),
+    publicLocation: publicStoreLocation(store),
+    displayBusinessAddress: store.displayBusinessAddress,
     openedLabel: dateFormat.format(store.createdAt),
     sellerName: `${store.owner.firstName} ${store.owner.lastName}`,
     sellerInitials: initials(store.owner.firstName, store.owner.lastName),

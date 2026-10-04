@@ -6,6 +6,7 @@ import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/prod
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 import { mobileBuyerLocale } from "@/lib/mobile-buyer-context";
+import { publicStoreCity } from "@/lib/seller-business-verification-policy";
 
 const PAGE_SIZE = 24;
 const productSelect = {
@@ -26,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const store = await prisma.store.findFirst({
     where: { slug, ...publicStoreAccessWhere(), products: { some: PUBLIC_PRODUCT } },
     select: {
-      id: true, name: true, slug: true, description: true, logo: true, banner: true, city: true, country: true, sellerType: true, createdAt: true,
+      id: true, name: true, slug: true, description: true, logo: true, banner: true, city: true, country: true, sellerType: true, displayBusinessAddress:true, createdAt: true,
       _count: { select: { products: { where: PUBLIC_PRODUCT } } },
       products: { where: PUBLIC_PRODUCT, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: offset, take: PAGE_SIZE, select: productSelect },
     },
@@ -35,8 +36,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const products = store.products.map((product) => {
     const content = resolveBuyerProductContent({ name: product.name, description: product.description, sourceMetadata: product.supplierLink?.sourceMetadata, locale, sourceLocale: product.sourceLocale, translations: product.translations });
     const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-    return { id: product.id, title: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, category: product.category, condition: product.condition, image: product.images[0] ?? null, stock: availability.hasActiveVariants ? null : product.stock, available: availability.isGenerallyAvailable, hasActiveVariants: availability.hasActiveVariants, requiresAuthoritativePrice: requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata), store: { name: store.name, slug: store.slug, city: store.city, country: store.country, logo: store.logo }, createdAt: product.createdAt.toISOString() };
+    return { id: product.id, title: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, category: product.category, condition: product.condition, image: product.images[0] ?? null, stock: availability.hasActiveVariants ? null : product.stock, available: availability.isGenerallyAvailable, hasActiveVariants: availability.hasActiveVariants, requiresAuthoritativePrice: requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata), store: { name: store.name, slug: store.slug, city: publicStoreCity(store), country: store.country, logo: store.logo }, createdAt: product.createdAt.toISOString() };
   });
   const { products: _products, _count, ...identity } = store;
-  return NextResponse.json({ store: { ...identity, createdAt: identity.createdAt.toISOString(), productCount: _count.products }, products, hasMore: offset + products.length < _count.products, nextOffset: offset + products.length }, { headers: { "Cache-Control": "private, no-store" } });
+  void _products;
+  return NextResponse.json({ store: { ...identity, city: publicStoreCity(identity), createdAt: identity.createdAt.toISOString(), productCount: _count.products }, products, hasMore: offset + products.length < _count.products, nextOffset: offset + products.length }, { headers: { "Cache-Control": "private, no-store" } });
 }

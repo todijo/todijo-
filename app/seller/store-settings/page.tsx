@@ -38,7 +38,8 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
     where: { id:storeContext.selected.id },
     select: {
       name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
-      legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true,
+      legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true, displayBusinessAddress:true, samePersonalBusinessAddress:true,
+      business:{select:{siren:true,inseeVerificationState:true}}, establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},
       contactEmail: true, phone: true, currency: true, language: true,
       shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true, shippingPostalCodes:true, shippingCarrier: true,
       owner: { select: { firstName: true, lastName: true } },
@@ -76,7 +77,7 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
       logo: store.logo ?? "", banner: store.banner ?? "", country: store.country, city: store.city,
       currency: store.currency, language: store.language,
       sellerType: store.sellerType, legalBusinessName: store.legalBusinessName ?? "", businessRegistrationId: store.businessRegistrationId ?? "",
-      businessAddress: store.businessAddress ?? "", businessPostalCode: store.businessPostalCode ?? "", vatNumber: store.vatNumber ?? "", vatStatus: store.vatStatus,
+      businessAddress: store.businessAddress ?? "", businessPostalCode: store.businessPostalCode ?? "", vatNumber: store.vatNumber ?? "", vatStatus: store.vatStatus, displayBusinessAddress:store.displayBusinessAddress,samePersonalBusinessAddress:store.samePersonalBusinessAddress,businessSiren:store.business?.siren??"",businessVerificationState:store.business?.inseeVerificationState??"NOT_STARTED",
       shippingEnabled: store.shippingEnabled, shippingMethodName: store.shippingMethodName ?? "", shippingPrice: store.shippingPrice?.toString() ?? "", shippingFree: store.shippingFree, shippingFreeThreshold:store.shippingFreeThreshold?.toString()??"", shippingMinDays: store.shippingMinDays, shippingMaxDays: store.shippingMaxDays, shippingCountries: store.shippingCountries, shippingWorldwide:store.shippingWorldwide, shippingPostalCodes:store.shippingPostalCodes, shippingCarrier: store.shippingCarrier ?? "",
     }} />
 

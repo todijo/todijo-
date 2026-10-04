@@ -26,7 +26,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     imageRecords:{orderBy:{position:"asc"},select:{url:true,optionValueImages:{orderBy:{position:"asc"},select:{isPrimary:true,optionValue:{select:{id:true}}}}}},
     variants:{orderBy:{createdAt:"asc"},select:{combinationKey:true,sku:true,barcode:true,priceOverride:true,compareAtPrice:true,stock:true,active:true,values:{select:{optionValue:{select:{value:true}}}}}},
     supplierLink:{select:{id:true,sourceMetadata:true}},
-    store:{select:{id:true,name:true,slug:true,status:true,sellerType:true,vatStatus:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,subscription:{select:{status:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},owner:{select:{firstName:true,lastName:true}}}},
+    store:{select:{id:true,name:true,slug:true,status:true,country:true,businessRegistrationId:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,subscription:{select:{status:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},owner:{select:{firstName:true,lastName:true}}}},
   }});
   if (!product) notFound();
   try{await requireStoreCapability(prisma,session.userId,product.store.id,"PRODUCT_VIEW")}catch{notFound()}

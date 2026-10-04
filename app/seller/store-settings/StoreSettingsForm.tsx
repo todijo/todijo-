@@ -32,6 +32,10 @@ type StoreValues = {
   businessRegistrationId: string;
   businessAddress: string;
   businessPostalCode: string;
+  displayBusinessAddress: boolean;
+  samePersonalBusinessAddress:boolean;
+  businessSiren:string;
+  businessVerificationState:string;
   vatNumber: string;
   vatStatus: "UNKNOWN" | "REGISTERED" | "NOT_REGISTERED_OR_NOT_APPLICABLE";
   shippingEnabled: boolean;
@@ -115,6 +119,7 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
 export default function StoreSettingsForm({ initialValues,storeId="",owner=true }: { initialValues: StoreValues;storeId?:string;owner?:boolean }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
+  const verification = useTranslations("SellerBusinessVerification");
   const shipping = useTranslations("Shipping");
   const { showToast } = useToast();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +130,16 @@ export default function StoreSettingsForm({ initialValues,storeId="",owner=true 
   const [uploading, setUploading] = useState<MediaKind | null>(null);
   const [logo, setLogo] = useState(initialValues.logo);
   const [banner, setBanner] = useState(initialValues.banner);
+  const [displayBusinessAddress,setDisplayBusinessAddress]=useState(initialValues.displayBusinessAddress);
+  const [verifying,setVerifying]=useState(false);
+  const [verificationMessage,setVerificationMessage]=useState("");
+  const formRef=useRef<HTMLFormElement>(null);
+
+  async function verifyBusiness(){
+    const form=formRef.current;if(!form)return;setVerifying(true);setVerificationMessage("");
+    try{const values=new FormData(form),response=await fetch("/api/seller/business/verification",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sellerType:initialValues.sellerType,country:initialValues.country,businessSiren:initialValues.businessSiren,businessRegistrationNumber:values.get("businessRegistrationId")})}),data=await response.json().catch(()=>({})),code=typeof data.code==="string"?data.code:data.error,key=code==="VERIFIED"?"success":code==="SIRET_SIREN_MISMATCH"||code==="SIREN_MISMATCH"?"mismatch":code==="NOT_FOUND"?"notFound":code==="PUBLIC_DATA_INCOMPLETE"||code==="INACTIVE_OR_CLOSED"?"partialData":code==="MANUAL_REVIEW"||data.state==="MANUAL_REVIEW"?"manualReview":"unavailable";setVerificationMessage(verification(key));}
+    catch{setVerificationMessage(verification("unavailable"));}finally{setVerifying(false);}
+  }
   const [dragging, setDragging] = useState<MediaKind | null>(null);
   const [shippingRule, setShippingRule] = useState<ShippingDraft>({enabled:initialValues.shippingEnabled,method:initialValues.shippingMethodName,price:initialValues.shippingPrice,free:initialValues.shippingFree,freeThreshold:initialValues.shippingFreeThreshold,minDays:String(initialValues.shippingMinDays??""),maxDays:String(initialValues.shippingMaxDays??""),countries:initialValues.shippingCountries,worldwide:initialValues.shippingWorldwide,postalCodes:initialValues.shippingPostalCodes.join("\n"),carrier:initialValues.shippingCarrier});
 
@@ -214,7 +229,7 @@ export default function StoreSettingsForm({ initialValues,storeId="",owner=true 
     setSaving(true);
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId,name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: owner?form.get("sellerType"):initialValues.sellerType, legalBusinessName: owner?form.get("legalBusinessName"):initialValues.legalBusinessName, businessRegistrationId: owner?form.get("businessRegistrationId"):initialValues.businessRegistrationId, businessAddress: owner?form.get("businessAddress"):initialValues.businessAddress, businessPostalCode: owner?form.get("businessPostalCode"):initialValues.businessPostalCode, vatNumber: owner?form.get("vatNumber"):initialValues.vatNumber, vatStatus: owner?form.get("vatStatus"):initialValues.vatStatus, ...shippingDraftPayload(shippingRule) }) });
+      const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId,name: form.get("name"), description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo, banner, country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: owner?form.get("sellerType"):initialValues.sellerType, legalBusinessName: owner?form.get("legalBusinessName"):initialValues.legalBusinessName, businessRegistrationId: owner?form.get("businessRegistrationId"):initialValues.businessRegistrationId, businessAddress: owner?form.get("businessAddress"):initialValues.businessAddress, businessPostalCode: owner?form.get("businessPostalCode"):initialValues.businessPostalCode, vatNumber: owner?form.get("vatNumber"):initialValues.vatNumber, vatStatus: owner?form.get("vatStatus"):initialValues.vatStatus, displayBusinessAddress, samePersonalBusinessAddress:initialValues.samePersonalBusinessAddress, ...shippingDraftPayload(shippingRule) }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); setMessageError(true); showToast({ message: text, tone: "error" }); return; }
       setMessage(t("settingsSaved")); setMessageError(false); showToast({ message: t("settingsSaved"), tone: "success" }); router.refresh();
@@ -280,7 +295,7 @@ export default function StoreSettingsForm({ initialValues,storeId="",owner=true 
   }
 
   return (
-    <form className="storeForm storeSettingsForm" onSubmit={submit}>
+    <form className="storeForm storeSettingsForm" ref={formRef} onSubmit={submit}>
       {owner&&<SellerTypeFields initial={initialValues}/>}
       <SellerSection id="profile" icon={Store} title={t("storeProfile")} description={t("storeProfileHelp")}>
         <div className="sellerControlFieldGrid">
@@ -314,6 +329,7 @@ export default function StoreSettingsForm({ initialValues,storeId="",owner=true 
           <div className="formField"><label htmlFor="country"><LabelWithIcon icon="location">{t("country")}</LabelWithIcon></label><input id="country" name="country" required defaultValue={initialValues.country} /></div>
           <div className="formField"><label htmlFor="city"><LabelWithIcon icon="city">{t("city")}</LabelWithIcon></label><input id="city" name="city" required defaultValue={initialValues.city} /></div>
         </div>
+        {owner&&initialValues.sellerType==="PROFESSIONAL"&&["FR","FRANCE"].includes(initialValues.country.trim().toUpperCase())&&<section className="sellerBusinessVerification"><h2>{verification("sectionTitle")}</h2><p>{verification("sectionIntro")}</p><p>{verification("siren")}: {initialValues.businessSiren||"—"} · {initialValues.businessVerificationState}</p><button className="sellerControlButton secondary" type="button" disabled={verifying||!initialValues.businessSiren} onClick={verifyBusiness}>{verifying?verification("unavailable"):verification("verify")}</button>{verificationMessage&&<p role="status">{verificationMessage}</p>}<fieldset><legend>{verification("addressTitle")}</legend><p>{verification("addressQuestion")}</p><label><input type="radio" checked={displayBusinessAddress} onChange={()=>setDisplayBusinessAddress(true)}/>{verification("showAddress")}</label><label><input type="radio" checked={!displayBusinessAddress} onChange={()=>setDisplayBusinessAddress(false)}/>{verification("countryOnly")}</label><small>{verification("addressHelper")}</small></fieldset></section>}
         <div className="formRow">
           <div className="formField"><label htmlFor="currency"><LabelWithIcon icon="money">{t("currency")}</LabelWithIcon></label><select id="currency" name="currency" defaultValue={initialValues.currency}><option value="EUR">EUR — Euro</option><option value="USD">USD — US Dollar</option><option value="GBP">GBP — Pound Sterling</option></select></div>
           <div className="formField"><label htmlFor="language"><LabelWithIcon icon="language">{t("language")}</LabelWithIcon></label><select id="language" name="language" defaultValue={initialValues.language}><option value="en">English</option><option value="fr">Français</option><option value="ar">العربية</option><option value="ku">کوردی</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="es">Español</option><option value="it">Italiano</option><option value="nl">Nederlands</option><option value="fa">فارسی</option><option value="hi">हिन्दी</option><option value="pt">Português</option><option value="ru">Русский</option></select></div>

@@ -13,6 +13,7 @@ import MarketplaceFooter from "@/components/MarketplaceFooter";
 import { readSession } from "@/lib/session";
 import { getLocale, getTranslations } from "next-intl/server";
 import { publicProductAccessWhere } from "@/lib/admin-access";
+import { publicStoreCity } from "@/lib/seller-business-verification-policy";
 import { buyerVisibleVariantWhere, minimumPurchasableVariantPrice, resolveProductAvailability } from "@/lib/product-availability";
 import { categoryLabel } from "@/lib/categories";
 import SellerTypeDisclosure from "@/components/SellerTypeDisclosure";
@@ -87,7 +88,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
       } },
       variants: { where: buyerVisibleVariantWhere(), orderBy:{createdAt:"asc"}, select: { id: true, stock: true, active: true, priceOverride: true, supplierVariantId:true, supplierSku:true, values: { select: { optionValue: { select: { id: true, value: true, option: { select: { id: true, name: true, position: true } } } } } } } },
       supplierLink:{select:{provider:true,ownerType:true,supplierProductId:true,sourceMetadata:true,connection:{select:{status:true,store:{select:{dropshippingEnabled:true}}}}}},
-      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true, currency: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true } },
+      store: { select: { name: true, slug: true, city: true, country: true, sellerType: true, displayBusinessAddress:true, currency: true, shippingEnabled: true, shippingMethodName: true, shippingPrice: true, shippingFree: true, shippingFreeThreshold:true, shippingMinDays: true, shippingMaxDays: true, shippingCountries: true, shippingWorldwide:true,shippingPostalCodes:true, shippingCarrier: true } },
     },
   });
   if (!product) notFound();
@@ -111,6 +112,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant.values.length })) });
   const conditionLabel=product.condition==="NEUF"?detailText("conditionNew"):product.condition==="COMME_NEUF"?detailText("conditionLikeNew"):product.condition==="BON_ETAT"?detailText("conditionGood"):product.condition==="OCCASION"?detailText("conditionUsed"):product.condition.replaceAll("_"," ");
   const productJsonLd = productStructuredData({ ...product, available: availability.isGenerallyAvailable }, locale);
+  const publicStoreLocationCity = publicStoreCity(product.store);
   const publicProductInfo = [
     ["productIdentifier", product.productIdentifier], ["manufacturerName", product.manufacturerName],
     ["manufacturerContact", product.manufacturerContact], ["responsiblePerson", product.responsiblePerson],
@@ -146,7 +148,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     </section>
     {hasPublicProductInfo && <section className="productCompliancePublic" aria-labelledby="product-information-title"><h2 id="product-information-title">{compliance("publicProductInfo")}</h2>{publicProductInfo.length > 0 && <dl>{publicProductInfo.map(([key,value])=><div key={key}><dt>{compliance(key)}</dt><dd>{value}</dd></div>)}</dl>}<div className="productComplianceLongText">{safetyInformation && <section><h3>{compliance("publicSafetyInfo")}</h3><p>{safetyInformation}</p></section>}{complianceInformation && <section><h3>{compliance("complianceInformation")}</h3><p>{complianceInformation}</p></section>}</div></section>}
     <section className="productSellerInformationCard">
-      <div className="productSellerInformationBody"><Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link><SellerTypeDisclosure sellerType={product.store.sellerType} notice/><p>{product.store.city}, {product.store.country}</p></div>
+      <div className="productSellerInformationBody"><Link className="productSellerLink" href={`/store/${product.store.slug}`}>{detailText("viewShop")} · {product.store.name}</Link><SellerTypeDisclosure sellerType={product.store.sellerType} notice/><p>{publicStoreLocationCity ? `${publicStoreLocationCity}, ${product.store.country}` : product.store.country}</p></div>
       <div className="productLowerActions">{product.allowPrepurchaseQuestions ? <div className="productAskSeller"><AskSellerButton productId={product.id} loggedIn={Boolean(session)} /></div> : null}<ProductReportButton productId={product.id} loggedIn={Boolean(session)}/></div>
       <div className="buyerProtection"><span>🛡️</span><div><strong>Todijo</strong><p>{productText("private")}</p></div></div>
     </section>

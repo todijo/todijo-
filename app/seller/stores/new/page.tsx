@@ -17,10 +17,10 @@ export default async function NewSellerStorePage() {
   try { principal = await requireBusinessOwner(prisma, session.userId); }
   catch { redirect(`/${locale}/dashboard`); }
   const [business, plan] = await Promise.all([
-    prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { maxStores: true, _count: { select: { stores: true } } } }),
+    prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { maxStores: true, siren:true, inseeVerificationState:true, billingStore:{select:{businessRegistrationId:true}}, _count: { select: { stores: true } } } }),
     sellerBusinessCommercialPlan(prisma, principal.businessId),
   ]);
   if (!business || business._count.stores >= business.maxStores || !canCreateAdditionalSellerStore(plan)) redirect(`/${locale}/dashboard`);
   const copy=sellerTeamCopy(locale);
-  return <main className="storeSetupPage"><section className="storeSetupCard"><a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><h1>{copy.createStore}</h1><p className="storeSetupIntro">{copy.createStoreHelp}</p><CreateStoreForm locale={locale} sellerIntent={null}/></section></main>;
+  return <main className="storeSetupPage"><section className="storeSetupCard"><a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><h1>{copy.createStore}</h1><p className="storeSetupIntro">{copy.createStoreHelp}</p><CreateStoreForm locale={locale} sellerIntent={null} businessSiren={business.siren??""} primarySiret={business.billingStore?.businessRegistrationId??""}/></section></main>;
 }

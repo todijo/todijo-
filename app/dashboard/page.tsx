@@ -26,6 +26,7 @@ import type { TeamPermission } from "@prisma/client";
 import FreeSellerStartCard from "@/components/FreeSellerStartCard";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { hasProSellerCapabilities } from "@/lib/seller-commercial-access";
+import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -60,13 +61,13 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,currency:true,status:true,sellerType:true,vatStatus:true,subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 export default async function DashboardPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
-  const [t, p, s, common, ordersText, privacy, transparency, compliance, auth, locale, session] = await Promise.all([
+  const [t, p, s, common, ordersText, privacy, transparency, compliance, verification, auth, locale, session] = await Promise.all([
     getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
     getTranslations("Common"), getTranslations("Orders"),
-    getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"), getTranslations("Auth"),
+    getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"),getTranslations("SellerBusinessVerification"), getTranslations("Auth"),
     getLocale(), readSession(),
   ]);
   if (!session) redirect("/login");
@@ -204,12 +205,13 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const subscriptionActive = canPublish(activeStore,new Date(),selectedCommercialPlan);
   const sellerTypeRequired = activeStore.sellerType === "UNKNOWN";
   const vatStatusRequired = activeStore.sellerType === "PROFESSIONAL" && activeStore.vatStatus === "UNKNOWN";
+  const businessVerificationRequired=!hasVerifiedFrenchBusiness(activeStore);
   const storeReadinessPending=activeStore.status!=="ACTIVE";
-  const readinessHref = sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
-  const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : activeStore.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
-  const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
-  const readinessAction = sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : selectedCommercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
-  const showReadinessWarning=Boolean(selectedPrincipal?.owner&&!subscriptionActive&&(storeReadinessPending||sellerTypeRequired||vatStatusRequired||selectedCommercialPlan==null));
+  const readinessHref = businessVerificationRequired||sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings?store=${activeStore.id}#location` : `/${locale}/seller/subscription`;
+  const readinessTitle = businessVerificationRequired ? verification("sectionTitle") : sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : activeStore.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
+  const readinessHelp = businessVerificationRequired ? verification("dashboardPending") : sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
+  const readinessAction = businessVerificationRequired ? verification("verify") : sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : selectedCommercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
+  const showReadinessWarning=Boolean(selectedPrincipal?.owner&&!subscriptionActive&&(storeReadinessPending||sellerTypeRequired||vatStatusRequired||businessVerificationRequired||selectedCommercialPlan==null));
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}

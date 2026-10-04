@@ -17,14 +17,18 @@ function slugify(value: string) {
     .slice(0, 60);
 }
 
-export default function CreateStoreForm({ locale, sellerIntent }: { locale: string; sellerIntent: SellerRegistrationIntent | null }) {
+export default function CreateStoreForm({ locale, sellerIntent, businessSiren="", primarySiret="" }: { locale: string; sellerIntent: SellerRegistrationIntent | null; businessSiren?:string; primarySiret?:string }) {
   const router = useRouter();
   const t = useTranslations("Seller");
+  const verification=useTranslations("SellerBusinessVerification");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [establishmentChoice,setEstablishmentChoice]=useState<"same"|"another">(primarySiret?"same":"another");
+  const [verificationMessage,setVerificationMessage]=useState("");
+  const [verifying,setVerifying]=useState(false);
 
   const displayedSlug = useMemo(
     () => slugify(slugEdited ? slug : name),
@@ -38,7 +42,7 @@ export default function CreateStoreForm({ locale, sellerIntent }: { locale: stri
 
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug: displayedSlug, description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo: form.get("logo"), country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus") }) });
+      const response = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug: displayedSlug, description: form.get("description"), contactEmail: form.get("contactEmail"), phone: form.get("phone"), logo: form.get("logo"), country: form.get("country"), city: form.get("city"), currency: form.get("currency"), language: form.get("language"), sellerType: form.get("sellerType"), legalBusinessName: form.get("legalBusinessName"), businessRegistrationId: form.get("businessRegistrationId"), businessAddress: form.get("businessAddress"), businessPostalCode: form.get("businessPostalCode"), vatNumber: form.get("vatNumber"), vatStatus: form.get("vatStatus"), businessSiren:form.get("businessSiren"), establishmentChoice }) });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) { setMessage(data.error ?? "Une erreur est survenue. Please try again."); return; }
       router.push(sellerOnboardingPath(locale, true, sellerIntent)); router.refresh();
@@ -46,9 +50,12 @@ export default function CreateStoreForm({ locale, sellerIntent }: { locale: stri
     finally { setSubmitting(false); }
   }
 
+  async function verifyEstablishment(){const form=document.querySelector<HTMLFormElement>(".storeForm");if(!form)return;setVerifying(true);setVerificationMessage("");try{const values=new FormData(form),response=await fetch("/api/seller/business/verification",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sellerType:values.get("sellerType"),country:values.get("country"),businessSiren,businessRegistrationNumber:values.get("businessRegistrationId")})}),data=await response.json().catch(()=>({})),code=typeof data.code==="string"?data.code:data.error,key=code==="VERIFIED"?"success":code==="SIRET_SIREN_MISMATCH"||code==="SIREN_MISMATCH"?"mismatch":code==="NOT_FOUND"?"notFound":code==="PUBLIC_DATA_INCOMPLETE"||code==="INACTIVE_OR_CLOSED"?"partialData":code==="MANUAL_REVIEW"||data.state==="MANUAL_REVIEW"?"manualReview":"unavailable";setVerificationMessage(verification(key));}catch{setVerificationMessage(verification("unavailable"));}finally{setVerifying(false);}}
+
   return (
     <form className="storeForm" onSubmit={submit} aria-busy={submitting}>
-      <SellerTypeFields />
+      <SellerTypeFields initial={{sellerType:"UNKNOWN",businessRegistrationId:establishmentChoice==="same"?primarySiret:""}} />
+      {businessSiren&&<section className="sellerBusinessVerification"><p>{verification("sameVerifiedBusiness")}</p><input type="hidden" name="businessSiren" value={businessSiren}/><fieldset><legend>{verification("sectionTitle")}</legend><label><input type="radio" checked={establishmentChoice==="same"} onChange={()=>setEstablishmentChoice("same")}/>{verification("sameEstablishment")}</label><label><input type="radio" checked={establishmentChoice==="another"} onChange={()=>setEstablishmentChoice("another")}/>{verification("anotherEstablishment")}</label><button type="button" className="sellerControlButton secondary" disabled={verifying} onClick={verifyEstablishment}>{verifying?verification("unavailable"):verification("verify")}</button>{verificationMessage&&<p role="status">{verificationMessage}</p>}</fieldset></section>}
       <div className="formField">
         <label htmlFor="name">{t("shopName")}</label>
         <input

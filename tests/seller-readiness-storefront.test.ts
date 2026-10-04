@@ -24,7 +24,8 @@ test("seller readiness distinguishes seller type, VAT, and subscription gates", 
   for (const file of [read("app", "dashboard", "page.tsx"), read("app", "seller", "products", "page.tsx")]) {
     assert.match(file, /sellerTypeRequired/);
     assert.match(file, /vatStatusRequired/);
-    assert.match(file, /store-settings#seller-status/);
+    assert.match(file, /businessVerificationRequired/);
+    assert.match(file, /seller\/store-settings[^`]*#location/);
     assert.match(file, /seller\/products\/new/);
   }
 });

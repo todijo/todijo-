@@ -9,6 +9,7 @@ import { countryAliasesForCode, marketplaceColorAliases } from "@/lib/marketplac
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import{localizedSupplierContentSearch}from"@/lib/product-content-search";
+import { publicStoreCity } from "@/lib/seller-business-verification-policy";
 
 const PAGE_SIZE = 24;
 const productSelect = {
@@ -16,7 +17,7 @@ const productSelect = {
   stock: true, condition: true, images: true, createdAt: true,
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
-  store: { select: { name: true, slug: true, city: true, country: true } },
+  store: { select: { name: true, slug: true, city: true, country: true, sellerType:true, displayBusinessAddress:true } },
   supplierLink: { select: { sourceMetadata: true } },
 } satisfies Prisma.ProductSelect;
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
@@ -29,7 +30,7 @@ function serializeProduct(product: ProductRow,locale:string) {
     currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock,
     hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
     condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name,
-    storeSlug: product.store.slug, city: product.store.city, country: product.store.country,
+    storeSlug: product.store.slug, city: publicStoreCity(product.store), country: product.store.country,
     createdAt: product.createdAt.toISOString(), requiresAuthoritativePrice: requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata),
   };
 }
