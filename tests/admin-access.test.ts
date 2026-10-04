@@ -112,7 +112,8 @@ test("bulk extension creates one audit grant per store and leaves Stripe untouch
   const created: Array<Record<string, unknown>> = [];
   let subscriptionTouched = false;
   const db = {
-    store: { findMany: async () => [{ id: "one", accessGrants: [], subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2026-02-01T00:00:00Z") } }, { id: "two", accessGrants: [], subscription: null }] },
+    $queryRaw: async () => [],
+    store: { findUnique: async ({ where }: { where: { id: string } }) => ({ accessGrants: [], subscription: where.id === "one" ? { status: "ACTIVE", currentPeriodEnd: new Date("2026-02-01T00:00:00Z") } : null }), findMany: async () => [{ id: "one", accessGrants: [], subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2026-02-01T00:00:00Z") } }, { id: "two", accessGrants: [], subscription: null }] },
     storeAccessGrant: { create: async (input: { data: Record<string, unknown> }) => { created.push(input.data); return { storeId: input.data.storeId, endsAt: input.data.endsAt }; } },
     product: { updateMany: async () => ({ count: 0 }) },
     sellerSubscription: { update: async () => { subscriptionTouched = true; } },
@@ -127,7 +128,7 @@ test("bulk extension creates one audit grant per store and leaves Stripe untouch
 test("Admin grant targets the one business billing Store and is audited once",async()=>{
   const grants:any[]=[],audits:any[]=[];
   const billing={accessGrants:[],subscription:null};
-  const db={store:{findMany:async()=>[
+  const db={$queryRaw:async()=>[],store:{findUnique:async()=>billing,findMany:async()=>[
     {id:"store-1",accessGrants:[],subscription:null,business:{id:"business",billingStoreId:"billing",billingStore:billing}},
     {id:"store-2",accessGrants:[],subscription:null,business:{id:"business",billingStoreId:"billing",billingStore:billing}},
   ]},storeAccessGrant:{create:async({data}:any)=>{grants.push(data);return{storeId:data.storeId,endsAt:data.endsAt};}},product:{updateMany:async()=>({count:0})},sellerBusinessAuditEvent:{create:async({data}:any)=>{audits.push(data);return data;}}}as never;

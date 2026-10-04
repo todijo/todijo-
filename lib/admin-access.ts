@@ -3,6 +3,7 @@ import { isSellerPlanId, type SellerPlanId } from "./seller-plans";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
 import { AdminAccessError } from "./admin-access-error";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
+import { lockAdminGrant } from "./admin-grant-lock";
 export { AdminAccessError } from "./admin-access-error";
 
 export const adminGrantMonths = [1, 3, 6, 12] as const;
@@ -176,7 +177,8 @@ export async function extendManagedAccess(
   months: AdminGrantMonths,
   now = new Date(),
   plan?: SellerPlanId,
-) {
+): Promise<Array<{ storeId: string; endsAt: Date | null }>> {
+  if ("$transaction" in db) return db.$transaction(tx => extendManagedAccess(tx, adminId, storeIds, months, now, plan), { isolationLevel: "Serializable" });
   if (!validGrantMonths(months)) throw new AdminAccessError("Duration must be 1, 3, 6, or 12 months.", 400, "INVALID_DURATION");
   if (!isSellerPlanId(plan)) throw new AdminAccessError("Select a valid seller plan.", 400, "INVALID_SELLER_PLAN");
   const ids = [...new Set(storeIds.filter(Boolean))];
@@ -193,9 +195,12 @@ export async function extendManagedAccess(
   if (stores.length !== ids.length) throw new AdminAccessError("One or more selected stores are not eligible.", 400, "STORE_INELIGIBLE");
   const results = [];
   const targets=new Map(stores.map(store=>[store.business?.billingStoreId??store.id,{storeId:store.business?.billingStoreId??store.id,businessId:store.business?.id??null,accessGrants:store.business?.billingStore?.accessGrants??store.accessGrants,subscription:store.business?.billingStore?.subscription??store.subscription}]));
-  for (const target of targets.values()) {
-    const stripeEnd = target.subscription && ["ACTIVE", "TRIALING"].includes(target.subscription.status) && target.subscription.currentPeriodEnd && target.subscription.currentPeriodEnd > now ? target.subscription.currentPeriodEnd : null;
-    const currentEnd = [target.accessGrants[0]?.endsAt, stripeEnd]
+  for (const target of [...targets.values()].sort((a,b)=>a.storeId.localeCompare(b.storeId))) {
+    await lockAdminGrant(db, target.storeId);
+    const live = await db.store.findUnique({ where: { id: target.storeId }, select: { accessGrants: { where: { source: "ADMIN_GRANTED" }, orderBy: { endsAt: "desc" }, take: 1, select: { endsAt: true } }, subscription: { select: { status: true, currentPeriodEnd: true } } } });
+    if (!live) throw new AdminAccessError("Store changed.", 409, "STORE_STATE_CHANGED");
+    const stripeEnd = live.subscription && ["ACTIVE", "TRIALING"].includes(live.subscription.status) && live.subscription.currentPeriodEnd && live.subscription.currentPeriodEnd > now ? live.subscription.currentPeriodEnd : null;
+    const currentEnd = [live.accessGrants[0]?.endsAt, stripeEnd]
       .filter((value): value is Date => Boolean(value))
       .sort((a, b) => b.getTime() - a.getTime())[0];
     const period = calculateGrantPeriod(now, months, currentEnd);

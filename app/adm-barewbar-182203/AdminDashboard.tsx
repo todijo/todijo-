@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { BadgeCheck, CalendarPlus, PackagePlus, ShieldCheck, Store, Users } from "lucide-react";
 import GlobalDropshippingMarginForm from "@/components/GlobalDropshippingMarginForm";
 import { adminStoreOwnerCopy } from "@/i18n/admin-store-owners";
+import { adminManagedPlanCopy } from "@/i18n/admin-managed-plan";
+import AdminManagedPlanControl from "@/components/AdminManagedPlanControl";
 
 type AdminUser = { id: string; firstName: string; lastName: string; email: string; role: string; hasStore: boolean; managedStoreEligible: boolean };
 type AdminStore = {
@@ -13,6 +15,8 @@ type AdminStore = {
   owner: { id: string; firstName: string; lastName: string; email: string; role: string };
   accessSource: "STRIPE" | "ADMIN_GRANTED" | "ADMIN_EXEMPT" | "NONE";
   expiresAt: string | null; stripeStatus: string | null;
+  effectivePlan: string | null; grantVersion: string | null;
+  accessError: string | null;
   dropshippingEnabled: boolean;
 };
 
@@ -20,6 +24,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
   adminId: string; locale: string; users: AdminUser[]; stores: AdminStore[]; globalDropshippingMarginPercent?: string;
 }) {
   const t = useTranslations("Admin");
+  const planCopy = adminManagedPlanCopy(locale);
   const supplierText = useTranslations("Supplier");
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
@@ -138,7 +143,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
       </section>
 
       <section className="adminPanel">
-        <div className="adminPanelHeading"><CalendarPlus/><div><h2>{t("grantAccess")}</h2><p>{t("grantAccessHelp")}</p></div></div>
+        <div className="adminPanelHeading"><CalendarPlus/><div><h2>{planCopy.extension}</h2><p>{t("grantAccessHelp")}</p></div></div>
         <form className="adminGrantForm" onSubmit={extend}>
           <label><span>{t("duration")}</span><select name="months" defaultValue="1"><option value="1">{t("months", { count: 1 })}</option><option value="3">{t("months", { count: 3 })}</option><option value="6">{t("months", { count: 6 })}</option><option value="12">{t("months", { count: 12 })}</option></select></label>
           <label><span>{t("source.ADMIN_GRANTED")}</span><select name="plan" defaultValue="basic"><option value="basic">BASIC</option><option value="plus">PLUS</option><option value="pro">PRO</option></select></label>
@@ -159,7 +164,7 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
     <section className="adminPanel adminTablePanel">
       <div className="adminPanelHeading"><BadgeCheck/><div><h2>{t("storeDirectory")}</h2><p>{t("storeDirectoryHelp")}</p></div></div>
       <div className="adminTableWrap"><table><thead><tr><th>{t("store")}</th><th>{t("owner")}</th><th>{t("accessSource")}</th><th>{t("expiry")}</th><th>{t("status")}</th><th>{t("products")}</th><th>{t("actions")}</th></tr></thead>
-        <tbody>{stores.map((store) => <tr key={store.id}><td><strong>{store.name}</strong><small>/{store.slug}</small></td><td>{store.owner.firstName} {store.owner.lastName}<small>{store.owner.email}</small></td><td><span className={`adminBadge source-${store.accessSource.toLowerCase()}`}>{t(`source.${store.accessSource}`)}</span>{store.stripeStatus && <small>{store.stripeStatus}</small>}</td><td>{store.expiresAt ? formatter.format(new Date(store.expiresAt)) : t(store.accessSource === "ADMIN_EXEMPT" ? "never" : "notAvailable")}</td><td><span className="adminBadge">{store.status}</span></td><td>{store.productCount}</td><td><a href={`/${locale}/store/${store.slug}`}>{t("view")}</a>{store.owner.id === adminId && <a href={`/${locale}/seller/products`}>{t("products")}</a>}</td></tr>)}</tbody>
+        <tbody>{stores.map((store) => <tr key={store.id}><td><strong>{store.name}</strong><small>/{store.slug}</small></td><td>{store.owner.firstName} {store.owner.lastName}<small>{store.owner.email}</small></td><td><span className={`adminBadge source-${store.accessSource.toLowerCase()}`}>{t(`source.${store.accessSource}`)}</span><small>{planCopy.plan}: {store.effectivePlan?.toUpperCase() ?? "—"}</small>{store.stripeStatus && <small>{planCopy.billing}: {store.stripeStatus}</small>}</td><td>{store.expiresAt ? formatter.format(new Date(store.expiresAt)) : t(store.accessSource === "ADMIN_EXEMPT" ? "never" : "notAvailable")}</td><td><span className="adminBadge">{store.status}</span></td><td>{store.productCount}</td><td><a href={`/${locale}/store/${store.slug}`}>{t("view")}</a>{store.owner.id === adminId && <a href={`/${locale}/seller/products`}>{t("products")}</a>}<AdminManagedPlanControl key={store.grantVersion ?? store.accessSource} storeId={store.id} plan={store.effectivePlan} version={store.grantVersion} source={store.accessSource} locale={locale}/></td></tr>)}</tbody>
       </table></div>
     </section>
   </>;

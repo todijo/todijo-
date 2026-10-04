@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { sellerPlanEntitlement, type SellerPlanId } from "./seller-plans";
+import { resolveSellerCommercialAccess } from "./seller-commercial-access";
 
 export class SellerBusinessError extends Error { constructor(public readonly code: string, public readonly status = 400) { super(code); } }
 
@@ -17,12 +17,7 @@ export async function ensureSellerBusiness(tx: Prisma.TransactionClient, ownerId
 export async function sellerBusinessCommercialEntitlement(db: PrismaClient | Prisma.TransactionClient, businessId: string, now = new Date()) {
   const business = await db.sellerBusiness.findUnique({ where: { id: businessId }, select: { owner: { select: { role: true } }, billingStore: { select: { id:true, subscription: { select: { status: true, plan: true, currentPeriodEnd:true } }, accessGrants: { select: { source: true, plan: true, startsAt: true, endsAt: true } } } } } });
   if (!business?.billingStore) return {businessId,billingStoreId:null,active:false,plan:null,source:"NONE" as const,expiresAt:null};
-  if(business.owner.role==="ADMIN")return{businessId,billingStoreId:business.billingStore.id,active:true,plan:"admin-exempt" as const,source:"ADMIN_EXEMPT" as const,expiresAt:null};
-  const subscription=business.billingStore.subscription;
-  if(subscription&&["ACTIVE","TRIALING"].includes(subscription.status)&&subscription.currentPeriodEnd&&subscription.currentPeriodEnd>now){const plan=sellerPlanEntitlement(subscription.plan)?.id??null;return{businessId,billingStoreId:business.billingStore.id,active:Boolean(plan),plan,source:plan?"STRIPE" as const:"NONE" as const,expiresAt:subscription.currentPeriodEnd};}
-  const grant=business.billingStore.accessGrants.filter(item=>item.source==="ADMIN_GRANTED"&&item.startsAt<=now&&item.endsAt!==null&&item.endsAt>now&&sellerPlanEntitlement(item.plan)).sort((a,b)=>b.endsAt!.getTime()-a.endsAt!.getTime())[0];
-  const plan=(sellerPlanEntitlement(grant?.plan)?.id??null) as SellerPlanId|null;
-  return{businessId,billingStoreId:business.billingStore.id,active:Boolean(plan),plan,source:plan?"ADMIN_GRANTED" as const:"NONE" as const,expiresAt:grant?.endsAt??null};
+  return { businessId, billingStoreId: business.billingStore.id, ...resolveSellerCommercialAccess({ role: business.owner.role, subscription: business.billingStore.subscription, accessGrants: business.billingStore.accessGrants }, now) };
 }
 
 export async function sellerBusinessCommercialPlan(db: PrismaClient | Prisma.TransactionClient, businessId: string, now = new Date()) {

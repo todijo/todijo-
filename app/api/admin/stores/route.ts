@@ -75,6 +75,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await readSession();
     const admin = await requireAdmin(prisma, session);
+    assertAdminMutationRequest(request);
     const body = await request.json();
     const months = Number(body.months);
     if (!validGrantMonths(months)) throw new AdminAccessError("Duration must be 1, 3, 6, or 12 months.", 400, "INVALID_DURATION");

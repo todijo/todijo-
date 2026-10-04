@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
-import { activeAccessSource, requireAdmin } from "@/lib/admin-access";
+import { requireAdmin } from "@/lib/admin-access";
+import { readManagedCommercialSummary } from "@/lib/admin-managed-plan";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import AdminDashboard from "./AdminDashboard";
@@ -55,15 +56,19 @@ export default async function AdminPage() {
     prisma.refundRequest.count({ where: { status: { in: ["SELLER_APPROVED", "SELLER_REJECTED"] } } }),
     readGlobalDropshippingMargin(prisma),
   ]);
-  const serializedStores = stores.map((store) => {
-    const access = activeAccessSource(store, now);
+  const serializedStores = await Promise.all(stores.map(async (store) => {
+    const state = await readManagedCommercialSummary(prisma, store.id, now);
+    const access = state.access;
     return {
       id: store.id, name: store.name, slug: store.slug, status: store.status,
       owner: store.owner, productCount: store._count.products,
       accessSource: access.source, expiresAt: access.expiresAt?.toISOString() ?? null,
-      stripeStatus: store.subscription?.status ?? null, dropshippingEnabled: store.dropshippingEnabled,
+      stripeStatus: state.target?.subscription?.status ?? store.subscription?.status ?? null, dropshippingEnabled: store.dropshippingEnabled,
+      effectivePlan: access.plan === "admin-exempt" ? null : access.plan,
+      grantVersion: access.source === "ADMIN_GRANTED" ? state.version : null,
+      accessError: state.error,
     };
-  });
+  }));
   const managedOwnerEligibility = new Map(await Promise.all(users.map(async (user) => {
     return [user.id, (await ownerEligibility(prisma, user, session.userId, now)).eligible] as const;
   })));

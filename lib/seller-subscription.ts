@@ -4,6 +4,7 @@ import { assertSellerActivity } from "./account-status";
 import { sellerPlanEntitlement, type SellerPlanId } from "./seller-plans";
 import { requireStoreCapability } from "./seller-business-access";
 import { sellerBusinessCommercialPlan } from "./seller-business";
+import { resolveSellerCommercialAccess } from "./seller-commercial-access";
 
 export const publishableSubscriptionStatuses: SubscriptionStatus[] = ["ACTIVE", "TRIALING"];
 
@@ -35,14 +36,7 @@ export function effectiveSellerPlan(input: {
   subscription: { status: SubscriptionStatus; plan: string; currentPeriodEnd?: Date | null } | null;
   accessGrants: Array<{ source: "ADMIN_GRANTED" | "ADMIN_EXEMPT"; plan?: string | null; startsAt: Date; endsAt: Date | null }>;
 }, now = new Date()): SellerPlanId | "admin-exempt" | null {
-  if (input.role === "ADMIN") return "admin-exempt";
-  if (input.subscription && publishableSubscriptionStatuses.includes(input.subscription.status) && input.subscription.currentPeriodEnd && input.subscription.currentPeriodEnd > now) {
-    return sellerPlanEntitlement(input.subscription.plan)?.id ?? null;
-  }
-  const grant = input.accessGrants
-    .filter((candidate) => candidate.source === "ADMIN_GRANTED" && candidate.startsAt <= now && candidate.endsAt !== null && candidate.endsAt > now)
-    .sort((a, b) => b.endsAt!.getTime() - a.endsAt!.getTime())[0];
-  return sellerPlanEntitlement(grant?.plan)?.id ?? null;
+  return resolveSellerCommercialAccess(input, now).plan;
 }
 
 export async function requirePublishingAccess(db: PrismaClient, userId: string) {

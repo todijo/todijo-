@@ -1,0 +1,5 @@
+export function adminManagedPlanCopy(locale: string) {
+  return locale === "fr"
+    ? { plan: "Plan effectif", billing: "Statut de facturation", change: "Changer le plan maintenant", extension: "Prolonger l’accès", confirm: "Changer immédiatement le plan ? Les dates restent inchangées. Les tiers des prolongations futures seront alignés sur ce plan.", paid: "L’abonnement payant est actuellement la source faisant autorité.", error: "Modification impossible. Actualisez et vérifiez l’état de l’accès.", saving: "Enregistrement…", exempt: "Admin exempté (sans niveau)", none: "Aucun accès actif", expires: "Expiration", never: "Jamais" }
+    : { plan: "Effective plan", billing: "Billing status", change: "Change plan now", extension: "Extend access", confirm: "Change the plan immediately? Dates stay unchanged. Future extension tiers will be aligned to this plan.", paid: "The paid subscription is currently authoritative.", error: "Change failed. Refresh and check the access state.", saving: "Saving…", exempt: "Admin exempt (tierless)", none: "No active access", expires: "Expiration", never: "Never" };
+}
