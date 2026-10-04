@@ -1,12 +1,12 @@
 import "server-only";
 import type { Prisma, PrismaClient, TeamPermission, SubscriptionStatus, UserRole } from "@prisma/client";
-import { sellerPlanEntitlement } from "./seller-plans";
+import { resolveSellerCommercialAccess, hasProSellerCapabilities } from "./seller-commercial-access";
 
 type Db = PrismaClient | Prisma.TransactionClient;
-type TeamBusinessEntitlement={owner:{role:UserRole};billingStore:{subscription:{status:SubscriptionStatus;plan:string}|null;accessGrants:Array<{source:"ADMIN_GRANTED"|"ADMIN_EXEMPT";plan:string|null;startsAt:Date;endsAt:Date|null}>}|null};
-function hasProTeamEntitlement(business:TeamBusinessEntitlement,now=new Date()){
-  if(business.billingStore?.subscription&&["ACTIVE","TRIALING"].includes(business.billingStore.subscription.status))return sellerPlanEntitlement(business.billingStore.subscription.plan)?.id==="pro";
-  return Boolean(business.billingStore?.accessGrants.some(grant=>grant.source==="ADMIN_GRANTED"&&grant.startsAt<=now&&grant.endsAt!==null&&grant.endsAt>now&&sellerPlanEntitlement(grant.plan)?.id==="pro"));
+type TeamBusinessEntitlement={owner:{role:UserRole};billingStore:{subscription:{status:SubscriptionStatus;plan:string;currentPeriodEnd?:Date|null}|null;accessGrants:Array<{source:"ADMIN_GRANTED"|"ADMIN_EXEMPT";plan:string|null;startsAt:Date;endsAt:Date|null}>}|null};
+export function hasProTeamEntitlement(business:TeamBusinessEntitlement,now=new Date()){
+  if (!business.billingStore) return false;
+  return hasProSellerCapabilities(resolveSellerCommercialAccess({ role: business.owner.role, subscription: business.billingStore.subscription, accessGrants: business.billingStore.accessGrants }, now).plan);
 }
 
 export class SellerCapabilityError extends Error {
@@ -29,7 +29,7 @@ export async function sellerPrincipal(db: Db, userId: string): Promise<SellerPri
 
 export async function sellerPrincipals(db: Db, userId: string): Promise<SellerPrincipal[]> {
   const owned = await db.sellerBusiness.findUnique({ where: { ownerId: userId }, select: { id: true, ownerId: true, stores: { select: { id: true } } } });
-  const memberships = await db.sellerTeamMembership.findMany({ where: { userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true, businessId: true, permissions: true, business: { select: { ownerId: true,owner:{select:{role:true}},billingStore:{select:{subscription:{select:{status:true,plan:true}},accessGrants:{select:{source:true,plan:true,startsAt:true,endsAt:true}}}} } }, assignments: { select: { storeId: true } } } });
+  const memberships = await db.sellerTeamMembership.findMany({ where: { userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true, businessId: true, permissions: true, business: { select: { ownerId: true,owner:{select:{role:true}},billingStore:{select:{subscription:{select:{status:true,plan:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,plan:true,startsAt:true,endsAt:true}}}} } }, assignments: { select: { storeId: true } } } });
   return [
     ...(owned ? [{ userId, businessId: owned.id, ownerId: owned.ownerId, owner: true, membershipId: null, permissions: [] as TeamPermission[], storeIds: owned.stores.map(store => store.id) }] : []),
     ...memberships.filter(membership=>hasProTeamEntitlement(membership.business)).map(membership => ({ userId, businessId: membership.businessId, ownerId: membership.business.ownerId, owner: false, membershipId: membership.id, permissions: membership.permissions, storeIds: membership.assignments.map(item => item.storeId) })),
@@ -57,7 +57,7 @@ export async function requireStoreCapability(db: Db, userId: string | null | und
     if (!store.businessId) throw new SellerCapabilityError("BUSINESS_NOT_FOUND", 403);
     return { userId, businessId: store.businessId, ownerId: userId, owner: true, membershipId: null, permissions: [], storeIds: [storeId] } satisfies SellerPrincipal;
   }
-  const membership = await db.sellerTeamMembership.findFirst({ where: { userId, businessId: store.businessId ?? undefined, status: "ACTIVE", assignments: { some: { storeId } } }, select: { id: true, businessId: true, permissions: true, business: { select: { ownerId: true,owner:{select:{role:true}},billingStore:{select:{subscription:{select:{status:true,plan:true}},accessGrants:{select:{source:true,plan:true,startsAt:true,endsAt:true}}}} } }, assignments: { select: { storeId: true } } } });
+  const membership = await db.sellerTeamMembership.findFirst({ where: { userId, businessId: store.businessId ?? undefined, status: "ACTIVE", assignments: { some: { storeId } } }, select: { id: true, businessId: true, permissions: true, business: { select: { ownerId: true,owner:{select:{role:true}},billingStore:{select:{subscription:{select:{status:true,plan:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,plan:true,startsAt:true,endsAt:true}}}} } }, assignments: { select: { storeId: true } } } });
   if (!membership) throw new SellerCapabilityError("STORE_ACCESS_DENIED", 403);
   if(!hasProTeamEntitlement(membership.business))throw new SellerCapabilityError("PERMISSION_DENIED",403);
   const principal = { userId, businessId: membership.businessId, ownerId: membership.business.ownerId, owner: false, membershipId: membership.id, permissions: membership.permissions, storeIds: membership.assignments.map(item => item.storeId) } satisfies SellerPrincipal;

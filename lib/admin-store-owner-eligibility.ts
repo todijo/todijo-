@@ -1,3 +1,4 @@
+import { canCreateAdditionalSellerStore } from "./seller-commercial-access";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { AdminAccessError } from "./admin-access-error";
 import { sellerBusinessCommercialPlan } from "./seller-business";
@@ -24,7 +25,7 @@ export async function managedOwnerEligibility(db: Db, owner: ManagedOwner | null
   const business = owner.ownedBusiness;
   if (!business || business._count.stores !== owner._count.stores) return deny("OWNER_BUSINESS_INCONSISTENT");
   if (business._count.stores >= business.maxStores) return deny("STORE_LIMIT_REACHED");
-  if (await sellerBusinessCommercialPlan(db, business.id, now) !== "pro") return deny("MULTI_STORE_PRO_REQUIRED");
+  if (!canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(db, business.id, now))) return deny("MULTI_STORE_PRO_REQUIRED");
   return { eligible: true, reason: null, mode: "ADDITIONAL", businessId: business.id };
 }
 export async function requireManagedOwner(db: Db, ownerId: string, adminId: string, now = new Date()) {

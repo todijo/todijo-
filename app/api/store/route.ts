@@ -1,3 +1,4 @@
+import { canCreateAdditionalSellerStore } from "@/lib/seller-commercial-access";
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
@@ -7,7 +8,8 @@ import { parseSellerType, sellerIdentityInput } from "@/lib/seller-transparency"
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { parseShippingSettings, ShippingError } from "@/lib/shipping";
 import { assertSellerActivity } from "@/lib/account-status";
-import { AdminAccessError } from "@/lib/admin-access";
+import { AdminAccessError, requireAdmin } from "@/lib/admin-access";
+import { assertAdminMutationRequest, MutationOriginError } from "@/lib/request-security";
 import { assertCatalogNameQuality, CatalogContentQualityError } from "@/lib/catalog-content-quality";
 import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
 import { ensureSellerBusiness, lockSellerBusiness, sellerBusinessCommercialPlan, SellerBusinessError } from "@/lib/seller-business";
@@ -92,12 +94,20 @@ export async function POST(request: Request) {
     }
 
     const store = await prisma.$transaction(async (tx) => {
+      // Serialize first-store creation too; an unlinked legacy store still counts.
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${session.userId} FOR UPDATE`;
+      const owner = await tx.user.findUnique({ where: { id: session.userId }, select: { role: true } });
+      if (owner?.role === "ADMIN") {
+        await requireAdmin(tx, session);
+        assertAdminMutationRequest(request);
+      }
       const firstStore = await tx.store.findFirst({ where: { ownerId: session.userId }, orderBy: { createdAt: "asc" }, select: { id: true } });
+      if (owner?.role === "ADMIN" && firstStore) throw new SellerBusinessError("ADMIN_ONE_STORE_REQUIRED", 409);
       const business = await ensureSellerBusiness(tx, session.userId, firstStore?.id);
       const locked = await lockSellerBusiness(tx, business.id);
       const storeCount = await tx.store.count({ where: { businessId: business.id } });
       if (storeCount >= locked.maxStores) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
-      if (storeCount > 0 && await sellerBusinessCommercialPlan(tx, business.id) !== "pro") throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
+      if (storeCount > 0 && !canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(tx, business.id))) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
       const created = await tx.store.create({
         data: {
           name,
@@ -131,6 +141,7 @@ export async function POST(request: Request) {
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
+    if (error instanceof MutationOriginError) return NextResponse.json({ error: error.message }, { status: 403 });
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof SellerBusinessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof CatalogContentQualityError) return NextResponse.json({ error: error.code }, { status: 400 });

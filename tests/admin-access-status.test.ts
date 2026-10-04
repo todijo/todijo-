@@ -66,7 +66,7 @@ test("Admin views share commercial summary and separate status cells", () => {
   const cells = readFileSync("components/AdminAccessStatus.tsx", "utf8");
   for (const field of ["lifecycle", "onboarding", "source", "active", "plan", "expiresAt", "billingStatus", "connectReadiness"]) assert.ok(cells.includes(`state.${field}`));
 });
-test("paid plan remains derived from authoritative Price mapping; Team exemption policy not broadened", () => {
+test("paid plan remains derived from authoritative Price mapping; Team uses resolved capabilities", () => {
   const payments = readFileSync("lib/payments.ts", "utf8"); assert.ok(payments.includes("configuredSellerPlanForPriceId(priceId)")); assert.ok(payments.includes("plan: configuredPlan.plan"));
-  const team = readFileSync("lib/seller-team.ts", "utf8"); assert.ok(team.includes('!== "pro"')); assert.ok(!team.includes('"admin-exempt"'));
+  const team = readFileSync("lib/seller-team.ts", "utf8"); assert.ok(team.includes("sellerBusinessCapabilityTier"));
 });

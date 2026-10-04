@@ -1,5 +1,5 @@
 import { connectReadinessState, type ConnectReadinessSeller } from "./connect-readiness";
-import { resolveSellerCommercialAccess } from "./seller-commercial-access";
+import { resolveSellerCommercialAccess, sellerCapabilityTier } from "./seller-commercial-access";
 
 /** Presentation boundary: legacy entitlement sentinels never become paid tiers. */
 export function adminAccessStatus(input: {
@@ -17,6 +17,7 @@ export function adminAccessStatus(input: {
     lifecycle: input.lifecycle, onboarding: input.onboarding,
     source, active: input.access.active,
     plan: input.access.plan === "admin-exempt" ? null : input.access.plan?.toUpperCase() ?? null,
+    capabilityTier: sellerCapabilityTier(input.access.plan)?.toUpperCase() ?? null,
     expiresAt: input.access.active ? input.access.expiresAt?.toISOString() ?? null : null,
     billingStatus: input.billingStatus, connectReadiness: connectReadinessState(input.connect),
     resolutionError: input.resolutionError ?? null,

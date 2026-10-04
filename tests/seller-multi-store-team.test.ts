@@ -15,7 +15,7 @@ function accessDb(plan="pro",memberStatus="ACTIVE") {
     { id: "assigned", name: "Assigned", slug: "assigned", businessId: "business-team", ownerId: "other-owner" },
     { id: "foreign", name: "Foreign", slug: "foreign", businessId: "business-foreign", ownerId: "foreign-owner" },
   ];
-  const membership = { id: "membership", businessId: "business-team", permissions: ["PRODUCT_VIEW", "ORDER_VIEW"], business: { ownerId: "other-owner",owner:{role:"SELLER"},billingStore:{subscription:{status:"ACTIVE",plan},accessGrants:[]} }, assignments: [{ storeId: "assigned" }] };
+  const membership = { id: "membership", businessId: "business-team", permissions: ["PRODUCT_VIEW", "ORDER_VIEW"], business: { ownerId: "other-owner",owner:{role:"SELLER"},billingStore:{subscription:{status:"ACTIVE",plan,currentPeriodEnd:new Date("2099-01-01")},accessGrants:[]} }, assignments: [{ storeId: "assigned" }] };
   return {
     store: {
       findUnique: async ({ where }: any) => stores.find((store) => store.id === where.id) ?? null,
@@ -90,7 +90,7 @@ test("seat accounting, invitation token rotation, session revocation and PRO che
   assert.match(team, /acceptedAt: null, revokedAt: null, expiresAt: \{ gt: now \}/);
   assert.match(team, /generateRawAuthToken\(\)/);
   assert.match(team, /hashAuthToken\(rawToken\)/);
-  assert.match(team, /sellerBusinessCommercialPlan[\s\S]*!== "pro"/);
+  assert.match(team, /sellerBusinessCapabilityTier[\s\S]*!== "pro"/);
   assert.match(team, /authVersion: \{ increment: 1 \}/);
   assert.match(team, /mobileSession\.updateMany/);
   assert.match(source("lib/seller-business-access.ts"), /hasProTeamEntitlement[\s\S]*PERMISSION_DENIED/);

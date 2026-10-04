@@ -4,6 +4,7 @@ import CreateStoreForm from "@/app/seller/create-store/CreateStoreForm";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { requireBusinessOwner } from "@/lib/seller-business-access";
+import { canCreateAdditionalSellerStore } from "@/lib/seller-commercial-access";
 import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 import { sellerTeamCopy } from "@/i18n/seller-team";
 
@@ -19,7 +20,7 @@ export default async function NewSellerStorePage() {
     prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { maxStores: true, _count: { select: { stores: true } } } }),
     sellerBusinessCommercialPlan(prisma, principal.businessId),
   ]);
-  if (!business || business._count.stores >= business.maxStores || plan !== "pro") redirect(`/${locale}/dashboard`);
+  if (!business || business._count.stores >= business.maxStores || !canCreateAdditionalSellerStore(plan)) redirect(`/${locale}/dashboard`);
   const copy=sellerTeamCopy(locale);
   return <main className="storeSetupPage"><section className="storeSetupCard"><a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><h1>{copy.createStore}</h1><p className="storeSetupIntro">{copy.createStoreHelp}</p><CreateStoreForm locale={locale} sellerIntent={null}/></section></main>;
 }

@@ -1,3 +1,4 @@
+import { canCreateAdditionalSellerStore } from "./seller-commercial-access";
 import type { Prisma } from "@prisma/client";
 import { AdminAccessError, type ManagedStoreInput } from "./admin-access";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
@@ -17,7 +18,7 @@ export async function createAdditionalAdminManagedStore(
   const locked = await lockSellerBusiness(tx, businessId);
   const storeCount = await tx.store.count({ where: { businessId } });
   if (storeCount >= locked.maxStores) throw new AdminAccessError("The Store limit has been reached.", 409, "STORE_LIMIT_REACHED");
-  if (await sellerBusinessCommercialPlan(tx, businessId, now) !== "pro") throw new AdminAccessError("PRO access is required for an additional Store.", 403, "MULTI_STORE_PRO_REQUIRED");
+  if (!canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(tx, businessId, now))) throw new AdminAccessError("PRO access is required for an additional Store.", 403, "MULTI_STORE_PRO_REQUIRED");
   const store = await tx.store.create({
     data: {
       name: input.name, slug: input.slug, description: input.description || null,

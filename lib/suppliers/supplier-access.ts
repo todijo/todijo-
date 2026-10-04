@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { requireAdmin } from "../admin-access";
+import { hasProSellerCapabilities } from "../seller-commercial-access";
 import { effectiveSellerPlan } from "../seller-subscription";
 import { requireStoreCapability } from "../seller-business-access";
 import { sellerBusinessCommercialPlan } from "../seller-business";
@@ -38,7 +39,7 @@ export async function requireSellerSupplierAccess(db: Database, session: { userI
   if (!store || !store.dropshippingEnabled) throw new SupplierAccessError("DROPSHIPPING_PERMISSION_DENIED");
   if(requestedStoreId&&store.ownerId!==session.userId)await requireStoreCapability(db,session.userId,store.id,permission);
   const plan = store.businessId?await sellerBusinessCommercialPlan(db,store.businessId):effectiveSellerPlan({ role: store.owner.role, subscription: store.subscription, accessGrants: store.accessGrants });
-  if (plan !== "pro" && plan !== "admin-exempt") throw new SupplierAccessError("DROPSHIPPING_PRO_PLAN_REQUIRED");
+  if (!hasProSellerCapabilities(plan)) throw new SupplierAccessError("DROPSHIPPING_PRO_PLAN_REQUIRED");
   return store;
 }
 

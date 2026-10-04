@@ -1,4 +1,15 @@
 import { sellerPlanEntitlement } from "./seller-plans";
+/** Accept only a server-resolved entitlement, never a client-submitted plan. */
+export function sellerCapabilityTier(plan: string | null | undefined) {
+  return plan === "admin-exempt" ? "pro" as const : sellerPlanEntitlement(plan)?.id ?? null;
+}
+export function hasProSellerCapabilities(plan: string | null | undefined) {
+  return sellerCapabilityTier(plan) === "pro";
+}
+/** PRO features do not override the explicit one-Admin-owned-store policy. */
+export function canCreateAdditionalSellerStore(plan: string | null | undefined) {
+  return plan !== "admin-exempt" && hasProSellerCapabilities(plan);
+}
 export type CommercialInput = {
   role: string;
   subscription: { status: string; plan: string; currentPeriodEnd?: Date | null } | null;

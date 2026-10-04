@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { resolveSellerCommercialAccess } from "./seller-commercial-access";
+import { resolveSellerCommercialAccess, sellerCapabilityTier } from "./seller-commercial-access";
 
 export class SellerBusinessError extends Error { constructor(public readonly code: string, public readonly status = 400) { super(code); } }
 
@@ -22,6 +22,9 @@ export async function sellerBusinessCommercialEntitlement(db: PrismaClient | Pri
 
 export async function sellerBusinessCommercialPlan(db: PrismaClient | Prisma.TransactionClient, businessId: string, now = new Date()) {
   return (await sellerBusinessCommercialEntitlement(db,businessId,now)).plan;
+}
+export async function sellerBusinessCapabilityTier(db: PrismaClient | Prisma.TransactionClient, businessId: string, now = new Date()) {
+  return sellerCapabilityTier(await sellerBusinessCommercialPlan(db, businessId, now));
 }
 
 export async function lockSellerBusiness(tx: Prisma.TransactionClient, businessId: string) {

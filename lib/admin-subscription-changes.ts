@@ -3,6 +3,7 @@ import { Prisma, SellerSubscriptionChangeOperation, SellerSubscriptionChangeStat
 import { AdminAccessError, requireAdmin } from "./admin-access";
 import { adminPage, normalizeAdminSearch } from "./admin-marketplace";
 import { readManagedCommercialSummary } from "./admin-managed-plan";
+import { sellerCapabilityTier } from "./seller-commercial-access";
 
 export const adminChangeStatuses = Object.values(SellerSubscriptionChangeStatus);
 export const adminChangeOperations = Object.values(SellerSubscriptionChangeOperation);
@@ -48,6 +49,7 @@ export async function inspectAdminSubscriptionChanges(db: PrismaClient, session:
       : summary.access.source === "ADMIN_EXEMPT" ? "ADMIN_EXEMPT" as const : "NONE" as const;
     return { ...row, commercial: { active: summary.access.active, source,
       plan: summary.access.plan === "admin-exempt" ? null : summary.access.plan,
+      capabilityTier: sellerCapabilityTier(summary.access.plan),
       expiresAt: summary.access.expiresAt, error: summary.error },
       // The domain service has no Admin-authorized, stale-checked atomic audit boundary.
       // Do not expose a shortcut around it or invent a reason for unresolved state.

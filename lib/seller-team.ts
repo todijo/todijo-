@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 import { Prisma, type PrismaClient, type TeamRoleTemplate } from "@prisma/client";
 import { generateRawAuthToken, hashAuthToken, validRawAuthToken } from "./auth-token-crypto";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
-import { lockSellerBusiness, sellerBusinessCommercialPlan } from "./seller-business";
+import { lockSellerBusiness, sellerBusinessCapabilityTier } from "./seller-business";
 import { parseTeamPermissions, parseTeamRoleTemplate, permissionsForTemplate, teamSeatLimit } from "./seller-team-permissions";
 
 export const TEAM_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -54,7 +54,7 @@ export async function issueSellerTeamInvitation(db: PrismaClient, input: { owner
     if (!business) throw new SellerTeamError("BUSINESS_NOT_FOUND", 404);
     if (business.owner.email.toLowerCase() === email) throw new SellerTeamError("OWNER_CANNOT_BE_INVITED", 409);
     if (await tx.sellerTeamMembership.findFirst({ where: { businessId: business.id, user: { email }, status: { in: ["ACTIVE", "SUSPENDED"] } }, select: { id: true } })) throw new SellerTeamError("ALREADY_A_MEMBER", 409);
-    if (await sellerBusinessCommercialPlan(tx, business.id) !== "pro") throw new SellerTeamError("PRO_REQUIRED", 403);
+    if (await sellerBusinessCapabilityTier(tx, business.id) !== "pro") throw new SellerTeamError("PRO_REQUIRED", 403);
     const previous = await tx.sellerTeamInvitation.findUnique({ where: { businessId_email: { businessId: business.id, email } }, select: { id: true } });
     await assertSeatAvailable(tx, business.id, now, previous?.id);
     const storeIds = await assertStoresBelongToBusiness(tx, business.id, input.storeIds);
@@ -80,7 +80,7 @@ export async function acceptSellerTeamInvitation(db: PrismaClient, input: { rawT
     if (invitation.acceptedAt) throw new SellerTeamError("INVITATION_USED", 409);
     if (invitation.expiresAt <= now) throw new SellerTeamError("INVITATION_EXPIRED", 410);
     await lockSellerBusiness(tx, invitation.businessId);
-    if(await sellerBusinessCommercialPlan(tx,invitation.businessId)!=="pro")throw new SellerTeamError("PRO_REQUIRED",403);
+    if(await sellerBusinessCapabilityTier(tx,invitation.businessId)!=="pro")throw new SellerTeamError("PRO_REQUIRED",403);
     const user = input.sessionUserId
       ? await tx.user.findUnique({ where: { id: input.sessionUserId }, select: { id: true, email: true, role: true } })
       : await tx.user.findUnique({ where: { email: invitation.email }, select: { id: true, email: true, role: true } });
@@ -112,7 +112,7 @@ export async function updateSellerTeamMember(db: PrismaClient, input: { ownerId:
     const action = typeof input.action === "string" ? input.action : "permissions";
     if (action === "reactivate") {
       await lockSellerBusiness(tx, membership.businessId);
-      if (await sellerBusinessCommercialPlan(tx, membership.businessId, now) !== "pro") throw new SellerTeamError("TEAM_PRO_REQUIRED", 403);
+      if (await sellerBusinessCapabilityTier(tx, membership.businessId, now) !== "pro") throw new SellerTeamError("TEAM_PRO_REQUIRED", 403);
     }
     if (["suspend", "reactivate", "remove"].includes(action)) {
       if(action==="reactivate"&&membership.status!=="SUSPENDED")throw new SellerTeamError("INVALID_MEMBER_STATE",409);
