@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
+import { lockSellerProductQuota, requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { createProductWithVariants, ProductVariantError, type ProductVariantsInput } from "@/lib/product-variants";
 import { ProductVariantImageError } from "@/lib/product-variant-images";
@@ -127,7 +127,10 @@ export async function POST(request: Request) {
         ...compliance,
         ...productShipping,
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
-      }, variantInput, body.variantImages);
+      }, variantInput, body.variantImages, async tx => {
+        await lockSellerProductQuota(tx, store.id);
+        await requireStorePublishingAccess(tx, session.userId, store.id, "PRODUCT_CREATE");
+      });
     await prisma.$transaction((tx)=>replaceProductVideo(tx,product.id,body.video));
     const principal=await requireStoreCapability(prisma,session.userId,store.id,"PRODUCT_CREATE");
     await appendSellerBusinessAudit(prisma,{businessId:principal.businessId,storeId:store.id,actorId:session.userId,category:"PRODUCT",action:"PRODUCT_CREATED",targetType:"Product",targetId:product.id,metadata:{status}});

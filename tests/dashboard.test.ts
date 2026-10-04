@@ -23,7 +23,8 @@ test("seller product actions keep the subscription and team capability gates", (
   assert.match(dashboardPage, /sellerCanAddProduct\s*=\s*Boolean\(activeStore\s*&&\s*canCreateProducts\s*&&\s*canPublish\(activeStore,new Date\(\),selectedCommercialPlan\)\)/);
   assert.match(dashboardPage, /sellerCanAddProduct&&<DashboardQuickAction[^>]+seller\/products\/new/);
   assert.match(dashboardPage, /selectedPrincipal\?\.owner&&!subscriptionActive&&<DashboardQuickAction label=\{readinessAction\} href=\{readinessHref\}/);
-  assert.match(productsPage, /href=\{subscriptionActive\s*\?\s*`\/\$\{locale\}\/seller\/products\/new\?store=\$\{store\.id\}`\s*:\s*readinessHref\}/);
+  assert.match(productsPage, /const canAddProduct = subscriptionActive && !quota.blocked/);
+  assert.match(productsPage, /href=\{canAddProduct\s*\?\s*`\/\$\{locale\}\/seller\/products\/new\?store=\$\{store\.id\}`\s*:\s*readinessHref\}/);
   assert.doesNotMatch(dashboardPage, /Status: \{user\.store\.subscription/);
   assert.doesNotMatch(productsPage, /store\.subscription\?\.status \?\? "NOT_STARTED"/);
 });

@@ -1,4 +1,4 @@
-import { isSellerBillingInterval, isSellerPlanId, type SellerBillingInterval, type SellerPlanId } from "./seller-plans";
+import { isSellerBillingInterval, isPaidSellerPlanId, type SellerBillingInterval, type SellerPlanId } from "./seller-plans";
 
 export type SellerRegistrationIntent = {
   plan: SellerPlanId;
@@ -6,13 +6,13 @@ export type SellerRegistrationIntent = {
 };
 
 export function sellerRegistrationIntent(plan: unknown, interval: unknown): SellerRegistrationIntent | null {
-  if (!isSellerPlanId(plan)) return null;
+  if (!isPaidSellerPlanId(plan)) return null;
   if (interval !== undefined && interval !== null && interval !== "" && !isSellerBillingInterval(interval)) return null;
   return { plan, interval: isSellerBillingInterval(interval) ? interval : "monthly" };
 }
 
 export function explicitSellerRegistrationIntent(plan: unknown, interval: unknown): SellerRegistrationIntent | null {
-  if (!isSellerPlanId(plan) || !isSellerBillingInterval(interval)) return null;
+  if (!isPaidSellerPlanId(plan) || !isSellerBillingInterval(interval)) return null;
   return { plan, interval };
 }
 
@@ -22,6 +22,7 @@ export function sellerRegistrationIntentQuery(intent: SellerRegistrationIntent |
 }
 
 export function sellerOnboardingPath(locale: string, hasStore: boolean, intent: SellerRegistrationIntent | null) {
+  if (!intent) return `/${locale}/dashboard`;
   const destination = hasStore ? "seller/subscription" : "seller/onboarding";
   return `/${locale}/${destination}${sellerRegistrationIntentQuery(intent)}`;
 }

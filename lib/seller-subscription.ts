@@ -1,5 +1,4 @@
-import type { PrismaClient, SellerStatus, SellerType, SellerVatStatus, SubscriptionStatus, UserRole } from "@prisma/client";
-import { activeAccessSource } from "./admin-access";
+import { Prisma, type PrismaClient, type SellerStatus, type SellerType, type SellerVatStatus, type SubscriptionStatus, type UserRole } from "@prisma/client";
 import { assertSellerActivity } from "./account-status";
 import { sellerPlanEntitlement, type SellerPlanId } from "./seller-plans";
 import { requireStoreCapability } from "./seller-business-access";
@@ -15,7 +14,8 @@ export function canPublish(store: {
   subscription: { status: SubscriptionStatus; currentPeriodEnd?: Date | null } | null;
   accessGrants?: Array<{ source: "ADMIN_GRANTED" | "ADMIN_EXEMPT"; startsAt: Date; endsAt: Date | null }>;
 }, now = new Date(), businessPlan?: SellerPlanId | "admin-exempt" | null) {
-  const commercialAccess = businessPlan === undefined ? activeAccessSource({ subscription: store.subscription, accessGrants: store.accessGrants ?? [] }, now).source !== "NONE" : businessPlan !== null;
+  void now;
+  const commercialAccess = businessPlan === undefined ? true : businessPlan !== null;
   return store.status === "ACTIVE" && store.sellerType !== "UNKNOWN" && !(store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") && commercialAccess;
 }
 
@@ -68,7 +68,7 @@ export async function requireProductCreationAccess(db: PrismaClient, userId: str
   return store;
 }
 
-export async function requireStorePublishingAccess(db: PrismaClient, userId: string, storeId: string, permission: "PRODUCT_CREATE"|"PRODUCT_PUBLISH" = "PRODUCT_CREATE") {
+export async function requireStorePublishingAccess(db: PrismaClient | Prisma.TransactionClient, userId: string, storeId: string, permission: "PRODUCT_CREATE"|"PRODUCT_PUBLISH" = "PRODUCT_CREATE", productId?: string) {
   await assertSellerActivity(db,userId);
   const principal=await requireStoreCapability(db,userId,storeId,permission);
   const store=await db.store.findUnique({where:{id:storeId},select:{id:true,currency:true,status:true,sellerType:true,vatStatus:true,_count:{select:{products:true}}}});
@@ -77,7 +77,12 @@ export async function requireStorePublishingAccess(db: PrismaClient, userId: str
   if(store.sellerType==="PROFESSIONAL"&&store.vatStatus==="UNKNOWN")throw Object.assign(new SellerSubscriptionError("Confirm your VAT status in store settings before publishing products."),{code:"VAT_STATUS_REQUIRED"});
   const plan=await sellerBusinessCommercialPlan(db,principal.businessId);
   if(store.status!=="ACTIVE"||!plan)throw new SellerSubscriptionError("Your seller subscription is inactive. Renew your plan to publish or reactivate products.");
-  const quota=sellerProductQuota({role:plan==="admin-exempt"?"ADMIN":"SELLER",plan,productCount:store._count.products});
+  const productCount = permission === "PRODUCT_PUBLISH" ? await db.product.count({ where: { storeId, status: "PUBLISHED", removedAt: null, ...(productId ? { id: { not: productId } } : {}) } }) : store._count.products;
+  const quota=sellerProductQuota({role:plan==="admin-exempt"?"ADMIN":"SELLER",plan,productCount});
   if(quota.blocked)throw Object.assign(new SellerSubscriptionError(`Your plan allows ${quota.productLimit} products and this store has reached that limit.`),{code:"SELLER_PRODUCT_LIMIT_REACHED"});
   return store;
+}
+
+export async function lockSellerProductQuota(tx: Prisma.TransactionClient, storeId: string) {
+  await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`seller-product-quota:${storeId}`}, 0))::text`);
 }

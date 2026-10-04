@@ -3,10 +3,10 @@ import type { AdminAccessStatus } from "@/lib/admin-access-status";
 export function adminAccessLabels(locale: string) {
   return locale === "fr" ? {
     lifecycle: "Statut boutique", onboarding: "Onboarding", source: "Source d’accès", active: "Accès commercial actif", plan: "Plan effectif", capability: "Niveau de fonctionnalités", notRequired: "Non requis", expires: "Expiration", billing: "Abonnement Stripe", connect: "État Stripe Connect",
-    PAID_SUBSCRIPTION: "Abonnement payant", ADMIN_GRANT: "Accordé par l’admin", ADMIN_EXEMPT: "Admin exempté", NONE: "Aucun accès actif", yes: "Oui", no: "Non", never: "Jamais",
+    PAID_SUBSCRIPTION: "Abonnement payant", ADMIN_GRANT: "Accordé par l’admin", ADMIN_EXEMPT: "Admin exempté", FREE: "FREE — sans abonnement", NONE: "Aucun accès actif", yes: "Oui", no: "Non", never: "Jamais",
   } : {
     lifecycle: "Store lifecycle", onboarding: "Onboarding", source: "Access source", active: "Commercial access active", plan: "Effective plan", capability: "Capability tier", notRequired: "Not required", expires: "Expiration", billing: "Stripe subscription", connect: "Stripe Connect readiness",
-    PAID_SUBSCRIPTION: "Paid subscription", ADMIN_GRANT: "Admin grant", ADMIN_EXEMPT: "Admin exempt", NONE: "No active access", yes: "Yes", no: "No", never: "Never",
+    PAID_SUBSCRIPTION: "Paid subscription", ADMIN_GRANT: "Admin grant", ADMIN_EXEMPT: "Admin exempt", FREE: "FREE — no subscription", NONE: "No active access", yes: "Yes", no: "No", never: "Never",
   };
 }
 export function AdminAccessStatusHeaders({ locale }: { locale: string }) {

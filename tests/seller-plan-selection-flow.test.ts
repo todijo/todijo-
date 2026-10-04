@@ -21,7 +21,7 @@ test("public seller plans make monthly and annual pricing explicit", () => {
 test("every canonical plan CTA preserves its plan and selected interval", () => {
   const chooser = source("app/sell/SellerPlanChooser.tsx");
   assert.match(chooser, /register\?role=seller&plan=\$\{plan\.id\}&interval=\$\{interval\}/);
-  for (const plan of ["basic", "plus", "pro"] as const) {
+  for (const plan of ["plus", "pro"] as const) {
     for (const interval of ["monthly", "annual"] as const) {
       assert.deepEqual(explicitSellerRegistrationIntent(plan, interval), { plan, interval });
     }
@@ -31,20 +31,12 @@ test("every canonical plan CTA preserves its plan and selected interval", () => 
   assert.equal(explicitSellerRegistrationIntent("pro", undefined), null);
 });
 
-test("seller entry points cannot silently bypass explicit plan selection", () => {
-  const sell = source("app/sell/page.tsx");
-  const dashboard = source("app/dashboard/page.tsx");
-  const footer = source("components/MarketplaceFooter.tsx");
-  const sellerLayout = source("components/SellerDashboardLayout.tsx");
-  const register = source("app/register/page.tsx");
-  const createStore = source("app/seller/create-store/page.tsx");
-  assert.match(sell, /className="primary" href="#plans"/);
-  assert.doesNotMatch(sell, /register\?role=seller`/);
-  assert.equal((dashboard.match(/sell#plans/g) ?? []).length, 2);
-  assert.equal((footer.match(/sell#plans/g) ?? []).length, 1);
-  assert.match(sellerLayout, /storeSlug \? publicStoreAvailable \? `\/\$\{locale\}\/store\/\$\{storeSlug\}` : `\/\$\{locale\}\/seller\/store-settings` : `\/\$\{locale\}\/sell#plans`/);
-  assert.match(register, /query\.role === "seller" && !intent/);
-  assert.match(createStore, /if \(!intent\) redirect\(`\/\$\{locale\}\/sell#plans`\)/);
+test("direct seller entry starts FREE without forced paid selection", () => {
+  assert.equal(explicitSellerRegistrationIntent("free", "monthly"), null);
+  assert.equal(sellerOnboardingPath("fr", false, null), "/fr/dashboard");
+  assert.doesNotMatch(source("app/register/page.tsx"), /query\.role === "seller" && !intent/);
+  assert.doesNotMatch(source("app/seller/create-store/page.tsx"), /if \(!intent\) redirect/);
+  assert.match(source("app/dashboard/page.tsx"), /FreeSellerStartCard/);
 });
 
 test("canonical seller intent survives password and social auth, store creation, and subscription", () => {
@@ -62,7 +54,7 @@ test("canonical seller intent survives password and social auth, store creation,
   assert.match(createStore, /sellerOnboardingDestination/);
   assert.match(onboardingForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(subscription, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);
-  assert.equal(sellerOnboardingPath("fr", false, { plan: "basic", interval: "annual" }), "/fr/seller/onboarding?plan=basic&interval=annual");
+  assert.equal(sellerOnboardingPath("fr", false, { plan: "plus", interval: "annual" }), "/fr/seller/onboarding?plan=plus&interval=annual");
 });
 
 test("seller subscription serializes only resolved strings into its Client Component", () => {
@@ -92,7 +84,7 @@ test("seller selection copy exists for every supported locale including RTL", ()
   }
 });
 
-test("Stripe checkout keeps canonical six-price authority", () => {
+test("Stripe checkout keeps four paid-price authority and never bills FREE", () => {
   const previous = { ...process.env };
   process.env.STRIPE_SELLER_BASIC_MONTHLY_PRICE_ID = "price_basicmonthly";
   process.env.STRIPE_SELLER_BASIC_ANNUAL_PRICE_ID = "price_basicannual";
@@ -101,8 +93,8 @@ test("Stripe checkout keeps canonical six-price authority", () => {
   process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID = "price_promonthly";
   process.env.STRIPE_SELLER_PRO_ANNUAL_PRICE_ID = "price_proannual";
   try {
-    assert.equal(configuredSellerPlan("basic", "monthly")?.priceId, "price_basicmonthly");
-    assert.equal(configuredSellerPlan("basic", "annual")?.priceId, "price_basicannual");
+    assert.equal(configuredSellerPlan("free", "monthly"), null);
+    assert.equal(configuredSellerPlan("free", "annual"), null);
     assert.equal(configuredSellerPlan("plus", "monthly")?.priceId, "price_plusmonthly");
     assert.equal(configuredSellerPlan("plus", "annual")?.priceId, "price_plusannual");
     assert.equal(configuredSellerPlan("pro", "monthly")?.priceId, "price_promonthly");

@@ -14,6 +14,7 @@ import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
 import { sellerBusinessCommercialEntitlement } from "./seller-business";
 import {configuredSellerPlanForPriceId} from "./seller-plans";
 import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
+import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -90,6 +91,10 @@ export async function createCheckout(
     if(authority.status!=="ACTIVE"||!authority.businessId)throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE",409);
     const entitlement=await (pricingDependencies.commercialEntitlement??sellerBusinessCommercialEntitlement)(db,authority.businessId);
     if(!entitlement.active||!entitlement.plan)throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE",409);
+    if (entitlement.plan === "free") {
+      const visible = await db.product.count({ where: { id: { in: products.filter(product => product.storeId === store.id).map(product => product.id) }, status: "PUBLISHED", removedAt: null, freeVisibilityPosition: { lte: 5 } } });
+      if (visible !== products.filter(product => product.storeId === store.id).length) throw new CheckoutError("SELLER_PRODUCT_LIMIT_REACHED", 409);
+    }
     if(store.sellerType==="UNKNOWN")throw new CheckoutError("SELLER_STATUS_REQUIRED",409);
     if(store.sellerType==="PROFESSIONAL"&&authority.vatStatus==="UNKNOWN")throw new CheckoutError("SELLER_VAT_STATUS_REQUIRED",409);
     if(!store.owner.stripeAccountId)throw new CheckoutError("SELLER_STRIPE_NOT_READY",409);
@@ -261,7 +266,7 @@ export async function processStripeEvent(
         const existing = await tx.sellerSubscription.findUnique({ where: { stripeSubscriptionId: invoiceSubscriptionId }, select: { storeId: true, currentPeriodEnd:true, store: { select: { sellerType: true, businessId:true } } } });
         if (!existing) throw new Error(`[Stripe webhook ${event.id}] No local seller subscription matches invoice subscription ${invoiceSubscriptionId}.`);
         await tx.sellerSubscription.update({ where: { stripeSubscriptionId: invoiceSubscriptionId }, data: { status } });
-        await tx.product.updateMany({ where: { ...(existing.store.businessId?{store:{businessId:existing.store.businessId}}:{storeId:existing.storeId}), status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+        await enforceSellerPublicationCapacity(tx, existing.storeId, existing.store.businessId);
         console.info(`[Stripe webhook ${event.id}] Invoice updated a seller subscription to ${status}.`);
         return { subscriptionUpdated: true, storeId: existing.storeId, status };
       }
@@ -363,9 +368,7 @@ async function syncSellerSubscription(
     update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
   });
   console.info(`[Stripe webhook ${eventId}] Seller subscription record updated (status=${subscriptionUpdate.status}).`);
-  const products = commerciallyActive
-    ? {count:0}
-    : await tx.product.updateMany({ where: { ...(store.businessId?{store:{businessId:store.businessId}}:{storeId}), status: "PUBLISHED", deactivationReason: "NONE" }, data: { status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" } });
+  const products = commerciallyActive && configuredPlan.plan === "pro" ? { count: 0 } : await enforceSellerPublicationCapacity(tx, storeId, store.businessId);
   console.info(`[Stripe webhook ${eventId}] Saved ${status} subscription state; updated ${products.count} product(s).`);
   return { storeId, status };
 }

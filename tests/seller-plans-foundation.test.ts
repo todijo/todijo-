@@ -7,11 +7,11 @@ test("canonical seller plans use approved cent-accurate monthly and annual price
   const plans = Object.fromEntries(sellerPlans().map((plan) => [plan.id, plan]));
   assert.deepEqual(
     {
-      basic: [plans.basic.monthlyAmountMinor, plans.basic.annualAmountMinor, plans.basic.productLimit, plans.basic.dropshipping],
+      free: [plans.free.monthlyAmountMinor, plans.free.annualAmountMinor, plans.free.productLimit, plans.free.dropshipping],
       plus: [plans.plus.monthlyAmountMinor, plans.plus.annualAmountMinor, plans.plus.productLimit, plans.plus.dropshipping],
       pro: [plans.pro.monthlyAmountMinor, plans.pro.annualAmountMinor, plans.pro.productLimit, plans.pro.dropshipping],
     },
-    { basic: [699, 6710, 10, false], plus: [1499, 14390, 50, false], pro: [2699, 25910, null, true] },
+    { free: [0, 0, 5, false], plus: [1499, 14390, 50, false], pro: [2699, 25910, null, true] },
   );
   for (const plan of Object.values(plans)) {
     assert.equal(plan.annualAmountMinor, Math.round(plan.monthlyAmountMinor * 12 * 0.8));

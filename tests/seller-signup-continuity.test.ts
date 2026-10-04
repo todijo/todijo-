@@ -7,8 +7,8 @@ import { configuredSellerPlan } from "../lib/seller-plans";
 
 const source=(path:string)=>readFileSync(path,"utf8");
 
-test("BASIC PLUS and PRO monthly or annual intent remains canonical through auth and onboarding",()=>{
-  for(const plan of ["basic","plus","pro"] as const)for(const interval of ["monthly","annual"] as const){
+test("PLUS PLUS and PRO monthly or annual intent remains canonical through auth and onboarding",()=>{
+  for(const plan of ["plus","plus","pro"] as const)for(const interval of ["monthly","annual"] as const){
     const intent=explicitSellerRegistrationIntent(plan,interval);
     assert.deepEqual(intent,{plan,interval});
     assert.equal(sellerOnboardingPath("fr",false,intent),`/fr/seller/onboarding?plan=${plan}&interval=${interval}`);
@@ -45,8 +45,8 @@ test("subscription review uses canonical server plan amounts and checkout price 
     assert.equal(configuredSellerPlan("pro","monthly")?.amountMinor,2699);
     assert.equal(configuredSellerPlan("pro","annual")?.amountMinor,25910);
   }finally{for(const key of Object.keys(process.env))if(!(key in previous))delete process.env[key];Object.assign(process.env,previous)}
-  const page=source("app/seller/subscription/page.tsx"),api=source("app/api/seller/subscription/checkout/route.ts"),stripe=source("lib/stripe.ts");
-  assert.match(page,/sellerSubscriptionReview/);
+  const api=source("app/api/seller/subscription/checkout/route.ts"),stripe=source("lib/stripe.ts");
+  assert.match(source("app/seller/subscription/SubscriptionPlans.tsx"),/sellerSubscriptionReview/);
   assert.match(api,/configuredSellerPlan\(body\.planId, body\.interval\)/);
   assert.match(stripe,/metadata\[interval\]/);
   assert.match(stripe,/idempotencyKey: input\.idempotencyKey/);

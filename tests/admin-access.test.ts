@@ -8,6 +8,7 @@ import {
   extendManagedAccess,
   exemptExistingAdminStore,
   publicProductAccessWhere,
+  publicStoreAccessWhere,
   requireAdmin,
 } from "../lib/admin-access";
 import { createAdditionalAdminManagedStore } from "../lib/admin-managed-store";
@@ -86,7 +87,7 @@ test("additional managed Store fails closed for non-PRO and at capacity", async 
     sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan,currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] } }) },
   }) as never;
   const input = { ownerId: "seller", name: "Second", slug: "second", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" };
-  await assert.rejects(() => createAdditionalAdminManagedStore(database("basic", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
+  await assert.rejects(() => createAdditionalAdminManagedStore(database("free", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
   await assert.rejects(() => createAdditionalAdminManagedStore(database("plus", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
   await assert.rejects(() => createAdditionalAdminManagedStore(database("pro", 2), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "STORE_LIMIT_REACHED");
 });
@@ -140,31 +141,15 @@ test("invalid duration is rejected", () => {
   assert.throws(() => calculateGrantPeriod(new Date(), 2 as 1), (error: unknown) => error instanceof AdminAccessError && error.code === "INVALID_DURATION");
 });
 
-test("public product visibility requires Stripe, a live admin grant, or admin exemption", () => {
-  const now = new Date("2026-01-01T00:00:00Z");
-  assert.deepEqual(publicProductAccessWhere(now), {
-    dataClass: "PRODUCTION",
-    removedAt: null,
-    store: {
-      dataClass: "PRODUCTION",
-      status: "ACTIVE",
-      owner: { sellerSuspendedAt: null, deactivatedAt: null },
-      OR: [
-        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
-        { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
-        { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
-        { business: { is: { billingStore: { is: { OR: [
-          { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
-          { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
-          { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
-        ] } } } } },
-      ],
-    },
-    OR: [
-      { supplierLink: { is: null } },
-      { supplierLink: { is: { supplierAvailable: true, syncStatus: "HEALTHY" } } },
-    ],
-  });
+test("public FREE listings retain lifecycle, data isolation, supplier safety and five-product visibility", () => {
+  const now = new Date("2026-01-01T00:00:00Z"), where = publicProductAccessWhere(now);
+  assert.equal(where.dataClass, "PRODUCTION"); assert.equal(where.removedAt, null);
+  assert.deepEqual(where.store, publicStoreAccessWhere(now));
+  assert.deepEqual(where.OR, [{supplierLink:{is:null}},{supplierLink:{is:{supplierAvailable:true,syncStatus:"HEALTHY"}}}]);
+  const serialized = JSON.stringify(where.NOT);
+  assert.match(serialized, /freeVisibilityPosition/); assert.match(serialized, /"gt":5/);
+  assert.match(serialized, /plus/); assert.match(serialized, /pro/);
+  assert.match(serialized, /currentPeriodEnd/); assert.doesNotMatch(serialized, /basic/);
 });
 
 test("existing admin store exemption is permanent, idempotent, and does not touch Stripe", async () => {

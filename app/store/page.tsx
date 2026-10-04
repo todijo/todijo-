@@ -5,16 +5,16 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import SiteHeader from "@/components/SiteHeader";
 import MarketplaceFooter from "@/components/MarketplaceFooter";
-import { publicStoreAccessWhere } from "@/lib/admin-access";
+import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
 import { unstable_cache } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 
 const listPublicStores = unstable_cache(async () => prisma.store.findMany({
-  where: { ...publicStoreAccessWhere(), products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } },
+  where: { ...publicStoreAccessWhere(), products: { some: { status: "PUBLISHED", ...publicProductAccessWhere() } } },
   orderBy: { updatedAt: "desc" },
   select: {
     id: true, name: true, slug: true, description: true, logo: true,
-    _count: { select: { products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } } },
+    _count: { select: { products: { where: { status: "PUBLISHED", ...publicProductAccessWhere() } } } },
   },
 }), ["public-store-directory"], { revalidate: 60, tags: [PUBLIC_STORES_CACHE_TAG] });
 

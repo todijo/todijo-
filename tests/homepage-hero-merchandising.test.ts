@@ -15,7 +15,7 @@ test("hero selects at most six distinct products without changing source order",
 test("hero query reuses public eligibility and requests the six-product composition", () => {
   const page = source("app/page.tsx");
   assert.match(page, /HOMEPAGE_HERO_PRODUCT_COUNT/);
-  assert.match(page, /where: \{ status: "PUBLISHED", \.\.\.publicProductAccess, images: \{ isEmpty: false \} \}/);
+  assert.match(page, /heroRows = heroTake > 0[\s\S]{0,200}where: \{ status: "PUBLISHED", \.\.\.publicProductAccess, images: \{ isEmpty: false \} \}/);
   assert.match(page, /take: heroTake/);
   assert.doesNotMatch(page, /heroRows[\s\S]{0,300}dataClass:\s*["']TEST/);
 });
@@ -52,19 +52,11 @@ test("store section renders only at the authoritative five-store threshold", () 
   assert.equal(shouldShowHomepageStores(5), true);
   assert.match(home, /shouldShowHomepageStores\(stores\.length\) && <section className="container featuredStores"/);
   assert.doesNotMatch(home, /featuredStoresPlaceholder|emptyStores/);
-  assert.match(page, /where: \{ \.\.\.publicStoreAccess, products: \{ some: \{ status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null \} \} \}/);
+  assert.ok(page.includes('products: { some: { status: "PUBLISHED", ...publicProductAccess } }'));
   assert.match(page, /take: 5/);
-  assert.deepEqual(publicStoreAccessWhere(new Date("2026-09-04T00:00:00Z")), {
-    dataClass: "PRODUCTION", status: "ACTIVE", owner: { sellerSuspendedAt: null, deactivatedAt: null },
-    OR: [
-      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: new Date("2026-09-04T00:00:00Z") } } } },
-      { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: null } } },
-      { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: { gt: new Date("2026-09-04T00:00:00Z") } } } },
-      { business: { is: { billingStore: { is: { OR: [
-        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: new Date("2026-09-04T00:00:00Z") } } } },
-        { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: null } } },
-        { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: new Date("2026-09-04T00:00:00Z") }, endsAt: { gt: new Date("2026-09-04T00:00:00Z") } } } },
-      ] } } } } },
-    ],
-  });
+  const where = publicStoreAccessWhere(new Date("2026-09-04T00:00:00Z"));
+  assert.equal(where.dataClass, "PRODUCTION"); assert.equal(where.status, "ACTIVE");
+  assert.deepEqual(where.owner, {role:{in:["SELLER","ADMIN"]},sellerSuspendedAt:null,deactivatedAt:null});
+  assert.ok(where.AND);
+  assert.doesNotMatch(JSON.stringify(where), /subscription/);
 });

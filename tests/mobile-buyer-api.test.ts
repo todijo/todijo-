@@ -63,7 +63,7 @@ test("public store APIs reuse production visibility and expose only buyer-safe f
   for (const route of [directory, detail]) {
     assert.match(route, /publicStoreAccessWhere/);
     assert.match(route, /PUBLISHED/);
-    assert.match(route, /PRODUCTION/);
+    assert.match(route, /publicProductAccessWhere/);
     for (const forbidden of ["stripeAccountId", "supplierCost", "contactEmail", "vatNumber", "businessRegistrationId", "owner:"]) assert.doesNotMatch(route, new RegExp(`${forbidden}\\s*:\\s*true`));
   }
   assert.match(detail, /buyerVisibleVariantWhere/);

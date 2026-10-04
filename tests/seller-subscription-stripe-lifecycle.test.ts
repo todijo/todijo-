@@ -8,8 +8,6 @@ import {sellerBusinessCommercialEntitlement} from "../lib/seller-business";
 import {requireSellerSupplierAccess} from "../lib/suppliers/supplier-access";
 
 const priceEnvironment={
-  STRIPE_SELLER_BASIC_MONTHLY_PRICE_ID:"price_basicmonthly",
-  STRIPE_SELLER_BASIC_ANNUAL_PRICE_ID:"price_basicannual",
   STRIPE_SELLER_PLUS_MONTHLY_PRICE_ID:"price_plusmonthly",
   STRIPE_SELLER_PLUS_ANNUAL_PRICE_ID:"price_plusannual",
   STRIPE_SELLER_PRO_MONTHLY_PRICE_ID:"price_promonthly",
@@ -43,9 +41,9 @@ const baseInput={storeId:"store",userId:"seller",customerId:"cus",locale:"fr",pl
 const checkoutResult={id:"cs_1",url:"https://checkout.stripe.test/one",expiresAt:new Date("2026-10-04T12:00:00Z")};
 
 test("all configured Stripe seller Prices resolve authoritatively and current amounts stay unchanged",()=>withPrices(()=>{
-  assert.deepEqual(sellerPlans().map(plan=>[plan.id,plan.monthlyAmountMinor,plan.annualAmountMinor]),[["basic",699,6710],["plus",1499,14390],["pro",2699,25910]]);
+  assert.deepEqual(sellerPlans().map(plan=>[plan.id,plan.monthlyAmountMinor,plan.annualAmountMinor]),[["free",0,0],["plus",1499,14390],["pro",2699,25910]]);
   for(const [key,priceId] of Object.entries(priceEnvironment)){
-    const [,plan,interval]=key.toLowerCase().match(/^stripe_seller_(basic|plus|pro)_(monthly|annual)_price_id$/)??[];
+    const [,plan,interval]=key.toLowerCase().match(/^stripe_seller_(plus|pro)_(monthly|annual)_price_id$/)??[];
     assert.deepEqual(configuredSellerPlanForPriceId(priceId),{plan,billingInterval:interval,priceId});
   }
   assert.equal(configuredSellerPlanForPriceId("price_unknown"),null);
@@ -57,6 +55,25 @@ test("open Checkout is reused and a different plan is refused",async()=>{
   const result=await createOrReuseSellerSubscriptionCheckout({...baseInput,db:fixture.db,createCheckout:async()=>{creates++;return checkoutResult}});
   assert.equal(result.reused,true);assert.equal(creates,0);
   await assert.rejects(()=>createOrReuseSellerSubscriptionCheckout({...baseInput,db:fixture.db,plan:{id:"plus",interval:"monthly",priceId:"price_plusmonthly"},createCheckout:async()=>checkoutResult}),error=>error instanceof SellerSubscriptionCheckoutError&&error.code==="SELLER_SUBSCRIPTION_CHECKOUT_IN_PROGRESS");
+});
+
+for (const id of ["plus", "pro"] as const) test(`FREE → ${id.toUpperCase()} uses paid Checkout with durable retry protection`, async () => {
+  const fixture = checkoutDb({ id: "local-subscription", storeId: "store", status: "CANCELED", plan: "free", stripeSubscriptionId: "sub_old", currentPeriodEnd: new Date("2026-10-01T00:00:00Z"), stripeCheckoutAttemptGeneration: 0 });
+  const priceId = `price_${id}monthly`;
+  let calls = 0;
+  const create = async (input: any) => { calls++; assert.equal(input.plan, id); assert.equal(input.priceId, priceId); return checkoutResult; };
+  const input = { ...baseInput, db: fixture.db, plan: { id, interval: "monthly" as const, priceId }, createCheckout: create };
+  assert.equal((await createOrReuseSellerSubscriptionCheckout(input)).id, "cs_1");
+  assert.equal((await createOrReuseSellerSubscriptionCheckout(input)).reused, true);
+  assert.equal(calls, 1);
+  assert.equal(fixture.state()?.status, "INCOMPLETE");
+});
+
+test("converted test billing still active at Stripe cannot silently create a duplicate subscription", async () => {
+  const fixture = checkoutDb({ id: "local-subscription", storeId: "store", status: "ACTIVE", plan: "free", stripeSubscriptionId: "sub_old", currentPeriodEnd: new Date("2026-10-04T00:00:00Z"), stripeCheckoutAttemptGeneration: 0 });
+  let calls = 0;
+  await assert.rejects(() => createOrReuseSellerSubscriptionCheckout({ ...baseInput, db: fixture.db, createCheckout: async () => { calls++; return checkoutResult; } }), error => error instanceof SellerSubscriptionCheckoutError && error.code === "SELLER_SUBSCRIPTION_RECONCILIATION_REQUIRED");
+  assert.equal(calls, 0);
 });
 
 test("ambiguous retry retains generation zero key and recovers the same Stripe Session",async()=>{
@@ -95,13 +112,13 @@ test("future active entitlement blocks Checkout while expired ACTIVE state can r
 
 function subscriptionDb(){
   let upsert:any,demoted=0,creates=0;
-  const tx:any={stripeWebhookEvent:{create:async()=>{creates++;}},sellerSubscription:{findFirst:async()=>({storeId:"store",plan:"basic",stripePriceId:"price_basicmonthly"}),findUnique:async()=>({storeId:"store",currentPeriodEnd:new Date("2026-10-01T00:00:00Z"),store:{sellerType:"PROFESSIONAL",businessId:"business"}}),upsert:async(args:any)=>{upsert=args;return args.update},update:async()=>({})},store:{findUnique:async()=>({id:"store",ownerId:"seller",stripeCustomerId:"cus",sellerType:"PROFESSIONAL",businessId:"business"}),update:async()=>({id:"store",status:"ACTIVE",stripeCustomerId:"cus"})},product:{updateMany:async()=>{demoted++;return{count:2}}}};
+  const tx:any={$queryRaw:async()=>[],sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store",subscription:upsert?.update??null,accessGrants:[]}})},stripeWebhookEvent:{create:async()=>{creates++;}},sellerSubscription:{findFirst:async()=>({storeId:"store",plan:"plus",stripePriceId:"price_plusmonthly"}),findUnique:async()=>({storeId:"store",currentPeriodEnd:new Date("2026-10-01T00:00:00Z"),store:{sellerType:"PROFESSIONAL",businessId:"business"}}),upsert:async(args:any)=>{upsert=args;return args.update},update:async()=>({})},store:{findMany:async()=>[{id:"store"}],findUnique:async()=>({id:"store",ownerId:"seller",stripeCustomerId:"cus",sellerType:"PROFESSIONAL",businessId:"business"}),update:async()=>({id:"store",status:"ACTIVE",stripeCustomerId:"cus"})},product:{updateMany:async()=>{demoted++;return{count:2}}}};
   return{db:{$transaction:async(fn:any)=>fn(tx)} as any,upsert:()=>upsert,demoted:()=>demoted,creates:()=>creates};
 }
-function stripeSubscription(overrides:Partial<StripeSubscription>={}):StripeSubscription{return{id:"sub",object:"subscription",customer:"cus",status:"active",metadata:{storeId:"store",plan:"basic",interval:"monthly"},items:{data:[{price:{id:"price_proannual"},current_period_start:1_799_000_000,current_period_end:1_830_536_000}]},...overrides};}
+function stripeSubscription(overrides:Partial<StripeSubscription>={}):StripeSubscription{return{id:"sub",object:"subscription",customer:"cus",status:"active",metadata:{storeId:"store",plan:"plus",interval:"monthly"},items:{data:[{price:{id:"price_proannual"},current_period_start:1_799_000_000,current_period_end:1_830_536_000}]},...overrides};}
 
 test("PRO annual Checkout activates authoritatively from Price ID with a future annual period",()=>withPrices(async()=>{
-  const fixture=subscriptionDb(),event:StripeEvent={id:"evt_checkout",type:"checkout.session.completed",data:{object:{id:"cs",mode:"subscription",customer:"cus",subscription:"sub",payment_intent:null,payment_status:"paid",client_reference_id:"store",metadata:{kind:"seller_subscription",storeId:"store",userId:"seller",plan:"basic",interval:"monthly"}}}};
+  const fixture=subscriptionDb(),event:StripeEvent={id:"evt_checkout",type:"checkout.session.completed",data:{object:{id:"cs",mode:"subscription",customer:"cus",subscription:"sub",payment_intent:null,payment_status:"paid",client_reference_id:"store",metadata:{kind:"seller_subscription",storeId:"store",userId:"seller",plan:"plus",interval:"monthly"}}}};
   await processStripeEvent(fixture.db,event,async()=>stripeSubscription());
   const saved=fixture.upsert().update;
   assert.equal(saved.plan,"pro");assert.equal(saved.billingInterval,"annual");assert.equal(saved.stripePriceId,"price_proannual");assert.equal(saved.status,"ACTIVE");assert.ok(saved.currentPeriodEnd>new Date());assert.equal(fixture.demoted(),0);assert.equal(fixture.creates(),1);

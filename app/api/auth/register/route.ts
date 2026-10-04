@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     const input = validation.value;
     const explicitSellerIntent = input.role === "SELLER" ? explicitSellerRegistrationIntent(body?.plan, body?.interval) : null;
-    if (input.role === "SELLER" && !explicitSellerIntent) {
+    if (input.role === "SELLER" && (body?.plan != null || body?.interval != null) && !explicitSellerIntent) {
       return NextResponse.json({ error: "Choisissez une formule vendeur et une période de facturation valides.", code: "INVALID_SELLER_PLAN" }, { status: 400 });
     }
     if (!await allowAuthRequest(authRequestKey("register", input.email, request))) {

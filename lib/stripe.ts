@@ -61,6 +61,7 @@ export type StripeSchedulePhase = {
 };
 
 export type StripeSubscriptionSchedule = {
+  end_behavior?: "release" | "cancel";
   id: string;
   object: "subscription_schedule";
   subscription?: string | { id: string } | null;
@@ -239,13 +240,18 @@ function preservePhaseSettings(body: URLSearchParams, prefix: string, phase: Str
   if (Array.isArray(item.tax_rates)) appendStripeParameter(body, `${prefix}[items][0][tax_rates]`, item.tax_rates.map(reference));
 }
 
-export function configureSellerSubscriptionSchedule(input: { scheduleId: string; changeId: string; start: Date; boundary: Date; sourcePriceId: string; targetPriceId: string; interval: "monthly" | "annual"; idempotencyKey: string; currentPhase?: StripeSchedulePhase }) {
+export function configureSellerSubscriptionSchedule(input: { scheduleId: string; changeId: string; start: Date; boundary: Date; sourcePriceId: string; targetPriceId: string; interval: "monthly" | "annual"; idempotencyKey: string; currentPhase?: StripeSchedulePhase; toFree?: boolean }) {
   const body = new URLSearchParams({ end_behavior: "release", proration_behavior: "none", "metadata[todijoChangeId]": input.changeId,
     "phases[0][start_date]": String(Math.floor(input.start.getTime() / 1000)), "phases[0][end_date]": String(Math.floor(input.boundary.getTime() / 1000)),
     "phases[0][items][0][price]": input.sourcePriceId, "phases[0][items][0][quantity]": "1", "phases[0][proration_behavior]": "none",
     "phases[1][start_date]": String(Math.floor(input.boundary.getTime() / 1000)), "phases[1][duration][interval]": input.interval === "annual" ? "year" : "month", "phases[1][duration][interval_count]": "1",
     "phases[1][items][0][price]": input.targetPriceId, "phases[1][items][0][quantity]": "1", "phases[1][proration_behavior]": "none" });
   if (input.currentPhase) { preservePhaseSettings(body, "phases[0]", input.currentPhase); preservePhaseSettings(body, "phases[1]", input.currentPhase); }
+  if (input.toFree) {
+    // Finish the existing paid phase and cancel; FREE has no Stripe Price/phase.
+    for (const key of [...body.keys()]) if (key.startsWith("phases[1]")) body.delete(key);
+    body.set("end_behavior", "cancel");
+  }
   return stripeRequest<StripeSubscriptionSchedule>(`/subscription_schedules/${encodeURIComponent(input.scheduleId)}`, {
     method: "POST", idempotencyKey: input.idempotencyKey,
     body,

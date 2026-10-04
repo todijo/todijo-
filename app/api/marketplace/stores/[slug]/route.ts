@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { publicStoreAccessWhere } from "@/lib/admin-access";
+import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-price-safety";
 import { mobileBuyerLocale } from "@/lib/mobile-buyer-context";
 
 const PAGE_SIZE = 24;
-const PUBLIC_PRODUCT = { status: "PUBLISHED" as const, dataClass: "PRODUCTION" as const, removedAt: null };
 const productSelect = {
   id: true, name: true, description: true, sourceLocale: true, translations: { select: { locale: true, title: true, description: true, automatic: true } },
   price: true, compareAtPrice: true, currency: true, category: true, condition: true, images: true, stock: true, createdAt: true,
@@ -18,6 +17,7 @@ const productSelect = {
 } satisfies Prisma.ProductSelect;
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  const PUBLIC_PRODUCT = { status: "PUBLISHED" as const, ...publicProductAccessWhere() };
   const { slug } = await params;
   const url = new URL(request.url);
   const requestedOffset = Number.parseInt(url.searchParams.get("offset") ?? "0", 10);
@@ -38,5 +38,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     return { id: product.id, title: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, category: product.category, condition: product.condition, image: product.images[0] ?? null, stock: availability.hasActiveVariants ? null : product.stock, available: availability.isGenerallyAvailable, hasActiveVariants: availability.hasActiveVariants, requiresAuthoritativePrice: requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata), store: { name: store.name, slug: store.slug, city: store.city, country: store.country, logo: store.logo }, createdAt: product.createdAt.toISOString() };
   });
   const { products: _products, _count, ...identity } = store;
-  return NextResponse.json({ store: { ...identity, createdAt: identity.createdAt.toISOString(), productCount: _count.products }, products, hasMore: offset + products.length < _count.products, nextOffset: offset + products.length }, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
+  return NextResponse.json({ store: { ...identity, createdAt: identity.createdAt.toISOString(), productCount: _count.products }, products, hasMore: offset + products.length < _count.products, nextOffset: offset + products.length }, { headers: { "Cache-Control": "private, no-store" } });
 }

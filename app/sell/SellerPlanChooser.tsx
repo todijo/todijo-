@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import type { SellerBillingInterval, SellerPlanId } from "@/lib/seller-plans";
+import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 
 type PublicPlan = {
   id: SellerPlanId;
@@ -27,6 +28,7 @@ type Copy = {
 
 export default function SellerPlanChooser({ locale, plans, copy }: { locale: string; plans: PublicPlan[]; copy: Copy }) {
   const [interval, setInterval] = useState<SellerBillingInterval>("monthly");
+  const benefitCopy = sellerFreeModelCopy(locale);
   return <>
     <div className="publicSellerBillingToggle" role="group" aria-label={`${copy.monthly} / ${copy.annual}`}>
       <button type="button" className={interval === "monthly" ? "isActive" : ""} aria-pressed={interval === "monthly"} onClick={() => setInterval("monthly")}>{copy.monthly}</button>
@@ -36,11 +38,12 @@ export default function SellerPlanChooser({ locale, plans, copy }: { locale: str
       const amount = interval === "monthly" ? plan.monthlyAmountMinor : plan.annualAmountMinor;
       return <article className={`publicSellerPlan${index === plans.length - 1 ? " isFeatured" : ""}`} key={plan.id}>
         <h3>{plan.name}</h3>
-        <p className="publicSellerPlanPrice"><strong>{new Intl.NumberFormat(locale, { style: "currency", currency: plan.currency }).format(amount / 100)}</strong><span>{interval === "monthly" ? copy.perMonth : copy.perYear}</span></p>
-        {interval === "annual" && <p className="publicSellerAnnualSaving">{copy.save20}</p>}
+        <p className="publicSellerPlanPrice"><strong>{new Intl.NumberFormat(locale, { style: "currency", currency: plan.currency }).format(amount / 100)}</strong><span>{plan.id === "free" ? benefitCopy.free : interval === "monthly" ? copy.perMonth : copy.perYear}</span></p>
+        {plan.id !== "free" && interval === "annual" && <p className="publicSellerAnnualSaving">{copy.save20}</p>}
         <p>{plan.productLimit ? copy.upTo.replace("{limit}", String(plan.productLimit)) : copy.unlimited}</p>
         <ul>{copy.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-        <a href={`/${locale}/register?role=seller&plan=${plan.id}&interval=${interval}`}>{copy.startWith[plan.id]}<ArrowRight size={16}/></a>
+        <ul>{(plan.id === "pro" ? [benefitCopy.proHelp, benefitCopy.resurfacing, benefitCopy.suppliesHelp] : [benefitCopy.oneStore, plan.id === "free" ? benefitCopy.freeHelp : benefitCopy.plusHelp]).map(feature => <li key={feature}>{feature}</li>)}</ul>
+        <a href={plan.id === "free" ? `/${locale}/register?role=seller` : `/${locale}/register?role=seller&plan=${plan.id}&interval=${interval}`}>{copy.startWith[plan.id]}<ArrowRight size={16}/></a>
       </article>;
     })}</div>
   </>;

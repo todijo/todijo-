@@ -17,11 +17,10 @@ export function sellerOnboardingDestination(state: SellerOnboardingState) {
   const root = `/${state.locale}`;
   const intentQuery = sellerRegistrationIntentQuery(state.intent);
   if (!state.hasStore) {
-    if (!state.hasDraft && !state.intent) return `${root}/sell#plans`;
     return `${root}/seller/onboarding${intentQuery}`;
   }
   const incomplete = (state.onboardingStep ?? 0) < 4 || ["NOT_STARTED", "IN_PROGRESS", "NEEDS_INFORMATION"].includes(state.onboardingStatus ?? "NOT_STARTED");
   if (incomplete) return `${root}/seller/onboarding${intentQuery}`;
-  if (state.entitlementSource && state.entitlementSource !== "NONE") return `${root}/dashboard`;
-  return `${root}/seller/subscription${intentQuery}`;
+  if (state.intent && state.entitlementSource !== "STRIPE" && state.entitlementSource !== "ADMIN_EXEMPT") return `${root}/seller/subscription${intentQuery}`;
+  return `${root}/dashboard`;
 }

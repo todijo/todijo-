@@ -21,6 +21,7 @@ import PremiumHeroSlider from "@/components/PremiumHeroSlider";
 import { localizedCategoryTreeValue } from "@/lib/category-tree-localization";
 import { selectDistinctHeroProducts, shouldShowHomepageStores } from "@/lib/homepage-merchandising";
 import { pageNumbers } from "@/lib/pagination";
+import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -53,11 +54,12 @@ function ProductRail({ id, title, titleHref, products, soldOut, icon = "sparkles
   return <section id={id} className={`container marketplaceRailSection${carousel ? " isCarousel" : ""}`}><div className="marketplaceRailHeading marketplaceSectionHeading"><div><span className="marketplaceHeadingIcon"><Icon size={20} aria-hidden="true"/></span><span><small>Todijo</small><h2><a className="marketplaceRailTitleLink" href={titleHref}>{title}</a></h2></span></div><a className="marketplaceViewAll" href={titleHref}>{viewAll}<ArrowRight size={16} aria-hidden="true"/></a></div>{carousel ? <div className="marketplaceCarouselFrame"><button className="marketplaceCarouselArrow previous" type="button" onClick={() => scroll(-1)} aria-label={previous}><ArrowLeft aria-hidden="true"/></button>{productRail}<button className="marketplaceCarouselArrow next" type="button" onClick={() => scroll(1)} aria-label={next}><ArrowRight aria-hidden="true"/></button></div> : productRail}</section>;
 }
 
-export default function HomeClient({ products, heroProducts, newArrivals, bestSellers, stores, categories, total, page, pageSize, initialFilters, facets, resultsOnly = false }: {
+export default function HomeClient({ products, heroProducts, newArrivals, bestSellers, proDiscovery = [], stores, categories, total, page, pageSize, initialFilters, facets, resultsOnly = false }: {
   products: MarketplaceProduct[];
   heroProducts: MarketplaceProduct[];
   newArrivals: MarketplaceProduct[];
   bestSellers: MarketplaceProduct[];
+  proDiscovery?: MarketplaceProduct[];
   stores: MarketplaceStore[];
   categories: string[];
   total: number;
@@ -256,6 +258,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
           <aside className="homepagePromoCard homepagePromoHome"><div><span>{d("categoryLabel")}</span><h2>{displayCategory("Maison")}</h2><p>{h("homePromoText")}</p><a href={buildUrl({ ...filters, category: "Maison" })}>{h("viewAll")}<ArrowRight size={17} aria-hidden="true"/></a></div></aside>
         </div>
         <ProductRail id="new-arrivals" title={h("newArrivals")} titleHref={`/${activeLocale}?sort=newest#products`} products={distinctNewArrivals.slice(0,10)} soldOut={t.soldOut} viewAll={h("viewAll")} carousel previous={t.previous} next={t.next}/>
+        {proDiscovery.length > 0 && <ProductRail id="pro-daily-discovery" title={sellerFreeModelCopy(activeLocale).discovery} titleHref={`/${activeLocale}#pro-daily-discovery`} products={proDiscovery} soldOut={t.soldOut} viewAll={h("viewAll")} carousel previous={t.previous} next={t.next}/>}
         <ProductRail id="best-sellers" title={h("bestSellers")} titleHref={`/${activeLocale}/best-sellers`} products={distinctBestSellers} soldOut={t.soldOut} icon="shopping" viewAll={h("viewAll")}/>
         {shouldShowHomepageStores(stores.length) && <section className="container featuredStores" aria-labelledby="featured-stores-title"><div className="marketplaceRailHeading marketplaceSectionHeading storeSectionHeading"><div><span className="marketplaceHeadingIcon"><Store size={20} aria-hidden="true"/></span><span><small>{d("storesLabel")}</small><h2 id="featured-stores-title"><a href={`/${activeLocale}/store`}>{d("storesTitle")}</a></h2></span></div><a className="marketplaceViewAll" href={`/${activeLocale}/store`}>{h("viewAll")}<ArrowRight size={16} aria-hidden="true"/></a></div><div className="featuredStoreGrid">{stores.map((store) => <article className="featuredStoreCard" key={store.id}><div className="featuredStoreIdentity">{store.logo ? <Image src={store.logo} alt="" width={58} height={58} unoptimized/> : <span><Store size={25} aria-hidden="true"/></span>}<div><h3><a href={`/${activeLocale}/store/${store.slug}`}>{store.name}</a></h3><small><MapPin size={12} aria-hidden="true"/>{store.city}, {store.country}</small></div></div>{store.description && <p>{store.description}</p>}<div className="featuredStoreProducts">{store.products.map((product) => <a href={`/${activeLocale}/product/${product.id}`} key={product.id} aria-label={product.name}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="110px" unoptimized/> : <Package size={24} aria-hidden="true"/>}</a>)}</div><a className="featuredStoreLink" href={`/${activeLocale}/store/${store.slug}`}>{d("visitStore")}<ArrowRight size={15} aria-hidden="true"/></a></article>)}</div></section>}
       </div>

@@ -17,21 +17,21 @@ export default async function SellOnTodijoPage() {
     <section className="container sellerStartHero">
       <div>
         <span className="sellerStartEyebrow">{french ? "Vendre sur Todijo" : "Sell on Todijo"}</span>
-        <h1>{french ? "Ouvrez votre boutique en connaissant les coûts avant de vous inscrire." : "Open your store with clear pricing before you sign up."}</h1>
-        <p>{french ? "Présentez vos produits, recevez des commandes et gérez votre activité depuis un espace vendeur dédié. Consultez d’abord les formules disponibles, puis créez votre compte vendeur lorsque vous êtes prêt." : "List products, receive orders and manage your business from a dedicated seller workspace. Review the available plans first, then create your seller account when you are ready."}</p>
+        <h1>{french ? "Commencez gratuitement, développez votre boutique à votre rythme." : "Start for free and grow your store at your own pace."}</h1>
+        <p>{french ? "FREE permet de vendre jusqu’à 5 produits après les vérifications et la configuration des paiements requises. PLUS et PRO sont facultatifs pour les catalogues plus grands et les fonctionnalités avancées." : "FREE lets you sell up to 5 products after required verification and payment setup. PLUS and PRO are optional for larger catalogs and advanced features."}</p>
         <div className="sellerStartActions"><a className="primary" href="#plans">{french ? "Choisir ma formule" : "Choose a plan"}<ArrowRight size={17}/></a><a className="secondary" href={`/${locale}/store`}>{french ? "Découvrir les boutiques" : "Discover stores"}</a></div>
       </div>
       <aside className="sellerStartPromise" aria-label={french ? "Fonctionnalités vendeur" : "Seller features"}>
         <div><b><Store size={17}/></b><span><strong>{french ? "Votre boutique" : "Your storefront"}</strong>{french ? "Une page publique pour présenter votre marque et vos produits." : "A public page for your brand and products."}</span></div>
         <div><b><Boxes size={17}/></b><span><strong>{french ? "Gestion des produits" : "Product management"}</strong>{french ? "Stocks, variantes, images et publication depuis votre espace vendeur." : "Manage stock, variants, images and publishing."}</span></div>
         <div><b><BarChart3 size={17}/></b><span><strong>{french ? "Suivi de l’activité" : "Business overview"}</strong>{french ? "Commandes, revenus et statistiques réunis dans le tableau de bord." : "Orders, revenue and statistics in one dashboard."}</span></div>
-        <div><b><CreditCard size={17}/></b><span><strong>{french ? "Abonnement transparent" : "Clear subscription"}</strong>{french ? "Consultez le prix mensuel avant de créer votre compte." : "See the monthly price before creating your account."}</span></div>
+        <div><b><CreditCard size={17}/></b><span><strong>{french ? "Commencez gratuitement" : "Start for free"}</strong>{french ? "FREE ne nécessite aucun abonnement vendeur. PLUS et PRO sont facultatifs." : "FREE requires no seller subscription. PLUS and PRO are optional."}</span></div>
       </aside>
     </section>
     <section className="container sellerPlanSection" id="plans">
-      <div className="sellerPlanHeading"><h2>{french ? "Choisissez votre formule" : "Choose your plan"}</h2><p>{french ? "Les montants ci-dessous correspondent aux formules actuellement configurées dans Todijo. Le paiement de l’abonnement est géré de manière sécurisée par Stripe après la création de votre boutique." : "These prices reflect the seller plans currently configured in Todijo. Subscription billing is securely handled by Stripe after your store is created."}</p></div>
+      <div className="sellerPlanHeading"><h2>{french ? "Choisissez votre formule" : "Choose your plan"}</h2><p>{french ? "Commencez avec FREE sans paiement. Si vous choisissez PLUS ou PRO, une seule confirmation de votre formule vous conduit au paiement sécurisé Stripe après la création de votre boutique." : "Start with FREE without payment. If you choose PLUS or PRO, one plan confirmation takes you to secure Stripe payment after your store is created."}</p></div>
       <SellerPlanChooser locale={locale} plans={plans} copy={{ ...planCopy, upTo: french ? "Jusqu’à {limit} produits" : "Up to {limit} products", unlimited: french ? "Produits illimités" : "Unlimited products", features: [french ? "Tableau de bord vendeur" : "Seller dashboard", french ? "Gestion des commandes" : "Order management", french ? "Suivi des revenus" : "Revenue tracking"], startWith: Object.fromEntries(plans.map((plan) => [plan.id, planCopy.startWith(plan.name)])) as Record<(typeof plans)[number]["id"], string> }} />
-      <p className="sellerStartFootnote">{french ? "Aucun abonnement n’est facturé depuis cette page. Vous créez d’abord votre compte et votre boutique, puis vous confirmez votre formule dans l’espace vendeur." : "No subscription is charged from this page. You first create your account and store, then confirm your plan in the seller workspace."}</p>
+      <p className="sellerStartFootnote">{french ? "Aucun paiement depuis cette page. L’inscription directe conduit au tableau de bord FREE ; les formules payantes restent facultatives." : "No payment from this page. Direct registration leads to the FREE dashboard; paid plans remain optional."}</p>
     </section>
     <MarketplaceFooter/>
   </main>;

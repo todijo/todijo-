@@ -6,8 +6,8 @@ import { sellerOnboardingDestination } from "../lib/seller-onboarding-flow";
 const source = (path: string) => readFileSync(path, "utf8");
 const annualPro = { plan: "pro", interval: "annual" } as const;
 
-test("new sellers start at plans while explicit intent enters canonical onboarding unchanged", () => {
-  assert.equal(sellerOnboardingDestination({ locale: "fr", intent: null, hasStore: false, hasDraft: false }), "/fr/sell#plans");
+test("new sellers start FREE setup while explicit intent enters canonical onboarding unchanged", () => {
+  assert.equal(sellerOnboardingDestination({ locale: "fr", intent: null, hasStore: false, hasDraft: false }), "/fr/seller/onboarding");
   assert.equal(sellerOnboardingDestination({ locale: "ku", intent: annualPro, hasStore: false, hasDraft: false }), "/ku/seller/onboarding?plan=pro&interval=annual");
 });
 
@@ -19,7 +19,8 @@ test("drafts and incomplete stores resume the one canonical onboarding route", (
 
 test("completed stores go to entitlement or dashboard state without changing intent", () => {
   assert.equal(sellerOnboardingDestination({ locale: "fr", intent: annualPro, hasStore: true, hasDraft: false, onboardingStatus: "PENDING_REVIEW", onboardingStep: 4, entitlementSource: "NONE" }), "/fr/seller/subscription?plan=pro&interval=annual");
-  for (const source of ["STRIPE", "ADMIN_GRANTED", "ADMIN_EXEMPT"] as const) assert.equal(sellerOnboardingDestination({ locale: "fr", intent: annualPro, hasStore: true, hasDraft: false, onboardingStatus: "VERIFIED", onboardingStep: 4, entitlementSource: source }), "/fr/dashboard");
+  assert.equal(sellerOnboardingDestination({locale:"fr",intent:null,hasStore:true,hasDraft:false,onboardingStatus:"VERIFIED",onboardingStep:4,entitlementSource:"NONE"}),"/fr/dashboard");
+  for (const source of ["STRIPE", "ADMIN_EXEMPT"] as const) assert.equal(sellerOnboardingDestination({ locale: "fr", intent: annualPro, hasStore: true, hasDraft: false, onboardingStatus: "VERIFIED", onboardingStep: 4, entitlementSource: source }), "/fr/dashboard");
 });
 
 test("legacy create-store is redirect-only and cannot create a competing store", () => {
@@ -51,7 +52,7 @@ test("redirect construction is localized, same-origin, and has no client redirec
   const helper = source("lib/seller-onboarding-flow.ts");
   assert.match(helper, /const root = `\/\$\{state\.locale\}`/);
   assert.doesNotMatch(helper, /next|returnTo|redirectTo|new URL/);
-  assert.doesNotMatch(helper, /interval: "monthly"|plan: "basic"/);
+  assert.doesNotMatch(helper, /interval: "monthly"|plan: "free"/);
 });
 
 test("existing activity restrictions and subscription authority stay unchanged", () => {

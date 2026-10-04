@@ -12,7 +12,7 @@ export function adminAccessStatus(input: {
 }) {
   const source = input.access.source === "STRIPE" ? "PAID_SUBSCRIPTION" as const
     : input.access.source === "ADMIN_GRANTED" ? "ADMIN_GRANT" as const
-    : input.access.source === "ADMIN_EXEMPT" ? "ADMIN_EXEMPT" as const : "NONE" as const;
+    : input.access.source === "ADMIN_EXEMPT" ? "ADMIN_EXEMPT" as const : input.access.source === "FREE" ? "FREE" as const : "NONE" as const;
   return {
     lifecycle: input.lifecycle, onboarding: input.onboarding,
     source, active: input.access.active,

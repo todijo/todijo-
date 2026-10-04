@@ -49,7 +49,7 @@ test("seller permission and connection lookup are scoped by authenticated store"
 });
 
 test("dropshipping requires PRO in addition to the existing Admin permission", async () => {
-  const plan = { current: "basic" };
+  const plan = { current: "free" };
   const db: any = { store: { findFirst: async () => ({ id: "store-a", dropshippingEnabled: true, owner: { role: "SELLER" }, subscription: { status: "ACTIVE", plan: plan.current,currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] }) } };
   await assert.rejects(() => requireSellerSupplierAccess(db, { userId: "seller-a" }), /DROPSHIPPING_PRO_PLAN_REQUIRED/);
   plan.current = "plus";

@@ -17,11 +17,11 @@ test("public product and store policy explicitly excludes TEST_DEMO catalog data
 
 test("homepage, search, directory, product detail and public counts share production visibility", () => {
   assert.match(source("app/page.tsx"), /publicProductAccessWhere/);
-  assert.match(source("app/page.tsx"), /products:\s*\{\s*some:\s*\{\s*status:\s*"PUBLISHED",\s*dataClass:\s*"PRODUCTION"/);
+  assert.match(source("app/page.tsx"), /products:\s*\{\s*some:\s*\{\s*status:\s*"PUBLISHED",\s*\.\.\.publicProductAccess/);
   assert.match(source("app/api/marketplace/products/route.ts"), /publicProductAccessWhere/);
   assert.match(source("app/product/[id]/page.tsx"), /publicProductAccessWhere/);
   assert.match(source("app/store/page.tsx"), /publicStoreAccessWhere/);
-  assert.match(source("app/store/page.tsx"), /dataClass:\s*"PRODUCTION"/);
+  assert.match(source("app/store/page.tsx"), /publicProductAccessWhere/);
   assert.match(source("app/sitemap.xml/route.ts"), /dataClass:\s*"PRODUCTION"/);
 });
 

@@ -1,4 +1,5 @@
-export const sellerPlanIds = ["basic", "plus", "pro"] as const;
+export const sellerPlanIds = ["free", "plus", "pro"] as const;
+export const paidSellerPlanIds = ["plus", "pro"] as const;
 export const sellerBillingIntervals = ["monthly", "annual"] as const;
 
 export type SellerPlanId = (typeof sellerPlanIds)[number];
@@ -16,13 +17,12 @@ export type SellerPlan = {
 };
 
 const planDefinitions: ReadonlyArray<Omit<SellerPlan, "priceIds">> = [
-  { id: "basic", name: "Basic", currency: "EUR", monthlyAmountMinor: 699, annualAmountMinor: 6710, productLimit: 10, dropshipping: false },
+  { id: "free", name: "FREE", currency: "EUR", monthlyAmountMinor: 0, annualAmountMinor: 0, productLimit: 5, dropshipping: false },
   { id: "plus", name: "Plus", currency: "EUR", monthlyAmountMinor: 1499, annualAmountMinor: 14390, productLimit: 50, dropshipping: false },
   { id: "pro", name: "Pro", currency: "EUR", monthlyAmountMinor: 2699, annualAmountMinor: 25910, productLimit: null, dropshipping: true },
 ];
 
-const priceEnvironmentKeys: Record<SellerPlanId, Record<SellerBillingInterval, string>> = {
-  basic: { monthly: "STRIPE_SELLER_BASIC_MONTHLY_PRICE_ID", annual: "STRIPE_SELLER_BASIC_ANNUAL_PRICE_ID" },
+const priceEnvironmentKeys: Record<Exclude<SellerPlanId, "free">, Record<SellerBillingInterval, string>> = {
   plus: { monthly: "STRIPE_SELLER_PLUS_MONTHLY_PRICE_ID", annual: "STRIPE_SELLER_PLUS_ANNUAL_PRICE_ID" },
   pro: { monthly: "STRIPE_SELLER_PRO_MONTHLY_PRICE_ID", annual: "STRIPE_SELLER_PRO_ANNUAL_PRICE_ID" },
 };
@@ -35,18 +35,22 @@ export function isSellerBillingInterval(value: unknown): value is SellerBillingI
   return typeof value === "string" && sellerBillingIntervals.includes(value as SellerBillingInterval);
 }
 
+export function isPaidSellerPlanId(value: unknown): value is Exclude<SellerPlanId, "free"> {
+  return value === "plus" || value === "pro";
+}
+
 export function sellerPlans(): SellerPlan[] {
   return planDefinitions.map((plan) => ({
     ...plan,
     priceIds: {
-      monthly: process.env[priceEnvironmentKeys[plan.id].monthly] ?? "",
-      annual: process.env[priceEnvironmentKeys[plan.id].annual] ?? "",
+      monthly: plan.id === "free" ? "" : process.env[priceEnvironmentKeys[plan.id].monthly] ?? "",
+      annual: plan.id === "free" ? "" : process.env[priceEnvironmentKeys[plan.id].annual] ?? "",
     },
   }));
 }
 
 export function configuredSellerPlan(planId: unknown, interval: unknown) {
-  if (!isSellerPlanId(planId) || !isSellerBillingInterval(interval)) return null;
+  if (!isPaidSellerPlanId(planId) || !isSellerBillingInterval(interval)) return null;
   const plan = sellerPlans().find((candidate) => candidate.id === planId);
   const priceId = plan?.priceIds[interval] ?? "";
   if (!plan || !/^price_[A-Za-z0-9]+$/.test(priceId)) return null;
@@ -63,7 +67,7 @@ export function configuredSellerPlanForPriceId(priceId: unknown) {
 
 export function canonicalActiveSellerPlanId(subscription: { status: string; plan: string;currentPeriodEnd?:Date|null } | null | undefined,now=new Date()) {
   if (!subscription || !["ACTIVE", "TRIALING"].includes(subscription.status)||!subscription.currentPeriodEnd||subscription.currentPeriodEnd<=now) return null;
-  return isSellerPlanId(subscription.plan) ? subscription.plan : null;
+  return isPaidSellerPlanId(subscription.plan) ? subscription.plan : null;
 }
 
 export function sellerPlanEntitlement(planId: unknown) {

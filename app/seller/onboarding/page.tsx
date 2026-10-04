@@ -17,12 +17,11 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
   const [locale, query, session] = await Promise.all([getLocale(), searchParams, readSession()]);
   const intent = explicitSellerRegistrationIntent(query.plan, query.interval);
   if (!session) {
-    if (!intent) redirect(`/${locale}/sell#plans`);
-    redirect(`/${locale}/login?next=${encodeURIComponent(sellerOnboardingPath(locale, false, intent))}`);
+    redirect(`/${locale}/login?next=${encodeURIComponent(intent ? sellerOnboardingPath(locale, false, intent) : `/${locale}/seller/onboarding`)}`);
   }
   if(session.role==="ADMIN") redirect(`/${locale}/dashboard`);
   const [user, buyerAddress] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.userId }, select: { sellerOnboardingDraft:true, store: { select: { name: true, country: true, city: true, phone: true, businessAddress: true, businessPostalCode: true, sellerType: true, sellerLegalForm: true, companySubtype: true, businessRegistrationId: true, legalBusinessName: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } } } }),
+    prisma.user.findUnique({ where: { id: session.userId }, select: { sellerOnboardingDraft:true, store: { select: { name: true, country: true, city: true, phone: true, businessAddress: true, businessPostalCode: true, sellerType: true, sellerLegalForm: true, companySubtype: true, businessRegistrationId: true, legalBusinessName: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, plan: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } } } }),
     defaultBuyerAddress(prisma, session.userId),
   ]);
   if (!user) redirect(`/${locale}/login`);

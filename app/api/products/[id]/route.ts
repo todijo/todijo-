@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
-import { requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
+import { lockSellerProductQuota, requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
 import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
@@ -61,7 +61,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (status === "PUBLISHED" && !product.complianceDeclaredAt && body.complianceDeclaration !== true) return NextResponse.json({ error: "COMPLIANCE_DECLARATION_REQUIRED" }, { status: 400 });
     if(status==="PUBLISHED"&&product.supplierLink?.classificationStatus==="QUARANTINED")return NextResponse.json({error:"SUPPLIER_CLASSIFICATION_REVIEW_REQUIRED"},{status:400});
     if (status === "PUBLISHED") {
-      await requireStorePublishingAccess(prisma, session.userId,product.storeId,"PRODUCT_PUBLISH");
+      await requireStorePublishingAccess(prisma, session.userId,product.storeId,"PRODUCT_PUBLISH", id);
       assertProductPublicationEligible(product);
     }
     const price = Number(body.price);
@@ -81,6 +81,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) return NextResponse.json({ error: "Le stock est invalide." }, { status: 400 });
 
     await prisma.$transaction(async (tx) => {
+      await lockSellerProductQuota(tx, product.storeId);
+      if (status === "PUBLISHED") await requireStorePublishingAccess(tx, session.userId, product.storeId, "PRODUCT_PUBLISH", id);
       const currentSupplierLink = await tx.supplierProductLink.findUnique({ where: { productId: id }, select: { id: true } });
       await tx.product.update({ where: { id }, data: {
         name, description, sourceLocale:name!==product.name||description!==product.description?contentSourceLocale(request):product.sourceLocale, category, condition, status,

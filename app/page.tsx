@@ -12,6 +12,7 @@ import { getLocale } from "next-intl/server";
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 import { BUYER_PRODUCT_PAGE_SIZE, buyerProductPage, buyerProductPageCount } from "@/lib/buyer-marketplace-pagination";
+import { proHomepageDiscovery } from "@/lib/pro-homepage-discovery";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -158,11 +159,11 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       _sum: { quantity: true }, orderBy: { _sum: { quantity: "desc" } }, take: 8,
     }),
     prisma.store.findMany({
-      where: { ...publicStoreAccess, products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } },
+      where: { ...publicStoreAccess, products: { some: { status: "PUBLISHED", ...publicProductAccess } } },
       orderBy: { updatedAt: "desc" },
       take: 5,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true,
-        products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
+        products: { where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
     prisma.product.findMany({
@@ -188,6 +189,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED", ...publicProductAccess }, select: productSelect }) : [];
   const bestSellerById = new Map(bestSellerRows.map((product) => [product.id, product]));
   const bestSellers = bestSellerIds.map((id) => bestSellerById.get(id)).filter((product): product is ProductRow => Boolean(product)).map(product=>serializeProduct(product,locale));
+  const proDiscovery = resultsOnly ? [] : await proHomepageDiscovery(prisma, productSelect, now);
   const products = rows.map(product=>serializeProduct(product,locale));
   const isColorName = (name: string) => /^(color|colour|couleur|farbe|لون|ڕەنگ)$/i.test(name.trim());
   const isSizeName = (name: string) => /^(size|taille|größe|groesse|قەبارە)$/i.test(name.trim());
@@ -209,6 +211,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       heroProducts={heroRows.map(product=>serializeProduct(product,locale))}
       newArrivals={newArrivalRows.map(product=>serializeProduct(product,locale))}
       bestSellers={bestSellers}
+      proDiscovery={proDiscovery.map(product => serializeProduct(product, locale))}
       stores={storeRows.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}

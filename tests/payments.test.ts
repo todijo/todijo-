@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { Prisma } from "@prisma/client";
 
-process.env.STRIPE_SELLER_BASIC_MONTHLY_PRICE_ID ??= "price_basic";
+process.env.STRIPE_SELLER_PLUS_MONTHLY_PRICE_ID ??= "price_plus";
 import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckoutGroups, processStripeEvent } from "../lib/payments";
 import { assertStripeCheckoutSessionMode, assertStripeWebhookMode, configuredStripeMode, stripeCheckoutSessionMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 const readyConnectedAccount = async (id = "acct_seller") => ({ id, object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
-const activeCommercialEntitlement:any=async()=>({active:true,plan:"basic",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")});
+const activeCommercialEntitlement:any=async()=>({active:true,plan:"plus",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")});
 const connectDeps = { retrieveConnectedAccount: readyConnectedAccount,commercialEntitlement:activeCommercialEntitlement };
 
 function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
@@ -24,7 +24,7 @@ function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROF
     },
     product: { findMany: async () => [product] },
     store: { findUniqueOrThrow: async () => ({ status:"ACTIVE",businessId:"business_1",vatStatus: "REGISTERED" }) },
-    sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store_1",subscription:{status:"ACTIVE",plan:"basic",currentPeriodEnd:new Date("2099-01-01T00:00:00Z")},accessGrants:[]}})},
+    sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store_1",subscription:{status:"ACTIVE",plan:"plus",currentPeriodEnd:new Date("2099-01-01T00:00:00Z")},accessGrants:[]}})},
     user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com", firstName: "Buyer", lastName: "Example" }), update: async () => ({}) },
   };
   return { db, product, getCreates: () => creates };
@@ -33,6 +33,7 @@ function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROF
 test("successful payment marks order paid and decrements stock once", async () => {
   const state = { stock: 2, status: "PENDING" };
   const tx: any = {
+    $queryRaw: async () => [],
     stripeWebhookEvent: { create: async () => ({}) },
     order: {
       findUnique: async () => ({ id: "order_1", buyerId: "buyer_1", storeIdSnapshot: "store_1", status: state.status, total: new Prisma.Decimal("25.00"), currency: "EUR", stripeCheckoutSessionId: "cs_1", items: [{ productId: "prod_1", variantId: null, quantity: 2 }] }),
@@ -71,6 +72,14 @@ test("no-plan seller cannot checkout a stale published product and no order or S
   const fixture=checkoutDb();let stripeCalls=0;
   await assert.rejects(()=>createCheckout(fixture.db,"buyer_1","request_no_plan",[{productId:"prod_1",quantity:1}],async()=>{stripeCalls++;return{id:"cs_forbidden",url:"https://stripe.test/forbidden"}},"FR",undefined,{...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",billingStoreId:"store_1",active:false,plan:null,source:"NONE",expiresAt:null})}),(error:unknown)=>error instanceof CheckoutError&&error.message==="SELLER_SUBSCRIPTION_INACTIVE"&&error.status===409);
   assert.equal(fixture.getCreates(),0);assert.equal(stripeCalls,0);
+});
+
+for (const allowed of [true, false]) test(`FREE checkout ${allowed ? "allows its five visible products" : "rejects excess products before order or Stripe creation"}`, async()=>{
+  const fixture=checkoutDb(); let stripeCalls=0, checked=false;
+  fixture.db.product.count=async({where}:any)=>{checked=true;assert.deepEqual(where.freeVisibilityPosition,{lte:5});assert.equal(where.removedAt,null);return allowed?1:0};
+  const run=()=>createCheckout(fixture.db,"buyer_1","request_free_"+allowed,[{productId:"prod_1",quantity:1}],async()=>{stripeCalls++;return{id:"cs_free",url:"https://checkout.stripe.test/free"}},"FR",undefined,{...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",billingStoreId:"store_1",active:true,plan:"free",source:"FREE",expiresAt:null})});
+  if(allowed)await run();else await assert.rejects(run,(e:unknown)=>e instanceof CheckoutError&&e.message==="SELLER_PRODUCT_LIMIT_REACHED");
+  assert.equal(checked,true);assert.equal(stripeCalls,allowed?1:0);assert.equal(fixture.getCreates(),allowed?1:0);
 });
 
 test("active Admin commercial entitlement remains accepted at checkout",async()=>{
@@ -316,9 +325,10 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
   let storeUpdate: any;
   let subscriptionUpsert: any;
   const tx: any = {
+    $queryRaw: async () => [],
     stripeWebhookEvent: { create: async () => ({}) },
     sellerSubscription: {
-      findFirst: async () => ({ storeId: "store_1", plan: "basic", stripePriceId: "price_basic" }),
+      findFirst: async () => ({ storeId: "store_1", plan: "plus", stripePriceId: "price_plus" }),
       upsert: async (args: any) => { subscriptionUpsert = args; return {}; },
     },
     store: {
@@ -331,14 +341,14 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
   const event: StripeEvent = {
     id: "evt_subscription_checkout",
     type: "checkout.session.completed",
-    data: { object: { id: "cs_sub", mode: "subscription", customer: "cus_1", subscription: "sub_1", payment_intent: null, payment_status: "paid", client_reference_id: "store_1", metadata: { kind: "seller_subscription", storeId: "store_1", userId: "seller_1", plan: "basic" } } },
+    data: { object: { id: "cs_sub", mode: "subscription", customer: "cus_1", subscription: "sub_1", payment_intent: null, payment_status: "paid", client_reference_id: "store_1", metadata: { kind: "seller_subscription", storeId: "store_1", userId: "seller_1", plan: "plus" } } },
   };
-  const retrieve = async () => ({ id: "sub_1", object: "subscription" as const, customer: "cus_1", status: "active", metadata: { storeId: "store_1", plan: "basic" }, items: { data: [{ price: { id: "price_basic" }, current_period_end: 1_800_000_000 }] } });
+  const retrieve = async () => ({ id: "sub_1", object: "subscription" as const, customer: "cus_1", status: "active", metadata: { storeId: "store_1", plan: "plus" }, items: { data: [{ price: { id: "price_plus" }, current_period_end: 1_800_000_000 }] } });
   assert.deepEqual(await processStripeEvent(db, event, retrieve), { subscriptionCheckoutCompleted: true, storeId: "store_1", status: "ACTIVE" });
   assert.equal(storeUpdate.data.stripeCustomerId, "cus_1");
   assert.equal(storeUpdate.data.status, "ACTIVE");
   assert.equal(subscriptionUpsert.update.stripeSubscriptionId, "sub_1");
-  assert.equal(subscriptionUpsert.update.stripePriceId, "price_basic");
+  assert.equal(subscriptionUpsert.update.stripePriceId, "price_plus");
   assert.equal(subscriptionUpsert.update.status, "ACTIVE");
   assert.equal(subscriptionUpsert.update.currentPeriodEnd.toISOString(), new Date(1_800_000_000 * 1000).toISOString());
 });
@@ -346,9 +356,10 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
 test("replayed subscription Checkout repairs an incomplete record instead of stopping as duplicate", async () => {
   let updatedStatus: string | undefined;
   const tx: any = {
+    $queryRaw: async () => [],
     stripeWebhookEvent: { create: async () => { throw new Error("event marker must not be recreated"); } },
     sellerSubscription: {
-      findFirst: async () => ({ storeId: "store_1", plan: "basic", stripePriceId: "price_basic" }),
+      findFirst: async () => ({ storeId: "store_1", plan: "plus", stripePriceId: "price_plus" }),
       upsert: async (args: any) => { updatedStatus = args.update.status; return { id: "local_sub", storeId: "store_1", ...args.update }; },
     },
     store: {
@@ -364,9 +375,9 @@ test("replayed subscription Checkout repairs an incomplete record instead of sto
   const event: StripeEvent = {
     id: "evt_replay",
     type: "checkout.session.completed",
-    data: { object: { id: "cs_replay", mode: "subscription", customer: "cus_1", subscription: "sub_1", payment_intent: null, payment_status: "paid", client_reference_id: "store_1", metadata: { kind: "seller_subscription", storeId: "store_1", userId: "seller_1", plan: "basic" } } },
+    data: { object: { id: "cs_replay", mode: "subscription", customer: "cus_1", subscription: "sub_1", payment_intent: null, payment_status: "paid", client_reference_id: "store_1", metadata: { kind: "seller_subscription", storeId: "store_1", userId: "seller_1", plan: "plus" } } },
   };
-  const retrieve = async () => ({ id: "sub_1", object: "subscription" as const, customer: "cus_1", status: "active", metadata: { storeId: "store_1" }, items: { data: [{ price: { id: "price_basic" }, current_period_end: 1_800_000_000 }] } });
+  const retrieve = async () => ({ id: "sub_1", object: "subscription" as const, customer: "cus_1", status: "active", metadata: { storeId: "store_1" }, items: { data: [{ price: { id: "price_plus" }, current_period_end: 1_800_000_000 }] } });
   const result = await processStripeEvent(db, event, retrieve);
   assert.equal("status" in result ? result.status : undefined, "ACTIVE");
   assert.equal(updatedStatus, "ACTIVE");

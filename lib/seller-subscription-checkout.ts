@@ -1,6 +1,6 @@
 import "server-only";
 import {Prisma,type PrismaClient} from "@prisma/client";
-import {sellerPlanEntitlement,type SellerBillingInterval,type SellerPlanId} from "./seller-plans";
+import {isPaidSellerPlanId,type SellerBillingInterval,type SellerPlanId} from "./seller-plans";
 import {createSellerSubscriptionCheckout} from "./stripe";
 
 type CheckoutCreator=typeof createSellerSubscriptionCheckout;
@@ -15,16 +15,18 @@ export function sellerSubscriptionCheckoutIdempotencyKey(storeId:string,priceId:
 }
 
 export function hasCurrentSellerSubscriptionEntitlement(subscription:{status:string;plan:string;currentPeriodEnd:Date|null}|null,now=new Date()){
-  return Boolean(subscription&&["ACTIVE","TRIALING"].includes(subscription.status)&&sellerPlanEntitlement(subscription.plan)&&subscription.currentPeriodEnd&&subscription.currentPeriodEnd>now);
+  return Boolean(subscription&&["ACTIVE","TRIALING"].includes(subscription.status)&&isPaidSellerPlanId(subscription.plan)&&subscription.currentPeriodEnd&&subscription.currentPeriodEnd>now);
 }
 
 export async function createOrReuseSellerSubscriptionCheckout(input:{
   db:PrismaClient;storeId:string;userId:string;customerId:string;locale:string;plan:IntendedPlan;now?:Date;createCheckout?:CheckoutCreator;
 }){
   const now=input.now??new Date(),createCheckout=input.createCheckout??createSellerSubscriptionCheckout;
+  if (!isPaidSellerPlanId(input.plan.id)) throw new SellerSubscriptionCheckoutError("INVALID_PLAN", 400);
   return input.db.$transaction(async(tx)=>{
     await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`seller-subscription-checkout:${input.storeId}`}, 0))::text`);
     let subscription=await tx.sellerSubscription.findUnique({where:{storeId:input.storeId}});
+    if(subscription?.stripeSubscriptionId && ["ACTIVE", "TRIALING", "PAST_DUE", "UNPAID"].includes(subscription.status) && !isPaidSellerPlanId(subscription.plan)) throw new SellerSubscriptionCheckoutError("SELLER_SUBSCRIPTION_RECONCILIATION_REQUIRED");
     if(hasCurrentSellerSubscriptionEntitlement(subscription,now))throw new SellerSubscriptionCheckoutError("SELLER_SUBSCRIPTION_ALREADY_ACTIVE");
 
     if(subscription?.stripeCheckoutSessionId&&subscription.stripeCheckoutUrl&&subscription.stripeCheckoutExpiresAt&&subscription.stripeCheckoutExpiresAt>now){

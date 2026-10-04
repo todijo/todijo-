@@ -16,5 +16,5 @@ export default function AdminManagedPlanControl({ storeId, plan, version, source
       router.refresh();
     } catch { setError(true); } finally { setBusy(false); }
   }
-  return <div><label>{copy.plan}<select value={selected} disabled={busy} onChange={event => setSelected(event.target.value)}>{["basic", "plus", "pro"].map(value => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label><button type="button" disabled={busy || !selected || selected === plan} onClick={() => void change()}>{busy ? copy.saving : copy.change}</button>{error && <small role="alert">{copy.error}</small>}</div>;
+  return <div><label>{copy.plan}<select value={selected} disabled={busy} onChange={event => setSelected(event.target.value)}>{["free", "plus", "pro"].map(value => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label><button type="button" disabled={busy || !selected || selected === plan} onClick={() => void change()}>{busy ? copy.saving : copy.change}</button>{error && <small role="alert">{copy.error}</small>}</div>;
 }

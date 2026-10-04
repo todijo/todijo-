@@ -8,6 +8,7 @@ import { isSellerPlanId } from "./seller-plans";
 import { resolveSellerCommercialAccess } from "./seller-commercial-access";
 import { ensureSellerBusiness } from "./seller-business";
 import { lockManagedOwner } from "./admin-store-owner-eligibility";
+import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
 type Db = PrismaClient | Prisma.TransactionClient;
 const select = {
   id: true, businessId: true, owner: { select: { id: true, role: true } },
@@ -24,7 +25,7 @@ export async function readManagedCommercialState(db: Db, storeId: string, now = 
   const target = targetId === requested.id ? requested : await db.store.findUnique({ where: { id: targetId }, select });
   if (!target || target.businessId !== requested.businessId || target.owner.id !== requested.owner.id) throw new AdminAccessError("Business billing store changed.", 409, "TARGET_CHANGED");
   const access = resolveSellerCommercialAccess({ role: target.owner.role, subscription: target.subscription, accessGrants: target.accessGrants }, now);
-  // Include the durable audit revision so BASIC → PRO → BASIC cannot revive an old UI token.
+  // Include the durable audit revision so FREE → PRO → FREE cannot revive an old UI token.
   const revision = target.businessId ? await db.sellerBusinessAuditEvent.count({ where: { businessId: target.businessId, storeId: target.id, action: "ADMIN_GRANT_PLAN_CHANGED" } }) : 0;
   const version = createHash("sha256").update(JSON.stringify({ revision, targetId, businessId: target.businessId, business: target.business, owner: target.owner, subscription: target.subscription, grants: target.accessGrants })).digest("hex");
   return { target, access, version };
@@ -71,6 +72,7 @@ export async function changeManagedGrantPlan(db: PrismaClient, session: { userId
       if (changed.count !== 1) throw new AdminAccessError("Grant changed concurrently.", 409, "GRANT_STATE_CHANGED");
     }
     await appendSellerBusinessAudit(tx, { businessId, storeId: state.target.id, actorId: admin.id, category: "ENTITLEMENT", action: "ADMIN_GRANT_PLAN_CHANGED", targetType: "STORE_ACCESS_GRANT", targetId: active[0].id, metadata: { previousEffectiveTier: state.access.plan, previous, plan, reason: input.reason?.trim().slice(0,500) ?? "", expiryPreserved: true, futureTiersAligned: true } });
+    if (plan !== "pro") await enforceSellerPublicationCapacity(tx, state.target.id, businessId, now);
     return { plan, expiresAt: active[0].endsAt!.toISOString() };
   }, { isolationLevel: "Serializable" });
 }

@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma, type PrismaClient, type SellerSubscriptionChange } from "@prisma/client";
-import { configuredSellerPlan, configuredSellerPlanForPriceId, sellerPlanIds } from "./seller-plans";
+import { configuredSellerPlan, configuredSellerPlanForPriceId, isSellerBillingInterval, sellerPlanIds } from "./seller-plans";
 import { hasCurrentSellerSubscriptionEntitlement } from "./seller-subscription-checkout";
 import { configureSellerSubscriptionSchedule, createSellerSubscriptionSchedule, releaseSellerSubscriptionSchedule, retrieveSellerStripeSubscription, retrieveSellerSubscriptionSchedule, retrieveStripeInvoice, StripeApiError, upgradeSellerStripeSubscription, type StripeSubscription, type StripeEvent, type StripeInvoice, type StripeSubscriptionSchedule } from "./stripe";
 
@@ -38,10 +38,11 @@ function assertSource(subscription: StripeSubscription, input: { stripeSubscript
 /** PREPARED is committed before any provider mutation. All writers share the Checkout lock. */
 export async function requestSellerSubscriptionChange(input: { db: PrismaClient; storeId: string; userId: string; planId?: unknown; interval?: unknown; cancelSchedule?: boolean; now?: Date; providers?: Providers }) {
   const now = input.now ?? new Date(), providers = input.providers ?? subscriptionChangeProviders;
-  const target = input.cancelSchedule ? null : configuredSellerPlan(input.planId, input.interval);
+  const toFree = input.planId === "free" && (input.interval === undefined || isSellerBillingInterval(input.interval));
+  const target = input.cancelSchedule ? null : toFree ? { id: "free" as const, interval: isSellerBillingInterval(input.interval) ? input.interval : "monthly" as const, priceId: "todijo_free" } : configuredSellerPlan(input.planId, input.interval);
   if (!input.cancelSchedule && !target) throw new SellerSubscriptionChangeError("INVALID_PLAN", 400);
   const targetAuthority = target ? configuredSellerPlanForPriceId(target.priceId) : null;
-  if (target && (targetAuthority?.plan !== target.id || targetAuthority.billingInterval !== target.interval)) throw new SellerSubscriptionChangeError("INVALID_PLAN", 400);
+  if (target && !toFree && (targetAuthority?.plan !== target.id || targetAuthority.billingInterval !== target.interval)) throw new SellerSubscriptionChangeError("INVALID_PLAN", 400);
   const prepared = await input.db.$transaction(async tx => {
     await lockSellerSubscription(tx, input.storeId);
     const store = await tx.store.findUnique({ where: { id: input.storeId }, select: { ownerId: true, stripeCustomerId: true } });
@@ -154,7 +155,7 @@ export async function executeSellerSubscriptionChange(db: PrismaClient, changeId
     const currentPhase = schedule.phases?.find(phase => phase.start_date === schedule.current_phase!.start_date);
     if (!currentPhase || currentPhase.items.length !== 1 || stripeId(currentPhase.items[0].price) !== change.sourcePriceId || currentPhase.items[0].quantity !== 1 || (Array.isArray(currentPhase.add_invoice_items) && currentPhase.add_invoice_items.length > 0)) throw new SellerSubscriptionChangeError("UNSUPPORTED_SCHEDULE_CONFIGURATION");
     await providers.configureSchedule({ scheduleId, changeId: change.id, start: new Date(schedule.current_phase.start_date * 1000), boundary: change.sourcePeriodEnd,
-      sourcePriceId: change.sourcePriceId, targetPriceId: change.targetPriceId, interval: change.targetBillingInterval as "monthly" | "annual", idempotencyKey: subscriptionChangeKey(change.id, "configure-schedule"), currentPhase });
+      sourcePriceId: change.sourcePriceId, targetPriceId: change.targetPriceId, interval: change.targetBillingInterval as "monthly" | "annual", idempotencyKey: subscriptionChangeKey(change.id, "configure-schedule"), currentPhase, ...(change.targetPlan === "free" ? { toFree: true } : {}) });
     await tx.sellerSubscriptionChange.updateMany({ where: { sellerSubscriptionId: change.sellerSubscriptionId, status: "SCHEDULED" }, data: { status: "CANCELED" } });
     const result = await tx.sellerSubscriptionChange.update({ where: { id: change.id }, data: { status: "SCHEDULED", stripeScheduleId: scheduleId } });
     await tx.sellerSubscription.update({ where: { id: change.sellerSubscriptionId }, data: { scheduledPlan: change.targetPlan, scheduledBillingInterval: change.targetBillingInterval, scheduledChangeAt: change.sourcePeriodEnd } });
@@ -175,7 +176,16 @@ export async function processSellerSubscriptionTransitionEvent(db: PrismaClient,
   let subscriptionId: string | undefined;
   if (isSubscription) subscriptionId = (event.data.object as StripeSubscription).id;
   if (isInvoice) { const invoice = event.data.object as StripeInvoice; subscriptionId = invoice.subscription ?? invoice.parent?.subscription_details?.subscription ?? undefined; }
-  if (isSchedule) { const schedule = await providers.schedule((event.data.object as StripeSubscriptionSchedule).id); subscriptionId = stripeId(schedule.subscription) ?? schedule.released_subscription ?? undefined; }
+  if (isSchedule) {
+    const schedule = await providers.schedule((event.data.object as StripeSubscriptionSchedule).id);
+    subscriptionId = stripeId(schedule.subscription) ?? schedule.released_subscription ?? undefined;
+    // Completed cancellation schedules may no longer expose an attached subscription.
+    // Resolve only our durable, metadata-correlated current FREE transition.
+    if (!subscriptionId && schedule.status === "completed" && schedule.end_behavior === "cancel" && schedule.metadata?.todijoChangeId) {
+      const change = await db.sellerSubscriptionChange.findFirst({ where: { id: schedule.metadata.todijoChangeId, stripeScheduleId: schedule.id, targetPlan: "free", status: { in: ["PREPARED", "SCHEDULED", "APPLIED"] } } });
+      subscriptionId = change?.stripeSubscriptionId;
+    }
+  }
   if (!subscriptionId) return null;
   const local = await db.sellerSubscription.findUnique({ where: { stripeSubscriptionId: subscriptionId } });
   if (!local) return null;
@@ -213,7 +223,9 @@ export async function reconcileSellerSubscriptionChanges(tx: Tx, live: StripeSub
       }
     } else if (change.stripeScheduleId) {
       const schedule = await providers.schedule(change.stripeScheduleId);
-      if ((stripeId(schedule.subscription) ?? schedule.released_subscription) !== live.id) continue;
+      const linkedSubscription = stripeId(schedule.subscription) ?? schedule.released_subscription;
+      const completedFree = !linkedSubscription && schedule.id === change.stripeScheduleId && schedule.metadata?.todijoChangeId === change.id && schedule.status === "completed" && schedule.end_behavior === "cancel" && change.targetPlan === "free" && change.stripeSubscriptionId === live.id && live.status === "canceled";
+      if (linkedSubscription !== live.id && !completedFree) continue;
       if (change.operation === "CANCEL_SCHEDULE") {
         if (schedule.status === "released" && !live.schedule) {
           await tx.sellerSubscriptionChange.updateMany({ where: { sellerSubscriptionId: local.id, status: "SCHEDULED", stripeScheduleId: change.stripeScheduleId }, data: { status: "CANCELED" } });
@@ -224,9 +236,13 @@ export async function reconcileSellerSubscriptionChanges(tx: Tx, live: StripeSub
       }
       // Replaced history never owns today's UI summary; only current SCHEDULED row is considered.
       if (schedule.metadata?.todijoChangeId !== change.id) continue;
-      const applied = change.sourcePeriodEnd <= now && live.items?.data?.[0]?.price?.id === change.targetPriceId && (periodStart(live) ?? 0) * 1000 >= change.sourcePeriodEnd.getTime();
+      const applied = change.sourcePeriodEnd <= now && (change.targetPlan === "free"
+        ? schedule.status === "completed" && live.status === "canceled"
+        : live.items?.data?.[0]?.price?.id === change.targetPriceId && (periodStart(live) ?? 0) * 1000 >= change.sourcePeriodEnd.getTime());
       if (change.status === "PREPARED") {
-        const configured = schedule.phases?.some(phase => phase.start_date * 1000 === change.sourcePeriodEnd.getTime() && stripeId(phase.items[0]?.price) === change.targetPriceId);
+        const configured = change.targetPlan === "free"
+          ? schedule.end_behavior === "cancel" && schedule.phases?.length === 1 && (schedule.phases[0].end_date ?? 0) * 1000 === change.sourcePeriodEnd.getTime() && stripeId(schedule.phases[0].items[0]?.price) === change.sourcePriceId
+          : schedule.phases?.some(phase => phase.start_date * 1000 === change.sourcePeriodEnd.getTime() && stripeId(phase.items[0]?.price) === change.targetPriceId);
         if (!configured && !applied) continue;
         await tx.sellerSubscriptionChange.updateMany({ where: { sellerSubscriptionId: local.id, status: "SCHEDULED", id: { not: change.id } }, data: { status: "CANCELED" } });
         if (!applied && schedule.status === "active") {

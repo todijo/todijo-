@@ -12,7 +12,7 @@ const productRoute = fs.readFileSync("app/api/products/route.ts", "utf8");
 const subscriptionPlans = fs.readFileSync("app/seller/subscription/SubscriptionPlans.tsx", "utf8");
 
 test("an admin bypasses a nominal 50-product quota without pretending to have a paid plan", () => {
-  assert.deepEqual(sellerProductQuota({ role: "ADMIN", plan: "basic", productCount: 264 }), { productLimit: null, blocked: false });
+  assert.deepEqual(sellerProductQuota({ role: "ADMIN", plan: "free", productCount: 264 }), { productLimit: null, blocked: false });
   assert.match(newProductPage, /owner: \{ select: \{ firstName: true, lastName: true, role: true \} \}/);
   assert.match(newProductPage, /adminUnlimitedUsage/);
 });
@@ -30,16 +30,16 @@ test("admin entitlement and subscription copy covers every supported locale with
 });
 
 test("ordinary seller product limits remain enforced", () => {
-  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 9 }), { productLimit: 10, blocked: false });
-  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 10 }), { productLimit: 10, blocked: true });
-  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "basic", productCount: 264 }), { productLimit: 10, blocked: true });
+  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "free", productCount: 4 }), { productLimit: 5, blocked: false });
+  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "free", productCount: 5 }), { productLimit: 5, blocked: true });
+  assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "free", productCount: 264 }), { productLimit: 5, blocked: true });
   assert.deepEqual(sellerProductQuota({ role: "SELLER", plan: "pro", productCount: 264 }), { productLimit: null, blocked: false });
 });
 
 function entitlementDb(role: "ADMIN" | "SELLER", productCount: number) {
   return {
     user: { findUnique: async () => ({ sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null }) },
-    store: { findFirst: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2099-01-01T00:00:00Z"), plan: "basic" }, accessGrants: [], _count: { products: productCount } }) },
+    store: { findFirst: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2099-01-01T00:00:00Z"), plan: "free" }, accessGrants: [], _count: { products: productCount } }) },
   };
 }
 
@@ -57,12 +57,12 @@ test("draft and published creation share the database-authoritative quota gate",
 
 test("only the canonical active paid plan is active", () => {
   const end=new Date("2026-02-01T00:00:00Z"),now=new Date("2026-01-01T00:00:00Z");
-  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "basic",currentPeriodEnd:end },now), "basic");
+  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "free",currentPeriodEnd:end },now), null);
   assert.equal(canonicalActiveSellerPlanId({ status: "TRIALING", plan: "pro",currentPeriodEnd:end },now), "pro");
-  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "basic",currentPeriodEnd:now },now), null);
-  assert.equal(canonicalActiveSellerPlanId({ status: "PAST_DUE", plan: "basic" }), null);
+  assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "free",currentPeriodEnd:now },now), null);
+  assert.equal(canonicalActiveSellerPlanId({ status: "PAST_DUE", plan: "free" }), null);
   assert.equal(canonicalActiveSellerPlanId({ status: "ACTIVE", plan: "invented-admin-plan" }), null);
-  assert.match(subscriptionPlans, /const isActive=activePlanId===plan\.id/);
+  assert.match(subscriptionPlans, /const isActive\s*=\s*activePlanId\s*===\s*plan\.id/);
   assert.doesNotMatch(subscriptionPlans, /active \? "Subscription active"/);
 });
 

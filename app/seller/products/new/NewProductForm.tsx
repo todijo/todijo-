@@ -19,6 +19,7 @@ import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type Shipping
 import {resolveProductPriceInput} from "@/lib/product-price-input";
 import {isLocale} from "@/i18n/config";
 import {loyaltyMessages} from "@/i18n/loyalty";
+import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="" }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string }) {
   const router = useRouter();
@@ -119,8 +120,8 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}),
       }),
     });
-    const data = await response.json() as { error?: string; product?: { id?: string } };
-    if (!response.ok) { const text = data.error ?? t("errorGeneric"); setMessage(text); showToast({ message: text, tone: "error" }); setSubmitting(false); submitLock.current = false; return; }
+    const data = await response.json() as { error?: string; code?: string; product?: { id?: string } };
+    if (!response.ok) { const text = data.code === "SELLER_PRODUCT_LIMIT_REACHED" && productLimit === 5 ? sellerFreeModelCopy(requestedLocale).quota : data.error ?? t("errorGeneric"); setMessage(text); showToast({ message: text, tone: "error" }); setSubmitting(false); submitLock.current = false; return; }
     if (status === "DRAFT") { router.push(data.product?.id ? `/seller/products/${data.product.id}/edit` : "/seller/products"); router.refresh(); return; }
     setImages([]); setVariantsEnabled(false); setVariantsInitialized(false); setVariantDraft({ options: [], generate: true, variants: [], generated: false }); setVariantImages([]);
     setBasePrice(""); setProductStock("1"); setUploading(false); setStep(0); setBlockers([]); setBlockersReady(false); setMessage(t("productPublishedSuccess")); showToast({ message: t("productPublishedSuccess"), tone: "success" }); setPublished(true); setResetGeneration((value) => value + 1);

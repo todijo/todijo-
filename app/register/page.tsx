@@ -10,7 +10,6 @@ import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/se
 export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ role?: string; plan?: string; interval?: string }> }) {
   const [session, locale, query] = await Promise.all([readSession(), getLocale(), searchParams]);
   const intent = query.role === "seller" ? explicitSellerRegistrationIntent(query.plan, query.interval) : null;
-  if (query.role === "seller" && !intent) redirect(`/${locale}/sell#plans`);
   if (session) {
     if (intent && session.role !== "ADMIN") {
       const store = await prisma.store.findFirst({ where: { ownerId: session.userId }, select: { id: true } });

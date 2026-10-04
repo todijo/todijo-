@@ -29,7 +29,7 @@ test("Admin self first-store rule checks primary pointer AND total ownership", a
 test("missing primary pointer does not bypass additional-store PRO and capacity", async () => {
   const owner = { ...seller, _count: { stores: 1 }, ownedBusiness: { id: "business", maxStores: 2, _count: { stores: 1 } } };
   const db = (plan: string) => ({ sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { id: "billing", subscription: { status: "ACTIVE", plan, currentPeriodEnd: new Date("2099-01-01") }, accessGrants: [] } }) } }) as unknown as Db;
-  assert.equal((await managedOwnerEligibility(db("basic"), owner, "admin")).reason, "MULTI_STORE_PRO_REQUIRED");
+  assert.equal((await managedOwnerEligibility(db("free"), owner, "admin")).reason, "MULTI_STORE_PRO_REQUIRED");
   assert.equal((await managedOwnerEligibility(db("pro"), owner, "admin")).mode, "ADDITIONAL");
   assert.equal((await managedOwnerEligibility(db("pro"), { ...owner, ownedBusiness: { ...owner.ownedBusiness, maxStores: 1 } }, "admin")).reason, "STORE_LIMIT_REACHED");
   assert.equal((await managedOwnerEligibility(emptyDb, { ...owner, ownedBusiness: null }, "admin")).reason, "OWNER_BUSINESS_INCONSISTENT");
@@ -58,7 +58,7 @@ test("concurrent first-store creation serializes and second stale request fails"
   const db = { $transaction: (run: (value: typeof tx) => Promise<unknown>) => {
     const result = tail.then(() => run(tx)); tail = result.then(() => undefined, () => undefined); return result;
   } } as unknown as Db;
-  const input = { ownerId: "seller", name: "Shop", slug: "shop", contactEmail: seller.email, country: "FR", city: "Paris", currency: "EUR", language: "fr", months: 1 as const, plan: "basic" as const };
+  const input = { ownerId: "seller", name: "Shop", slug: "shop", contactEmail: seller.email, country: "FR", city: "Paris", currency: "EUR", language: "fr", months: 1 as const, plan: "free" as const };
   const results = await Promise.allSettled([createManagedStore(db, "admin", input), createManagedStore(db, "admin", input)]);
   assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
   assert.equal(count, 1);

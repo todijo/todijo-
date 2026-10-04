@@ -21,25 +21,25 @@ test("Admin exemption remains permanent non-paid access with PRO capabilities", 
   assert.deepEqual(sellerProductQuota({ role: "ADMIN", plan: result.plan, productCount: 99999 }), { productLimit: null, blocked: false });
   assert.equal(canCreateAdditionalSellerStore(result.plan), false);
 });
-for (const plan of ["basic", "plus", "pro"]) {
+for (const plan of ["free", "plus", "pro"]) {
   for (const source of ["paid", "grant"]) test(`${source} ${plan} retains only its own capabilities`, () => {
     const result = access("SELLER", source === "paid" ? plan : null, source === "grant" ? plan : null);
     assert.equal(sellerCapabilityTier(result.plan), plan); assert.equal(hasProSellerCapabilities(result.plan), plan === "pro");
-    assert.equal(result.source, source === "paid" ? "STRIPE" : "ADMIN_GRANTED"); assert.equal(result.expiresAt, future);
+    assert.equal(result.source, source === "paid" ? plan === "free" ? "FREE" : "STRIPE" : "ADMIN_GRANTED"); assert.equal(result.expiresAt, source === "paid" && plan === "free" ? null : future);
   });
 }
 test("expired, future and forged grants do not inherit exemption capabilities", () => {
   for (const result of [access("SELLER", null, "pro", now), access("SELLER", "pro", null, now), access("SELLER", null, "admin-exempt")]) {
-    assert.equal(hasProSellerCapabilities(result.plan), false); assert.equal(sellerCapabilityTier(result.plan), null);
+    assert.equal(hasProSellerCapabilities(result.plan), false); assert.equal(sellerCapabilityTier(result.plan), "free");
   }
-  assert.equal(access("SELLER", "basic", "pro").plan, "basic");
+  assert.equal(access("SELLER", "plus", "pro").plan, "plus");
 });
 test("Team permission gate permits Admin exemption and valid PRO but respects expiration and paid precedence", () => {
   const grant = { source: "ADMIN_GRANTED" as const, plan: "pro", startsAt: now, endsAt: future };
   assert.equal(hasProTeamEntitlement({ owner: { role: "ADMIN" }, billingStore: { subscription: null, accessGrants: [] } }, now), true);
   assert.equal(hasProTeamEntitlement({ owner: { role: "SELLER" }, billingStore: { subscription: null, accessGrants: [grant] } }, now), true);
   assert.equal(hasProTeamEntitlement({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "pro", currentPeriodEnd: now }, accessGrants: [] } }, now), false);
-  assert.equal(hasProTeamEntitlement({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "basic", currentPeriodEnd: future }, accessGrants: [grant] } }, now), false);
+  assert.equal(hasProTeamEntitlement({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "plus", currentPeriodEnd: future }, accessGrants: [grant] } }, now), false);
 });
 test("Admin can issue Team invitation using existing scoped/audited service without subscription writes", async () => {
   const audits: unknown[] = [];

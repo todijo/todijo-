@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { OrderStatus, Prisma } from "@prisma/client";
+import { proHomepageDiscovery } from "@/lib/pro-homepage-discovery";
 import { prisma } from "@/lib/prisma";
 import { publicProductAccessWhere, publicStoreAccessWhere } from "@/lib/admin-access";
 import { buyerVisibleVariantWhere, resolveProductAvailability } from "@/lib/product-availability";
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
   const [newRows, bestCounts, eligibleStores, heroCount] = await Promise.all([
     prisma.product.findMany({ where: { status: "PUBLISHED", ...publicProduct }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take: 18, select }),
     prisma.orderItem.groupBy({ by: ["productId"], where: { order: { status: { in: qualifying } }, product: { status: "PUBLISHED", ...publicProduct } }, _sum: { quantity: true }, orderBy: [{ _sum: { quantity: "desc" } }, { productId: "asc" }], take: 8 }),
-    prisma.store.findMany({ where: { ...publicStore, products: { some: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null } } }, orderBy: { updatedAt: "desc" }, take: 5, select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, products: { where: { status: "PUBLISHED", dataClass: "PRODUCTION", removedAt: null }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description: true, sourceLocale: true, translations: { select: { locale: true, title: true, description: true, automatic: true } }, images: true, supplierLink: { select: { sourceMetadata: true } } } } } }),
+    prisma.store.findMany({ where: { ...publicStore, products: { some: { status: "PUBLISHED", ...publicProduct } } }, orderBy: { updatedAt: "desc" }, take: 5, select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, products: { where: { status: "PUBLISHED", ...publicProduct }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description: true, sourceLocale: true, translations: { select: { locale: true, title: true, description: true, automatic: true } }, images: true, supplierLink: { select: { sourceMetadata: true } } } } } }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProduct, images: { isEmpty: false } } }),
   ]);
   const heroTake = Math.min(HOMEPAGE_HERO_PRODUCT_COUNT, heroCount);
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
   const newArrivals = newRows.filter((row) => !bestSet.has(row.id)).slice(0, 10);
   const showStores = shouldShowHomepageStores(eligibleStores.length);
   const stores = showStores ? eligibleStores.map((store) => ({ ...store, products: store.products.map((product) => ({ id: product.id, title: resolveBuyerProductContent({ name: product.name, description: product.description, sourceMetadata: product.supplierLink?.sourceMetadata, locale, sourceLocale: product.sourceLocale, translations: product.translations }).title, image: product.images[0] ?? null })) })) : [];
-  const response = { locale, market, sections: { hero: selectDistinctHeroProducts(heroRows).map((row) => serialize(row, locale)), categories: buyerCategoryTree(locale), newArrivals: newArrivals.map((row) => serialize(row, locale)), bestSellers: bestSellers.map((row) => serialize(row, locale)), stores: { visible: showStores, threshold: 5, items: stores } } } satisfies HomeResponse;
+  const proRows = await proHomepageDiscovery(prisma, select);
+  const response = { locale, market, sections: { proDiscovery: proRows.map(row => serialize(row, locale)), hero: selectDistinctHeroProducts(heroRows).map((row) => serialize(row, locale)), categories: buyerCategoryTree(locale), newArrivals: newArrivals.map((row) => serialize(row, locale)), bestSellers: bestSellers.map((row) => serialize(row, locale)), stores: { visible: showStores, threshold: 5, items: stores } } } satisfies HomeResponse;
   return NextResponse.json(response, { headers: { "Cache-Control": "private, no-store" } });
 }

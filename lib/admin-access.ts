@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient, StoreAccessSource, UserRole } from "@prisma/client";
-import { isSellerPlanId, type SellerPlanId } from "./seller-plans";
+import { isPaidSellerPlanId, isSellerPlanId, type SellerPlanId } from "./seller-plans";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
 import { AdminAccessError } from "./admin-access-error";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
@@ -46,7 +46,7 @@ export function calculateGrantPeriod(now: Date, months: AdminGrantMonths, curren
 }
 
 export function activeAccessSource(store: {
-  subscription: { status: string; currentPeriodEnd?: Date | null } | null;
+  subscription: { status: string; plan?: string; currentPeriodEnd?: Date | null } | null;
   accessGrants: Array<{ source: StoreAccessSource; startsAt: Date; endsAt: Date | null }>;
 }, now = new Date()) {
   const active = store.accessGrants
@@ -56,28 +56,35 @@ export function activeAccessSource(store: {
     ))
     .sort((a, b) => (b.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (a.endsAt?.getTime() ?? Number.MAX_SAFE_INTEGER))[0];
   if (active?.source === "ADMIN_EXEMPT") return { source: active.source, expiresAt: null };
-  if (store.subscription && ["ACTIVE", "TRIALING"].includes(store.subscription.status) && store.subscription.currentPeriodEnd && store.subscription.currentPeriodEnd > now) {
+  if (store.subscription && isPaidSellerPlanId(store.subscription.plan) && ["ACTIVE", "TRIALING"].includes(store.subscription.status) && store.subscription.currentPeriodEnd && store.subscription.currentPeriodEnd > now) {
     return { source: "STRIPE" as const, expiresAt: store.subscription.currentPeriodEnd ?? null };
   }
   return active ? { source: active.source, expiresAt: active.endsAt } : { source: "NONE" as const, expiresAt: null };
 }
 
-export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
+export function elevatedStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
   return {
     dataClass: "PRODUCTION",
     status: "ACTIVE",
     owner: { sellerSuspendedAt: null, deactivatedAt: null },
     OR: [
-      { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
+      { owner: { role: "ADMIN" } },
+      { subscription: { is: { plan: { in: ["plus", "pro"] }, status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
       { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
-      { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+      { accessGrants: { some: { plan: { in: ["plus", "pro"] }, source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
       { business: { is: { billingStore: { is: { OR: [
-        { subscription: { is: { status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
+        { subscription: { is: { plan: { in: ["plus", "pro"] }, status: { in: ["ACTIVE", "TRIALING"] }, currentPeriodEnd: { gt: now } } } },
         { accessGrants: { some: { source: "ADMIN_EXEMPT", startsAt: { lte: now }, endsAt: null } } },
-        { accessGrants: { some: { source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
+        { accessGrants: { some: { plan: { in: ["plus", "pro"] }, source: "ADMIN_GRANTED", startsAt: { lte: now }, endsAt: { gt: now } } } },
       ] } } } } },
     ],
   };
+}
+
+export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
+  void now; // Preserve the shared time-aware API; FREE lifecycle eligibility has no expiration.
+  return { dataClass: "PRODUCTION", status: "ACTIVE", owner: { role: { in: ["SELLER", "ADMIN"] }, sellerSuspendedAt: null, deactivatedAt: null },
+    AND: [{ sellerType: { not: "UNKNOWN" } }, { OR: [{ sellerType: "PRIVATE" }, { vatStatus: { not: "UNKNOWN" } }] }] };
 }
 
 export function publicProductAccessWhere(now = new Date()): Prisma.ProductWhereInput {
@@ -85,6 +92,7 @@ export function publicProductAccessWhere(now = new Date()): Prisma.ProductWhereI
     dataClass: "PRODUCTION",
     removedAt: null,
     store: publicStoreAccessWhere(now),
+    NOT: { AND: [{ store: { NOT: elevatedStoreAccessWhere(now) } }, { OR: [{ freeVisibilityPosition: null }, { freeVisibilityPosition: { gt: 5 } }] }] },
     OR: [
       { supplierLink: { is: null } },
       { supplierLink: { is: { supplierAvailable: true, syncStatus: "HEALTHY" } } },
@@ -208,10 +216,7 @@ export async function extendManagedAccess(
       data: { storeId: target.storeId, grantedById: adminId, source: "ADMIN_GRANTED", plan, ...period },
       select: { storeId: true, endsAt: true },
     }));
-    await db.product.updateMany({
-      where: { ...(target.businessId?{store:{businessId:target.businessId}}:{storeId:target.storeId}), removedAt:null, status: "DRAFT", deactivationReason: "SUBSCRIPTION_INACTIVE" },
-      data: { status: "PUBLISHED", deactivationReason: "NONE" },
-    });
+    // Tier changes never republish previously demoted products automatically.
     if(target.businessId)await appendSellerBusinessAudit(db,{businessId:target.businessId,storeId:target.storeId,actorId:adminId,category:"ENTITLEMENT",action:"ADMIN_GRANT_CREATED",targetType:"STORE_ACCESS_GRANT",targetId:target.storeId,metadata:{plan,startsAt:period.startsAt.toISOString(),endsAt:period.endsAt.toISOString()}});
   }
   return results;

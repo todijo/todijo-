@@ -32,7 +32,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
   const sellerNext = sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : null;
 
   useEffect(() => {
-    if (params?.get("role") === "seller" && sellerIntent) setRole("seller");
+    if (params?.get("role") === "seller") setRole("seller");
   }, [params, sellerIntent]);
 
   const updateTurnstileToken = useCallback((token: string) => {
@@ -110,7 +110,7 @@ export default function RegisterForm({ turnstileSiteKey }: { turnstileSiteKey: s
       <form className="authForm" onSubmit={submit} aria-busy={loading}>
         <div className="roleOptions">
           <label className="roleCard"><input type="radio" name="role" checked={role === "customer"} onChange={() => setRole("customer")} /><strong>🛍️ {t("buyer")}</strong><span>{t("buyerHelp")}</span></label>
-          <label className="roleCard"><input type="radio" name="role" checked={role === "seller"} onChange={() => sellerIntent ? setRole("seller") : router.push(`/${locale}/sell#plans`)} /><strong>🏪 {t("seller")}</strong><span>{t("sellerHelp")}</span></label>
+          <label className="roleCard"><input type="radio" name="role" checked={role === "seller"} onChange={() => setRole("seller")} /><strong>🏪 {t("seller")}</strong><span>{t("sellerHelp")}</span></label>
         </div>
         <div className="formRow"><div className="formField"><label htmlFor="firstName">{t("firstName")}</label><input id="firstName" name="firstName" autoComplete="given-name" required /></div><div className="formField"><label htmlFor="lastName">{t("lastName")}</label><input id="lastName" name="lastName" autoComplete="family-name" required /></div></div>
         <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" aria-describedby="email-security-guidance" required /><small id="email-security-guidance">{t("emailSecurityGuidance")}</small></div>

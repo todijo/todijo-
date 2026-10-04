@@ -5,7 +5,7 @@ import { readSession } from "@/lib/session";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlPanel";
 import NewProductForm from "./NewProductForm";
-import { requireStorePublishingAccess, sellerProductQuota } from "@/lib/seller-subscription";
+import { requireStorePublishingAccess, sellerProductQuota, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { isLocale } from "@/i18n/config";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 import { resolveSellerStoreContext } from "@/lib/seller-business-access";
@@ -24,7 +24,7 @@ export default async function NewProductPage({searchParams}:{searchParams:Promis
   const session = await readSession();
   if (!session) redirect("/login");
 
-  let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"PRODUCT_CREATE");await requireStorePublishingAccess(prisma,session.userId,storeContext.selected.id,"PRODUCT_CREATE")}catch{redirect(`/${locale}/seller/products`)}
+  let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"PRODUCT_CREATE");await requireStorePublishingAccess(prisma,session.userId,storeContext.selected.id,"PRODUCT_CREATE")}catch(error){redirect(`/${locale}/seller/products${error instanceof SellerSubscriptionError && error.code === "SELLER_PRODUCT_LIMIT_REACHED" ? "?quota=limit" : ""}`)}
   const store = await prisma.store.findUnique({
     where: { id:storeContext.selected.id },
     select: {
