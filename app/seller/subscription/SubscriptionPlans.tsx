@@ -22,9 +22,8 @@ export default function SubscriptionPlans({ plans, activePlanId, hasActiveSubscr
   const [loading, setLoading] = useState<string | null>(null);
   const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const [error, setError] = useState("");
-  const [needsProFeature, setNeedsProFeature] = useState(false);
   const selected = plans.find(plan => plan.id === reviewPlanId && plan.id !== "free");
-  const recommendation = recommendedSellerPlan(productCount, needsProFeature);
+  const recommendation = recommendedSellerPlan(productCount);
   const amount = (plan: Plan, period = interval) => new Intl.NumberFormat(locale, { style: "currency", currency: plan.currency }).format((period === "monthly" ? plan.monthlyAmountMinor : plan.annualAmountMinor) / 100);
   async function change(planId?: string, targetInterval?: BillingInterval) {
     setLoading(planId ?? "cancel"); setError("");
@@ -75,7 +74,6 @@ export default function SubscriptionPlans({ plans, activePlanId, hasActiveSubscr
       <button className="authSubmit" disabled={loading !== null || !selected.available[interval]} onClick={() => void subscribe(selected.id)}>{loading ? copy.opening : freeCopy.continue}</button>
       <button type="button" disabled={loading !== null} onClick={() => setReviewPlanId(null)}>{freeCopy.modify}</button>
     </section> : <>
-      <label><input type="checkbox" checked={needsProFeature} onChange={event => setNeedsProFeature(event.target.checked)}/>{freeCopy.proNeeds}</label>
       <div className="subscriptionBillingToggle" role="group" aria-label={`${copy.monthly} / ${copy.annual}`}><button type="button" className={interval === "monthly" ? "isActive" : ""} aria-pressed={interval === "monthly"} onClick={() => setInterval("monthly")}>{copy.monthly}</button><button type="button" className={interval === "annual" ? "isActive" : ""} aria-pressed={interval === "annual"} onClick={() => setInterval("annual")}>{copy.annual} · {copy.save20}</button></div>
       <div className="subscriptionPlanGrid">{plans.map(plan => {
         const isActive = activePlanId === plan.id && (plan.id === "free" || !transition || transition.currentInterval === interval);

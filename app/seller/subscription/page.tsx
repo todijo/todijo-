@@ -46,7 +46,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
   const plans = sellerPlans().map(({ priceIds, ...plan }) => ({
     ...plan,
     productLimitLabel:plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,
-    features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue, ...(plan.id === "pro" ? [freeCopy.proHelp, freeCopy.resurfacing, freeCopy.suppliesHelp] : [freeCopy.oneStore, plan.id === "free" ? freeCopy.freeHelp : freeCopy.plusHelp])],
+    features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue, ...(plan.id === "pro" ? [freeCopy.proHelp, freeCopy.resurfacing, freeCopy.suppliesHelp, freeCopy.proImport] : [freeCopy.oneStore, plan.id === "free" ? freeCopy.freeHelp : freeCopy.plusHelp])],
     available: { monthly: Boolean(priceIds.monthly), annual: Boolean(priceIds.annual) },
   }));
   const clientCopy={monthly:copy.monthly,annual:copy.annual,save20:copy.save20,perMonth:copy.perMonth,perYear:copy.perYear,opening:copy.opening,active:copy.active,anotherActive:copy.anotherActive,subscribe:copy.subscribe,unavailable:copy.unavailable,checkoutError:copy.checkoutError};

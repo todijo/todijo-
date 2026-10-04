@@ -63,9 +63,9 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
 const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,currency:true,status:true,sellerType:true,vatStatus:true,subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 export default async function DashboardPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
-  const [t, p, s, common, ordersText, control, privacy, transparency, compliance, auth, locale, session] = await Promise.all([
+  const [t, p, s, common, ordersText, privacy, transparency, compliance, auth, locale, session] = await Promise.all([
     getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
-    getTranslations("Common"), getTranslations("Orders"), getTranslations("SellerControl"),
+    getTranslations("Common"), getTranslations("Orders"),
     getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"), getTranslations("Auth"),
     getLocale(), readSession(),
   ]);
@@ -119,7 +119,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const selectedCommercialPlan=selectedPrincipal?await sellerBusinessCommercialPlan(prisma,selectedPrincipal.businessId):null;
   const freeCopy = sellerFreeModelCopy(locale);
   const sellerCanAddProduct = Boolean(activeStore && canCreateProducts && canPublish(activeStore,new Date(),selectedCommercialPlan));
-  const sellerNav = sellerDashboardNavItems({ locale, storeSlug: activeStore?.slug, publicStoreAvailable:sellerCanAddProduct, ownerTools:Boolean(selectedPrincipal?.owner),permissions:selectedPrincipal?.owner?undefined:selectedPrincipal?.permissions??[],labels: { dashboard:p("nav.dashboard"), products:p("nav.products"), addProduct:p("nav.addProduct"), orders:p("nav.orders"), messages:p("nav.messages"), statistics:p("nav.statistics"), revenue:p("nav.revenue"), reviews:p("nav.reviews"), store:p("nav.store"), settings:p("nav.settings"), notifications:p("notifications"), eyebrow:p("seller.eyebrow"), logout:common("logout"), menu:s("menu"), collapse:s("collapse") }, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active: "dashboard", unreadMessages });
+  const sellerNav = sellerDashboardNavItems({ locale, storeSlug: activeStore?.slug, publicStoreAvailable:sellerCanAddProduct, proImportAvailable:Boolean(selectedPrincipal?.owner&&hasProSellerCapabilities(selectedCommercialPlan)), ownerTools:Boolean(selectedPrincipal?.owner),permissions:selectedPrincipal?.owner?undefined:selectedPrincipal?.permissions??[],labels: { dashboard:p("nav.dashboard"), products:p("nav.products"), addProduct:p("nav.addProduct"), orders:p("nav.orders"), messages:p("nav.messages"), statistics:p("nav.statistics"), revenue:p("nav.revenue"), reviews:p("nav.reviews"), store:p("nav.store"), settings:p("nav.settings"), notifications:p("notifications"), eyebrow:p("seller.eyebrow"), logout:common("logout"), menu:s("menu"), collapse:s("collapse"), importProducts:freeCopy.importProducts }, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active: "dashboard", unreadMessages });
   const sellerMobileNav = sellerNav;
 
   if (!isSeller) {
@@ -204,14 +204,16 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const subscriptionActive = canPublish(activeStore,new Date(),selectedCommercialPlan);
   const sellerTypeRequired = activeStore.sellerType === "UNKNOWN";
   const vatStatusRequired = activeStore.sellerType === "PROFESSIONAL" && activeStore.vatStatus === "UNKNOWN";
-  const readinessHref = sellerTypeRequired || vatStatusRequired ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
-  const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : control("subscriptionInactive");
-  const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : control("subscriptionInactiveHelp", { status: control("subscriptionInactive") });
-  const readinessAction = sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : control("viewPlans");
+  const storeReadinessPending=activeStore.status!=="ACTIVE";
+  const readinessHref = sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings#seller-status` : `/${locale}/seller/subscription`;
+  const readinessTitle = sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : activeStore.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
+  const readinessHelp = sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
+  const readinessAction = sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : selectedCommercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
+  const showReadinessWarning=Boolean(selectedPrincipal?.owner&&!subscriptionActive&&(storeReadinessPending||sellerTypeRequired||vatStatusRequired||selectedCommercialPlan==null));
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}
-      {selectedPrincipal?.owner&&!subscriptionActive && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
+      {showReadinessWarning && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
       {selectedPrincipal?.owner && selectedCommercialPlan === "free" && <FreeSellerStartCard locale={locale}/>}
       {selectedPrincipal?.owner && hasProSellerCapabilities(selectedCommercialPlan) && <section className="storeSetupCard"><h2>{freeCopy.supplies}</h2><p>{freeCopy.suppliesHelp}</p><Link href={`/${locale}/seller/shipping-supplies`}>{freeCopy.suppliesRequest}</Link></section>}
       {pendingRefundCount > 0 && <section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount === 1 ? "pendingRefundRequestSingular" : "pendingRefundRequestPlural", { count: pendingRefundCount })}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
@@ -232,7 +234,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
       </DashboardSection>}
       {canViewAnalytics&&<DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating > 0 && <article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{cancellationRate != null && <article><ReceiptText size={20}/><span>{s("cancellationRate")}</span><strong>{cancellationRate.toFixed(1)}%</strong></article>}{reviewStats._count.rating === 0 && cancellationRate == null && <DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>}
       {selectedPrincipal?.owner&&<StripeConnectSection
-        commercialEntitlementActive={subscriptionActive}
+        commercialEntitlementActive={selectedCommercialPlan!==null}
         initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>
       }
     </div></div>

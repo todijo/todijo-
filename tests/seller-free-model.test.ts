@@ -68,7 +68,6 @@ test("sixth FREE product is rejected by authoritative store creation gate",async
 for(const [count,expected] of [[0,"free"],[5,"free"],[6,"plus"],[50,"plus"],[51,"pro"]] as const){
   test(`transparent recommendation for ${count} products`,()=>assert.equal(recommendedSellerPlan(count),expected));
 }
-test("explicit PRO feature need overrides catalog-only recommendation",()=>assert.equal(recommendedSellerPlan(1,true),"pro"));
 test("direct registration routes to dashboard while paid intent survives auth",()=>{
   assert.equal(sellerOnboardingPath("fr",false,null),"/fr/dashboard");
   assert.equal(explicitSellerRegistrationIntent("free","annual"),null);
@@ -151,5 +150,5 @@ test("FREE quota is explained before creation and on concurrent server rejection
   assert.match(list,/quota.productLimit === 5 \? freeCopy.quota/);
   assert.match(list,/seller\/subscription/);
   assert.match(source("app/seller/products/new/NewProductForm.tsx"),/data.code === "SELLER_PRODUCT_LIMIT_REACHED" && productLimit === 5/);
-  assert.match(source("app/seller/subscription/SubscriptionPlans.tsx"),/recommendedSellerPlan\(productCount, needsProFeature\)/);
+  assert.match(source("app/seller/subscription/SubscriptionPlans.tsx"),/recommendedSellerPlan\(productCount\)/);
 });

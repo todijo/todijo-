@@ -18,14 +18,14 @@ export default async function SellOnTodijoPage() {
       <div>
         <span className="sellerStartEyebrow">{french ? "Vendre sur Todijo" : "Sell on Todijo"}</span>
         <h1>{french ? "Commencez gratuitement, développez votre boutique à votre rythme." : "Start for free and grow your store at your own pace."}</h1>
-        <p>{french ? "FREE permet de vendre jusqu’à 5 produits après les vérifications et la configuration des paiements requises. PLUS et PRO sont facultatifs pour les catalogues plus grands et les fonctionnalités avancées." : "FREE lets you sell up to 5 products after required verification and payment setup. PLUS and PRO are optional for larger catalogs and advanced features."}</p>
+        <p>{french ? "Commencez gratuitement avec FREE, puis passez à PLUS ou PRO lorsque votre activité grandit et que vous avez besoin de plus de capacité et d’outils. Acheter sur Todijo ne nécessite jamais d’abonnement vendeur." : "Start free with FREE, then move to PLUS or PRO as your business grows and you need more capacity and tools. Buying on Todijo never requires a seller subscription."}</p>
         <div className="sellerStartActions"><a className="primary" href="#plans">{french ? "Choisir ma formule" : "Choose a plan"}<ArrowRight size={17}/></a><a className="secondary" href={`/${locale}/store`}>{french ? "Découvrir les boutiques" : "Discover stores"}</a></div>
       </div>
       <aside className="sellerStartPromise" aria-label={french ? "Fonctionnalités vendeur" : "Seller features"}>
         <div><b><Store size={17}/></b><span><strong>{french ? "Votre boutique" : "Your storefront"}</strong>{french ? "Une page publique pour présenter votre marque et vos produits." : "A public page for your brand and products."}</span></div>
         <div><b><Boxes size={17}/></b><span><strong>{french ? "Gestion des produits" : "Product management"}</strong>{french ? "Stocks, variantes, images et publication depuis votre espace vendeur." : "Manage stock, variants, images and publishing."}</span></div>
         <div><b><BarChart3 size={17}/></b><span><strong>{french ? "Suivi de l’activité" : "Business overview"}</strong>{french ? "Commandes, revenus et statistiques réunis dans le tableau de bord." : "Orders, revenue and statistics in one dashboard."}</span></div>
-        <div><b><CreditCard size={17}/></b><span><strong>{french ? "Commencez gratuitement" : "Start for free"}</strong>{french ? "FREE ne nécessite aucun abonnement vendeur. PLUS et PRO sont facultatifs." : "FREE requires no seller subscription. PLUS and PRO are optional."}</span></div>
+        <div><b><CreditCard size={17}/></b><span><strong>{french ? "Commencez gratuitement" : "Start for free"}</strong>{french ? "Jusqu’à 5 produits sur FREE, sans abonnement vendeur. Acheter sur Todijo reste toujours possible sans formule vendeur." : "Up to 5 products on FREE, with no seller subscription. Buyers never need a seller plan."}</span></div>
       </aside>
     </section>
     <section className="container sellerPlanSection" id="plans">

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
-import { BarChart3, Bell, Boxes, CircleDollarSign, CreditCard, FileClock, Gift, Home, MessageCircle, Plus, ReceiptText, Settings, ShieldCheck, Star, Store, UserRound, Users } from "lucide-react";
+import { BarChart3, Bell, Boxes, CircleDollarSign, CreditCard, FileClock, FileUp, Gift, Home, MessageCircle, Plus, ReceiptText, Settings, ShieldCheck, Star, Store, UserRound, Users } from "lucide-react";
 import { isLocale } from "@/i18n/config";
 import { loyaltyMessages } from "@/i18n/loyalty";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
@@ -11,16 +11,19 @@ import EmailVerificationNotice from "./EmailVerificationNotice";
 import { sellerTeamCopy } from "@/i18n/seller-team";
 import { sellerPrincipals } from "@/lib/seller-business-access";
 import type { TeamPermission } from "@prisma/client";
+import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
+import { hasProSellerCapabilities } from "@/lib/seller-commercial-access";
+import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 
 type Labels = {
-  dashboard: string; products: string; orders: string; messages: string; statistics: string;
+  dashboard: string; products: string; orders: string; messages: string; statistics: string; importProducts?: string;
   revenue: string; reviews: string; store: string; settings: string; notifications: string;
   eyebrow: string; logout: string; menu: string; collapse: string; addProduct: string;
 };
 
-export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "orders" | "messages" | "notifications" | "settings" | "subscription" | "loyalty" | "reviews" | "account";
+export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "import-products" | "orders" | "messages" | "notifications" | "settings" | "subscription" | "loyalty" | "reviews" | "account";
 
-export function sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable=true, labels, accountLabel, privacyLabel, active, unreadMessages = 0,ownerTools=false,permissions }: { locale: string; storeSlug?: string; publicStoreAvailable?: boolean; labels: Labels; accountLabel: string; privacyLabel: string; active: SellerNavigationActive; unreadMessages?: number;ownerTools?:boolean;permissions?:TeamPermission[] }): DashboardNavItem[] {
+export function sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable=true, proImportAvailable=false, labels, accountLabel, privacyLabel, active, unreadMessages = 0,ownerTools=false,permissions }: { locale: string; storeSlug?: string; publicStoreAvailable?: boolean; proImportAvailable?: boolean; labels: Labels; accountLabel: string; privacyLabel: string; active: SellerNavigationActive; unreadMessages?: number;ownerTools?:boolean;permissions?:TeamPermission[] }): DashboardNavItem[] {
   const team=sellerTeamCopy(locale);
   const unrestricted=permissions===undefined;
   const can=(permission:TeamPermission)=>ownerTools||unrestricted||permissions.includes(permission);
@@ -28,6 +31,7 @@ export function sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailabl
     { label: labels.dashboard, href: `/${locale}/dashboard`, icon: Home, active: active === "dashboard" },
     ...(can("PRODUCT_VIEW")?[{ label: labels.products, href: `/${locale}/seller/products`, icon: Boxes, active: active === "products" }]:[]),
     ...(can("PRODUCT_CREATE")?[{ label: labels.addProduct, href: `/${locale}/seller/products/new`, icon: Plus, active: active === "new-product" }]:[]),
+    ...(ownerTools&&proImportAvailable?[{label:labels.importProducts??sellerFreeModelCopy(locale).importProducts,href:`/${locale}/seller/products/import`,icon:FileUp,active:active==="import-products"}]:[]),
     ...(can("ORDER_VIEW")?[{ label: labels.orders, href: `/${locale}/seller/orders`, icon: ReceiptText, active: active === "orders" }]:[]),
     ...(can("MESSAGE_VIEW")?[{ label: labels.messages, href: `/${locale}/messages`, icon: MessageCircle, badge: unreadMessages, active: active === "messages" }]:[]),
     { label: labels.notifications, href: `/${locale}/notifications`, icon: Bell, active: active === "notifications" },
@@ -50,8 +54,10 @@ export default async function SellerDashboardLayout({ children, locale, storeSlu
   const session=await readSession();
   const principals=session?await sellerPrincipals(prisma,session.userId):[];
   const ownerTools=principals.some(principal=>principal.owner);
+  const ownerPrincipal=principals.find(principal=>principal.owner);
+  const proImportAvailable=Boolean(ownerPrincipal&&hasProSellerCapabilities(await sellerBusinessCommercialPlan(prisma,ownerPrincipal.businessId)));
   const permissions=ownerTools?undefined:[...new Set(principals.flatMap(principal=>principal.permissions))];
-  const items = sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable:canAddProduct!==false, labels: text, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active, unreadMessages,ownerTools,permissions });
+  const items = sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable:canAddProduct!==false, proImportAvailable, labels: text, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active, unreadMessages,ownerTools,permissions });
   const mobileMenuItems = items;
   const verification=session?await prisma.user.findUnique({where:{id:session.userId},select:{email:true,emailVerified:true}}):null;
   return <main className="premiumDashboard premiumSellerDashboard">

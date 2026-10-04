@@ -42,7 +42,7 @@ export default function SellerPlanChooser({ locale, plans, copy }: { locale: str
         {plan.id !== "free" && interval === "annual" && <p className="publicSellerAnnualSaving">{copy.save20}</p>}
         <p>{plan.productLimit ? copy.upTo.replace("{limit}", String(plan.productLimit)) : copy.unlimited}</p>
         <ul>{copy.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-        <ul>{(plan.id === "pro" ? [benefitCopy.proHelp, benefitCopy.resurfacing, benefitCopy.suppliesHelp] : [benefitCopy.oneStore, plan.id === "free" ? benefitCopy.freeHelp : benefitCopy.plusHelp]).map(feature => <li key={feature}>{feature}</li>)}</ul>
+        <ul>{(plan.id === "pro" ? [benefitCopy.proHelp, benefitCopy.resurfacing, benefitCopy.suppliesHelp, benefitCopy.proImport] : [benefitCopy.oneStore, plan.id === "free" ? benefitCopy.freeHelp : benefitCopy.plusHelp]).map(feature => <li key={feature}>{feature}</li>)}</ul>
         <a href={plan.id === "free" ? `/${locale}/register?role=seller` : `/${locale}/register?role=seller&plan=${plan.id}&interval=${interval}`}>{copy.startWith[plan.id]}<ArrowRight size={16}/></a>
       </article>;
     })}</div>
