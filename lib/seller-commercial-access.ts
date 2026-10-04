@@ -9,7 +9,7 @@ export function resolveSellerCommercialAccess(input: CommercialInput, now = new 
   const subscription = input.subscription;
   if (subscription && ["ACTIVE", "TRIALING"].includes(subscription.status) && subscription.currentPeriodEnd && subscription.currentPeriodEnd > now) {
     const plan = sellerPlanEntitlement(subscription.plan)?.id ?? null;
-    return { active: Boolean(plan), plan, source: plan ? "STRIPE" as const : "NONE" as const, expiresAt: subscription.currentPeriodEnd };
+    if (plan) return { active: true, plan, source: "STRIPE" as const, expiresAt: subscription.currentPeriodEnd };
   }
   const grant = input.accessGrants.filter(item => item.source === "ADMIN_GRANTED" && item.startsAt <= now && item.endsAt !== null && item.endsAt > now && sellerPlanEntitlement(item.plan))
     .sort((a, b) => b.endsAt!.getTime() - a.endsAt!.getTime())[0];

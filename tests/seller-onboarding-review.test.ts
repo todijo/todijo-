@@ -51,7 +51,7 @@ test("concurrent state change fails closed before audit", async () => {
 test("pending Admin inspection exposes context without Stripe calls", () => {
   const page = readFileSync(join(process.cwd(), "app/adm-barewbar-182203/seller-review/page.tsx"), "utf8");
   assert.match(page, /status: "PENDING"/);
-  for (const field of ["activeAccessSource", "billingInterval", "currentPeriodEnd", "stripeChargesEnabled", "stripePayoutsEnabled", "onboardingStatus"]) assert.ok(page.includes(field));
+  for (const field of ["readManagedCommercialSummary", "adminAccessStatus", "billingInterval", "currentPeriodEnd", "stripeChargesEnabled", "stripePayoutsEnabled", "onboardingStatus"]) assert.ok(page.includes(field));
   assert.doesNotMatch(page, /retrieveStripe|createConnectedAccount|sellerSubscriptionChange/);
 });
 test("Admin review remains discoverable, localized, and RTL-aware",()=>{for(const locale of locales){const copy=sellerReviewMessages[locale];for(const value of Object.values(copy))assert.ok(value.trim(),`${locale} review copy`);}const admin=readFileSync(join(process.cwd(),"app/adm-barewbar-182203/page.tsx"),"utf8"),page=readFileSync(join(process.cwd(),"app/adm-barewbar-182203/seller-review/page.tsx"),"utf8"),actions=readFileSync(join(process.cwd(),"app/adm-barewbar-182203/seller-review/SellerReviewActions.tsx"),"utf8");assert.match(admin,/seller-review/);assert.match(page,/rtlLocales\.has\(locale\)/);assert.match(actions,/role="status"/);assert.doesNotMatch(actions,/>Verify<|>Reject<|placeholder="Review reason"/);});

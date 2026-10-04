@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { BadgeCheck, CalendarPlus, PackagePlus, ShieldCheck, Store, Users } from "lucide-react";
@@ -8,6 +8,8 @@ import GlobalDropshippingMarginForm from "@/components/GlobalDropshippingMarginF
 import { adminStoreOwnerCopy } from "@/i18n/admin-store-owners";
 import { adminManagedPlanCopy } from "@/i18n/admin-managed-plan";
 import AdminManagedPlanControl from "@/components/AdminManagedPlanControl";
+import { AdminAccessStatusHeaders, AdminAccessStatusCells } from "@/components/AdminAccessStatus";
+import type { AdminAccessStatus } from "@/lib/admin-access-status";
 
 type AdminUser = { id: string; firstName: string; lastName: string; email: string; role: string; hasStore: boolean; managedStoreEligible: boolean };
 type AdminStore = {
@@ -17,6 +19,7 @@ type AdminStore = {
   expiresAt: string | null; stripeStatus: string | null;
   effectivePlan: string | null; grantVersion: string | null;
   accessError: string | null;
+  accessStatus: AdminAccessStatus;
   dropshippingEnabled: boolean;
 };
 
@@ -59,7 +62,6 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
   const sellerStores = stores.filter((store) => store.owner.role === "SELLER");
   const adminStore = stores.find((store) => store.owner.id === adminId);
   const activeCount = stores.filter((store) => store.accessSource !== "NONE").length;
-  const formatter = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }), [locale]);
 
   async function request(method: "POST" | "PUT" | "PATCH", body: Record<string, unknown> = {}) {
     setBusy(true);
@@ -163,8 +165,8 @@ export default function AdminDashboard({ adminId, locale, users, stores, globalD
 
     <section className="adminPanel adminTablePanel">
       <div className="adminPanelHeading"><BadgeCheck/><div><h2>{t("storeDirectory")}</h2><p>{t("storeDirectoryHelp")}</p></div></div>
-      <div className="adminTableWrap"><table><thead><tr><th>{t("store")}</th><th>{t("owner")}</th><th>{t("accessSource")}</th><th>{t("expiry")}</th><th>{t("status")}</th><th>{t("products")}</th><th>{t("actions")}</th></tr></thead>
-        <tbody>{stores.map((store) => <tr key={store.id}><td><strong>{store.name}</strong><small>/{store.slug}</small></td><td>{store.owner.firstName} {store.owner.lastName}<small>{store.owner.email}</small></td><td><span className={`adminBadge source-${store.accessSource.toLowerCase()}`}>{t(`source.${store.accessSource}`)}</span><small>{planCopy.plan}: {store.effectivePlan?.toUpperCase() ?? "—"}</small>{store.stripeStatus && <small>{planCopy.billing}: {store.stripeStatus}</small>}</td><td>{store.expiresAt ? formatter.format(new Date(store.expiresAt)) : t(store.accessSource === "ADMIN_EXEMPT" ? "never" : "notAvailable")}</td><td><span className="adminBadge">{store.status}</span></td><td>{store.productCount}</td><td><a href={`/${locale}/store/${store.slug}`}>{t("view")}</a>{store.owner.id === adminId && <a href={`/${locale}/seller/products`}>{t("products")}</a>}<AdminManagedPlanControl key={store.grantVersion ?? store.accessSource} storeId={store.id} plan={store.effectivePlan} version={store.grantVersion} source={store.accessSource} locale={locale}/></td></tr>)}</tbody>
+      <div className="adminTableWrap"><table><thead><tr><th>{t("store")}</th><th>{t("owner")}</th><AdminAccessStatusHeaders locale={locale}/><th>{t("products")}</th><th>{t("actions")}</th></tr></thead>
+        <tbody>{stores.map((store) => <tr key={store.id}><td><strong>{store.name}</strong><small>/{store.slug}</small></td><td>{store.owner.firstName} {store.owner.lastName}<small>{store.owner.email}</small></td><AdminAccessStatusCells state={store.accessStatus} locale={locale}/><td>{store.productCount}</td><td><a href={`/${locale}/store/${store.slug}`}>{t("view")}</a>{store.owner.id === adminId && <a href={`/${locale}/seller/products`}>{t("products")}</a>}<AdminManagedPlanControl key={store.grantVersion ?? store.accessSource} storeId={store.id} plan={store.effectivePlan} version={store.grantVersion} source={store.accessSource} locale={locale}/></td></tr>)}</tbody>
       </table></div>
     </section>
   </>;

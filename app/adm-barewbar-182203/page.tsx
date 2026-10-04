@@ -9,6 +9,7 @@ import { readManagedCommercialSummary } from "@/lib/admin-managed-plan";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import AdminDashboard from "./AdminDashboard";
+import { adminAccessStatus } from "@/lib/admin-access-status";
 import { adminUserManagementMessages } from "@/i18n/admin-user-management";
 import { isLocale } from "@/i18n/config";
 import { siteContentMessages } from "@/i18n/site-content";
@@ -46,8 +47,8 @@ export default async function AdminPage() {
     prisma.store.findMany({
       orderBy: { createdAt: "desc" },
       select: {
-        id: true, name: true, slug: true, status: true, dropshippingEnabled: true,
-        owner: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+        id: true, name: true, slug: true, status: true, onboardingStatus: true, dropshippingEnabled: true,
+        owner: { select: { id: true, firstName: true, lastName: true, email: true, role: true, sellerSuspendedAt: true, stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } },
         subscription: { select: { status: true, currentPeriodEnd: true } },
         accessGrants: { orderBy: { createdAt: "desc" }, select: { source: true, startsAt: true, endsAt: true } },
         _count: { select: { products: true } },
@@ -61,12 +62,13 @@ export default async function AdminPage() {
     const access = state.access;
     return {
       id: store.id, name: store.name, slug: store.slug, status: store.status,
-      owner: store.owner, productCount: store._count.products,
+      owner: { id: store.owner.id, firstName: store.owner.firstName, lastName: store.owner.lastName, email: store.owner.email, role: store.owner.role }, productCount: store._count.products,
       accessSource: access.source, expiresAt: access.expiresAt?.toISOString() ?? null,
       stripeStatus: state.target?.subscription?.status ?? store.subscription?.status ?? null, dropshippingEnabled: store.dropshippingEnabled,
       effectivePlan: access.plan === "admin-exempt" ? null : access.plan,
       grantVersion: access.source === "ADMIN_GRANTED" ? state.version : null,
       accessError: state.error,
+      accessStatus: adminAccessStatus({ lifecycle: store.status, onboarding: store.onboardingStatus, access, resolutionError: state.error, billingStatus: state.target?.subscription?.status ?? null, connect: store.owner }),
     };
   }));
   const managedOwnerEligibility = new Map(await Promise.all(users.map(async (user) => {
