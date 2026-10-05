@@ -14,6 +14,7 @@ import { resolveBuyerProductContent } from "@/lib/product-content";
 import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 import { BUYER_PRODUCT_PAGE_SIZE, buyerProductPage, buyerProductPageCount } from "@/lib/buyer-marketplace-pagination";
 import { proHomepageDiscovery } from "@/lib/pro-homepage-discovery";
+import { homepageLowPricePage, homepageLowPricePageCount, homepageLowPriceWhere, HOMEPAGE_LOW_PRICE_PAGE_SIZE } from "@/lib/homepage-low-price-products";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,6 +51,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const now = new Date();
   const publicProductAccess = publicProductAccessWhere(now);
   const publicStoreAccess = publicStoreAccessWhere(now);
+  const lowPriceWhere = homepageLowPriceWhere(publicProductAccess);
+  const requestedLowPricePage = homepageLowPricePage(params.lowPricePage);
   const refinements: Prisma.ProductWhereInput[] = [];
   if (availability === "in-stock") refinements.push(productGenerallyAvailableWhere());
   if (color) {
@@ -144,7 +147,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     return ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product));
   }
 
-  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows, heroProductCount, facetRows] = await Promise.all([
+  const [initialRows, total, categoryRows, newArrivalRows, bestSellerCounts, storeRows, heroProductCount, facetRows, lowPriceTotal, initialLowPriceRows] = await Promise.all([
     productsForPage(page),
     prisma.product.count({ where: isBestSelling ? { ...where, orderItems: { some: { order: { status: { in: qualifyingOrderStatuses } } } } } : where }),
     prisma.product.findMany({
@@ -172,7 +175,12 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       take: 500,
       select: { colors: true, sizes: true, store: { select: { country: true } }, options: { where: { active: true }, select: { name: true, values: { where: { active: true }, select: { value: true } } } } },
     }),
+    resultsOnly ? Promise.resolve(0) : prisma.product.count({ where: lowPriceWhere }),
+    resultsOnly ? Promise.resolve([] as ProductRow[]) : prisma.product.findMany({ where: lowPriceWhere, orderBy: [{ price: "asc" }, { id: "asc" }], skip: (requestedLowPricePage - 1) * HOMEPAGE_LOW_PRICE_PAGE_SIZE, take: HOMEPAGE_LOW_PRICE_PAGE_SIZE, select: productSelect }),
   ]);
+  const lowPriceTotalPages = homepageLowPricePageCount(lowPriceTotal);
+  const lowPricePage = Math.min(requestedLowPricePage, lowPriceTotalPages);
+  const lowPriceRows = lowPricePage === requestedLowPricePage ? initialLowPriceRows : await prisma.product.findMany({ where: lowPriceWhere, orderBy: [{ price: "asc" }, { id: "asc" }], skip: (lowPricePage - 1) * HOMEPAGE_LOW_PRICE_PAGE_SIZE, take: HOMEPAGE_LOW_PRICE_PAGE_SIZE, select: productSelect });
   const availablePages = buyerProductPageCount(total);
   const normalizedPage = Math.min(page, availablePages);
   const rows = normalizedPage === page ? initialRows : await productsForPage(normalizedPage);
@@ -213,6 +221,9 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       newArrivals={newArrivalRows.map(product=>serializeProduct(product,locale))}
       bestSellers={bestSellers}
       proDiscovery={proDiscovery.map(product => serializeProduct(product, locale))}
+      lowPriceProducts={lowPriceRows.map(product => serializeProduct(product, locale))}
+      lowPricePage={lowPricePage}
+      lowPriceTotalPages={lowPriceTotalPages}
       stores={storeRows.map((store) => ({id:store.id,name:store.name,slug:store.slug,description:store.description,logo:store.logo,city:publicStoreCity({sellerType:store.sellerType,country:store.country,displayBusinessAddress:store.displayBusinessAddress,city:store.city}),country:store.country,products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
