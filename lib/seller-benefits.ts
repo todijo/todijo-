@@ -102,12 +102,21 @@ export async function setSellerBenefitAccess(db: PrismaClient, input: { business
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-export type SellerBenefitItemInput = { id?: string; name: string; description: string; priceType: "FREE" | "SPECIAL"; priceMinor: number; quantityLimitPerStore: number; active: boolean; availableFrom: Date | null; availableUntil: Date | null };
+export type SellerBenefitItemInput = { id?: string; name: string; description: string; imageUrl: string | null; priceType: "FREE" | "SPECIAL"; priceMinor: number; quantityLimitPerStore: number; active: boolean; availableFrom: Date | null; availableUntil: Date | null };
+export function normalizeSellerBenefitImageUrl(value: string | null) {
+  if (value === null || value === "") return null;
+  if (value.length > 2048) throw new SellerBenefitError("INVALID_ITEM", 400);
+  let url: URL;
+  try { url = new URL(value); } catch { throw new SellerBenefitError("INVALID_ITEM", 400); }
+  if ((url.protocol !== "https:" && url.protocol !== "http:") || !url.hostname || url.username || url.password) throw new SellerBenefitError("INVALID_ITEM", 400);
+  return url.toString();
+}
 export async function saveSellerBenefitItem(db: PrismaClient, input: SellerBenefitItemInput & { adminId: string }) {
   if (!input.name.trim() || input.name.trim().length > 160 || input.description.trim().length > 1200 || !Number.isSafeInteger(input.priceMinor) || input.priceMinor < 0 || input.priceType === "FREE" && input.priceMinor !== 0 || input.priceType === "SPECIAL" && input.priceMinor === 0 || !Number.isSafeInteger(input.quantityLimitPerStore) || input.quantityLimitPerStore < 1 || input.quantityLimitPerStore > 10000 || input.availableFrom && input.availableUntil && input.availableUntil <= input.availableFrom) throw new SellerBenefitError("INVALID_ITEM", 400);
+  const imageUrl = normalizeSellerBenefitImageUrl(input.imageUrl);
   return db.$transaction(async tx => {
     if (input.id) await tx.$queryRaw`SELECT "id" FROM "SellerBenefitCatalogItem" WHERE "id"=${input.id} FOR UPDATE`;
-    const data = { name: input.name.trim(), description: input.description.trim(), priceType: input.priceType, priceMinor: input.priceMinor, quantityLimitPerStore: input.quantityLimitPerStore, active: input.active, availableFrom: input.availableFrom, availableUntil: input.availableUntil, updatedById: input.adminId };
+    const data = { name: input.name.trim(), description: input.description.trim(), imageUrl, priceType: input.priceType, priceMinor: input.priceMinor, quantityLimitPerStore: input.quantityLimitPerStore, active: input.active, availableFrom: input.availableFrom, availableUntil: input.availableUntil, updatedById: input.adminId };
     const item = input.id
       ? await tx.sellerBenefitCatalogItem.update({ where: { id: input.id }, data })
       : await tx.sellerBenefitCatalogItem.create({ data: { ...data, createdById: input.adminId } });

@@ -59,9 +59,9 @@ test("shared feedback styling supports responsive, dark, RTL-safe, and reduced-m
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
 });
 
-test("global errors keep technical details in console and present recovery actions", () => {
+test("global errors log only the safe digest and present recovery actions", () => {
   const error = readFileSync("app/error.tsx", "utf8");
-  assert.match(error, /console\.error\("Todijo page failed to load", error\)/);
+  assert.match(error, /console\.error\("\[route-error\]", JSON\.stringify\(\{ boundary: "app", digest: error\.digest \?\? null \}\)\)/);
   assert.match(error, /onClick=\{reset\}/);
-  assert.doesNotMatch(error, /error\.message|error\.stack|error\.digest/);
+  assert.doesNotMatch(error, /error\.message|error\.stack/);
 });

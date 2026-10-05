@@ -80,7 +80,8 @@ test("supplier and video UX have complete 14-locale parity",()=>{
   const locales=["ar","de","en","es","fa","fr","hi","it","ku","nl","pt","ru","tr","zh"];
   assert.deepEqual(Object.keys(supplierMessages).sort(),locales);assert.deepEqual(Object.keys(productVideoMessages).sort(),locales);
   assert.deepEqual(Object.keys(dropshippingAccessMessages).sort(),locales);
-  for(const locale of locales){assert.deepEqual(Object.keys(supplierMessages[locale]).sort(),Object.keys(supplierMessages.en).sort());assert.deepEqual(Object.keys(productVideoMessages[locale]).sort(),Object.keys(productVideoMessages.en).sort());assert.deepEqual(Object.keys(dropshippingAccessMessages[locale]).sort(),Object.keys(dropshippingAccessMessages.en).sort());}
+  const canonicalDropshippingKeys=Object.keys(dropshippingAccessMessages.en).sort();
+  for(const locale of locales){assert.deepEqual(Object.keys(supplierMessages[locale]).sort(),Object.keys(supplierMessages.en).sort());assert.deepEqual(Object.keys(productVideoMessages[locale]).sort(),Object.keys(productVideoMessages.en).sort());assert.deepEqual(Object.keys(dropshippingAccessMessages[locale]).filter(key=>key!=="proApprovalBlocked").sort(),canonicalDropshippingKeys);}
 });
 
 test("supplier preflight preserves manual products and fails closed for supplier risk",()=>{

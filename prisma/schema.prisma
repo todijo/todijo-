@@ -507,6 +507,7 @@ model User {
   loyaltyPlatformFunding LoyaltyPlatformFunding[] @relation("LoyaltyPlatformFundingAdmin")
   loyaltyPlatformFundingAttestations LoyaltyPlatformFundingAttestation[] @relation("LoyaltyPlatformFundingVerifier")
   loyaltyStoreChanges LoyaltyStoreChange[] @relation("LoyaltyStoreChangeActor")
+  sellerProductImports SellerProductImportJob[] @relation("SellerProductImportCreator")
 
   @@index([blockedAt, blockExpiresAt])
   @@index([sellerSuspendedAt])
@@ -910,6 +911,7 @@ model Store {
   billingForBusiness SellerBusiness? @relation("SellerBusinessBillingStore")
 
   products      Product[]
+  productImports SellerProductImportJob[]
   conversations Conversation[]
   subscription  SellerSubscription?
   accessGrants  StoreAccessGrant[]
@@ -964,6 +966,7 @@ model SellerBusiness {
   benefitAccess      SellerBenefitAccess?
   benefitRequests    SellerBenefitRequest[]
   benefitAuditEvents SellerBenefitAuditEvent[]
+  productImports SellerProductImportJob[]
 
   @@index([maxStores])
 }
@@ -1105,10 +1108,54 @@ model SellerBenefitAccess {
   @@index([enabled, updatedAt])
 }
 
+model SellerProductImportJob {
+  id             String   @id @default(cuid())
+  businessId     String
+  storeId        String
+  createdById    String
+  idempotencyKey String   @db.VarChar(80)
+  sourceFormat   String   @db.VarChar(8)
+  mapping        Json
+  status         String   @default("PROCESSING") @db.VarChar(24)
+  requestedCount Int
+  importedCount  Int      @default(0)
+  failedCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  business SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("SellerProductImportCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  items SellerProductImportItem[]
+
+  @@unique([businessId, idempotencyKey])
+  @@index([storeId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model SellerProductImportItem {
+  id        String   @id @default(cuid())
+  importId  String
+  rowNumber Int
+  sourceRow Json
+  status    String   @default("PENDING") @db.VarChar(24)
+  errorCode String?  @db.VarChar(80)
+  productId String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  import  SellerProductImportJob @relation(fields: [importId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([importId, rowNumber])
+  @@index([importId, status])
+}
+
 model SellerBenefitCatalogItem {
   id                    String                 @id @default(cuid())
   name                  String                 @db.VarChar(160)
   description           String                 @db.VarChar(1200)
+  imageUrl              String?                @db.VarChar(2048)
   priceType             SellerBenefitPriceType
   priceMinor            Int                    @default(0)
   quantityLimitPerStore Int
@@ -1282,6 +1329,10 @@ model Product {
   shippingCarrier String?
   shippingProvider String?
   shippingExternalServiceId String?
+  weightGrams Int?
+  lengthMm Int?
+  widthMm Int?
+  heightMm Int?
   removedAt DateTime?
   removedById String?
   removalActorRole UserRole?
@@ -1304,6 +1355,7 @@ model Product {
   media         ProductMedia[]
   catalogTranslationItems CatalogTranslationItem[]
   translations ProductTranslation[]
+  sellerImportItem SellerProductImportItem?
 
   @@unique([storeId, slug])
   @@index([storeId, status])

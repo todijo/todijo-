@@ -22,7 +22,7 @@ test("registration and verification preserve only the safe seller continuation",
   const register=source("app/api/auth/register/route.ts"),email=source("lib/email/send.ts"),verify=source("app/api/auth/verify-email/route.ts"),client=source("app/verify-email/VerifyEmailClient.tsx");
   assert.match(register,/sendVerificationEmail\([^\n]+next/);
   assert.match(email,/url\.searchParams\.set\("next",input\.next\)/);
-  assert.match(verify,/safeLoginDestination\(next,locale\)/);
+  assert.match(verify,/nextValue\?safeLoginDestination\(nextValue,locale\):user\?\.role==="SELLER"\?sellerOnboardingDestination/);
   assert.match(client,/success&&next\?next/);
 });
 

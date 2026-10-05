@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { locales } from "../i18n/config";
-import { sellerReviewMessages } from "../i18n/seller-review";
+import { sellerReviewMessages, sellerReviewStateLabel } from "../i18n/seller-review";
 import { reviewSellerOnboarding, SellerReviewError } from "../lib/seller-onboarding-review";
 import { requireAdmin } from "../lib/admin-access";
 import { assertAdminMutationRequest } from "../lib/request-security";
@@ -55,3 +55,13 @@ test("pending Admin inspection exposes context without Stripe calls", () => {
   assert.doesNotMatch(page, /retrieveStripe|createConnectedAccount|sellerSubscriptionChange/);
 });
 test("Admin review remains discoverable, localized, and RTL-aware",()=>{for(const locale of locales){const copy=sellerReviewMessages[locale];for(const value of Object.values(copy))assert.ok(value.trim(),`${locale} review copy`);}const admin=readFileSync(join(process.cwd(),"app/adm-barewbar-182203/page.tsx"),"utf8"),page=readFileSync(join(process.cwd(),"app/adm-barewbar-182203/seller-review/page.tsx"),"utf8"),actions=readFileSync(join(process.cwd(),"app/adm-barewbar-182203/seller-review/SellerReviewActions.tsx"),"utf8");assert.match(admin,/seller-review/);assert.match(page,/rtlLocales\.has\(locale\)/);assert.match(actions,/role="status"/);assert.doesNotMatch(actions,/>Verify<|>Reject<|placeholder="Review reason"/);});
+test("Admin seller readiness displays localized known states and preserves unknown state identity", () => {
+  assert.equal(sellerReviewStateLabel("fr", "onboarding", "PENDING_REVIEW"), "En attente de validation");
+  assert.equal(sellerReviewStateLabel("fr", "sellerType", "PROFESSIONAL"), "Professionnel");
+  assert.equal(sellerReviewStateLabel("fr", "verification", "INSEE_NEW_STATE"), "État inconnu (INSEE_NEW_STATE)");
+  assert.equal(sellerReviewStateLabel("en", "vat", "REGISTERED"), "Registered");
+  const page = readFileSync(join(process.cwd(), "app/adm-barewbar-182203/seller-review/page.tsx"), "utf8");
+  assert.match(page, /stateLabel\("verification", store\.business\?\.inseeVerificationState\)/);
+  assert.match(page, /countryLabel\(store\.country\)/);
+  assert.doesNotMatch(page, /\{store\.onboardingStatus\}|\{store\.owner\.role\}|\{store\.vatStatus\}/);
+});

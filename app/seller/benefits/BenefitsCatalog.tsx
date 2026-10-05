@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Store = { id: string; name: string };
-type Item = { id: string; name: string; description: string; priceType: "FREE" | "SPECIAL"; priceMinor: number; quantityLimitPerStore: number; remaining: number; unavailable: boolean; availableFrom: string | null; availableUntil: string | null };
+type Item = { id: string; name: string; description: string; imageUrl: string | null; priceType: "FREE" | "SPECIAL"; priceMinor: number; quantityLimitPerStore: number; remaining: number; unavailable: boolean; availableFrom: string | null; availableUntil: string | null };
 
 export default function BenefitsCatalog({ locale, store, storeLabel, stores, items }: { locale: string; store: Store; storeLabel: string; stores: Store[]; items: Item[] }) {
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function BenefitsCatalog({ locale, store, storeLabel, stores, ite
   return <>
     {stores.length > 1 && <label>{storeLabel}<select value={store.id} onChange={event => router.push(`/${locale}/seller/benefits?store=${encodeURIComponent(event.target.value)}`)}>{stores.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
     <div className="premiumQuickGrid sellerBenefitsGrid">{items.map(item => <article className="storeSetupCard sellerBenefitCard" key={item.id}>
-      <h2>{item.name}</h2><p>{item.description}</p>
+      {item.imageUrl && <img className="sellerBenefitImage" src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer"/>}<h2>{item.name}</h2><p>{item.description}</p>
       <p><strong>{item.priceType === "FREE" ? "Offert" : "Tarif préférentiel"}</strong>{item.priceType === "SPECIAL" ? ` · ${new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(item.priceMinor / 100)}` : ""}</p>
       <p>Limite : {item.quantityLimitPerStore} par boutique.</p>
       {item.unavailable ? <p>{"Indisponible actuellement"}</p> : <form onSubmit={event => { event.preventDefault(); void choose(item, event.currentTarget); }}>

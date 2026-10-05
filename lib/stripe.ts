@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export type StripeCheckoutSession = {
   id: string;
@@ -123,10 +123,22 @@ export class StripeApiError extends Error {
   }
 }
 
-export function stripeErrorDiagnostic(error: unknown) {
-  if (error instanceof StripeApiError) return { category: "provider", code: error.code ?? "unknown", statusCode: error.statusCode ?? null };
-  if (error instanceof StripeTransportError) return { category: "transport", code: "unreachable", statusCode: null };
-  return { category: "internal", code: "unexpected", statusCode: null };
+export function stripeErrorDiagnostic(error: unknown, context: { correlationId?: string; route?: string; sellerId?: string; hasStoredAccount?: boolean } = {}) {
+  const provider = error instanceof StripeApiError ? { category: "provider", code: error.code ?? "unknown", statusCode: error.statusCode ?? null }
+    : error instanceof StripeTransportError ? { category: "transport", code: "unreachable", statusCode: null }
+    : { category: "internal", code: "unexpected", statusCode: null };
+  let stripeMode: StripeMode | null = null;
+  try { stripeMode = configuredStripeMode(); } catch { /* Configuration detail is represented as unknown, never logged verbatim. */ }
+  return {
+    ...provider,
+    occurredAt: new Date().toISOString(),
+    correlationId: context.correlationId ?? null,
+    route: context.route ?? null,
+    sellerRef: context.sellerId ? createHash("sha256").update(context.sellerId).digest("hex").slice(0, 12) : null,
+    stripeMode,
+    storedAccountIdPresent: context.hasStoredAccount ?? null,
+    accountPlatformMembership: "unconfirmed_after_failure",
+  };
 }
 
 async function stripeRequest<T>(path: string, init: { method?: "GET" | "POST"; body?: URLSearchParams; idempotencyKey?: string } = {}) {

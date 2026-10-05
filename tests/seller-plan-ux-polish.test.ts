@@ -26,23 +26,31 @@ test("PRO product import is denied for FREE and PLUS and allowed for paid, grant
   assert.equal((await requireProProductImport(importDb(null, "ADMIN"), "seller")).businessId, "business");
 });
 
-test("import route fails closed before the unavailable importer response and never calls Admin/CJ APIs", () => {
+test("PRO import route applies the server-side gate before processing files and never calls Admin/CJ APIs", () => {
   const route = source("app/api/seller/products/import/route.ts");
-  assert.ok(route.indexOf("isTrustedMutationRequest(request)") < route.indexOf("requireProProductImport(prisma, session.userId)"));
-  assert.match(route, /PRO_PRODUCT_IMPORT_NOT_AVAILABLE/);
+  const post = route.slice(route.indexOf("export async function POST"));
+  assert.ok(post.indexOf("isTrustedMutationRequest(request)") < post.indexOf("requireProProductImport(prisma, session.userId)"));
+  assert.ok(post.indexOf("requireProProductImport(prisma, session.userId)") < post.indexOf("parseSellerProductImport"));
+  assert.match(route, /createSellerProductImportJob/);
+  assert.match(route, /processSellerProductImport/);
   assert.doesNotMatch(route, /api\/admin|api\/supplier\/cj|CjCatalogProvider|importSupplierProduct/);
   assert.match(source("app/seller/products/import/page.tsx"), /requireProProductImport\(prisma, session\.userId\)/);
 });
 
-test("PRO import appears only in the effective owner navigation and the preview admits the importer is not built", () => {
+test("PRO import appears only in effective owner navigation and exposes the approved import UI", () => {
   const navigation = source("components/SellerDashboardLayout.tsx");
   assert.match(navigation, /ownerTools&&proImportAvailable/);
   assert.match(navigation, /hasProSellerCapabilities\(await sellerBusinessCommercialPlan/);
   assert.match(source("app/dashboard/page.tsx"), /proImportAvailable:Boolean\(selectedPrincipal\?\.owner&&hasProSellerCapabilities\(selectedCommercialPlan\)\)/);
   const copy = sellerFreeModelCopy("fr");
-  assert.match(copy.proImport, /plateformes et marketplaces compatibles/);
-  assert.match(copy.proImport, /bientôt disponible/);
-  assert.match(copy.importIntro, /en préparation/);
+  assert.equal(copy.importProducts, "Importer vos produits");
+  assert.equal(copy.importSource, "Source d’importation");
+  assert.equal(copy.importFile, "Fichier catalogue");
+  assert.equal(copy.importFormats, "Formats acceptés : CSV, Excel, XML et JSON.");
+  assert.equal(copy.importVerify, "Vérifier le fichier");
+  assert.equal(copy.importAsDrafts, "Importer comme brouillons");
+  assert.equal(copy.importReady, "{count} produits prêts à être importés comme brouillons.");
+  assert.doesNotMatch(source("i18n/seller-free-model.ts"), /bientôt disponible|en préparation/);
   assert.match(copy.suppliesHelp, /^Accès aux fournitures d’expédition Todijo, selon disponibilité et conditions\.$/);
 });
 

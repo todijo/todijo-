@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { connectedAccountIdempotencyKey, startStripeConnectOnboarding } from "../lib/stripe-connect-onboarding";
-import { StripeApiError, StripeTransportError, type StripeConnectedAccount } from "../lib/stripe";
+import { StripeApiError, StripeTransportError, stripeErrorDiagnostic, type StripeConnectedAccount } from "../lib/stripe";
 
 const seller = { id: "seller_1", email: "seller@example.com", stripeAccountId: null };
 const account = (id = "acct_new"): StripeConnectedAccount => ({ id, object: "account", details_submitted: false, charges_enabled: false, payouts_enabled: false });
@@ -28,6 +28,22 @@ test("first connected-account attempt uses the legacy generation-zero key and pe
   const { db, state } = database(); const calls: string[] = [];
   const url = await startStripeConnectOnboarding(db, seller, { createAccount: async (input) => { calls.push(input.idempotencyKey); return account(); }, createAccountLink: link });
   assert.equal(url, "https://connect.stripe.test/acct_new"); assert.deepEqual(calls, ["connect-account-v2:seller_1"]); assert.equal(state.stripeAccountId, "acct_new"); assert.equal(state.stripeConnectAccountAttemptGeneration, 0);
+});
+
+test("Stripe Connect diagnostics identify provider account_invalid safely without exposing identifiers or messages", () => {
+  const previous = process.env.STRIPE_SECRET_KEY, previousMode = process.env.STRIPE_MODE;
+  process.env.STRIPE_SECRET_KEY = "sk_test_diagnostic_only"; process.env.STRIPE_MODE = "test";
+  try {
+    const diagnostic = stripeErrorDiagnostic(new StripeApiError("invalid account acct_private for seller@example.com", "account_invalid", 403), {
+      correlationId: "request-diagnostic-1", route: "GET /api/stripe/connect/status", sellerId: "seller_private", hasStoredAccount: true,
+    });
+    assert.equal(diagnostic.category, "provider"); assert.equal(diagnostic.code, "account_invalid"); assert.equal(diagnostic.statusCode, 403);
+    assert.equal(diagnostic.correlationId, "request-diagnostic-1"); assert.equal(diagnostic.route, "GET /api/stripe/connect/status");
+    assert.equal(diagnostic.stripeMode, "test"); assert.equal(diagnostic.storedAccountIdPresent, true); assert.equal(diagnostic.accountPlatformMembership, "unconfirmed_after_failure");
+    assert.match(String(diagnostic.sellerRef), /^[a-f0-9]{12}$/); assert.doesNotMatch(JSON.stringify(diagnostic), /acct_private|seller_private|seller@example\.com|invalid account/);
+    const transport = stripeErrorDiagnostic(new StripeTransportError("timeout while contacting Stripe"));
+    assert.equal(transport.category, "transport"); assert.equal(transport.code, "unreachable"); assert.doesNotMatch(JSON.stringify(transport), /timeout while contacting Stripe/);
+  } finally { if (previous === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previous; if (previousMode === undefined) delete process.env.STRIPE_MODE; else process.env.STRIPE_MODE = previousMode; }
 });
 
 test("ambiguous transport retries reuse the same durable idempotency key", async () => {

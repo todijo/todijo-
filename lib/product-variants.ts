@@ -149,7 +149,7 @@ async function createProductOptionsAndVariants(tx: Prisma.TransactionClient, pro
   if (draftByKey.size !== generated.length) throw new ProductVariantError("Invalid product variant.");
 }
 
-export async function createProductWithVariants(db: PrismaClient, data: Prisma.ProductUncheckedCreateInput, input?: ProductVariantsInput, variantImages?: unknown, authorize?: (tx: Prisma.TransactionClient) => Promise<unknown>) {
+export async function createProductWithVariants(db: PrismaClient, data: Prisma.ProductUncheckedCreateInput, input?: ProductVariantsInput, variantImages?: unknown, authorize?: (tx: Prisma.TransactionClient) => Promise<unknown>, afterCreate?: (tx: Prisma.TransactionClient, productId: string) => Promise<unknown>) {
   const options = input ? normalizeOptions(input.options) : [];
   if (input?.generate) {
     const count = combinations(options.map((option) => option.values.map(({ value }) => value))).length;
@@ -161,6 +161,7 @@ export async function createProductWithVariants(db: PrismaClient, data: Prisma.P
     if (input && options.length) await createProductOptionsAndVariants(tx, product.id, new Prisma.Decimal(String(data.price)), options, input);
     const productImages = Array.isArray(data.images) ? data.images as string[] : [];
     if (productImages.length || variantImages != null) await replaceProductVariantImages(tx, product.id, productImages, variantImages);
+    if (afterCreate) await afterCreate(tx, product.id);
     return product;
   });
 }

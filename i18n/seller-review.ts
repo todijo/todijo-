@@ -23,3 +23,31 @@ const baseSellerReviewMessages: Record<Locale, SellerReviewCopy> = {
   ru: { reason: "Причина решения", verify: "Подтвердить", needsInformation: "Нужна информация", reject: "Отклонить", working: "Сохранение…", failed: "Не удалось сохранить решение.", saved: "Решение сохранено.", backAdmin: "Назад в панель администратора" },
 };
 export const sellerReviewMessages = Object.fromEntries(Object.entries(baseSellerReviewMessages).map(([locale, copy]) => [locale, { ...copy, ...(locale === "fr" ? reviewDetails.fr : reviewDetails.en) }])) as Record<Locale, SellerReviewCopy & typeof reviewDetails.en>;
+
+type StatusGroup = "role" | "store" | "sellerType" | "onboarding" | "verification" | "legalForm" | "vat";
+const localizedStates: Record<"en" | "fr", Record<StatusGroup, Record<string, string>>> = {
+  en: {
+    role: { SELLER: "Seller", ADMIN: "Administrator", CUSTOMER: "Buyer" },
+    store: { PENDING: "Pending", ACTIVE: "Active", SUSPENDED: "Suspended", REJECTED: "Rejected" },
+    sellerType: { UNKNOWN: "Not specified", PROFESSIONAL: "Professional", PRIVATE: "Private seller" },
+    onboarding: { NOT_STARTED: "Not started", IN_PROGRESS: "In progress", PENDING_REVIEW: "Awaiting validation", VERIFIED: "Verified", REJECTED: "Rejected", NEEDS_INFORMATION: "Information required" },
+    verification: { NOT_STARTED: "Not started", PENDING: "In progress", VERIFIED: "Verified", MANUAL_REVIEW: "Manual review", REJECTED: "Rejected", REVERIFY_REQUIRED: "Re-verification required" },
+    legalForm: { PRIVATE: "Private seller", SOLE_TRADER: "Sole trader", COMPANY: "Company", ASSOCIATION: "Association", OTHER: "Other" },
+    vat: { UNKNOWN: "Not specified", REGISTERED: "Registered", NOT_REGISTERED_OR_NOT_APPLICABLE: "Not registered / not applicable" },
+  },
+  fr: {
+    role: { SELLER: "Vendeur", ADMIN: "Administrateur", CUSTOMER: "Acheteur" },
+    store: { PENDING: "En attente", ACTIVE: "Active", SUSPENDED: "Suspendue", REJECTED: "Refusée" },
+    sellerType: { UNKNOWN: "Non renseigné", PROFESSIONAL: "Professionnel", PRIVATE: "Particulier" },
+    onboarding: { NOT_STARTED: "Non commencé", IN_PROGRESS: "En cours", PENDING_REVIEW: "En attente de validation", VERIFIED: "Vérifié", REJECTED: "Refusé", NEEDS_INFORMATION: "Informations requises" },
+    verification: { NOT_STARTED: "Non commencé", PENDING: "En cours de vérification", VERIFIED: "Vérifié", MANUAL_REVIEW: "Vérification manuelle", REJECTED: "Refusé", REVERIFY_REQUIRED: "Nouvelle vérification requise" },
+    legalForm: { PRIVATE: "Particulier", SOLE_TRADER: "Entreprise individuelle", COMPANY: "Société", ASSOCIATION: "Association", OTHER: "Autre" },
+    vat: { UNKNOWN: "Non renseigné", REGISTERED: "Assujetti à la TVA", NOT_REGISTERED_OR_NOT_APPLICABLE: "Non assujetti / non applicable" },
+  },
+};
+
+export function sellerReviewStateLabel(locale: string, group: StatusGroup, value: string | null | undefined) {
+  if (!value) return "—";
+  const language = locale === "fr" ? "fr" : "en";
+  return localizedStates[language][group][value] ?? `${language === "fr" ? "État inconnu" : "Unknown state"} (${value})`;
+}

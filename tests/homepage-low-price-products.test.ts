@@ -26,6 +26,7 @@ test("low-price page inputs are bounded and query pagination is independent of m
   assert.equal(homepageLowPricePageCount(25), 3);
   assert.equal(homepageLowPricePageCount(0), 1);
   const home = readFileSync("app/HomeClient.tsx", "utf8");
+  assert.match(home, /activeLocale === "fr" \? "Les meilleures trouvailles de 0,50 € à 4 €"/);
   assert.match(home, /`\/\$\{activeLocale\}\?lowPricePage=\$\{nextPage\}#low-price-products`/);
   assert.match(home, /homepageLowPricePagination/);
   assert.match(home, /aria-current="page"/);

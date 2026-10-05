@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { requireSellerBenefitAccess, SellerBenefitError, sellerBenefitAccessAllowed, sellerBenefitItemAvailable, sellerBenefitQuantityFits } from "../lib/seller-benefits";
+import { normalizeSellerBenefitImageUrl, requireSellerBenefitAccess, SellerBenefitError, sellerBenefitAccessAllowed, sellerBenefitItemAvailable, sellerBenefitQuantityFits } from "../lib/seller-benefits";
 import { assertAdminMutationRequest } from "../lib/request-security";
 
 const source = (path: string) => readFileSync(path, "utf8");
@@ -64,6 +64,18 @@ test("catalog prices and request records are snapshotted and auditable", () => {
   for (const model of ["SellerBenefitAccess", "SellerBenefitCatalogItem", "SellerBenefitRequest", "SellerBenefitAuditEvent"]) assert.match(schema, new RegExp(`model ${model} \\{`));
 });
 
+test("Admin benefit images accept safe HTTP(S) URLs only and are persisted/displayed", () => {
+  assert.equal(normalizeSellerBenefitImageUrl(null), null);
+  assert.equal(normalizeSellerBenefitImageUrl("https://cdn.example/item.jpg"), "https://cdn.example/item.jpg");
+  assert.equal(normalizeSellerBenefitImageUrl("http://cdn.example/item.jpg"), "http://cdn.example/item.jpg");
+  for (const value of ["javascript:alert(1)", "data:image/svg+xml,hello", "https://user:pass@example.com/a.jpg", "not-a-url"]) {
+    assert.throws(() => normalizeSellerBenefitImageUrl(value), (error: unknown) => error instanceof SellerBenefitError && error.code === "INVALID_ITEM");
+  }
+  assert.match(source("app/adm-barewbar-182203/benefits/AdminSellerBenefitsManager.tsx"), /Image de l’article \(URL\)/);
+  assert.match(source("app/seller/benefits/BenefitsCatalog.tsx"), /sellerBenefitImage/);
+  assert.match(source("prisma/migrations/20261005210000_add_seller_benefit_image/migration.sql"), /ADD COLUMN "imageUrl" VARCHAR\(2048\)/);
+});
+
 test("Admin mutations require Admin authorization and trusted mutation origin", () => {
   const api = source("app/api/admin/seller-benefits/route.ts"), review = source("app/api/admin/seller-benefits/requests/[requestId]/route.ts");
   assert.match(api, /assertAdminMutationRequest\(request\)/);
@@ -95,13 +107,13 @@ test("dashboard exposes the approved card only for PRO with explicit enablement"
 test("approved catalog copy and old free-form entry are handled safely", () => {
   const page = source("app/seller/benefits/page.tsx"), catalog = source("app/seller/benefits/BenefitsCatalog.tsx"), admin = source("app/adm-barewbar-182203/benefits/AdminSellerBenefitsManager.tsx"), oldPage = source("app/seller/shipping-supplies/page.tsx"), oldApi = source("app/api/seller/shipping-supplies/route.ts");
   for (const text of ["Cadeaux et avantages Todijo", "Offert", "Tarif préférentiel", "Indisponible actuellement", "Quantité", "Limite :", "Choisir cet article"]) assert.ok(`${page}${catalog}`.includes(text));
-  for (const text of ["Gestion des avantages Todijo PRO", "Activer l’accès au catalogue", "Désactiver l’accès au catalogue", "Ajouter un avantage", "Nom de l’article", "Description", "Tarif", "Quantité disponible", "Début de disponibilité", "Fin de disponibilité", "Article actif"]) assert.ok(admin.includes(text));
+  for (const text of ["Gestion des avantages Todijo PRO", "Activer l’accès au catalogue", "Désactiver l’accès au catalogue", "Ajouter un avantage", "Nom de l’article", "Description", "Image de l’article (URL)", "Tarif", "Quantité disponible", "Début de disponibilité", "Fin de disponibilité", "Article actif"]) assert.ok(admin.includes(text));
   assert.match(oldPage, /seller\/benefits/);
   assert.match(oldApi, /STRUCTURED_CATALOG_REQUIRED/);
   assert.doesNotMatch(oldApi, /requestProShippingSupplies/);
 });
 
-test("seller and Admin benefits use structured responsive catalog cards and preserve failed edits", () => {
+test("seller and Admin benefits use structured responsive catalog cards, explicit editor modes, and approved save feedback", () => {
   const catalog = source("app/seller/benefits/BenefitsCatalog.tsx"), admin = source("app/adm-barewbar-182203/benefits/AdminSellerBenefitsManager.tsx"), css = source("app/globals.css");
   assert.match(catalog, /sellerBenefitsGrid/);
   assert.match(catalog, /sellerBenefitCard/);
@@ -109,7 +121,11 @@ test("seller and Admin benefits use structured responsive catalog cards and pres
   assert.match(admin, /adminBenefitEditor/);
   assert.match(admin, /adminBenefitItemGrid/);
   assert.match(admin, /const saved = await post\(/);
-  assert.match(admin, /if \(saved\) setEditing\(null\)/);
+  assert.match(admin, /data-editor-mode=\{editing \? "edit" : "create"\}/);
+  assert.match(admin, /setFeedback\("Avantage enregistré\."\)/);
+  assert.match(admin, /role="status"\>\{feedback\}/);
+  assert.match(admin, /required=\{priceType === "SPECIAL"\}/);
+  assert.match(admin, /if \(saved\) \{/);
   assert.match(css, /\.adminBenefitItemGrid\{display:grid/);
   assert.match(css, /\.sellerBenefitsPage\{/);
   assert.match(css, /@media\(max-width:640px\)\{\.adminSellerBenefitsPage/);
