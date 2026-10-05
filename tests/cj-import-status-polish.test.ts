@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { locales } from "../i18n/config";
 import { supplierBulkMessages } from "../i18n/supplier-bulk";
 import { canContinueCatalogJob, catalogJobProgress, type CatalogJobProgressInput } from "../lib/suppliers/catalog-job-progress";
-import { readCatalogImportJob } from "../lib/suppliers/supplier-catalog-jobs";
+import { CATALOG_IMPORT_JOBS_PAGE_SIZE, listCatalogImportJobsPage, readCatalogImportJob } from "../lib/suppliers/supplier-catalog-jobs";
 
 const base:CatalogJobProgressInput={status:"RUNNING",requestedCount:35,processedCount:24,importedCount:20,skippedCount:2,quarantinedCount:2,failedCount:0,createdAt:"2026-09-03T10:00:00.000Z",startedAt:"2026-09-03T10:00:00.000Z",completedAt:null,isProcessing:true};
 
@@ -54,4 +54,15 @@ test("active progress refresh uses lightweight no-store snapshots and avoids ove
   const workspace=readFileSync("components/SupplierCatalogWorkspace.tsx","utf8"),route=readFileSync("app/api/admin/supplier-products/bulk-import/[jobId]/route.ts","utf8");
   assert.match(workspace,/pendingJobLoadsRef/);assert.match(workspace,/setInterval\(poll,1000\)/);assert.match(workspace,/\?progress=1/);assert.match(workspace,/jobsRef\.current\.filter\(job=>job\.isProcessing\)/);
   assert.match(route,/searchParams\.get\("progress"\)!=="1"/);assert.match(route,/Cache-Control":"private, no-store"/);
+});
+
+test("import history pagination reads only the requested bounded page without deleting history",async()=>{
+  let query:any;
+  const row=(id:string)=>({id,status:"COMPLETED",requestedCount:1,processedCount:1,importedCount:1,skippedCount:0,quarantinedCount:0,failedCount:0,batchLimit:10,destinationCountry:"FR",createdAt:new Date(0),startedAt:new Date(0),updatedAt:new Date(0),completedAt:new Date(0)});
+  const db={supplierCatalogImportJob:{count:async()=>23,findMany:async(args:any)=>{query=args;return [row("job-21"),row("job-22"),row("job-23")];}},supplierCatalogImportItem:{groupBy:async()=>[]}} as never;
+  const result=await listCatalogImportJobsPage(db,"admin",3);
+  assert.equal(CATALOG_IMPORT_JOBS_PAGE_SIZE,10);assert.deepEqual({page:result.page,pageCount:result.pageCount,total:result.total,jobs:result.jobs.length},{page:3,pageCount:3,total:23,jobs:3});
+  assert.equal(query.skip,20);assert.equal(query.take,10);assert.equal(query.where.createdById,"admin");
+  const workspace=readFileSync("components/SupplierCatalogWorkspace.tsx","utf8");
+  assert.match(workspace,/scrollIntoView\(\{behavior:"smooth",block:"center"\}\)/);assert.match(workspace,/id=\{`supplier-job-\$\{job\.id\}`\}/);assert.match(workspace,/href=\{`\?page=/);assert.doesNotMatch(workspace,/scrollTo\(0,document\.body\.scrollHeight\)|footer\.scrollIntoView/);
 });

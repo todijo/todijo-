@@ -60,12 +60,26 @@ export async function createCatalogImportJob(db:PrismaClient,input:JobCategoryIn
 }
 
 const jobSummarySelect={id:true,status:true,requestedCount:true,processedCount:true,importedCount:true,skippedCount:true,quarantinedCount:true,failedCount:true,batchLimit:true,destinationCountry:true,createdAt:true,startedAt:true,updatedAt:true,completedAt:true} as const;
+type CatalogImportJobSummary=Prisma.SupplierCatalogImportJobGetPayload<{select:typeof jobSummarySelect}>;
+
+export const CATALOG_IMPORT_JOBS_PAGE_SIZE=10;
+
+async function decorateCatalogImportJobs(db:PrismaClient,jobs:CatalogImportJobSummary[]){
+  if(!jobs.length)return [];
+  const jobIds=jobs.map(job=>job.id),active=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobIds},status:"IMPORTING"},_count:{_all:true}}),stale=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobIds},status:"IMPORTING",claimedAt:{lt:new Date(Date.now()-STALE_CLAIM_MS)}},_count:{_all:true}}),counts=new Map(active.map(row=>[row.jobId,row._count._all])),staleCounts=new Map(stale.map(row=>[row.jobId,row._count._all]));
+  return jobs.map(job=>{const processingCount=job.status==="CANCELLED"?0:counts.get(job.id)??0,isStale=processingCount>0&&processingCount===staleCounts.get(job.id),remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0&&!isStale,isStale,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING")};});
+}
+
+export async function listCatalogImportJobsPage(db:PrismaClient,adminId:string,requestedPage:unknown=1){
+  const parsed=Number(requestedPage),safePage=Number.isSafeInteger(parsed)&&parsed>0?parsed:1;
+  const total=await db.supplierCatalogImportJob.count({where:{createdById:adminId}}),pageCount=Math.max(1,Math.ceil(total/CATALOG_IMPORT_JOBS_PAGE_SIZE)),page=Math.min(safePage,pageCount);
+  const jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},skip:(page-1)*CATALOG_IMPORT_JOBS_PAGE_SIZE,take:CATALOG_IMPORT_JOBS_PAGE_SIZE,select:jobSummarySelect});
+  return {jobs:await decorateCatalogImportJobs(db,jobs),page,pageCount,total};
+}
 
 export async function listCatalogImportJobs(db:PrismaClient,adminId:string){
   const jobs=await db.supplierCatalogImportJob.findMany({where:{createdById:adminId},orderBy:{createdAt:"desc"},take:20,select:jobSummarySelect});
-  if(!jobs.length)return[];
-  const jobIds=jobs.map(job=>job.id),active=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobIds},status:"IMPORTING"},_count:{_all:true}}),stale=await db.supplierCatalogImportItem.groupBy({by:["jobId"],where:{jobId:{in:jobIds},status:"IMPORTING",claimedAt:{lt:new Date(Date.now()-STALE_CLAIM_MS)}},_count:{_all:true}}),counts=new Map(active.map(row=>[row.jobId,row._count._all])),staleCounts=new Map(stale.map(row=>[row.jobId,row._count._all]));
-  return jobs.map(job=>{const processingCount=job.status==="CANCELLED"?0:counts.get(job.id)??0,isStale=processingCount>0&&processingCount===staleCounts.get(job.id),remainingCount=Math.max(0,job.requestedCount-job.processedCount);return{...job,processingCount,remainingCount,isProcessing:processingCount>0&&!isStale,isStale,canContinue:processingCount===0&&remainingCount>0&&(job.status==="PENDING"||job.status==="RUNNING")};});
+  return decorateCatalogImportJobs(db,jobs);
 }
 
 type CatalogPricingAttempt={supplierVariantId:string;origins:string[];status:"SELECTED"|"REJECTED";errorCode?:string;selectedOrigin?:string;freightAmount?:string;freightCurrency?:string;buyerPrice?:string};
