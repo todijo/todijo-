@@ -11,6 +11,12 @@ export function collectRuntimeErrors(page: Page) {
   return () => expect(errors, "unexpected browser runtime errors").toEqual([]);
 }
 
+export function collectUncaughtRuntimeErrors(page: Page) {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  return () => expect(errors, "uncaught browser runtime exceptions").toEqual([]);
+}
+
 export async function dismissCookieConsent(page: Page) {
   const rejectAll = page.locator(".cookieReject");
   try {

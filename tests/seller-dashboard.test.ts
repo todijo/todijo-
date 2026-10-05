@@ -30,16 +30,16 @@ test("seller analytics prefer immutable product snapshots", () => {
 
 test("seller recent orders prefer snapshots and retain relation fallbacks", () => {
   const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
-  assert.match(source, /productImageUrlSnapshot \?\? item\?\.product\.images\[0\]/);
-  assert.match(source, /productNameSnapshot \?\? item\?\.product\.name/);
-  assert.match(source, /recipientName \?\? order\.buyerNameSnapshot \?\?/);
+  assert.match(source, /productImageUrlSnapshot\s*\?\?\s*item\?\.product\.images\[0\]/);
+  assert.match(source, /productNameSnapshot\s*\?\?\s*item\?\.product\.name/);
+  assert.match(source, /recipientName\s*\?\?\s*order\.buyerNameSnapshot\s*\?\?/);
 });
 
 test("seller dashboard reuses the strict order ownership filter and retains five recent orders", () => {
   const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
-  assert.match(source, /const sellerOrdersWhere = sellerOrderHistoryWhere\(session\.userId, activeStore\.id, ""\)/);
+  assert.match(source, /const sellerOrdersWhere = sellerOrderHistoryWhere\(userId, storeId, ""\)/);
   assert.match(source, /prisma\.order\.findMany\(\{ where: sellerOrdersWhere,/);
-  assert.match(source, /sellerOrders\.slice\(0, 5\)/);
+  assert.match(source, /permissions\.orders \? prisma\.order\.findMany\(\{ where: sellerOrdersWhere, take: 5/);
   const branches: any[] = (sellerOrderHistoryWhere("seller_1", "store_1", "") as any).AND[0].OR;
   assert.deepEqual(branches[0], { storeIdSnapshot: "store_1" });
   assert.equal(branches[1].storeIdSnapshot, null);
@@ -71,16 +71,18 @@ test("seller dashboard keeps its primary hero and operational content ahead of s
   assert.ok(multiStore.indexOf("premiumStatsGrid") < multiStore.indexOf("<DashboardSection"));
   assert.ok(multiStore.indexOf("<DashboardSection") < multiStore.indexOf("<LockedMultiStoreTeaser"));
 
-  const singleStore = source.slice(source.indexOf("const sellerOrdersWhere"));
+  const singleStore = source.slice(source.indexOf("const dashboardMetrics = loadSellerDashboardMetrics"));
   const hero = singleStore.indexOf("<section className=\"sellerOverviewHero\">");
-  const metrics = singleStore.indexOf("className=\"premiumStatsGrid\"", hero);
-  const dashboardContent = singleStore.indexOf("className=\"premiumDashboardColumns sellerColumns\"", metrics);
-  const freeUpgrade = singleStore.indexOf("<FreeSellerStartCard", dashboardContent);
-  const teaser = singleStore.indexOf("<LockedMultiStoreTeaser", dashboardContent);
-  const supplies = singleStore.indexOf("sellerBenefitCatalogEnabled", dashboardContent);
-  assert.ok(hero >= 0 && hero < metrics && metrics < dashboardContent);
-  assert.ok(dashboardContent < freeUpgrade && dashboardContent < teaser && dashboardContent < supplies);
-  assert.ok(singleStore.indexOf("<StripeConnectSection", dashboardContent) > supplies);
+  const heroMetrics = singleStore.indexOf("<SellerDashboardHeroMetrics", hero);
+  const secondary = singleStore.indexOf("<SellerDashboardSecondarySections", hero);
+  const benefits = singleStore.indexOf("sellerBenefitCatalogEnabled", secondary);
+  const stripe = singleStore.indexOf("<StripeConnectSection", benefits);
+  assert.ok(hero >= 0 && hero < heroMetrics && heroMetrics < secondary);
+  assert.ok(secondary > 0 && benefits > secondary && stripe > benefits);
+  const secondaryComponent = source.slice(source.indexOf("async function SellerDashboardSecondarySections"), source.indexOf("export default async function DashboardPage"));
+  assert.ok(secondaryComponent.indexOf("className=\"premiumStatsGrid\"") < secondaryComponent.indexOf("className=\"premiumDashboardColumns sellerColumns\""));
+  assert.ok(secondaryComponent.indexOf("className=\"premiumDashboardColumns sellerColumns\"") < secondaryComponent.indexOf("<FreeSellerStartCard"));
+  assert.ok(secondaryComponent.indexOf("<FreeSellerStartCard") < secondaryComponent.indexOf("<LockedMultiStoreTeaser"));
 });
 
 test("Admin dashboard hero, summary metrics and management content retain their ordered structure", () => {

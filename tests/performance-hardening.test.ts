@@ -11,10 +11,14 @@ import {
 const root = process.cwd();
 const read = (...parts: string[]) => fs.readFileSync(path.join(root, ...parts), "utf8");
 
-test("seller dashboard uses a bounded recent-order query and minimal analytics relations", () => {
+test("seller dashboard streams order widgets independently and bounds the recent-order query", () => {
   const source = read("app", "dashboard", "page.tsx");
-  assert.match(source, /const \[analyticsOrders, sellerOrders,[\s\S]*Promise\.all/);
+  assert.match(source, /async function loadSellerDashboardMetrics[\s\S]*dashboardData\(Promise\.all\(/);
+  assert.match(source, /catch \(error\)[\s\S]*\[dashboard-secondary\] seller dashboard widgets unavailable/);
+  assert.match(source, /<Suspense fallback=\{null\}><SellerDashboardSecondarySections/);
+  assert.match(source, /<Suspense fallback=\{null\}><SellerDashboardHeroMetrics/);
   assert.match(source, /take: 5, select:/);
+  assert.doesNotMatch(source, /_count: \{ select: \{ orders: true, buyerConversations: true, reviews: true \} \}/);
   assert.doesNotMatch(source, /include: \{ buyer:[\s\S]*store: \{ select: \{ name: true, slug: true \}/);
 });
 

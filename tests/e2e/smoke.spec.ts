@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectRuntimeErrors, dismissCookieConsent } from "./helpers";
+import { collectRuntimeErrors, collectUncaughtRuntimeErrors, dismissCookieConsent } from "./helpers";
 import { SignJWT } from "jose";
 import { PrismaClient } from "@prisma/client";
 import { DESKTOP_CATEGORY_TAXONOMY, subcategoryId } from "../../lib/desktop-category-taxonomy";
@@ -12,6 +12,13 @@ const databaseUsers = [
   { id: "buyer-a", firstName: "Buyer", lastName: "A", email: "buyer-a@e2e.todijo.test" },
   { id: "buyer-b", firstName: "Buyer", lastName: "B", email: "buyer-b@e2e.todijo.test" },
 ] as const;
+const dashboardFixtures = [
+  { id: "dashboard-admin", firstName: "Dashboard", lastName: "Admin", email: "dashboard-admin@e2e.todijo.test", role: "ADMIN" as const, storeCount: 1, verification: null, pro: false },
+  { id: "dashboard-insee-pending", firstName: "Pending", lastName: "Verification", email: "dashboard-insee-pending@e2e.todijo.test", role: "SELLER" as const, storeCount: 1, verification: "PENDING" as const, pro: false },
+  { id: "dashboard-pro", firstName: "Pro", lastName: "Seller", email: "dashboard-pro@e2e.todijo.test", role: "SELLER" as const, storeCount: 1, verification: "VERIFIED" as const, pro: true },
+  { id: "dashboard-connect-incomplete", firstName: "Connect", lastName: "Incomplete", email: "dashboard-connect-incomplete@e2e.todijo.test", role: "SELLER" as const, storeCount: 1, verification: "VERIFIED" as const, pro: true },
+  { id: "dashboard-multistore", firstName: "Multi", lastName: "Store", email: "dashboard-multistore@e2e.todijo.test", role: "SELLER" as const, storeCount: 2, verification: "VERIFIED" as const, pro: true },
+] as const;
 const db = new PrismaClient();
 
 test.beforeAll(async () => {
@@ -23,6 +30,49 @@ test.beforeAll(async () => {
         create: { ...user, role: "CUSTOMER", authVersion: 0 },
         update: { role: "CUSTOMER", authVersion: 0 },
       });
+    }
+
+    for (const fixture of dashboardFixtures) {
+      await tx.user.upsert({
+        where: { id: fixture.id },
+        create: { id: fixture.id, firstName: fixture.firstName, lastName: fixture.lastName, email: fixture.email, role: fixture.role, emailVerified: true, authVersion: 0 },
+        update: { firstName: fixture.firstName, lastName: fixture.lastName, email: fixture.email, role: fixture.role, emailVerified: true, authVersion: 0, blockedAt: null, deactivatedAt: null },
+      });
+      if (fixture.role !== "SELLER") {
+        const storeId = `${fixture.id}-store-1`;
+        await tx.store.upsert({
+          where: { id: storeId },
+          create: { id: storeId, name: "Admin managed store", slug: storeId, country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "VERIFIED", onboardingStep: 4 },
+          update: { name: "Admin managed store", country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "VERIFIED", onboardingStep: 4 },
+        });
+        await tx.user.update({ where: { id: fixture.id }, data: { primaryStoreId: storeId } });
+        continue;
+      }
+
+      const businessId = `${fixture.id}-business`;
+      await tx.sellerBusiness.upsert({
+        where: { ownerId: fixture.id },
+        create: { id: businessId, ownerId: fixture.id, maxStores: 3, inseeVerificationState: fixture.verification ?? "NOT_STARTED" },
+        update: { maxStores: 3, inseeVerificationState: fixture.verification ?? "NOT_STARTED" },
+      });
+      for (let index = 0; index < fixture.storeCount; index += 1) {
+        const storeId = `${fixture.id}-store-${index + 1}`;
+        await tx.store.upsert({
+          where: { id: storeId },
+          create: { id: storeId, name: `${fixture.firstName} Store ${index + 1}`, slug: storeId, country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, businessId, status: "ACTIVE", sellerType: "PROFESSIONAL", onboardingStatus: "VERIFIED", onboardingStep: 4 },
+          update: { name: `${fixture.firstName} Store ${index + 1}`, country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, businessId, status: "ACTIVE", sellerType: "PROFESSIONAL", onboardingStatus: "VERIFIED", onboardingStep: 4 },
+        });
+      }
+      const firstStoreId = `${fixture.id}-store-1`;
+      await tx.sellerBusiness.update({ where: { ownerId: fixture.id }, data: { billingStoreId: firstStoreId } });
+      await tx.user.update({ where: { id: fixture.id }, data: { primaryStoreId: firstStoreId } });
+      if (fixture.pro) {
+        await tx.sellerSubscription.upsert({
+          where: { storeId: firstStoreId },
+          create: { id: `${fixture.id}-subscription`, storeId: firstStoreId, stripeSubscriptionId: `sub_test_${fixture.id}`, stripePriceId: "price_test_pro_monthly", plan: "pro", billingInterval: "monthly", status: "ACTIVE", currentPeriodStart: new Date(Date.now() - 86_400_000), currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000) },
+          update: { stripeSubscriptionId: `sub_test_${fixture.id}`, stripePriceId: "price_test_pro_monthly", plan: "pro", billingInterval: "monthly", status: "ACTIVE", currentPeriodStart: new Date(Date.now() - 86_400_000), currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000) },
+        });
+      }
     }
 
     await tx.newsArticle.upsert({
@@ -65,6 +115,10 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   try {
     await db.newsArticle.deleteMany({ where: { id: "news-localization-e2e" } });
+    await db.store.deleteMany({ where: { ownerId: { in: dashboardFixtures.map((user) => user.id) } } });
+    await db.sellerBusiness.deleteMany({ where: { ownerId: { in: dashboardFixtures.map((user) => user.id) } } });
+    await db.user.updateMany({ where: { id: { in: dashboardFixtures.map((user) => user.id) } }, data: { primaryStoreId: null } });
+    await db.user.deleteMany({ where: { id: { in: dashboardFixtures.map((user) => user.id) } } });
     await db.user.deleteMany({ where: { id: { in: databaseUsers.map((user) => user.id) } } });
   } finally {
     await db.$disconnect();
@@ -77,6 +131,66 @@ async function authenticate(page: import("@playwright/test").Page, userId: strin
   const token = await new SignJWT({ userId, role: "CUSTOMER", authVersion: 0 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
   await page.context().addCookies([{ name: "todijo_session", value: token, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
 }
+
+test("authenticated Admin and seller dashboards leave skeleton loading and render useful content", async ({ page }) => {
+  test.setTimeout(120_000);
+  const assertNoRuntimeErrors = collectUncaughtRuntimeErrors(page);
+
+  for (const fixture of dashboardFixtures) {
+    await authenticate(page, fixture.id);
+    const response = await page.goto("/en/dashboard");
+    expect(response?.ok(), `${fixture.id} dashboard response`).toBeTruthy();
+    await expect(page.getByRole("heading", { level: 1, name: new RegExp(fixture.firstName, "i") })).toBeVisible({ timeout: 20_000 });
+    if (fixture === dashboardFixtures[0]) await dismissCookieConsent(page);
+    await expect(page.locator("main[aria-busy='true']")).toHaveCount(0);
+    await expect(page.locator(".dashboardSkeleton")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/en\/dashboard$/);
+  }
+
+  await authenticate(page, "dashboard-pro");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/en/dashboard");
+  await expect(page.getByRole("heading", { level: 1, name: /Pro/i })).toBeVisible();
+  await expect(page.locator(".premiumStatsGrid").first()).toBeVisible({ timeout: 20_000 });
+  await page.screenshot({ path: "test-results/dashboard-desktop.png", fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/en/dashboard");
+  await expect(page.getByRole("heading", { level: 1, name: /Pro/i })).toBeVisible();
+  await expect(page.locator(".dashboardSkeleton")).toHaveCount(0);
+  await expect(page.locator(".premiumStatsGrid").first()).toBeVisible({ timeout: 20_000 });
+  await page.screenshot({ path: "test-results/dashboard-mobile.png", fullPage: true });
+
+  const stableUrl = page.url();
+  await page.waitForTimeout(2_000);
+  await expect(page).toHaveURL(stableUrl);
+  assertNoRuntimeErrors();
+});
+
+test("seller dashboard renders its primary content while order widgets are database-blocked", async ({ page }) => {
+  test.setTimeout(45_000);
+  let markLocked!: () => void;
+  let unlock!: () => void;
+  const locked = new Promise<void>((resolve) => { markLocked = resolve; });
+  const hold = new Promise<void>((resolve) => { unlock = resolve; });
+  const lockTransaction = db.$transaction(async (tx) => {
+    await tx.$executeRaw`LOCK TABLE "Order" IN ACCESS EXCLUSIVE MODE`;
+    markLocked();
+    await hold;
+  }, { timeout: 40_000, maxWait: 5_000 });
+
+  await locked;
+  try {
+    await authenticate(page, "dashboard-pro");
+    await page.goto("/en/dashboard", { waitUntil: "commit", timeout: 20_000 });
+    await expect(page.getByRole("heading", { level: 1, name: /Pro/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".dashboardSkeleton")).toHaveCount(0);
+    await expect(page.locator("main[aria-busy='true']")).toHaveCount(0);
+  } finally {
+    unlock();
+    await lockTransaction;
+  }
+});
 
 async function openFavorites(page: import("@playwright/test").Page) {
   const link = page.locator('header[data-marketplace-header]').getByRole("link", { name: "My favorites" });
