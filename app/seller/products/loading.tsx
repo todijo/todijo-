@@ -1,2 +1,3 @@
 import LocalizedPageSkeleton from "@/components/LocalizedPageSkeleton";
-export default function SellerProductsLoading() { return <LocalizedPageSkeleton variant="cards"/>; }
+import LoadingTimeoutNotice from "@/components/LoadingTimeoutNotice";
+export default function SellerProductsLoading() { return <><LocalizedPageSkeleton variant="cards"/><LoadingTimeoutNotice route="seller-products"/></>; }

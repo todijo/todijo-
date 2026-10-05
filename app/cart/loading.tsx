@@ -1,2 +1,3 @@
 import LocalizedPageSkeleton from "@/components/LocalizedPageSkeleton";
-export default function CartLoading() { return <LocalizedPageSkeleton variant="list"/>; }
+import LoadingTimeoutNotice from "@/components/LoadingTimeoutNotice";
+export default function CartLoading() { return <><LocalizedPageSkeleton variant="list"/><LoadingTimeoutNotice route="cart"/></>; }

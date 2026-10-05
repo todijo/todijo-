@@ -48,22 +48,23 @@ export default function SupplierCatalogWorkspace({initialJobs,historyPage=1,hist
   const overrideLabels:CategoryLabels={main:categoryText("mainCategory"),group:categoryText("categoryGroup"),leaf:categoryText("leafCategory"),chooseMain:categoryText("chooseMainCategory"),chooseGroup:categoryText("chooseCategoryGroup"),chooseLeaf:categoryText("chooseLeafCategory")};
   const marketplace=useTranslations("Marketplace");
 
-  function scrollToJob(jobId:string){window.requestAnimationFrame(()=>{const target=document.getElementById(`supplier-job-${jobId}`)??document.getElementById("supplier-catalog-jobs");target?.scrollIntoView({behavior:"smooth",block:"center"});});}
+  function scrollToJob(jobId:string){window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{const target=document.getElementById(`supplier-job-${jobId}`)??document.getElementById("supplier-catalog-jobs");target?.scrollIntoView({behavior:"smooth",block:"center"});}));}
 
   const loadJob=useCallback(async function loadCatalogJob(jobId:string,details=false){
     const pending=pendingJobLoadsRef.current.get(jobId);if(pending){const data=await pending;if(details&&!data.items){if(pendingJobLoadsRef.current.get(jobId)===pending)pendingJobLoadsRef.current.delete(jobId);return loadCatalogJob(jobId,true);}if(details&&data.items)setActive({...data,items:data.items,nextCursor:data.nextCursor??null});return data;}
-    const request=(async()=>{const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}${details?"?take=100":"?progress=1"}`,{cache:"no-store"}),payload=await response.json() as {error?:string;job?:JobReadResponse};if(!response.ok||!payload.job)throw new Error(payload.error??"SUPPLIER_CATALOG_JOB_FAILED");const job=payload.job;setJobs(current=>current.map(item=>item.id===jobId?job:item));if(details&&job.items)setActive({...job,items:job.items,nextCursor:job.nextCursor??null});return job;})();
+    const request=(async()=>{const response=await fetch(`/api/admin/supplier-products/bulk-import/${jobId}${details?"?take=100":"?progress=1"}`,{cache:"no-store",signal:AbortSignal.timeout(12_000)}),payload=await response.json() as {error?:string;job?:JobReadResponse};if(!response.ok||!payload.job)throw new Error(payload.error??"SUPPLIER_CATALOG_JOB_FAILED");const job=payload.job;setJobs(current=>current.map(item=>item.id===jobId?job:item));if(details&&job.items)setActive({...job,items:job.items,nextCursor:job.nextCursor??null});return job;})();
     pendingJobLoadsRef.current.set(jobId,request);
     try{return await request;}finally{if(pendingJobLoadsRef.current.get(jobId)===request)pendingJobLoadsRef.current.delete(jobId);}
   },[]);
   const shouldPollCatalogJobs=jobs.some(job=>job.isProcessing)||Boolean(runningJobId);
   useEffect(()=>{previewQueue.updateSelection(selected);if(!selected.size)setMessage("");},[previewQueue,selected]);
+  useEffect(()=>{if(runningJobId)scrollToJob(runningJobId);},[runningJobId]);
   useEffect(()=>{if(!shouldPollCatalogJobs)return;const poll=()=>{setNow(Date.now());const activeIds=new Set(jobsRef.current.filter(job=>job.isProcessing).map(job=>job.id));if(runningJobRef.current)activeIds.add(runningJobRef.current);for(const jobId of activeIds)void loadJob(jobId).catch(()=>undefined);};poll();const timer=window.setInterval(poll,1000);return()=>window.clearInterval(timer);},[loadJob,shouldPollCatalogJobs]);
 
   async function search(nextPage=1){setBusy(true);setMessage("");try{const response=await fetch(`/api/admin/supplier-products/catalog-search?q=${encodeURIComponent(query)}&page=${nextPage}&pageSize=20`,{cache:"no-store"}),data=await response.json() as {error?:string;items?:SearchItem[];hasMore?:boolean};if(!response.ok)throw new Error(data.error);setResults(current=>nextPage===1?(data.items??[]):[...current,...(data.items??[]).filter(item=>!current.some(existing=>existing.supplierProductId===item.supplierProductId))]);setPage(nextPage);setHasMore(Boolean(data.hasMore));}catch(error){setMessage(error instanceof Error?error.message:"SUPPLIER_CATALOG_SEARCH_FAILED");}finally{setBusy(false);}}
   function toggle(identifier:string){setSelected(current=>{const next=new Set(current);if(next.has(identifier))next.delete(identifier);else next.add(identifier);return next;});}
   async function resume(jobId:string,automatic=false){
-    if(runningJobRef.current)return;scrollToJob(jobId);runningJobRef.current=jobId;setRunningJobId(jobId);setMessage("");
+    if(runningJobRef.current)return;runningJobRef.current=jobId;setRunningJobId(jobId);setMessage("");
     try{
       const job=await runCatalogJobBatches(jobId,automatic,{loadJob,resumeBatch:async targetJobId=>{const response=await fetch(`/api/admin/supplier-products/bulk-import/${targetJobId}/resume`,{method:"POST",headers:mutationHeaders,body:JSON.stringify({})}),data=await response.json() as {error?:string};if(!response.ok)throw new Error(data.error);}});
       setMessage(`${t("bulkComplete")}: ${job.processedCount}/${job.requestedCount} · ${elapsedLabel(job,Date.now(),t("durationUnavailable"))}`);

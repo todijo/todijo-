@@ -7,7 +7,7 @@ import { feedbackCopy } from "@/lib/feedback-copy";
 
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const locale = useLocale(); const text = feedbackCopy(locale);
-  useEffect(() => { console.error("Todijo page failed to load", error); }, [error]);
+  useEffect(() => { console.error("[route-error]", JSON.stringify({ boundary: "app", digest: error.digest ?? null })); }, [error]);
   return <main className="feedbackErrorPage" role="alert">
     <span><AlertTriangle size={34} aria-hidden="true"/></span><h1>{text.errorTitle}</h1>
     <p>{text.errorText}</p>

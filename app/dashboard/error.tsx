@@ -8,7 +8,7 @@ import { feedbackCopy } from "@/lib/feedback-copy";
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const text = feedbackCopy(useLocale());
   useEffect(() => {
-    console.error("Dashboard failed to load", error);
+    console.error("[route-error]", JSON.stringify({ boundary: "dashboard", digest: error.digest ?? null }));
   }, [error]);
 
   return <main className="dashboardError" role="alert">

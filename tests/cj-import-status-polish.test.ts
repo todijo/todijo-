@@ -54,6 +54,7 @@ test("active progress refresh uses lightweight no-store snapshots and avoids ove
   const workspace=readFileSync("components/SupplierCatalogWorkspace.tsx","utf8"),route=readFileSync("app/api/admin/supplier-products/bulk-import/[jobId]/route.ts","utf8");
   assert.match(workspace,/pendingJobLoadsRef/);assert.match(workspace,/setInterval\(poll,1000\)/);assert.match(workspace,/\?progress=1/);assert.match(workspace,/jobsRef\.current\.filter\(job=>job\.isProcessing\)/);
   assert.match(route,/searchParams\.get\("progress"\)!=="1"/);assert.match(route,/Cache-Control":"private, no-store"/);
+  assert.match(workspace,/AbortSignal\.timeout\(12_000\)/,"a hung progress request must release the per-job in-flight lock");
 });
 
 test("import history pagination reads only the requested bounded page without deleting history",async()=>{
@@ -65,4 +66,12 @@ test("import history pagination reads only the requested bounded page without de
   assert.equal(query.skip,20);assert.equal(query.take,10);assert.equal(query.where.createdById,"admin");
   const workspace=readFileSync("components/SupplierCatalogWorkspace.tsx","utf8");
   assert.match(workspace,/scrollIntoView\(\{behavior:"smooth",block:"center"\}\)/);assert.match(workspace,/id=\{`supplier-job-\$\{job\.id\}`\}/);assert.match(workspace,/href=\{`\?page=/);assert.doesNotMatch(workspace,/scrollTo\(0,document\.body\.scrollHeight\)|footer\.scrollIntoView/);
+  assert.match(workspace,/useEffect\(\(\)=>\{if\(runningJobId\)scrollToJob\(runningJobId\);\},\[runningJobId\]\)/,"progress scrolling occurs after the active job card renders");
+});
+
+test("long-running route skeletons reveal a localized recovery path with safe route diagnostics",()=>{
+  const notice=readFileSync("components/LoadingTimeoutNotice.tsx","utf8"),error=readFileSync("app/error.tsx","utf8"),dashboardError=readFileSync("app/dashboard/error.tsx","utf8");
+  assert.match(notice,/NOTICE_AFTER_MS\s*=\s*20_000/);assert.match(notice,/feedbackCopy\(locale\)/);assert.match(notice,/window\.location\.reload\(\)/);assert.match(notice,/event:\s*"loading_timeout"/);
+  assert.doesNotMatch(error,/console\.error\([^\n]*error\)/);assert.doesNotMatch(dashboardError,/console\.error\([^\n]*error\)/);
+  assert.match(error,/boundary:\s*"app"/);assert.match(dashboardError,/boundary:\s*"dashboard"/);
 });

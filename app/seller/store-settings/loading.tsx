@@ -1,2 +1,3 @@
 import LocalizedPageSkeleton from "@/components/LocalizedPageSkeleton";
-export default function StoreSettingsLoading() { return <LocalizedPageSkeleton variant="form"/>; }
+import LoadingTimeoutNotice from "@/components/LoadingTimeoutNotice";
+export default function StoreSettingsLoading() { return <><LocalizedPageSkeleton variant="form"/><LoadingTimeoutNotice route="seller-settings"/></>; }

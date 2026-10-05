@@ -1,2 +1,3 @@
 import LocalizedPageSkeleton from "@/components/LocalizedPageSkeleton";
-export default function ConversationLoading() { return <LocalizedPageSkeleton variant="detail"/>; }
+import LoadingTimeoutNotice from "@/components/LoadingTimeoutNotice";
+export default function ConversationLoading() { return <><LocalizedPageSkeleton variant="detail"/><LoadingTimeoutNotice route="message-detail"/></>; }
