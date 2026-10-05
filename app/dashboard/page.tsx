@@ -64,7 +64,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 export default async function DashboardPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
   const [t, p, s, common, ordersText, privacy, transparency, compliance, verification, auth, locale, session] = await Promise.all([
@@ -80,6 +80,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     where: { id: session.userId },
     select: {
       firstName: true, lastName: true, email: true, emailVerified: true, role: true,
+      sellerOnboardingDraft: { select: { id: true } },
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
       store: { select: sellerStoreSelect },
       _count: { select: { orders: true, buyerConversations: true, reviews: true } },
@@ -95,6 +96,10 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const ownedStoreChoices=principal?.owner?storeChoices.filter(store=>store.businessId===principal.businessId):[];
   const selectedStoreId=isSeller?(requestedStore&&requestedStore!=="all"?requestedStore:ownedStoreChoices.length===1?ownedStoreChoices[0]?.id:!principal?.owner?storeChoices[0]?.id:null):null;
   const activeStore=selectedStoreId?await dashboardData(prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect})):user.store;
+  if (isSeller && !user.emailVerified) redirect(`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`);
+  if (isSeller && (!activeStore || (activeStore.onboardingStep < 4 && activeStore.onboardingStatus !== "PENDING_REVIEW"))) {
+    redirect(`/${locale}/seller/onboarding`);
+  }
   const selectedPrincipal=activeStore?principals.find(item=>item.storeIds.includes(activeStore.id))??null:principal;
   const hasSellerPermission=(permission:TeamPermission)=>Boolean(selectedPrincipal&&(selectedPrincipal.owner||selectedPrincipal.permissions.includes(permission)));
   const canViewProducts=hasSellerPermission("PRODUCT_VIEW");

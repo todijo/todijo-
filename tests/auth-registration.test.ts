@@ -117,3 +117,16 @@ test("login and registration entry points preserve localized defaults and canoni
   assert.doesNotMatch(loginLayout, /redirect\("\/dashboard"\)/);
   assert.doesNotMatch(registerPage, /redirect\("\/dashboard"\)/);
 });
+
+test("successful email verification automatically continues through the safe destination or login continuation", () => {
+  const route = readFileSync("app/api/auth/verify-email/route.ts", "utf8");
+  assert.match(route, /result\.status==="success"/);
+  assert.match(route, /safeLoginDestination\(nextValue,locale\)/);
+  assert.match(route, /currentSession\?\.userId===result\.userId\?continuation/);
+  assert.match(route, /sellerOnboardingDestination\(/);
+  const flow = readFileSync("lib/seller-onboarding-flow.ts", "utf8");
+  assert.match(flow, /"REJECTED"/);
+  const dashboard = readFileSync("app/dashboard/page.tsx", "utf8");
+  assert.match(dashboard, /verify-email\?next=/);
+  assert.match(dashboard, /seller\/onboarding/);
+});

@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { requireProProductImport } from "../lib/pro-product-import";
 import { sellerFreeModelCopy } from "../i18n/seller-free-model";
+import { dropshippingAccessMessages } from "../i18n/dropshipping-access";
 
 function source(path: string) { return readFileSync(path, "utf8"); }
 
@@ -62,6 +63,15 @@ test("FREE and paid onboarding progress show different step-three meanings while
   assert.match(form, /sellerIntent \? journeyCopy\.subscription : journeyCopy\.verification/);
   assert.match(form, /sellerIntent \? <>{journeyCopy\.noPaymentYet}<br\/>\{journeyCopy\.nextStripe\}<\/> : journeyCopy\.nextFree/);
   assert.match(source("app/seller/subscription/page.tsx"), /journeyCopy\.subscription/);
+});
+
+test("PRO seller products explain when supplier access still needs Todijo approval", () => {
+  const products = source("app/seller/products/page.tsx");
+  assert.match(products, /dropshippingPro &&/);
+  assert.match(products, /store\.dropshippingEnabled \? supplierText\("approvedNotConnected"\) : dropshippingCopy\.proApprovalBlocked/);
+  assert.equal(dropshippingAccessMessages.fr.proApprovalBlocked, "Le dropshipping est inclus avec PRO. L’accès fournisseur doit être activé par Todijo avant utilisation.");
+  assert.match(source("lib/suppliers/supplier-access.ts"), /!store\.dropshippingEnabled/);
+  assert.match(source("lib/suppliers/supplier-access.ts"), /hasProSellerCapabilities\(plan\)/);
 });
 
 test("FREE dashboard promotes upgrades and readiness warnings contain no inactive-subscription renewal copy", () => {

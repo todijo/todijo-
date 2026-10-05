@@ -77,9 +77,18 @@ test("selector exposes search/loading/error/empty without unrelated policy chang
   for (const locale of ["fr", "en"]) for (const text of Object.values(adminStoreOwnerCopy(locale))) assert.ok(text.trim());
   const route = readFileSync("app/api/admin/stores/route.ts", "utf8");
   assert.ok(route.includes("assertAdminMutationRequest(request)"));
+  const exemptMutation = route.slice(route.indexOf("export async function PUT"));
+  assert.match(exemptMutation, /PUT\(request: Request\)/);
+  assert.ok(exemptMutation.indexOf("requireAdmin(prisma, session)") < exemptMutation.indexOf("assertAdminMutationRequest(request)"));
+  assert.ok(exemptMutation.indexOf("assertAdminMutationRequest(request)") < exemptMutation.indexOf("exemptExistingAdminStore"));
   assert.ok(route.indexOf("lockManagedOwner(tx") < route.indexOf("requireManagedOwner(tx"));
   assert.ok(readFileSync("lib/admin-store-owner-eligibility.ts", "utf8").includes("FOR UPDATE"));
   assert.ok(readFileSync("app/api/admin/store-owners/route.ts", "utf8").includes("requireAdmin"));
   assert.equal(adminStoreOwnerCopy("fr").empty, "Aucun vendeur ne peut actuellement être sélectionné : vérifiez que son compte est actif et que ses boutiques sont correctement rattachées.");
   assert.equal(adminStoreOwnerCopy("en").empty, "No seller can currently be selected: check that their account is active and their stores are correctly linked.");
+});
+
+test("Admin exemption mutation requires same-origin action marker", () => {
+  assert.throws(() => assertAdminMutationRequest(new Request("https://todijo.com/api/admin/stores", { method: "PUT" })));
+  assert.doesNotThrow(() => assertAdminMutationRequest(new Request("https://todijo.com/api/admin/stores", { method: "PUT", headers: { "x-todijo-admin-action": "1", origin: "https://todijo.com" } })));
 });

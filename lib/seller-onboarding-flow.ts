@@ -19,7 +19,7 @@ export function sellerOnboardingDestination(state: SellerOnboardingState) {
   if (!state.hasStore) {
     return `${root}/seller/onboarding${intentQuery}`;
   }
-  const incomplete = (state.onboardingStep ?? 0) < 4 || ["NOT_STARTED", "IN_PROGRESS", "NEEDS_INFORMATION"].includes(state.onboardingStatus ?? "NOT_STARTED");
+  const incomplete = (state.onboardingStep ?? 0) < 4 || ["NOT_STARTED", "IN_PROGRESS", "REJECTED", "NEEDS_INFORMATION"].includes(state.onboardingStatus ?? "NOT_STARTED");
   if (incomplete) return `${root}/seller/onboarding${intentQuery}`;
   if (state.intent && state.entitlementSource !== "STRIPE" && state.entitlementSource !== "ADMIN_EXEMPT") return `${root}/seller/subscription${intentQuery}`;
   return `${root}/dashboard`;

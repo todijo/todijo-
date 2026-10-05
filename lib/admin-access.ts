@@ -179,12 +179,14 @@ export async function exemptExistingAdminStore(db: Database, adminId: string, no
   if (existing) {
     if (existing.endsAt !== null) {
       await db.storeAccessGrant.update({ where: { id: existing.id }, data: { endsAt: null } });
+      await db.accountSecurityEvent.create({ data: { userId: adminId, type: `ADMIN_STORE_EXEMPTION_ENABLED:${store.id}`.slice(0, 80) } });
     }
     return { storeId: store.id, created: false };
   }
   await db.storeAccessGrant.create({
     data: { storeId: store.id, grantedById: adminId, source: "ADMIN_EXEMPT", startsAt: now, endsAt: null },
   });
+  await db.accountSecurityEvent.create({ data: { userId: adminId, type: `ADMIN_STORE_EXEMPTION_ENABLED:${store.id}`.slice(0, 80) } });
   return { storeId: store.id, created: true };
 }
 

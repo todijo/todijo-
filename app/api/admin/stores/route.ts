@@ -88,10 +88,11 @@ export async function PATCH(request: Request) {
   }
 }
 
-export async function PUT() {
+export async function PUT(request: Request) {
   try {
     const session = await readSession();
     const admin = await requireAdmin(prisma, session);
+    assertAdminMutationRequest(request);
     const result = await prisma.$transaction(
       (tx) => exemptExistingAdminStore(tx, admin.id),
       { isolationLevel: "Serializable" },

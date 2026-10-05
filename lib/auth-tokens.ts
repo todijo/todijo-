@@ -31,20 +31,20 @@ export async function issuePasswordResetToken(userId: string, now = new Date(), 
   return issued ? rawToken : null;
 }
 
-export async function consumeEmailVerificationToken(rawToken: string, now = new Date()): Promise<AuthTokenResult> {
-  if (!validRawAuthToken(rawToken)) return "invalid";
+export async function consumeEmailVerificationToken(rawToken: string, now = new Date()): Promise<{ status: AuthTokenResult; userId?: string }> {
+  if (!validRawAuthToken(rawToken)) return { status: "invalid" };
   return prisma.$transaction(async (tx) => {
     const token = await tx.emailVerificationToken.findUnique({ where: { tokenHash: hashAuthToken(rawToken) } });
     const state = authTokenState(token, now);
-    if (state !== "success" || !token) return state;
+    if (state !== "success" || !token) return { status: state };
     const consumed = await tx.emailVerificationToken.updateMany({ where: { id: token.id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } });
     if (consumed.count !== 1) {
       const current = await tx.emailVerificationToken.findUnique({ where: { id: token.id } });
-      return authTokenState(current, now) === "success" ? "invalid" : authTokenState(current, now);
+      return { status: authTokenState(current, now) === "success" ? "invalid" : authTokenState(current, now) };
     }
     await tx.user.update({ where: { id: token.userId }, data: { emailVerified: true, emailVerifiedAt: now } });
     await tx.emailVerificationToken.updateMany({ where: { userId: token.userId, id: { not: token.id }, usedAt: null }, data: { usedAt: now } });
-    return "success";
+    return { status: "success", userId: token.userId };
   });
 }
 

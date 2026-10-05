@@ -163,6 +163,7 @@ test("public FREE listings retain lifecycle, data isolation, supplier safety and
 
 test("existing admin store exemption is permanent, idempotent, and does not touch Stripe", async () => {
   const created: Array<Record<string, unknown>> = [];
+  const events: Array<Record<string, unknown>> = [];
   let subscriptionTouched = false;
   const store = { id: "store-admin", owner: { role: "ADMIN" }, accessGrants: [] as Array<{ id: string; endsAt: Date | null }> };
   const db = {
@@ -175,6 +176,7 @@ test("existing admin store exemption is permanent, idempotent, and does not touc
       update: async () => undefined,
     },
     sellerSubscription: { update: async () => { subscriptionTouched = true; } },
+    accountSecurityEvent: { create: async ({ data }: { data: Record<string, unknown> }) => { events.push(data); return data; } },
   } as unknown as Db;
   const first = await exemptExistingAdminStore(db, "admin", new Date("2026-01-01T00:00:00Z"));
   const second = await exemptExistingAdminStore(db, "admin", new Date("2026-01-02T00:00:00Z"));
@@ -183,6 +185,8 @@ test("existing admin store exemption is permanent, idempotent, and does not touc
   assert.equal(created.length, 1);
   assert.equal(created[0].source, "ADMIN_EXEMPT");
   assert.equal(created[0].endsAt, null);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "ADMIN_STORE_EXEMPTION_ENABLED:store-admin");
   assert.equal(subscriptionTouched, false);
 });
 
