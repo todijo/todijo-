@@ -10,6 +10,18 @@ export function hasProSellerCapabilities(plan: string | null | undefined) {
 export function canCreateAdditionalSellerStore(plan: string | null | undefined) {
   return plan !== "admin-exempt" && hasProSellerCapabilities(plan);
 }
+/** Seller self-service capacity is a plan entitlement, not an Admin-managed limit. */
+export function sellerSelfServiceStoreLimit(plan: string | null | undefined) {
+  return canCreateAdditionalSellerStore(plan) ? 3 : 1;
+}
+export function canSellerSelfCreateStore(plan: string | null | undefined, currentStoreCount: number) {
+  if (!Number.isSafeInteger(currentStoreCount) || currentStoreCount < 0) return false;
+  if (currentStoreCount >= sellerSelfServiceStoreLimit(plan)) return false;
+  return currentStoreCount === 0 || canCreateAdditionalSellerStore(plan);
+}
+export function hasLockedSellerMultiStoreTeaser(plan: string | null | undefined) {
+  return plan === "free" || plan === "plus";
+}
 export type CommercialInput = {
   role: string;
   subscription: { status: string; plan: string; currentPeriodEnd?: Date | null } | null;

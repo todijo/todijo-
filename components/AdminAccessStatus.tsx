@@ -1,4 +1,4 @@
-import type { AdminAccessStatus } from "@/lib/admin-access-status";
+import { adminStatusDisplay, type AdminAccessStatus } from "@/lib/admin-access-status";
 
 export function adminAccessLabels(locale: string) {
   return locale === "fr" ? {
@@ -15,6 +15,6 @@ export function AdminAccessStatusHeaders({ locale }: { locale: string }) {
 }
 export function AdminAccessStatusCells({ state, locale }: { state: AdminAccessStatus; locale: string }) {
   const copy = adminAccessLabels(locale);
-  if (state.resolutionError) return <><td>{state.lifecycle}</td><td>{state.onboarding}</td><td>{locale === "fr" ? "Accès indéterminé — vérifier l’identité" : "Access unresolved — review identity"}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>{state.source === "ADMIN_EXEMPT" ? copy.notRequired : state.billingStatus ?? "—"}</td><td>{state.connectReadiness}</td></>;
-  return <><td>{state.lifecycle}</td><td>{state.onboarding}</td><td>{copy[state.source]}</td><td>{state.active ? copy.yes : copy.no}</td><td>{state.plan ?? "—"}</td><td>{state.capabilityTier ?? "—"}</td><td>{state.expiresAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(state.expiresAt)) : state.source === "ADMIN_EXEMPT" ? copy.never : "—"}</td><td>{state.source === "ADMIN_EXEMPT" ? copy.notRequired : state.billingStatus ?? "—"}</td><td>{state.connectReadiness}</td></>;
+  if (state.resolutionError) return <><td>{adminStatusDisplay(state.lifecycle, "lifecycle", locale)}</td><td>{adminStatusDisplay(state.onboarding, "onboarding", locale)}</td><td>{locale === "fr" ? "Accès indéterminé — vérifier l’identité" : "Access unresolved — review identity"}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>{state.source === "ADMIN_EXEMPT" ? copy.notRequired : adminStatusDisplay(state.billingStatus, "billing", locale)}</td><td>{adminStatusDisplay(state.connectReadiness, "connect", locale)}</td></>;
+  return <><td>{adminStatusDisplay(state.lifecycle, "lifecycle", locale)}</td><td>{adminStatusDisplay(state.onboarding, "onboarding", locale)}</td><td>{copy[state.source]}</td><td>{state.active ? copy.yes : copy.no}</td><td>{state.plan ?? "—"}</td><td>{state.capabilityTier ?? "—"}</td><td>{state.expiresAt ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(state.expiresAt)) : state.source === "ADMIN_EXEMPT" ? copy.never : "—"}</td><td>{state.source === "ADMIN_EXEMPT" ? copy.notRequired : adminStatusDisplay(state.billingStatus, "billing", locale)}</td><td>{adminStatusDisplay(state.connectReadiness, "connect", locale)}</td></>;
 }

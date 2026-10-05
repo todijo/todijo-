@@ -155,3 +155,10 @@ test("Admin directory distinguishes effective tier and billing; action is confir
   const control = readFileSync("components/AdminManagedPlanControl.tsx", "utf8");
   assert.ok(control.includes("window.confirm")); assert.ok(control.includes('source !== "ADMIN_GRANTED"')); assert.ok(control.includes('plan ?? ""'));
 });
+test("Admin seller store column reports actual owned stores, not editable capacity", () => {
+  const page = readFileSync("app/adm-barewbar-182203/sellers/page.tsx", "utf8");
+  assert.ok(page.includes('_count: { select: { stores: true } }'));
+  assert.ok(page.includes("store.owner._count.stores"));
+  assert.ok(!page.includes("AdminSellerStoreCapacity"));
+  assert.ok(!page.includes("maxStores"));
+});

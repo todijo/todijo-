@@ -63,3 +63,30 @@ test("seller dashboard scope excludes every legacy multi-store order before rend
   assert.equal(allows("store_1", ["store_2"]), true);
   assert.equal(allows("store_2", ["store_1"]), false);
 });
+
+test("seller dashboard keeps its primary hero and operational content ahead of secondary benefits", () => {
+  const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
+  const multiStore = source.slice(source.indexOf("if(principal?.owner&&ownedStoreChoices.length>1"), source.indexOf("if (!activeStore)"));
+  assert.ok(multiStore.indexOf("sellerOverviewHero") < multiStore.indexOf("premiumStatsGrid"));
+  assert.ok(multiStore.indexOf("premiumStatsGrid") < multiStore.indexOf("<DashboardSection"));
+  assert.ok(multiStore.indexOf("<DashboardSection") < multiStore.indexOf("<LockedMultiStoreTeaser"));
+
+  const singleStore = source.slice(source.indexOf("const sellerOrdersWhere"));
+  const hero = singleStore.indexOf("<section className=\"sellerOverviewHero\">");
+  const metrics = singleStore.indexOf("className=\"premiumStatsGrid\"", hero);
+  const dashboardContent = singleStore.indexOf("className=\"premiumDashboardColumns sellerColumns\"", metrics);
+  const freeUpgrade = singleStore.indexOf("<FreeSellerStartCard", dashboardContent);
+  const teaser = singleStore.indexOf("<LockedMultiStoreTeaser", dashboardContent);
+  const supplies = singleStore.indexOf("sellerBenefitCatalogEnabled", dashboardContent);
+  assert.ok(hero >= 0 && hero < metrics && metrics < dashboardContent);
+  assert.ok(dashboardContent < freeUpgrade && dashboardContent < teaser && dashboardContent < supplies);
+  assert.ok(singleStore.indexOf("<StripeConnectSection", dashboardContent) > supplies);
+});
+
+test("Admin dashboard hero, summary metrics and management content retain their ordered structure", () => {
+  const page = readFileSync(join(process.cwd(), "app", "adm-barewbar-182203", "page.tsx"), "utf8");
+  const dashboard = readFileSync(join(process.cwd(), "app", "adm-barewbar-182203", "AdminDashboard.tsx"), "utf8");
+  assert.ok(page.indexOf("className=\"adminHero\"") < page.indexOf("<AdminDashboard"));
+  assert.ok(dashboard.indexOf("className=\"adminStats\"") < dashboard.indexOf("className=\"adminColumns\""));
+  assert.ok(dashboard.indexOf("className=\"adminColumns\"") < dashboard.indexOf("className=\"adminPanel adminTablePanel\""));
+});

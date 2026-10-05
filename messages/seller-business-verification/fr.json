@@ -10,6 +10,8 @@
   "verify": "Vérifier mon entreprise",
   "invalidSiren": "Le SIREN doit comporter 9 chiffres.",
   "invalidSiret": "Le SIRET doit comporter 14 chiffres.",
+  "invalidSirenChecksum": "Le SIREN comporte 9 chiffres, mais sa clé de contrôle est invalide.",
+  "invalidSiretChecksum": "Le SIRET comporte 14 chiffres, mais sa clé de contrôle est invalide.",
   "success": "SIREN et SIRET vérifiés auprès de l’INSEE.",
   "notFound": "Aucun résultat ne correspond à ce SIREN ou à ce SIRET. Vérifiez les numéros saisis.",
   "mismatch": "Ce SIRET ne correspond pas à l’entreprise indiquée par le SIREN.",

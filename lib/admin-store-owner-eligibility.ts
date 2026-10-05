@@ -1,13 +1,12 @@
-import { canCreateAdditionalSellerStore } from "./seller-commercial-access";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { AdminAccessError } from "./admin-access-error";
-import { sellerBusinessCommercialPlan } from "./seller-business";
 type Db = PrismaClient | Prisma.TransactionClient;
 export const managedOwnerSelect = {
   id: true, firstName: true, lastName: true, email: true, role: true, primaryStoreId: true,
+  store: { select: { id: true, ownerId: true, businessId: true } },
   sellerSuspendedAt: true, deactivatedAt: true, blockedAt: true, blockExpiresAt: true,
   _count: { select: { stores: true } },
-  ownedBusiness: { select: { id: true, maxStores: true, _count: { select: { stores: true } } } },
+  ownedBusiness: { select: { id: true, billingStoreId: true, billingStore: { select: { id: true, ownerId: true, businessId: true } }, _count: { select: { stores: true } } } },
 } as const;
 export type ManagedOwner = Prisma.UserGetPayload<{ select: typeof managedOwnerSelect }>;
 export type OwnerEligibility = { eligible: boolean; reason: string | null; mode: "FIRST" | "ADDITIONAL"; businessId: string | null };
@@ -15,17 +14,20 @@ export async function managedOwnerEligibility(db: Db, owner: ManagedOwner | null
   const deny = (reason: string): OwnerEligibility => ({ eligible: false, reason, mode: "FIRST", businessId: owner?.ownedBusiness?.id ?? null });
   if (!owner) return deny("OWNER_NOT_FOUND");
   if (owner.sellerSuspendedAt || owner.deactivatedAt || owner.blockedAt && (!owner.blockExpiresAt || owner.blockExpiresAt > now)) return deny("OWNER_RESTRICTED");
-  if (owner.id === adminId) return owner.role === "ADMIN" && !owner.primaryStoreId && owner._count.stores === 0
-    ? { eligible: true, reason: null, mode: "FIRST", businessId: owner.ownedBusiness?.id ?? null } : deny("OWNER_INELIGIBLE");
+  if (owner.id === adminId) {
+    if (owner.role !== "ADMIN") return deny("OWNER_INELIGIBLE");
+    if (owner._count.stores === 0 && (owner.primaryStoreId || owner.store)) return deny("OWNER_STATE_CHANGED");
+    return { eligible: true, reason: null, mode: owner._count.stores === 0 ? "FIRST" : "ADDITIONAL", businessId: null };
+  }
   if (owner.role !== "SELLER") return deny("OWNER_INELIGIBLE");
   if (owner._count.stores === 0) {
-    if (owner.primaryStoreId) return deny("OWNER_STATE_CHANGED");
+    if (owner.primaryStoreId || owner.store || owner.ownedBusiness && (owner.ownedBusiness._count.stores !== 0 || owner.ownedBusiness.billingStoreId !== null || owner.ownedBusiness.billingStore)) return deny("OWNER_STATE_CHANGED");
     return { eligible: true, reason: null, mode: "FIRST", businessId: owner.ownedBusiness?.id ?? null };
   }
   const business = owner.ownedBusiness;
   if (!business || business._count.stores !== owner._count.stores) return deny("OWNER_BUSINESS_INCONSISTENT");
-  if (business._count.stores >= business.maxStores) return deny("STORE_LIMIT_REACHED");
-  if (!canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(db, business.id, now))) return deny("MULTI_STORE_PRO_REQUIRED");
+  if (!business.billingStoreId || business.billingStore?.id !== business.billingStoreId || business.billingStore.ownerId !== owner.id || business.billingStore.businessId !== business.id) return deny("OWNER_BUSINESS_INCONSISTENT");
+  if (owner.primaryStoreId && (owner.store?.id !== owner.primaryStoreId || owner.store.ownerId !== owner.id || owner.store.businessId !== business.id)) return deny("OWNER_BUSINESS_INCONSISTENT");
   return { eligible: true, reason: null, mode: "ADDITIONAL", businessId: business.id };
 }
 export async function requireManagedOwner(db: Db, ownerId: string, adminId: string, now = new Date()) {

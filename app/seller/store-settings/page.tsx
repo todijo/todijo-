@@ -10,7 +10,7 @@ import StoreSettingsForm from "./StoreSettingsForm";
 import { canPublish } from "@/lib/seller-subscription";
 import { requireStoreCapability, resolveSellerStoreContext } from "@/lib/seller-business-access";
 import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
-import { canCreateAdditionalSellerStore } from "@/lib/seller-commercial-access";
+import { canSellerSelfCreateStore } from "@/lib/seller-commercial-access";
 import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 import { sellerTeamCopy } from "@/i18n/seller-team";
 
@@ -30,10 +30,10 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
   let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"STORE_VIEW_SETTINGS")}catch{redirect(`/${locale}/dashboard`)}
   const principal=await requireStoreCapability(prisma,session.userId,storeContext.selected.id,"STORE_VIEW_SETTINGS");
   const [businessCapacity, commercialPlan] = principal.owner ? await Promise.all([
-    prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { maxStores: true, _count: { select: { stores: true } } } }),
+    prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { _count: { select: { stores: true } } } }),
     sellerBusinessCommercialPlan(prisma, principal.businessId),
   ]) : [null, null];
-  const canCreateStore = Boolean(businessCapacity && canCreateAdditionalSellerStore(commercialPlan) && businessCapacity._count.stores < businessCapacity.maxStores);
+  const canCreateStore = Boolean(businessCapacity && canSellerSelfCreateStore(commercialPlan, businessCapacity._count.stores));
   const store = await prisma.store.findUnique({
     where: { id:storeContext.selected.id },
     select: {

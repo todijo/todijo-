@@ -10,6 +10,8 @@
   "verify": "Verify my business",
   "invalidSiren": "The SIREN must contain 9 digits.",
   "invalidSiret": "The SIRET must contain 14 digits.",
+  "invalidSirenChecksum": "The SIREN has 9 digits, but its checksum is invalid.",
+  "invalidSiretChecksum": "The SIRET has 14 digits, but its checksum is invalid.",
   "success": "SIREN and SIRET verified with INSEE.",
   "notFound": "No result matches this SIREN or SIRET. Check the numbers entered.",
   "mismatch": "This SIRET does not belong to the business identified by the SIREN.",

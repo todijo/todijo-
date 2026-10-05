@@ -24,3 +24,38 @@ export function adminAccessStatus(input: {
   };
 }
 export type AdminAccessStatus = ReturnType<typeof adminAccessStatus>;
+
+const frenchStatusLabels = {
+  lifecycle: { ACTIVE: "Active" },
+  onboarding: {
+    NOT_STARTED: "Non commencé",
+    IN_PROGRESS: "En cours",
+    PENDING_REVIEW: "En attente de validation",
+    VERIFIED: "Vérifié",
+    REJECTED: "Refusé",
+    NEEDS_INFORMATION: "Informations requises",
+  },
+  billing: {
+    INCOMPLETE: "Incomplet",
+    TRIALING: "Période d’essai",
+    ACTIVE: "Active",
+    PAST_DUE: "Paiement en retard",
+    UNPAID: "Impayé",
+    CANCELED: "Annulé",
+    EXPIRED: "Expiré",
+  },
+  connect: {
+    NOT_STARTED: "Non commencé",
+    ONBOARDING_INCOMPLETE: "Inscription incomplète",
+    CHARGES_DISABLED: "Paiements désactivés",
+    PAYOUTS_DISABLED: "Versements désactivés",
+    READY: "Prêt",
+  },
+} as const;
+
+export function adminStatusDisplay(value: string | null, kind: keyof typeof frenchStatusLabels, locale: string) {
+  if (!value) return "—";
+  if (locale !== "fr") return value;
+  const labels = frenchStatusLabels[kind] as Record<string, string>;
+  return labels[value] ?? value;
+}

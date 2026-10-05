@@ -1,4 +1,4 @@
-import { canCreateAdditionalSellerStore } from "@/lib/seller-commercial-access";
+import { canCreateAdditionalSellerStore, sellerSelfServiceStoreLimit } from "@/lib/seller-commercial-access";
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
@@ -108,10 +108,11 @@ export async function POST(request: Request) {
       const firstStore = await tx.store.findFirst({ where: { ownerId: session.userId }, orderBy: { createdAt: "asc" }, select: { id: true } });
       if (owner?.role === "ADMIN" && firstStore) throw new SellerBusinessError("ADMIN_ONE_STORE_REQUIRED", 409);
       const business = await ensureSellerBusiness(tx, session.userId, firstStore?.id);
-      const locked = await lockSellerBusiness(tx, business.id);
+      await lockSellerBusiness(tx, business.id);
       const storeCount = await tx.store.count({ where: { businessId: business.id } });
-      if (storeCount >= locked.maxStores) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
-      if (storeCount > 0 && !canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(tx, business.id))) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
+      const commercialPlan = await sellerBusinessCommercialPlan(tx, business.id);
+      if (storeCount > 0 && !canCreateAdditionalSellerStore(commercialPlan)) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
+      if (storeCount >= sellerSelfServiceStoreLimit(commercialPlan)) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
       let establishmentId:string|null=null;
       if(isFrenchProfessional(sellerType,country)){
         const siren=normalizeSiren(body.businessSiren),siret=normalizeSiret(sellerIdentity.businessRegistrationId);
@@ -259,6 +260,18 @@ export async function PATCH(request: Request) {
     const samePersonalBusinessAddress=body.samePersonalBusinessAddress===true;
     const legalChanged=JSON.stringify([currentStore.sellerType,currentStore.legalBusinessName,currentStore.businessRegistrationId,currentStore.businessAddress,currentStore.businessPostalCode,currentStore.vatNumber,currentStore.vatStatus,currentStore.displayBusinessAddress,currentStore.samePersonalBusinessAddress])!==JSON.stringify([sellerType,sellerIdentity.legalBusinessName,sellerIdentity.businessRegistrationId,sellerIdentity.businessAddress,sellerIdentity.businessPostalCode,sellerIdentity.vatNumber,sellerIdentity.vatStatus,displayBusinessAddress,samePersonalBusinessAddress]);
     if(legalChanged&&!principal.owner)throw new SellerCapabilityError("OWNER_REQUIRED",403);
+    let establishmentId=currentStore.establishmentId;
+    if(currentStore.businessId&&currentStore.businessRegistrationId!==sellerIdentity.businessRegistrationId){
+      establishmentId=null;
+      if(isFrenchProfessional(sellerType,country)){
+        const siren=normalizeSiren((await prisma.sellerBusiness.findUnique({where:{id:currentStore.businessId},select:{siren:true}}))?.siren);
+        const siret=normalizeSiret(sellerIdentity.businessRegistrationId);
+        if(siren.ok&&siret.ok&&sirenForSiret(siret.value)===siren.value){
+          const verifiedEstablishment=await prisma.sellerBusinessEstablishment.findUnique({where:{businessId_siret:{businessId:currentStore.businessId,siret:siret.value}},select:{id:true,legalUnitSiren:true,verificationState:true}});
+          if(verifiedEstablishment?.verificationState==="VERIFIED"&&verifiedEstablishment.legalUnitSiren===siren.value)establishmentId=verifiedEstablishment.id;
+        }
+      }
+    }
     for(const permission of new Set(needed))await requireStoreCapability(prisma,session.userId,currentStore.id,permission);
     const store = await prisma.store.update({
       where: { id: currentStore.id },
@@ -277,7 +290,7 @@ export async function PATCH(request: Request) {
         ...sellerIdentity,
         displayBusinessAddress:sellerType==="PROFESSIONAL"&&country.toUpperCase()==="FR"&&displayBusinessAddress,
         samePersonalBusinessAddress:sellerType==="PROFESSIONAL"&&country.toUpperCase()==="FR"&&samePersonalBusinessAddress,
-        ...(currentStore.businessRegistrationId!==sellerIdentity.businessRegistrationId?{establishmentId:null}:{}),
+        ...(currentStore.businessRegistrationId!==sellerIdentity.businessRegistrationId?{establishmentId}:{}),
         ...shippingSettings,
       },
       select: { slug: true },

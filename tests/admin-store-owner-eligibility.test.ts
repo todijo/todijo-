@@ -6,7 +6,7 @@ import { createManagedStore, requireAdmin } from "../lib/admin-access";
 import { adminStoreOwnerCopy } from "../i18n/admin-store-owners";
 import { assertAdminMutationRequest } from "../lib/request-security";
 
-const seller: ManagedOwner = { id: "seller", firstName: "Seller", lastName: "Owner", email: "seller@example.test", role: "SELLER", primaryStoreId: null, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, _count: { stores: 0 }, ownedBusiness: null };
+const seller: ManagedOwner = { id: "seller", firstName: "Seller", lastName: "Owner", email: "seller@example.test", role: "SELLER", primaryStoreId: null, store: null, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, _count: { stores: 0 }, ownedBusiness: null };
 type Db = Parameters<typeof managedOwnerEligibility>[0];
 const emptyDb = {} as Db;
 test("unrestricted SELLER first-store eligible; CUSTOMER remains excluded", async () => {
@@ -24,14 +24,15 @@ test("expired block does not exclude an otherwise eligible seller", async () => 
 test("Admin self first-store rule checks primary pointer AND total ownership", async () => {
   const admin = { ...seller, id: "admin", role: "ADMIN" as const };
   assert.equal((await managedOwnerEligibility(emptyDb, admin, "admin")).eligible, true);
-  for (const extra of [{ primaryStoreId: "primary" }, { _count: { stores: 1 } }]) assert.equal((await managedOwnerEligibility(emptyDb, { ...admin, ...extra }, "admin")).eligible, false);
+  assert.equal((await managedOwnerEligibility(emptyDb, { ...admin, primaryStoreId: "primary" }, "admin")).eligible, false);
+  assert.equal((await managedOwnerEligibility(emptyDb, { ...admin, _count: { stores: 2 } }, "admin")).mode, "ADDITIONAL");
 });
-test("missing primary pointer does not bypass additional-store PRO and capacity", async () => {
-  const owner = { ...seller, _count: { stores: 1 }, ownedBusiness: { id: "business", maxStores: 2, _count: { stores: 1 } } };
-  const db = (plan: string) => ({ sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { id: "billing", subscription: { status: "ACTIVE", plan, currentPeriodEnd: new Date("2099-01-01") }, accessGrants: [] } }) } }) as unknown as Db;
-  assert.equal((await managedOwnerEligibility(db("free"), owner, "admin")).reason, "MULTI_STORE_PRO_REQUIRED");
-  assert.equal((await managedOwnerEligibility(db("pro"), owner, "admin")).mode, "ADDITIONAL");
-  assert.equal((await managedOwnerEligibility(db("pro"), { ...owner, ownedBusiness: { ...owner.ownedBusiness, maxStores: 1 } }, "admin")).reason, "STORE_LIMIT_REACHED");
+test("Admin additional-store eligibility is independent of seller PRO and self-service capacity", async () => {
+  const billingStore = { id: "billing", ownerId: "seller", businessId: "business" };
+  const owner = { ...seller, _count: { stores: 2 }, ownedBusiness: { id: "business", billingStoreId: "billing", billingStore, _count: { stores: 2 } } };
+  assert.equal((await managedOwnerEligibility(emptyDb, owner, "admin")).mode, "ADDITIONAL");
+  assert.equal((await managedOwnerEligibility(emptyDb, { ...owner, ownedBusiness: { ...owner.ownedBusiness, _count: { stores: 3 } } }, "admin")).reason, "OWNER_BUSINESS_INCONSISTENT");
+  assert.equal((await managedOwnerEligibility(emptyDb, { ...owner, ownedBusiness: { ...owner.ownedBusiness, billingStore: { ...billingStore, ownerId: "other" } } }, "admin")).reason, "OWNER_BUSINESS_INCONSISTENT");
   assert.equal((await managedOwnerEligibility(emptyDb, { ...owner, ownedBusiness: null }, "admin")).reason, "OWNER_BUSINESS_INCONSISTENT");
 });
 test("eligible-owner list excludes invalid owners, deduplicates and supports bounded search", async () => {
@@ -53,8 +54,15 @@ test("forged Admin session rejected; mutation origin requires same-origin action
   assert.throws(() => assertAdminMutationRequest(new Request("https://todijo.com/api/admin/stores", { headers: { "x-todijo-admin-action": "1", origin: "https://evil.test" } })));
 });
 test("concurrent first-store creation serializes and second stale request fails", async () => {
-  let count = 0, tail = Promise.resolve();
-  const tx = { $queryRaw: async () => [], user: { findUnique: async () => ({ ...seller, _count: { stores: count } }) }, store: { create: async () => { count++; return { id: "created", slug: "created" }; } } };
+  let count = 0, tail = Promise.resolve(), business: any = null;
+  const owner: any = { ...seller };
+  const tx: any = {
+    $queryRaw: async () => [],
+    user: { findUnique: async () => ({ ...owner, _count: { stores: count } }), updateMany: async ({ data }: any) => { Object.assign(owner, data); return { count: 1 }; } },
+    store: { create: async () => { count++; return { id: "created", slug: "created" }; }, updateMany: async () => ({ count: 1 }) },
+    sellerBusiness: { upsert: async () => { business ??= { id: "business-created", billingStoreId: null, maxStores: 1, _count: { stores: 0 } }; business._count.stores = count; return business; }, update: async ({ data }: any) => { if (data.billingStoreId) { business.billingStoreId = data.billingStoreId; owner.store = { id: data.billingStoreId, ownerId: owner.id, businessId: business.id }; } } },
+    sellerBusinessAuditEvent: { create: async ({ data }: any) => data },
+  };
   const db = { $transaction: (run: (value: typeof tx) => Promise<unknown>) => {
     const result = tail.then(() => run(tx)); tail = result.then(() => undefined, () => undefined); return result;
   } } as unknown as Db;
@@ -72,4 +80,6 @@ test("selector exposes search/loading/error/empty without unrelated policy chang
   assert.ok(route.indexOf("lockManagedOwner(tx") < route.indexOf("requireManagedOwner(tx"));
   assert.ok(readFileSync("lib/admin-store-owner-eligibility.ts", "utf8").includes("FOR UPDATE"));
   assert.ok(readFileSync("app/api/admin/store-owners/route.ts", "utf8").includes("requireAdmin"));
+  assert.equal(adminStoreOwnerCopy("fr").empty, "Aucun vendeur ne peut actuellement être sélectionné : vérifiez que son compte est actif et que ses boutiques sont correctement rattachées.");
+  assert.equal(adminStoreOwnerCopy("en").empty, "No seller can currently be selected: check that their account is active and their stores are correctly linked.");
 });

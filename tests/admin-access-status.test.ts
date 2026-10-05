@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolveSellerCommercialAccess } from "../lib/seller-commercial-access";
-import { adminAccessStatus } from "../lib/admin-access-status";
+import { adminAccessStatus, adminStatusDisplay } from "../lib/admin-access-status";
 
 const now = new Date("2026-10-04T00:00:00Z"), end = new Date("2027-10-04T00:00:00Z");
 const connect = { sellerSuspendedAt: null, stripeAccountId: null, stripeOnboardingComplete: false, stripeChargesEnabled: false, stripePayoutsEnabled: false };
@@ -69,4 +69,13 @@ test("Admin views share commercial summary and separate status cells", () => {
 test("paid plan remains derived from authoritative Price mapping; Team uses resolved capabilities", () => {
   const payments = readFileSync("lib/payments.ts", "utf8"); assert.ok(payments.includes("configuredSellerPlanForPriceId(priceId)")); assert.ok(payments.includes("plan: configuredPlan.plan"));
   const team = readFileSync("lib/seller-team.ts", "utf8"); assert.ok(team.includes("sellerBusinessCapabilityTier"));
+});
+test("Admin status display uses approved French labels and preserves unknown codes", () => {
+  assert.equal(adminStatusDisplay("PENDING_REVIEW", "onboarding", "fr"), "En attente de validation");
+  assert.equal(adminStatusDisplay("NEEDS_INFORMATION", "onboarding", "fr"), "Informations requises");
+  assert.equal(adminStatusDisplay("PAST_DUE", "billing", "fr"), "Paiement en retard");
+  assert.equal(adminStatusDisplay("PAYOUTS_DISABLED", "connect", "fr"), "Versements désactivés");
+  assert.equal(adminStatusDisplay("FUTURE_STATUS", "onboarding", "fr"), "FUTURE_STATUS");
+  assert.equal(adminStatusDisplay("PENDING_REVIEW", "onboarding", "en"), "PENDING_REVIEW");
+  assert.equal(adminStatusDisplay(null, "billing", "fr"), "—");
 });

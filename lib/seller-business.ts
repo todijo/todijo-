@@ -28,7 +28,7 @@ export async function sellerBusinessCapabilityTier(db: PrismaClient | Prisma.Tra
 }
 
 export async function lockSellerBusiness(tx: Prisma.TransactionClient, businessId: string) {
-  const rows = await tx.$queryRaw<Array<{ id: string; maxStores: number }>>(Prisma.sql`SELECT "id", "maxStores" FROM "SellerBusiness" WHERE "id"=${businessId} FOR UPDATE`);
+  const rows = await tx.$queryRaw<Array<{ id: string; maxStores: number; billingStoreId: string | null }>>(Prisma.sql`SELECT "id", "maxStores", "billingStoreId" FROM "SellerBusiness" WHERE "id"=${businessId} FOR UPDATE`);
   if (rows.length !== 1) throw new SellerBusinessError("BUSINESS_NOT_FOUND", 404);
   return rows[0];
 }

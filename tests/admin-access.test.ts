@@ -41,12 +41,29 @@ test("admin creates an own permanent store without payment", async () => {
   assert.equal(data?.status, "ACTIVE");
 });
 
-test("admin creates an eligible seller store with timed access and no Stripe data", async () => {
+test("Admin can create additional own stores without seller plan or self-service capacity", async () => {
   let data: Record<string, unknown> | undefined;
   const db = {
     $queryRaw: async () => [],
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, _count: { stores: 0 } }) },
-    store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; } },
+    user: { findUnique: async () => ({ id: "admin", role: "ADMIN", primaryStoreId: "existing-admin-store", _count: { stores: 4 }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null }) },
+    store: { create: async ({ data: input }: { data: Record<string, unknown> }) => { data = input; return { id: "admin-store-5", slug: "admin-shop-5" }; } },
+  } as never;
+  const created = await createAdditionalAdminManagedStore(db, "admin", { ownerId: "admin", name: "Admin Shop 5", slug: "admin-shop-5", contactEmail: "admin@example.com", country: "FR", city: "Paris", currency: "EUR", language: "fr" }, null);
+  assert.deepEqual(created, { id: "admin-store-5", slug: "admin-shop-5" });
+  const grant = (data?.accessGrants as { create: { source: string; endsAt: Date | null } }).create;
+  assert.equal(grant.source, "ADMIN_EXEMPT"); assert.equal(grant.endsAt, null);
+  assert.equal("subscription" in (data ?? {}), false);
+});
+
+test("admin creates an eligible seller store with timed access and no Stripe data", async () => {
+  let data: Record<string, unknown> | undefined;
+  const links: Array<Record<string, unknown>> = [], audits: Array<Record<string, unknown>> = [];
+  const db = {
+    $queryRaw: async () => [],
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, store: null, _count: { stores: 0 }, ownedBusiness: null }), updateMany: async (input: { where: Record<string, unknown>; data: Record<string, unknown> }) => { links.push(input); return { count: 1 }; } },
+    store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; }, updateMany: async (input: { data: Record<string, unknown> }) => { links.push(input); return { count: 1 }; } },
+    sellerBusiness: { upsert: async () => ({ id: "business-seller", billingStoreId: null, maxStores: 1 }), update: async (input: { data: Record<string, unknown> }) => { links.push(input); } },
+    sellerBusinessAuditEvent: { create: async (input: { data: Record<string, unknown> }) => { audits.push(input.data); return input.data; } },
   } as unknown as Db;
   const now = new Date("2026-01-15T12:00:00Z");
   await createManagedStore(db, "admin", { ownerId: "seller", name: "Seller Shop", slug: "seller-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr", months: 3, plan: "plus" }, now);
@@ -55,41 +72,33 @@ test("admin creates an eligible seller store with timed access and no Stripe dat
   assert.equal(nested.plan, "plus");
   assert.equal(nested.endsAt.toISOString(), "2026-04-15T12:00:00.000Z");
   assert.equal("subscription" in (data ?? {}), false);
+  assert.equal(links.some(item => JSON.stringify(item).includes("business-seller")), true);
+  assert.equal(audits[0].action, "ADMIN_MANAGED_STORE_CREATED");
 });
 
-test("admin creates an additional PRO Store inside the existing business without duplicating commercial identity", async () => {
+test("Admin creates an additional seller Store and business-level managed grant regardless of self-service tier/capacity", async () => {
   let created: Record<string, unknown> | undefined;
-  const audits: Array<Record<string, unknown>> = [];
+  const audits: Array<Record<string, unknown>> = [], grants: Array<Record<string, unknown>> = [];
+  const billing = { accessGrants: [], subscription: null };
   const db = {
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, _count: { stores: 1 }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1", maxStores: 3, _count: { stores: 1 } } }) },
-    $queryRaw: async () => [{ id: "business-1", maxStores: 3 }],
+    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, store: null, _count: { stores: 3 }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1", billingStoreId: "billing", billingStore: { id: "billing", ownerId: "seller", businessId: "business-1" }, _count: { stores: 3 } } }) },
+    $queryRaw: async () => [{ id: "business-1", maxStores: 1, billingStoreId: "billing" }],
     store: {
-      count: async () => 1,
       create: async ({ data }: { data: Record<string, unknown> }) => { created = data; return { id: "store-2", slug: "second-shop" }; },
+      findMany: async () => [{ id: "store-2", accessGrants: [], subscription: null, business: { id: "business-1", billingStoreId: "billing", billingStore: billing } }],
+      findUnique: async () => billing,
     },
-    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan: "pro",currentPeriodEnd:new Date("2026-02-01T00:00:00Z") }, accessGrants: [] } }) },
+    storeAccessGrant: { create: async ({ data }: { data: Record<string, unknown> }) => { grants.push(data); return { storeId: data.storeId, endsAt: data.endsAt }; } },
     sellerBusinessAuditEvent: { create: async ({ data }: { data: Record<string, unknown> }) => { audits.push(data); return data; } },
   } as never;
-  const store = await createAdditionalAdminManagedStore(db, "admin", { ownerId: "seller", name: "Second Shop", slug: "second-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" }, "business-1", new Date("2026-01-01T00:00:00Z"));
+  const store = await createAdditionalAdminManagedStore(db, "admin", { ownerId: "seller", name: "Second Shop", slug: "second-shop", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr", months: 3, plan: "free" }, "business-1", new Date("2026-01-01T00:00:00Z"));
   assert.deepEqual(store, { id: "store-2", slug: "second-shop" });
   assert.equal(created?.ownerId, "seller");
   assert.equal(created?.businessId, "business-1");
   assert.equal("subscription" in (created ?? {}), false);
   assert.equal("accessGrants" in (created ?? {}), false);
-  assert.equal(audits[0].action, "ADMIN_MANAGED_STORE_CREATED");
-});
-
-test("additional managed Store fails closed for non-PRO and at capacity", async () => {
-  const database = (plan: string, count: number) => ({
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, _count: { stores: count }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null, ownedBusiness: { id: "business-1", maxStores: 2, _count: { stores: count } } }) },
-    $queryRaw: async () => [{ id: "business-1", maxStores: 2 }],
-    store: { count: async () => count, create: async () => { throw new Error("must not create"); } },
-    sellerBusiness: { findUnique: async () => ({ owner: { role: "SELLER" }, billingStore: { subscription: { status: "ACTIVE", plan,currentPeriodEnd:new Date("2099-01-01T00:00:00Z") }, accessGrants: [] } }) },
-  }) as never;
-  const input = { ownerId: "seller", name: "Second", slug: "second", contactEmail: "seller@example.com", country: "FR", city: "Lyon", currency: "EUR", language: "fr" };
-  await assert.rejects(() => createAdditionalAdminManagedStore(database("free", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
-  await assert.rejects(() => createAdditionalAdminManagedStore(database("plus", 1), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "MULTI_STORE_PRO_REQUIRED");
-  await assert.rejects(() => createAdditionalAdminManagedStore(database("pro", 2), "admin", input, "business-1"), (error: unknown) => error instanceof AdminAccessError && error.code === "STORE_LIMIT_REACHED");
+  assert.equal(grants.length, 1); assert.equal(grants[0].storeId, "billing"); assert.equal(grants[0].plan, "free");
+  assert.deepEqual(audits.map(item => item.action).sort(), ["ADMIN_GRANT_CREATED", "ADMIN_MANAGED_STORE_CREATED"]);
 });
 
 test("normal customer cannot receive an admin-created seller store", async () => {

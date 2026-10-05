@@ -4,6 +4,7 @@ import { appendSellerBusinessAudit } from "./seller-business-audit";
 import { AdminAccessError } from "./admin-access-error";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
 import { lockAdminGrant } from "./admin-grant-lock";
+import { ensureSellerBusiness } from "./seller-business";
 export { AdminAccessError } from "./admin-access-error";
 
 export const adminGrantMonths = [1, 3, 6, 12] as const;
@@ -130,7 +131,7 @@ export async function createManagedStore(db: Database, adminId: string, input: M
   if (!ownStore && !validGrantMonths(input.months)) throw new AdminAccessError("Select an initial access duration.", 400, "INVALID_DURATION");
   if (!ownStore && !isSellerPlanId(input.plan)) throw new AdminAccessError("Select a valid seller plan.", 400, "INVALID_SELLER_PLAN");
   const period = ownStore ? null : calculateGrantPeriod(now, input.months!);
-  return db.store.create({
+  const store = await db.store.create({
     data: {
       name: input.name,
       slug: input.slug,
@@ -156,6 +157,11 @@ export async function createManagedStore(db: Database, adminId: string, input: M
     },
     select: { id: true, slug: true },
   });
+  if (!ownStore) {
+    const business = await ensureSellerBusiness(db, owner.id, store.id);
+    await appendSellerBusinessAudit(db, { businessId: business.id, storeId: store.id, actorId: adminId, category: "STORE", action: "ADMIN_MANAGED_STORE_CREATED", targetType: "STORE", targetId: store.id, metadata: { ownerId: owner.id, source: "ADMIN_MANAGED_FIRST_STORE" } });
+  }
+  return store;
 }
 
 export async function exemptExistingAdminStore(db: Database, adminId: string, now = new Date()) {

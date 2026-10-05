@@ -5,12 +5,19 @@ import { normalizeSiren, normalizeSiret, sirenForSiret } from "../lib/sirene-ide
 import { hasVerifiedFrenchBusiness, isFrenchProfessional, publicStoreCity } from "../lib/seller-business-verification-policy";
 import { evaluateSireneSnapshot, isTransientSireneFailure } from "../lib/seller-business-verification";
 import { InseeSireneV311 } from "../lib/insee-sirene-v311";
+import { sellerBusinessVerificationMessage } from "../lib/seller-dashboard-readiness";
 
 test("French identifiers normalize whitespace, validate checksums, and preserve SIREN/SIRET relation", () => {
   assert.deepEqual(normalizeSiren("732 829 320"), { ok: true, value: "732829320" });
   assert.deepEqual(normalizeSiret("732 829 320 00074"), { ok: true, value: "73282932000074" });
-  assert.equal(normalizeSiren("732829321").ok, false);
-  assert.equal(normalizeSiret("73282932000075").ok, false);
+  assert.deepEqual(normalizeSiren("73282932"), { ok: false, code: "SIREN_INVALID_FORMAT" });
+  assert.deepEqual(normalizeSiren("0732829320"), { ok: false, code: "SIREN_INVALID_FORMAT" });
+  assert.deepEqual(normalizeSiren("732829321"), { ok: false, code: "SIREN_INVALID_CHECKSUM" });
+  assert.deepEqual(normalizeSiren(" 732\t829\n320 "), { ok: true, value: "732829320" });
+  assert.deepEqual(normalizeSiret("7328293200007"), { ok: false, code: "SIRET_INVALID_FORMAT" });
+  assert.deepEqual(normalizeSiret("073282932000074"), { ok: false, code: "SIRET_INVALID_FORMAT" });
+  assert.deepEqual(normalizeSiret("73282932000075"), { ok: false, code: "SIRET_INVALID_CHECKSUM" });
+  assert.deepEqual(normalizeSiret("73282932000074"), { ok: true, value: "73282932000074" });
   assert.equal(sirenForSiret("73282932000074"), "732829320");
 });
 
@@ -55,6 +62,15 @@ test("transient INSEE failures remain retryable without treating definitive 404 
   assert.equal(isTransientSireneFailure("NOT_FOUND"), false);
 });
 
+test("seller dashboard readiness distinguishes INSEE outcomes from pending and transient states", () => {
+  assert.equal(sellerBusinessVerificationMessage({businessState:"REJECTED",businessReason:"NOT_FOUND",establishmentState:"REJECTED",establishmentReason:"NOT_FOUND"}),"notFound");
+  assert.equal(sellerBusinessVerificationMessage({businessState:"REJECTED",businessReason:"SIRET_SIREN_MISMATCH",establishmentState:"REJECTED",establishmentReason:"SIRET_SIREN_MISMATCH"}),"mismatch");
+  assert.equal(sellerBusinessVerificationMessage({businessState:"MANUAL_REVIEW",businessReason:"PUBLIC_DATA_INCOMPLETE",establishmentState:"MANUAL_REVIEW",establishmentReason:"PUBLIC_DATA_INCOMPLETE"}),"partialData");
+  assert.equal(sellerBusinessVerificationMessage({businessState:"MANUAL_REVIEW",businessReason:"INACTIVE_OR_CLOSED",establishmentState:"MANUAL_REVIEW"}),"manualReview");
+  assert.equal(sellerBusinessVerificationMessage({businessState:"PENDING",businessReason:"TIMEOUT",establishmentState:"PENDING",establishmentReason:"TIMEOUT"}),"unavailable");
+  assert.equal(sellerBusinessVerificationMessage({businessState:"NOT_STARTED"}),"dashboardPending");
+});
+
 test("French professional publishing requires a verified establishment linked to the current SIRET", () => {
   assert.equal(isFrenchProfessional("PROFESSIONAL", "France"), true);
   assert.equal(isFrenchProfessional("PRIVATE", "FR"), false);
@@ -84,6 +100,35 @@ test("verification writes are origin-protected, server-owned, and public French 
   assert.match(publish, /hasVerifiedFrenchBusiness\(store\)/);
   assert.match(access, /inseeVerificationState: "VERIFIED"/);
   assert.match(access, /establishment: \{ is: \{ verificationState: "VERIFIED" \} \}/);
+});
+
+test("existing professional sellers can submit editable SIREN/SIRET values from store settings and retain verified establishment linkage", () => {
+  const form = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
+  const route = readFileSync("app/api/store/route.ts", "utf8");
+  assert.match(form, /name="businessSiren"[^>]*defaultValue=\{initialValues\.businessSiren\}/);
+  assert.match(form, /name="businessRegistrationId"[^>]*defaultValue=\{initialValues\.businessRegistrationId\}/);
+  assert.match(form, /businessSiren:values\.get\("businessSiren"\),businessRegistrationNumber:values\.get\("businessRegistrationId"\)/);
+  assert.match(route, /verifiedEstablishment\?\.verificationState==="VERIFIED"&&verifiedEstablishment\.legalUnitSiren===siren\.value/);
+  assert.match(route, /\?\{establishmentId\}:\{\}/);
+});
+
+test("corrected identifiers clear stale errors and preserve separate length, checksum, not-found, and outage messages", () => {
+  const onboarding = readFileSync("app/seller/onboarding/SellerAddressOnboardingForm.tsx", "utf8");
+  const settings = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
+  const french = JSON.parse(readFileSync("messages/seller-business-verification/fr.json", "utf8")) as Record<string, string>;
+  assert.match(onboarding, /setBusinessSiren\(event\.target\.value\); setVerificationMessage\(""\)/);
+  assert.match(onboarding, /setBusinessRegistrationNumber\(event\.target\.value\); setVerificationMessage\(""\)/);
+  assert.match(settings, /onChange=\{\(\)=>setVerificationMessage\(""\)\}/);
+  assert.match(onboarding, /SIREN_INVALID_FORMAT[^;]*invalidSiren/);
+  assert.match(onboarding, /SIRET_INVALID_FORMAT[^;]*invalidSiret/);
+  assert.match(onboarding, /SIREN_INVALID_CHECKSUM[^;]*invalidSirenChecksum/);
+  assert.match(onboarding, /SIRET_INVALID_CHECKSUM[^;]*invalidSiretChecksum/);
+  assert.equal(french.invalidSiren, "Le SIREN doit comporter 9 chiffres.");
+  assert.equal(french.invalidSiret, "Le SIRET doit comporter 14 chiffres.");
+  assert.equal(french.invalidSirenChecksum, "Le SIREN comporte 9 chiffres, mais sa clé de contrôle est invalide.");
+  assert.equal(french.invalidSiretChecksum, "Le SIRET comporte 14 chiffres, mais sa clé de contrôle est invalide.");
+  assert.match(onboarding, /code === "NOT_FOUND" \? "notFound"/);
+  assert.match(onboarding, /"RATE_LIMITED", "UPSTREAM_ERROR"/);
 });
 
 test("Admin approval accepts only a matching verified/manual-review pair and keeps an audit trail", () => {

@@ -1,24 +1,35 @@
-import { canCreateAdditionalSellerStore } from "./seller-commercial-access";
 import type { Prisma } from "@prisma/client";
-import { AdminAccessError, type ManagedStoreInput } from "./admin-access";
+import { AdminAccessError, extendManagedAccess, type ManagedStoreInput, validGrantMonths } from "./admin-access";
+import { isSellerPlanId } from "./seller-plans";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
-import { lockSellerBusiness, sellerBusinessCommercialPlan } from "./seller-business";
+import { lockSellerBusiness } from "./seller-business";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
 
 export async function createAdditionalAdminManagedStore(
   tx: Prisma.TransactionClient,
   adminId: string,
   input: ManagedStoreInput,
-  businessId: string,
+  businessId: string | null,
   now = new Date(),
 ) {
   await lockManagedOwner(tx, input.ownerId);
   const { owner, mode, businessId: eligibleBusinessId } = await requireManagedOwner(tx, input.ownerId, adminId, now);
-  if (mode !== "ADDITIONAL" || eligibleBusinessId !== businessId) throw new AdminAccessError("Selected owner state changed.", 409, "OWNER_STATE_CHANGED");
+  if (owner.id === adminId && owner.role === "ADMIN" && mode === "ADDITIONAL" && !businessId && !eligibleBusinessId) {
+    return tx.store.create({
+      data: {
+        name: input.name, slug: input.slug, description: input.description || null,
+        contactEmail: input.contactEmail, phone: input.phone || null, country: input.country,
+        city: input.city, currency: input.currency, language: input.language,
+        status: "ACTIVE", marketplaceActivatedAt: now, ownerId: owner.id,
+        accessGrants: { create: { grantedById: adminId, source: "ADMIN_EXEMPT", plan: null, startsAt: now, endsAt: null } },
+      },
+      select: { id: true, slug: true },
+    });
+  }
+  if (mode !== "ADDITIONAL" || !businessId || eligibleBusinessId !== businessId) throw new AdminAccessError("Selected owner state changed.", 409, "OWNER_STATE_CHANGED");
   const locked = await lockSellerBusiness(tx, businessId);
-  const storeCount = await tx.store.count({ where: { businessId } });
-  if (storeCount >= locked.maxStores) throw new AdminAccessError("The Store limit has been reached.", 409, "STORE_LIMIT_REACHED");
-  if (!canCreateAdditionalSellerStore(await sellerBusinessCommercialPlan(tx, businessId, now))) throw new AdminAccessError("PRO access is required for an additional Store.", 403, "MULTI_STORE_PRO_REQUIRED");
+  if (!locked.billingStoreId) throw new AdminAccessError("Seller business billing identity is incomplete.", 409, "OWNER_BUSINESS_INCONSISTENT");
+  if (!validGrantMonths(input.months) || !isSellerPlanId(input.plan)) throw new AdminAccessError("Select a valid initial access grant.", 400, "INVALID_INITIAL_ACCESS");
   const store = await tx.store.create({
     data: {
       name: input.name, slug: input.slug, description: input.description || null,
@@ -28,6 +39,7 @@ export async function createAdditionalAdminManagedStore(
     },
     select: { id: true, slug: true },
   });
+  await extendManagedAccess(tx, adminId, [store.id], input.months, now, input.plan);
   await appendSellerBusinessAudit(tx, { businessId, storeId: store.id, actorId: adminId, category: "STORE", action: "ADMIN_MANAGED_STORE_CREATED", targetType: "STORE", targetId: store.id, metadata: { ownerId: owner.id, source: "ADMIN_MANAGED_MULTI_STORE" } });
   return store;
 }

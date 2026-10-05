@@ -25,8 +25,11 @@ import { sellerTeamCopy } from "@/i18n/seller-team";
 import type { TeamPermission } from "@prisma/client";
 import FreeSellerStartCard from "@/components/FreeSellerStartCard";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
-import { hasProSellerCapabilities } from "@/lib/seller-commercial-access";
+import { canSellerSelfCreateStore, hasLockedSellerMultiStoreTeaser, hasProSellerCapabilities } from "@/lib/seller-commercial-access";
+import { sellerMultiStoreTeaserCopy } from "@/i18n/seller-multi-store-teaser";
+import LockedMultiStoreTeaser from "@/components/LockedMultiStoreTeaser";
 import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
+import { sellerBusinessVerificationMessage } from "@/lib/seller-dashboard-readiness";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -61,7 +64,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 export default async function DashboardPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
   const [t, p, s, common, ordersText, privacy, transparency, compliance, verification, auth, locale, session] = await Promise.all([
@@ -118,6 +121,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
   const selectedCommercialPlan=selectedPrincipal?await sellerBusinessCommercialPlan(prisma,selectedPrincipal.businessId):null;
+  const sellerBenefitCatalogEnabled=Boolean(selectedPrincipal?.owner&&user.role==="SELLER"&&hasProSellerCapabilities(selectedCommercialPlan)&&(await prisma.sellerBenefitAccess.findUnique({where:{businessId:selectedPrincipal.businessId},select:{enabled:true}}))?.enabled);
   const freeCopy = sellerFreeModelCopy(locale);
   const sellerCanAddProduct = Boolean(activeStore && canCreateProducts && canPublish(activeStore,new Date(),selectedCommercialPlan));
   const sellerNav = sellerDashboardNavItems({ locale, storeSlug: activeStore?.slug, publicStoreAvailable:sellerCanAddProduct, proImportAvailable:Boolean(selectedPrincipal?.owner&&hasProSellerCapabilities(selectedCommercialPlan)), ownerTools:Boolean(selectedPrincipal?.owner),permissions:selectedPrincipal?.owner?undefined:selectedPrincipal?.permissions??[],labels: { dashboard:p("nav.dashboard"), products:p("nav.products"), addProduct:p("nav.addProduct"), orders:p("nav.orders"), messages:p("nav.messages"), statistics:p("nav.statistics"), revenue:p("nav.revenue"), reviews:p("nav.reviews"), store:p("nav.store"), settings:p("nav.settings"), notifications:p("notifications"), eyebrow:p("seller.eyebrow"), logout:common("logout"), menu:s("menu"), collapse:s("collapse"), importProducts:freeCopy.importProducts }, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active: "dashboard", unreadMessages });
@@ -163,13 +167,34 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
       prisma.product.count({where:{storeId:{in:ids}}}),
       prisma.orderGroup.findMany({where:{storeId:{in:ids},kind:"MARKETPLACE"},select:{sellerNetAmountMinor:true,order:{select:{currency:true}}}}),
       prisma.order.count({where:{groups:{some:{storeId:{in:ids}}}}}),
-      prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{maxStores:true}}),
+      prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{id:true}}),
       sellerBusinessCommercialPlan(prisma,principal.businessId),
     ]));
     const revenueByCurrency=groups.reduce<Record<string,number>>((totals,group)=>{totals[group.order.currency]=(totals[group.order.currency]??0)+group.sellerNetAmountMinor;return totals},{});
     const revenue=Object.entries(revenueByCurrency).map(([currency,minor])=>money(locale,minor/100,currency)).join(" · ")||money(locale,0,"EUR");
-    const canCreateStore=Boolean(business&&commercialPlan==="pro"&&ownedStoreChoices.length<business.maxStores);
-    return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent"><SellerStoreSwitcher stores={storeChoices} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll/><section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome",{name:user.firstName})}</h1><p>{teamCopy.allStores}</p></div>{canCreateStore&&<Link className="premiumPrimaryButton" href={`/${locale}/seller/stores/new`}>{teamCopy.createStore}</Link>}</section><section className="premiumStatsGrid"><DashboardStatCard label={p("nav.store")} value={ownedStoreChoices.length} icon={Store}/><DashboardStatCard label={p("nav.products")} value={productCount} icon={Boxes}/><DashboardStatCard label={p("stats.orders")} value={orderCount} icon={ReceiptText} tone="blue"/><DashboardStatCard label={p("nav.revenue")} value={revenue} icon={TrendingUp} tone="mint"/></section><DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><div className="premiumQuickGrid">{ownedStoreChoices.map(store=><DashboardQuickAction key={store.id} label={store.name} href={`/${locale}/dashboard?store=${store.id}`} icon={Store}/>)}</div></DashboardSection></div></div></main>
+    const canCreateStore=Boolean(business&&canSellerSelfCreateStore(commercialPlan,ownedStoreChoices.length));
+    const teaserCopy=user.role==="SELLER"&&hasLockedSellerMultiStoreTeaser(commercialPlan)?sellerMultiStoreTeaserCopy(locale):null;
+    return <main className="premiumDashboard premiumSellerDashboard">
+      <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
+      <div className="premiumDashboardMain">
+        <DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/>
+        <div className="premiumDashboardContent">
+          <SellerStoreSwitcher stores={storeChoices} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll/>
+          <section className="sellerOverviewHero">
+            <div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome",{name:user.firstName})}</h1><p>{teamCopy.allStores}</p></div>
+            {canCreateStore&&<Link className="premiumPrimaryButton" href={`/${locale}/seller/stores/new`}>{teamCopy.createStore}</Link>}
+          </section>
+          <section className="premiumStatsGrid">
+            <DashboardStatCard label={p("nav.store")} value={ownedStoreChoices.length} icon={Store}/>
+            <DashboardStatCard label={p("nav.products")} value={productCount} icon={Boxes}/>
+            <DashboardStatCard label={p("stats.orders")} value={orderCount} icon={ReceiptText} tone="blue"/>
+            <DashboardStatCard label={p("nav.revenue")} value={revenue} icon={TrendingUp} tone="mint"/>
+          </section>
+          <DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><div className="premiumQuickGrid">{ownedStoreChoices.map(store=><DashboardQuickAction key={store.id} label={store.name} href={`/${locale}/dashboard?store=${store.id}`} icon={Store}/>)}</div></DashboardSection>
+          {teaserCopy&&<LockedMultiStoreTeaser copy={teaserCopy}/>}
+        </div>
+      </div>
+    </main>
   }
 
   if (!activeStore) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={paths.dashboard} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}<FreeSellerStartCard locale={locale} noStore/><DashboardEmptyState headingLevel="h1" title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/onboarding`}>{t("createShop")}</Link>}/>{principal?.owner&&<StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>}</div></div></main>;
@@ -209,15 +234,13 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const storeReadinessPending=activeStore.status!=="ACTIVE";
   const readinessHref = businessVerificationRequired||sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings?store=${activeStore.id}#location` : `/${locale}/seller/subscription`;
   const readinessTitle = businessVerificationRequired ? verification("sectionTitle") : sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : activeStore.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
-  const readinessHelp = businessVerificationRequired ? verification("dashboardPending") : sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
+  const readinessHelp = businessVerificationRequired ? verification(sellerBusinessVerificationMessage({businessState:activeStore.business?.inseeVerificationState,businessReason:activeStore.business?.inseeVerificationReason,establishmentState:activeStore.establishment?.verificationState,establishmentReason:activeStore.establishment?.verificationReason})) : sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
   const readinessAction = businessVerificationRequired ? verification("verify") : sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : selectedCommercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
   const showReadinessWarning=Boolean(selectedPrincipal?.owner&&!subscriptionActive&&(storeReadinessPending||sellerTypeRequired||vatStatusRequired||businessVerificationRequired||selectedCommercialPlan==null));
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}
       {showReadinessWarning && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
-      {selectedPrincipal?.owner && selectedCommercialPlan === "free" && <FreeSellerStartCard locale={locale}/>}
-      {selectedPrincipal?.owner && hasProSellerCapabilities(selectedCommercialPlan) && <section className="storeSetupCard"><h2>{freeCopy.supplies}</h2><p>{freeCopy.suppliesHelp}</p><Link href={`/${locale}/seller/shipping-supplies`}>{freeCopy.suppliesRequest}</Link></section>}
       {pendingRefundCount > 0 && <section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount === 1 ? "pendingRefundRequestSingular" : "pendingRefundRequestPlural", { count: pendingRefundCount })}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
       <SellerStoreSwitcher stores={storeChoices} selectedId={activeStore.id} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll={Boolean(principal?.owner&&ownedStoreChoices.length>1)}/>
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<div className="sellerHeroMetrics">{canViewSales&&<div><small>{s("todayRevenue")}</small><strong>{money(locale, todayRevenue, activeStore.currency)}</strong></div>}{canViewOrders&&<><div><small>{s("pendingOrders")}</small><strong>{pendingOrders}</strong></div><div><small>{s("newCustomers")}</small><strong>{newCustomers}</strong></div></>}{canViewMessages&&<div><small>{s("unreadMessages")}</small><strong>{unreadMessages}</strong></div>}</div>}<Link href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`}>{t("viewShop")} <Store size={18}/></Link></section>
@@ -235,6 +258,9 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
         }
       </DashboardSection>}
       {canViewAnalytics&&<DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating > 0 && <article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{cancellationRate != null && <article><ReceiptText size={20}/><span>{s("cancellationRate")}</span><strong>{cancellationRate.toFixed(1)}%</strong></article>}{reviewStats._count.rating === 0 && cancellationRate == null && <DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>}
+      {selectedPrincipal?.owner && selectedCommercialPlan === "free" && <FreeSellerStartCard locale={locale}/>}
+      {selectedPrincipal?.owner && user.role==="SELLER" && ownedStoreChoices.length>0 && hasLockedSellerMultiStoreTeaser(selectedCommercialPlan) && sellerMultiStoreTeaserCopy(locale) && <LockedMultiStoreTeaser copy={sellerMultiStoreTeaserCopy(locale)!}/>}
+      {sellerBenefitCatalogEnabled && <section className="storeSetupCard"><h2>Les cadeaux Todijo pour vous</h2><p>Découvrez les cadeaux et avantages sélectionnés par Todijo pour votre activité. Les disponibilités, quantités et tarifs sont indiqués pour chaque article.</p><Link href={`/${locale}/seller/benefits?store=${activeStore.id}`}>Découvrir mes avantages</Link></section>}
       {selectedPrincipal?.owner&&<StripeConnectSection
         commercialEntitlementActive={selectedCommercialPlan!==null}
         initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>

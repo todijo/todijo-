@@ -60,11 +60,11 @@ test("Admin dropshipping capability does not bypass explicit dropshipping permis
   assert.equal((await requireSellerSupplierAccess(db, { userId: "admin" })).id, "store");
   store.dropshippingEnabled = false; await assert.rejects(() => requireSellerSupplierAccess(db, { userId: "admin" }), /DROPSHIPPING_PERMISSION_DENIED/);
 });
-test("one-store Admin exception stays authoritative regardless of PRO capability", async () => {
+test("Admin-managed owner eligibility permits additional Admin stores independently of PRO capability", async () => {
   const admin = { id: "admin", role: "ADMIN", primaryStoreId: null, _count: { stores: 0 }, ownedBusiness: null, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null } as ManagedOwner;
   const db = {} as Parameters<typeof managedOwnerEligibility>[0];
   assert.equal((await managedOwnerEligibility(db, admin, "admin", now)).eligible, true);
-  assert.equal((await managedOwnerEligibility(db, { ...admin, _count: { stores: 1 } }, "admin", now)).eligible, false);
+  assert.equal((await managedOwnerEligibility(db, { ...admin, _count: { stores: 1 } }, "admin", now)).mode, "ADDITIONAL");
   assert.equal((await managedOwnerEligibility(db, { ...admin, primaryStoreId: "primary" }, "admin", now)).eligible, false);
   assert.equal(canCreateAdditionalSellerStore("pro"), true); assert.equal(canCreateAdditionalSellerStore("admin-exempt"), false);
   const route = readFileSync("app/api/store/route.ts", "utf8");

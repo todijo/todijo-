@@ -398,6 +398,19 @@ enum SupportRequestStatus {
   CLOSED
 }
 
+enum SellerBenefitPriceType {
+  FREE
+  SPECIAL
+}
+
+enum SellerBenefitRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  FULFILLED
+  CANCELED
+}
+
 enum SiteContentPageStatus {
   ACTIVE
   ARCHIVED
@@ -447,6 +460,12 @@ model User {
   teamMemberships     SellerTeamMembership[]
   acceptedTeamInvitations SellerTeamInvitation[] @relation("AcceptedTeamInvitationUser")
   sellerBusinessAuditEvents SellerBusinessAuditEvent[] @relation("SellerBusinessAuditActor")
+  sellerBenefitRequests              SellerBenefitRequest[]              @relation("SellerBenefitRequester")
+  sellerBenefitRequestsReviewed      SellerBenefitRequest[]              @relation("SellerBenefitReviewer")
+  sellerBenefitAccessUpdated         SellerBenefitAccess[]               @relation("SellerBenefitAccessUpdater")
+  sellerBenefitItemsCreated          SellerBenefitCatalogItem[]          @relation("SellerBenefitItemCreator")
+  sellerBenefitItemsUpdated          SellerBenefitCatalogItem[]          @relation("SellerBenefitItemUpdater")
+  sellerBenefitAuditEvents           SellerBenefitAuditEvent[]           @relation("SellerBenefitAuditActor")
   buyerConversations  Conversation[] @relation("ConversationBuyer")
   sellerConversations Conversation[] @relation("ConversationSeller")
   sentMessages        Message[]
@@ -900,6 +919,7 @@ model Store {
   teamAssignments SellerTeamStoreAssignment[]
   invitationAssignments SellerTeamInvitationStore[]
   businessAuditEvents SellerBusinessAuditEvent[]
+  sellerBenefitRequests SellerBenefitRequest[]
   loyaltyAccounts LoyaltyAccount[]
   loyaltyChanges LoyaltyStoreChange[]
 
@@ -941,6 +961,9 @@ model SellerBusiness {
   invitations  SellerTeamInvitation[]
   auditEvents  SellerBusinessAuditEvent[]
   establishments SellerBusinessEstablishment[]
+  benefitAccess      SellerBenefitAccess?
+  benefitRequests    SellerBenefitRequest[]
+  benefitAuditEvents SellerBenefitAuditEvent[]
 
   @@index([maxStores])
 }
@@ -1066,6 +1089,93 @@ model SellerBusinessAuditEvent {
   @@index([businessId, storeId, createdAt])
   @@index([actorId, createdAt])
   @@index([category, createdAt])
+}
+
+model SellerBenefitAccess {
+  id          String   @id @default(cuid())
+  businessId  String   @unique
+  enabled     Boolean  @default(false)
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business  SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  updatedBy User           @relation("SellerBenefitAccessUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([enabled, updatedAt])
+}
+
+model SellerBenefitCatalogItem {
+  id                    String                 @id @default(cuid())
+  name                  String                 @db.VarChar(160)
+  description           String                 @db.VarChar(1200)
+  priceType             SellerBenefitPriceType
+  priceMinor            Int                    @default(0)
+  quantityLimitPerStore Int
+  active                Boolean                @default(false)
+  availableFrom         DateTime?
+  availableUntil        DateTime?
+  createdById           String
+  updatedById           String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  createdBy   User                      @relation("SellerBenefitItemCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User                      @relation("SellerBenefitItemUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  requests    SellerBenefitRequest[]
+  auditEvents SellerBenefitAuditEvent[]
+
+  @@index([active, availableFrom, availableUntil])
+}
+
+model SellerBenefitRequest {
+  id                     String                     @id @default(cuid())
+  businessId             String
+  storeId                String
+  itemId                 String
+  requestedById          String
+  reviewedById           String?
+  quantity               Int
+  status                 SellerBenefitRequestStatus @default(REQUESTED)
+  priceTypeSnapshot      SellerBenefitPriceType
+  unitPriceMinorSnapshot Int
+  idempotencyKey         String                     @db.VarChar(80)
+  reviewedAt             DateTime?
+  reviewNote             String?                    @db.VarChar(1000)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  business    SellerBusiness            @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  store       Store                     @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  item        SellerBenefitCatalogItem  @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  requestedBy User                      @relation("SellerBenefitRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User?                     @relation("SellerBenefitReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  auditEvents SellerBenefitAuditEvent[]
+
+  @@unique([businessId, storeId, idempotencyKey])
+  @@index([businessId, storeId, itemId, status])
+  @@index([status, createdAt])
+}
+
+model SellerBenefitAuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String
+  businessId String?
+  itemId     String?
+  requestId  String?
+  action     String   @db.VarChar(80)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor    User                      @relation("SellerBenefitAuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  business SellerBusiness?           @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  item     SellerBenefitCatalogItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  request  SellerBenefitRequest?     @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([businessId, createdAt])
+  @@index([itemId, createdAt])
+  @@index([requestId, createdAt])
 }
 
 enum OrderSnapshotSource {

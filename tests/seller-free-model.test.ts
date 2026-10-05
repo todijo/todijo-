@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { sellerPlans, configuredSellerPlan, configuredSellerPlanForPriceId } from "../lib/seller-plans";
-import { resolveSellerCommercialAccess, hasProSellerCapabilities, canCreateAdditionalSellerStore } from "../lib/seller-commercial-access";
+import { resolveSellerCommercialAccess, hasProSellerCapabilities, canCreateAdditionalSellerStore, canSellerSelfCreateStore, hasLockedSellerMultiStoreTeaser, sellerSelfServiceStoreLimit } from "../lib/seller-commercial-access";
 import { canPublish, sellerProductQuota, requireStorePublishingAccess } from "../lib/seller-subscription";
 import { createOrReuseSellerSubscriptionCheckout } from "../lib/seller-subscription-checkout";
 import { dailyDiscoveryOffset, interleaveDiscoveryStores, proHomepageDiscovery } from "../lib/pro-homepage-discovery";
@@ -10,6 +10,7 @@ import { requireProShippingSupplies, requestProShippingSupplies } from "../lib/p
 import { recommendedSellerPlan } from "../lib/seller-plan-recommendation";
 import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "../lib/seller-registration-intent";
 import { sellerFreeModelCopy } from "../i18n/seller-free-model";
+import { sellerMultiStoreTeaserCopy } from "../i18n/seller-multi-store-teaser";
 import { locales } from "../i18n/config";
 
 const now = new Date("2026-10-05T00:00:00Z"), end = new Date("2099-01-01");
@@ -41,6 +42,53 @@ test("commercial precedence preserves Admin exemption, paid plans, grants, FREE,
   assert.equal(resolveSellerCommercialAccess({role:"SELLER",subscription:null,accessGrants:[grant]},now).plan,"pro");
   assert.equal(resolveSellerCommercialAccess({role:"SELLER",...base},now).plan,"free");
   assert.equal(resolveSellerCommercialAccess({role:"CUSTOMER",...base},now).active,false);
+});
+test("FREE and PLUS retain one store while PRO self-service is capped at three regardless of Admin capacity",()=>{
+  for(const plan of ["free","plus"]){
+    assert.equal(sellerSelfServiceStoreLimit(plan),1);
+    assert.equal(canSellerSelfCreateStore(plan,0),true);
+    assert.equal(canSellerSelfCreateStore(plan,1),false);
+  }
+  assert.equal(sellerSelfServiceStoreLimit("pro"),3);
+  assert.equal(canSellerSelfCreateStore("pro",0),true);
+  assert.equal(canSellerSelfCreateStore("pro",1),true);
+  assert.equal(canSellerSelfCreateStore("pro",2),true);
+  assert.equal(canSellerSelfCreateStore("pro",3),false);
+  assert.equal(canSellerSelfCreateStore("pro",4),false);
+  assert.equal(canSellerSelfCreateStore("admin-exempt",1),false);
+  assert.equal(canSellerSelfCreateStore("pro",-1),false);
+});
+test("seller store creation surfaces and API enforce the same plan entitlement instead of Admin maxStores",()=>{
+  for(const file of ["app/dashboard/page.tsx","app/seller/stores/new/page.tsx","app/seller/store-settings/page.tsx"]){
+    assert.match(source(file),/canSellerSelfCreateStore\(/);
+    assert.doesNotMatch(source(file),/maxStores/);
+  }
+  const route=source("app/api/store/route.ts");
+  assert.match(route,/sellerSelfServiceStoreLimit\(commercialPlan\)/);
+  assert.match(route,/canCreateAdditionalSellerStore\(commercialPlan\)/);
+  assert.doesNotMatch(route,/storeCount >= locked\.maxStores/);
+});
+test("FREE/PLUS dashboard teaser is informational while PRO receives a real add-store link below three",()=>{
+  for(const plan of ["free","plus"]){
+    assert.equal(hasLockedSellerMultiStoreTeaser(plan),true);
+    assert.equal(canSellerSelfCreateStore(plan,1),false);
+  }
+  assert.equal(hasLockedSellerMultiStoreTeaser("pro"),false);
+  assert.equal(canSellerSelfCreateStore("pro",2),true);
+  assert.equal(canSellerSelfCreateStore("pro",3),false);
+  const exactCopy=sellerMultiStoreTeaserCopy("fr");
+  assert.deepEqual(exactCopy,{
+    title:"Développez votre activité avec plusieurs boutiques",
+    explanation:"Les boutiques supplémentaires sont incluses avec PRO. Passez à PRO pour gérer plusieurs boutiques depuis votre espace vendeur.",
+    informationalLabel:"Disponible avec PRO",
+    badge:"Inclus avec PRO",
+  });
+  assert.equal(sellerMultiStoreTeaserCopy("en"),null,"unapproved localized wording is not introduced");
+  const dashboard=source("app/dashboard/page.tsx"),component=source("components/LockedMultiStoreTeaser.tsx");
+  assert.match(dashboard,/hasLockedSellerMultiStoreTeaser\(commercialPlan\)/);
+  assert.match(dashboard,/href=\{`\/\$\{locale\}\/seller\/stores\/new`\}/);
+  assert.match(component,/aria-disabled="true"/);
+  assert.doesNotMatch(component,/<(?:a|Link|button)\b/);
 });
 for(const plan of ["free","plus","pro","admin-exempt"]){
   test(`${plan} retains capability boundaries and Admin remains one-store`,()=>{
