@@ -59,12 +59,12 @@ test("suspended historical sellers remain counted but do not fail active complia
 test("admin compliance view identifies sellers and gives a safe remediation path", () => {
   const page = readFileSync(join(process.cwd(), "app/adm-barewbar-182203/connect-readiness/page.tsx"), "utf8");
   assert.match(page, /requireAdmin/);
-  assert.match(page, /Seller readiness register/);
-  assert.match(page, /ACTION REQUIRED/);
+  assert.match(page, /Suivi de la préparation des vendeurs/);
+  assert.match(page, /ACTION REQUISE/);
   assert.match(page, /sellerSuspendedAt/);
-  assert.match(page, /SUSPENDED \/ HISTORICAL — NOT COUNTED IN ACTIVE COMPLIANCE/);
-  assert.match(page, /Reactivation immediately makes Connect readiness required again/);
-  assert.match(page, /Dashboard → Connect Stripe/);
+  assert.match(page, /SUSPENDU \/ HISTORIQUE — HORS CONFORMITÉ ACTIVE/);
+  assert.match(page, /Leur réactivation rend de nouveau obligatoire la vérification Stripe Connect/);
+  assert.match(page, /Tableau de bord → Stripe Connect/);
   assert.match(page, /maskedStripeAccountId/);
   assert.doesNotMatch(page, /createConnectedAccount|STRIPE_SECRET_KEY/);
 });
