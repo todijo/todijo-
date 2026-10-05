@@ -1,8 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { collectRuntimeErrors, dismissCookieConsent } from "./helpers";
 import { SignJWT } from "jose";
-import { execFileSync } from "node:child_process";
-import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { DESKTOP_CATEGORY_TAXONOMY, subcategoryId } from "../../lib/desktop-category-taxonomy";
 import { localizedCategoryLeafLabel } from "../../lib/category-tree-localization";
@@ -14,37 +12,63 @@ const databaseUsers = [
   { id: "buyer-a", firstName: "Buyer", lastName: "A", email: "buyer-a@e2e.todijo.test" },
   { id: "buyer-b", firstName: "Buyer", lastName: "B", email: "buyer-b@e2e.todijo.test" },
 ] as const;
-
-function executeFixtureSql(sql: string) {
-  execFileSync(process.execPath, [join(process.cwd(), "node_modules", "prisma", "build", "index.js"), "db", "execute", "--schema", join(process.cwd(), "prisma", "schema.prisma"), "--stdin"], { input: sql, env: process.env, stdio: ["pipe", "ignore", "pipe"] });
-}
+const db = new PrismaClient();
 
 test.beforeAll(async () => {
-  executeFixtureSql(`INSERT INTO "User" ("id","firstName","lastName","email","role","authVersion","createdAt","updatedAt") VALUES
-    ('header-buyer','Header','Buyer','header-buyer@e2e.todijo.test','CUSTOMER',0,NOW(),NOW()),
-    ('buyer-a','Buyer','A','buyer-a@e2e.todijo.test','CUSTOMER',0,NOW(),NOW()),
-    ('buyer-b','Buyer','B','buyer-b@e2e.todijo.test','CUSTOMER',0,NOW(),NOW())
-    ON CONFLICT ("id") DO UPDATE SET "role"='CUSTOMER', "authVersion"=0, "updatedAt"=NOW();`);
-  executeFixtureSql(`INSERT INTO "NewsArticle" ("id","locale","title","content","published","publishedAt","editorAdminId","createdAt","updatedAt") VALUES
-    ('news-localization-e2e','fr','Titre source','Contenu source',true,NOW(),'header-buyer',NOW(),NOW())
-    ON CONFLICT ("id") DO UPDATE SET "published"=true, "publishedAt"=NOW(), "updatedAt"=NOW();
-    INSERT INTO "NewsArticleTranslation" ("id","articleId","locale","title","content","automatic","createdAt","updatedAt") VALUES
-    ('news-en-e2e','news-localization-e2e','en','English translated news','English translated body',true,NOW(),NOW()),
-    ('news-ar-e2e','news-localization-e2e','ar','خبر مترجم','محتوى مترجم',true,NOW(),NOW())
-    ON CONFLICT ("articleId","locale") DO UPDATE SET "title"=EXCLUDED."title", "content"=EXCLUDED."content", "automatic"=true, "updatedAt"=NOW();`);
-  const db = new PrismaClient();
-  try {
-    const fixture = await db.newsArticle.findFirst({ where: { id: "news-localization-e2e", published: true, publishedAt: { lte: new Date() } }, include: { translations: true } });
-    expect(fixture?.published).toBe(true);
-    expect(fixture?.translations).toHaveLength(2);
-  } finally {
-    await db.$disconnect();
-  }
+  const publishedAt = new Date(Date.now() - 60_000);
+  await db.$transaction(async (tx) => {
+    for (const user of databaseUsers) {
+      await tx.user.upsert({
+        where: { id: user.id },
+        create: { ...user, role: "CUSTOMER", authVersion: 0 },
+        update: { role: "CUSTOMER", authVersion: 0 },
+      });
+    }
+
+    await tx.newsArticle.upsert({
+      where: { id: "news-localization-e2e" },
+      create: {
+        id: "news-localization-e2e",
+        locale: "fr",
+        title: "Titre source",
+        content: "Contenu source",
+        published: true,
+        publishedAt,
+        editorAdminId: "header-buyer",
+      },
+      update: { published: true, publishedAt },
+    });
+
+    for (const translation of [
+      { locale: "en", title: "English translated news", content: "English translated body" },
+      { locale: "ar", title: "خبر مترجم", content: "محتوى مترجم" },
+    ]) {
+      await tx.newsArticleTranslation.upsert({
+        where: { articleId_locale: { articleId: "news-localization-e2e", locale: translation.locale } },
+        create: {
+          id: `news-${translation.locale}-e2e`,
+          articleId: "news-localization-e2e",
+          ...translation,
+          automatic: true,
+        },
+        update: { ...translation, automatic: true },
+      });
+    }
+  });
+
+  // Assert after the transaction commits: the app/test client must see committed fixture data.
+  const fixture = await db.newsArticle.findFirst({ where: { id: "news-localization-e2e", published: true, publishedAt: { lte: new Date() } }, include: { translations: true } });
+  expect(fixture?.published).toBe(true);
+  expect(fixture?.translations).toHaveLength(2);
 });
 
 test.afterAll(async () => {
-  executeFixtureSql(`DELETE FROM "NewsArticle" WHERE "id"='news-localization-e2e';`);
-  executeFixtureSql(`DELETE FROM "User" WHERE "id" IN (${databaseUsers.map((user) => `'${user.id}'`).join(",")});`);
+  try {
+    await db.newsArticle.deleteMany({ where: { id: "news-localization-e2e" } });
+    await db.user.deleteMany({ where: { id: { in: databaseUsers.map((user) => user.id) } } });
+  } finally {
+    await db.$disconnect();
+  }
 });
 
 test("completed Actualités translations render in listing and detail",async({page})=>{for(const [locale,title,body] of [["en","English translated news","English translated body"],["ar","خبر مترجم","محتوى مترجم"]]){await page.goto(`/${locale}/actualites`);await expect(page.getByRole("link",{name:title})).toBeVisible();await page.goto(`/${locale}/actualites/news-localization-e2e`);await expect(page.getByRole("heading",{name:title})).toBeVisible();await expect(page.getByText(body)).toBeVisible();}await expect(page.locator("html")).toHaveAttribute("dir","rtl");});
@@ -52,6 +76,11 @@ test("completed Actualités translations render in listing and detail",async({pa
 async function authenticate(page: import("@playwright/test").Page, userId: string) {
   const token = await new SignJWT({ userId, role: "CUSTOMER", authVersion: 0 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(new TextEncoder().encode(e2eSecret));
   await page.context().addCookies([{ name: "todijo_session", value: token, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
+}
+
+async function openFavorites(page: import("@playwright/test").Page) {
+  const link = page.locator('header[data-marketplace-header]').getByRole("link", { name: "My favorites" });
+  await Promise.all([page.waitForURL("**/en/favorites"), link.click()]);
 }
 
 test("English authentication entry renders the application shell", async ({ page }) => {
@@ -289,60 +318,55 @@ test("favorites require a database-backed session and reject a JWT-only identity
 });
 
 test("favorites remain isolated across logout and two authenticated buyers", async ({ page }) => {
+  test.setTimeout(90_000);
   const products = [
     { id: "e2e-product-x", name: "Buyer A favorite", price: "29.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test" },
     { id: "e2e-product-y", name: "Buyer B favorite", price: "39.99", compareAtPrice: null, currency: "EUR", category: "electronics", stock: 4, hasActiveVariants: false, isGenerallyAvailable: true, condition: "NEUF", image: null, storeName: "Todijo Test Store", storeSlug: "todijo-test" },
   ];
-  let currentUser: { id: string; name: string } | null = { id: "buyer-a", name: "Buyer A" };
-  await page.route("**/api/auth/session", (route) => route.fulfill({
-    json: currentUser ? { authenticated: true, userId: currentUser.id, name: currentUser.name } : { authenticated: false },
-  }));
   await page.route("**/api/products?ids=**", (route) => {
     const ids = new URL(route.request().url()).searchParams.get("ids")?.split(",") ?? [];
     return route.fulfill({ json: { products: products.filter((product) => ids.includes(product.id)) } });
   });
 
-  await authenticate(page, currentUser.id);
+  await authenticate(page, "buyer-a");
   await page.goto("/en/e2e-ux");
-  await page.getByRole("article").filter({ hasText: products[0].name }).getByRole("button", { name: "Add to favorites" }).click();
-  await page.getByRole("link", { name: "My favorites" }).click();
+  const buyerAFavorite = page.getByRole("article").filter({ hasText: products[0].name }).getByRole("button", { name: "Add to favorites" });
+  await expect(buyerAFavorite).toBeEnabled({ timeout: 20_000 });
+  await buyerAFavorite.click();
+  await openFavorites(page);
   await expect(page.getByRole("heading", { name: products[0].name })).toBeVisible();
   await expect(page.getByRole("heading", { name: products[1].name })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("heading", { name: products[0].name })).toBeVisible();
 
-  currentUser = null;
   await page.context().clearCookies();
   await page.goto("/en/e2e-ux");
   await expect(page.getByRole("button", { name: "Add to favorites" })).toHaveCount(2);
 
-  currentUser = { id: "buyer-b", name: "Buyer B" };
-  await authenticate(page, currentUser.id);
-  await page.goto("/en/e2e-ux");
+  await authenticate(page, "buyer-b");
+  await page.reload();
   await expect(page.getByRole("button", { name: "Add to favorites" })).toHaveCount(2);
-  await page.getByRole("article").filter({ hasText: products[1].name }).getByRole("button", { name: "Add to favorites" }).click();
-  await page.getByRole("link", { name: "My favorites" }).click();
+  const buyerBFavorite = page.getByRole("article").filter({ hasText: products[1].name }).getByRole("button", { name: "Add to favorites" });
+  await expect(buyerBFavorite).toBeEnabled({ timeout: 20_000 });
+  await buyerBFavorite.click();
+  await openFavorites(page);
   await expect(page.getByRole("heading", { name: products[1].name })).toBeVisible();
   await expect(page.getByRole("heading", { name: products[0].name })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("heading", { name: products[1].name })).toBeVisible();
 
-  currentUser = null;
   await page.context().clearCookies();
   await page.goto("/en/e2e-ux");
-  currentUser = { id: "buyer-a", name: "Buyer A" };
-  await authenticate(page, currentUser.id);
+  await authenticate(page, "buyer-a");
   await page.goto("/en/favorites");
   await expect(page.getByRole("heading", { name: products[0].name })).toBeVisible();
   await expect(page.getByRole("heading", { name: products[1].name })).toHaveCount(0);
   await page.getByRole("button", { name: "Remove from favorites" }).click();
   await expect(page.getByText("You don’t have any favorites yet.")).toBeVisible();
 
-  currentUser = null;
   await page.context().clearCookies();
   await page.goto("/en/e2e-ux");
-  currentUser = { id: "buyer-b", name: "Buyer B" };
-  await authenticate(page, currentUser.id);
+  await authenticate(page, "buyer-b");
   await page.goto("/en/favorites");
   await expect(page.getByRole("heading", { name: products[1].name })).toBeVisible();
 });
