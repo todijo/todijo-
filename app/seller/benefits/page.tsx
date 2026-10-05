@@ -22,7 +22,7 @@ export default async function SellerBenefitsPage({ searchParams }: { searchParam
     if (!(error instanceof SellerBenefitError)) console.error("Seller benefits page failed", error);
     notFound();
   }
-  return <main className="storeSetupPage"><section className="storeSetupCard">
+  return <main className="storeSetupPage sellerBenefitsPage"><section className="storeSetupCard sellerBenefitsShell">
     <a href={`/${locale}/dashboard`}>Todijo</a>
     <h1>Cadeaux et avantages Todijo</h1>
     <BenefitsCatalog locale={locale} store={data.store} storeLabel={dashboardText("nav.store")} stores={(await sellerStoreChoices(prisma, session.userId)).filter(store => store.businessId === data.businessId)} items={data.items.map(item => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString(), availableFrom: item.availableFrom?.toISOString() ?? null, availableUntil: item.availableUntil?.toISOString() ?? null }))} />

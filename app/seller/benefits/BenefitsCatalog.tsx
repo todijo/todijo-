@@ -29,7 +29,7 @@ export default function BenefitsCatalog({ locale, store, storeLabel, stores, ite
   }
   return <>
     {stores.length > 1 && <label>{storeLabel}<select value={store.id} onChange={event => router.push(`/${locale}/seller/benefits?store=${encodeURIComponent(event.target.value)}`)}>{stores.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
-    <div className="premiumQuickGrid">{items.map(item => <article className="storeSetupCard" key={item.id}>
+    <div className="premiumQuickGrid sellerBenefitsGrid">{items.map(item => <article className="storeSetupCard sellerBenefitCard" key={item.id}>
       <h2>{item.name}</h2><p>{item.description}</p>
       <p><strong>{item.priceType === "FREE" ? "Offert" : "Tarif préférentiel"}</strong>{item.priceType === "SPECIAL" ? ` · ${new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(item.priceMinor / 100)}` : ""}</p>
       <p>Limite : {item.quantityLimitPerStore} par boutique.</p>

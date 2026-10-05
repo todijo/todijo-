@@ -101,6 +101,20 @@ test("approved catalog copy and old free-form entry are handled safely", () => {
   assert.doesNotMatch(oldApi, /requestProShippingSupplies/);
 });
 
+test("seller and Admin benefits use structured responsive catalog cards and preserve failed edits", () => {
+  const catalog = source("app/seller/benefits/BenefitsCatalog.tsx"), admin = source("app/adm-barewbar-182203/benefits/AdminSellerBenefitsManager.tsx"), css = source("app/globals.css");
+  assert.match(catalog, /sellerBenefitsGrid/);
+  assert.match(catalog, /sellerBenefitCard/);
+  assert.match(admin, /adminBenefitAccessGrid/);
+  assert.match(admin, /adminBenefitEditor/);
+  assert.match(admin, /adminBenefitItemGrid/);
+  assert.match(admin, /const saved = await post\(/);
+  assert.match(admin, /if \(saved\) setEditing\(null\)/);
+  assert.match(css, /\.adminBenefitItemGrid\{display:grid/);
+  assert.match(css, /\.sellerBenefitsPage\{/);
+  assert.match(css, /@media\(max-width:640px\)\{\.adminSellerBenefitsPage/);
+});
+
 test("Issue 9 database migration is additive and contains no destructive statements", () => {
   const migration = source("prisma/migrations/20261005120000_add_seller_benefits_catalog/migration.sql");
   assert.match(migration, /CREATE TABLE "SellerBenefitAccess"/);
