@@ -45,7 +45,8 @@ test("unresolved buyer pricing is never presented as a final zero and cannot sta
   assert.match(cart, /pricingResolved \? formatCurrency\(subtotal/);
   assert.match(checkout, /if\(!pricingResolved\)\{setError/);
   assert.match(checkout, /disabled=\{loading\|\|!quote\|\|!pricingResolved\}/);
-  assert.match(checkout, /item\.authoritativePrice===false\?pricing\("pricingLoading"\)/);
+  assert.match(checkout, /item\.authoritativePrice===false\?\(item\.pricingFailed\?pricing\("verificationFailed"\):pricing\("pricingLoading"\)\)/);
+  assert.match(checkout, /onClick=\{\(\)=>retryPricing\(lineKey\)\}/);
   assert.match(checkout, /pricingResolved\?formatCurrency\(subtotal/);
 });
 

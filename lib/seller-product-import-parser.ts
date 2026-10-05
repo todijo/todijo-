@@ -1,5 +1,7 @@
 import "server-only";
 import { inflateRawSync } from "node:zlib";
+import { createRequire } from "node:module";
+import { Readable } from "node:stream";
 
 export const SELLER_IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const SELLER_IMPORT_MAX_REQUEST_BYTES = 6 * 1024 * 1024;
@@ -8,6 +10,71 @@ export type SellerImportRows = { headers: string[]; rows: Array<Record<string, s
 
 export class SellerImportParseError extends Error {
   constructor(public readonly code: "IMPORT_FILE_TOO_LARGE" | "IMPORT_REQUEST_TOO_LARGE" | "IMPORT_FORMAT_UNSUPPORTED" | "IMPORT_FILE_INVALID" | "IMPORT_EMPTY" | "IMPORT_TOO_MANY_ROWS") { super(code); }
+}
+
+type ImportMultipartFileInfo = { filename: string; mimeType: string };
+type ImportMultipartFile = Readable & { truncated?: boolean };
+type ImportMultipartParser = {
+  on(event: "file", listener: (name: string, stream: ImportMultipartFile, info: ImportMultipartFileInfo) => void): ImportMultipartParser;
+  on(event: "field", listener: (name: string, value: string) => void): ImportMultipartParser;
+  on(event: "filesLimit" | "fieldsLimit" | "partsLimit" | "error" | "finish", listener: (error?: Error) => void): ImportMultipartParser;
+};
+type ImportMultipartFactory = (options: { headers: Record<string,string>; limits: { files:number; fields:number; parts:number; fileSize:number; fieldSize:number; fieldNameSize:number } }) => ImportMultipartParser;
+const createBusboy = createRequire(__filename)("busboy") as ImportMultipartFactory;
+
+export async function parseSellerProductImportMultipart(body: Buffer, contentType: string): Promise<{storeId:string; filename:string; bytes:Buffer}> {
+  if (body.length > SELLER_IMPORT_MAX_REQUEST_BYTES) throw new SellerImportParseError("IMPORT_REQUEST_TOO_LARGE");
+  if (!/^multipart\/form-data\s*;/i.test(contentType)) throw new SellerImportParseError("IMPORT_FILE_INVALID");
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let storeId: string | null = null;
+    let filename: string | null = null;
+    let fileEnded = false;
+    let fileSize = 0;
+    let partsSeen = 0;
+    const chunks: Buffer[] = [];
+    let parser: ImportMultipartParser;
+    const fail = (code: SellerImportParseError["code"]) => {
+      if (settled) return;
+      settled = true;
+      input.unpipe(parser as never);
+      input.destroy();
+      reject(new SellerImportParseError(code));
+    };
+    const input = Readable.from([body]);
+    try { parser = createBusboy({ headers: { "content-type": contentType }, limits: { files:1, fields:1, parts:3, fileSize:SELLER_IMPORT_MAX_FILE_BYTES, fieldSize:200, fieldNameSize:40 } }); }
+    catch { reject(new SellerImportParseError("IMPORT_FILE_INVALID")); return; }
+    parser.on("field", (name, value) => {
+      if (++partsSeen > 2) { fail("IMPORT_FILE_INVALID"); return; }
+      if (name !== "storeId" || storeId !== null || !value.trim()) { fail("IMPORT_FILE_INVALID"); return; }
+      storeId = value.trim();
+    });
+    parser.on("file", (name, file, info) => {
+      if (++partsSeen > 2) { file.resume(); fail("IMPORT_FILE_INVALID"); return; }
+      if (name !== "file" || filename !== null || !info.filename) { file.resume(); fail("IMPORT_FILE_INVALID"); return; }
+      filename = info.filename;
+      file.on("data", (chunk: Buffer) => {
+        fileSize += chunk.length;
+        if (fileSize > SELLER_IMPORT_MAX_FILE_BYTES) { fail("IMPORT_FILE_TOO_LARGE"); return; }
+        chunks.push(chunk);
+      });
+      file.on("limit", () => fail("IMPORT_FILE_TOO_LARGE"));
+      file.on("error", () => fail("IMPORT_FILE_INVALID"));
+      file.on("end", () => { if (!settled && !file.truncated) fileEnded = true; });
+    });
+    parser.on("filesLimit", () => fail("IMPORT_FILE_INVALID"));
+    parser.on("fieldsLimit", () => fail("IMPORT_FILE_INVALID"));
+    parser.on("partsLimit", () => fail("IMPORT_FILE_INVALID"));
+    parser.on("error", () => fail("IMPORT_FILE_INVALID"));
+    parser.on("finish", () => {
+      if (settled) return;
+      if (!storeId || !filename || !fileEnded || fileSize === 0) { fail("IMPORT_FILE_INVALID"); return; }
+      settled = true;
+      resolve({ storeId, filename, bytes:Buffer.concat(chunks, fileSize) });
+    });
+    input.on("error", () => fail("IMPORT_FILE_INVALID"));
+    input.pipe(parser as never);
+  });
 }
 
 export async function readBoundedSellerImportBody(request: Request) {

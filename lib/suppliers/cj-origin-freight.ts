@@ -1,10 +1,11 @@
 import {Prisma} from "@prisma/client";
 import type {CjFreightQuote} from "./cj-freight";
+import {CjRateLimitError} from "./cj-client";
 
 export type FreightProvider={calculateFreight(input:{originCountry:string;destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<CjFreightQuote>};
 export type CjFreightAttempt={originCountry:string;errorCode:string};
 export class CjFreightResolutionError extends Error{
- constructor(public readonly code:"DROPSHIPPING_ORIGIN_UNAVAILABLE"|"CJ_FREIGHT_NO_METHODS"|"CJ_FREIGHT_RESPONSE_INVALID"|"CJ_FREIGHT_TEMPORARY_FAILURE"|"CJ_FREIGHT_ALL_ORIGINS_UNAVAILABLE",public readonly attempts:CjFreightAttempt[]){super(code);}
+ constructor(public readonly code:"DROPSHIPPING_ORIGIN_UNAVAILABLE"|"CJ_FREIGHT_NO_METHODS"|"CJ_FREIGHT_RESPONSE_INVALID"|"CJ_FREIGHT_TEMPORARY_FAILURE"|"CJ_FREIGHT_ALL_ORIGINS_UNAVAILABLE",public readonly attempts:CjFreightAttempt[],public readonly retryAfterMs=0){super(code);}
 }
 
 function safeCode(error:unknown){const value=error instanceof Error?error.message:"CJ_FREIGHT_ALL_ORIGINS_UNAVAILABLE";return /^[A-Z][A-Z0-9_]{2,80}$/.test(value)?value:"CJ_FREIGHT_ALL_ORIGINS_UNAVAILABLE";}
@@ -24,13 +25,13 @@ function terminalCode(attempts:CjFreightAttempt[]):CjFreightResolutionError["cod
 export async function resolveCjFreightAcrossOrigins(provider:FreightProvider,input:{originCountryCodes:string[];destinationCountry:string;variantId:string;quantity:number;requestedMethod?:string}):Promise<CjFreightQuote>{
  const origins=[...new Set(input.originCountryCodes.map(code=>code.trim().toUpperCase()).filter(code=>/^[A-Z]{2}$/.test(code)))].sort();
  if(!origins.length)throw new CjFreightResolutionError("DROPSHIPPING_ORIGIN_UNAVAILABLE",[]);
- const quotes:CjFreightQuote[]=[],attempts:CjFreightAttempt[]=[];
+ const quotes:CjFreightQuote[]=[],attempts:CjFreightAttempt[]=[];let retryAfterMs=0;
  for(const originCountry of origins){
   try{
    const request={originCountry,destinationCountry:input.destinationCountry,variantId:input.variantId,quantity:input.quantity,requestedMethod:input.requestedMethod};
    quotes.push(validQuote(await provider.calculateFreight(request),request));
-  }catch(error){if(error instanceof CjFreightResolutionError)attempts.push(...error.attempts);else attempts.push({originCountry,errorCode:safeCode(error)});}
+  }catch(error){if(error instanceof CjFreightResolutionError){attempts.push(...error.attempts);retryAfterMs=Math.max(retryAfterMs,error.retryAfterMs);}else{attempts.push({originCountry,errorCode:safeCode(error)});if(error instanceof CjRateLimitError)retryAfterMs=Math.max(retryAfterMs,error.retryAfterMs);}}
  }
- if(!quotes.length)throw new CjFreightResolutionError(terminalCode(attempts),attempts);
+ if(!quotes.length)throw new CjFreightResolutionError(terminalCode(attempts),attempts,retryAfterMs);
  return quotes.sort((left,right)=>new Prisma.Decimal(left.selected.amount).comparedTo(new Prisma.Decimal(right.selected.amount))||left.selected.estimatedDelivery.localeCompare(right.selected.estimatedDelivery)||left.selected.originCountry.localeCompare(right.selected.originCountry)||(left.selected.id??left.selected.name).localeCompare(right.selected.id??right.selected.name))[0];
 }

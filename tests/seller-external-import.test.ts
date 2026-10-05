@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
-import { parseSellerProductImport, readBoundedSellerImportBody, SellerImportParseError, SELLER_IMPORT_MAX_REQUEST_BYTES } from "../lib/seller-product-import-parser";
+import { parseSellerProductImport, parseSellerProductImportMultipart, readBoundedSellerImportBody, SellerImportParseError, SELLER_IMPORT_MAX_REQUEST_BYTES } from "../lib/seller-product-import-parser";
 import { readFileSync } from "node:fs";
 
 function xlsxFixture() {
@@ -51,6 +51,22 @@ test("import request bodies are capped while streaming even without a declared c
   const request = new Request("https://todijo.test/api/seller/products/import", { method: "POST", body: Buffer.alloc(SELLER_IMPORT_MAX_REQUEST_BYTES + 1) });
   assert.equal(request.headers.has("content-length"), false);
   await assert.rejects(() => readBoundedSellerImportBody(request), (error: unknown) => error instanceof SellerImportParseError && error.code === "IMPORT_REQUEST_TOO_LARGE");
+});
+
+test("seller multipart import parsing uses bounded Node streams and validates the exact fields", async () => {
+  const boundary = "seller-import-boundary";
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="storeId"\r\n\r\nstore-1\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="catalog.csv"\r\nContent-Type: text/csv\r\n\r\n`),
+    Buffer.from("title,price\nSample,10\r\n"), Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  const parsed = await parseSellerProductImportMultipart(body, `multipart/form-data; boundary=${boundary}`);
+  assert.deepEqual({storeId:parsed.storeId,filename:parsed.filename,rows:parseSellerProductImport(parsed.filename,parsed.bytes).rows}, {storeId:"store-1",filename:"catalog.csv",rows:[{title:"Sample",price:"10"}]});
+  await assert.rejects(() => parseSellerProductImportMultipart(body, "multipart/form-data; boundary=wrong"), SellerImportParseError);
+  const route = readFileSync("app/api/seller/products/import/route.ts", "utf8"), parser = readFileSync("lib/seller-product-import-parser.ts", "utf8");
+  assert.match(route, /parseSellerProductImportMultipart\(rawBody, contentType\)/);
+  assert.doesNotMatch(route, /new Response\(rawBody[\s\S]*\.formData\(\)/);
+  assert.match(parser, /Readable\.from\(\[body\]\)/);
 });
 
 test("seller import endpoint remains isolated from Admin CJ import and writes only drafts", () => {

@@ -44,8 +44,8 @@ test("product detail fails closed without a buyer-market price and invalidates c
  assert.match(panel,/useLayoutEffect/);assert.match(panel,/pricingReady=dropshippingEligible\?Boolean\(activePricing\):Boolean\(marketplacePricing\)/);
  assert.match(panel,/<BuyerProductPrice[^>]+onResolved=\{updateMarketplacePricing\}/);
  assert.match(panel,/disabled=\{!available\|\|!pricingReady\}/);
- assert.match(live,/setState\(\{status:"loading",data:null\}\);onChange\(null,true\)/);
- assert.match(live,/setState\(\{status:"error",data:null\}\);onChange\(null,false\)/);
+ assert.match(live,/setState\(\{status:"loading",data:null\}\);onChange\(null,true,false\)/);
+ assert.match(live,/setState\(\{status:"error",data:null,retryAt:Date\.now\(\)\+retryAfterMs\}\);onChange\(null,false,true\)/);
  assert.match(live,/state\.status==="error"[\s\S]*productPriceUi\[locale\]\.retry/);assert.match(live,/setRetry\(value=>value\+1\)/);
 });
 
@@ -53,7 +53,8 @@ test("cart excludes unverified deferred lines and records authoritative server u
  const provider=source("components/CartProvider.tsx"),cart=source("app/cart/page.tsx");
  assert.match(provider,/item\.authoritativePrice===false\?0:item\.price \* item\.quantity/);
  assert.match(provider,/authoritativePrice:true/);
- assert.match(cart,/item\.authoritativePrice===false \? pricing\("pricingLoading"\)/);
+ assert.match(cart,/item\.authoritativePrice===false \? \(item\.pricingFailed \? pricing\("verificationFailed"\) : pricing\("pricingLoading"\)\)/);
+ assert.match(cart,/onClick=\{\(\)=>retryPricing\(item\.lineKey!\)\}/);
 });
 
 test("reference freight-inclusive prices replace rather than reuse deferred snapshots",()=>{

@@ -6,7 +6,7 @@ import { readSession } from "@/lib/session";
 import { isTrustedMutationRequest } from "@/lib/request-security";
 import { ProProductImportError, requireProProductImport } from "@/lib/pro-product-import";
 import { SellerCapabilityError } from "@/lib/seller-business-access";
-import { parseSellerProductImport, readBoundedSellerImportBody, SellerImportParseError } from "@/lib/seller-product-import-parser";
+import { parseSellerProductImport, parseSellerProductImportMultipart, readBoundedSellerImportBody, SellerImportParseError } from "@/lib/seller-product-import-parser";
 import { createSellerProductImportJob, processSellerProductImport, type SellerImportMapping } from "@/lib/seller-product-import";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
 
@@ -30,14 +30,11 @@ export async function POST(request: Request) {
     const contentType = request.headers.get("content-type") ?? "";
     const rawBody = await readBoundedSellerImportBody(request);
     if (contentType.includes("multipart/form-data")) {
-      const form = await new Response(rawBody, { headers: { "Content-Type": contentType } }).formData();
-      const file = form.get("file"), storeId = form.get("storeId");
-      if (!(file instanceof File) || typeof storeId !== "string" || !storeId) return NextResponse.json({ error: "IMPORT_FILE_INVALID" }, { status: 400 });
-      if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "IMPORT_FILE_TOO_LARGE" }, { status: 400 });
+      const { filename, storeId, bytes } = await parseSellerProductImportMultipart(rawBody, contentType);
       const store = await prisma.store.findFirst({ where: { id: storeId, businessId: principal.businessId, ownerId: session.userId }, select: { id: true } });
       if (!store) return NextResponse.json({ error: "STORE_ACCESS_DENIED" }, { status: 403 });
-      const parsed = parseSellerProductImport(file.name, Buffer.from(await file.arrayBuffer()));
-      return NextResponse.json({ sourceFormat: file.name.split(".").pop()?.toLowerCase(), headers: parsed.headers, rows: parsed.rows }, { headers: { "Cache-Control": "private, no-store" } });
+      const parsed = parseSellerProductImport(filename, bytes);
+      return NextResponse.json({ sourceFormat: filename.split(".").pop()?.toLowerCase(), headers: parsed.headers, rows: parsed.rows }, { headers: { "Cache-Control": "private, no-store" } });
     }
     let body: { action?: unknown; storeId?: unknown; sourceFormat?: unknown; idempotencyKey?: unknown; mapping?: unknown; headers?: unknown; rows?: unknown };
     try { body = JSON.parse(rawBody.toString("utf8")) as typeof body; } catch { return NextResponse.json({ error: "IMPORT_REQUEST_INVALID" }, { status: 400 }); }

@@ -51,8 +51,16 @@ test("ordinary cards batch only the active currency and CJ cards use the shared 
 test("same-currency country changes do not reprice ordinary shipping or cart lines",()=>{
  const shipping=readFileSync("components/BuyerShippingPrice.tsx","utf8"),cart=readFileSync("components/CartProvider.tsx","utf8");
  assert.doesNotMatch(shipping,/market\.country/);assert.match(shipping,/\[kind,market\.currency,market\.ready,productId\]/);
- assert.match(cart,/ordinaryCurrencyRef\.current!==market\.currency/);assert.match(cart,/item\.requiresAuthoritativePrice\|\|refreshNormal/);
+ assert.match(cart,/ordinaryCurrencyRef\.current !== market\.currency/);assert.match(cart,/refreshNormal && !item\.requiresAuthoritativePrice/);assert.match(cart,/item\.requiresAuthoritativePrice \|\|/);
  assert.match(cart,/destinationCountry:market\.country/);
+});
+
+test("PDP presentment failures terminate the skeleton and expose an explicit retry without trusting display prices",()=>{
+ const buyerPrice=readFileSync("components/BuyerProductPrice.tsx","utf8"),panel=readFileSync("components/ProductPurchasePanel.tsx","utf8"),detail=readFileSync("app/product/[id]/ProductDetailPrice.tsx","utf8"),cards=readFileSync("components/AuthoritativeProductCardPrice.tsx","utf8");
+ assert.match(buyerPrice,/AbortSignal\.timeout\(15_000\)/);assert.match(buyerPrice,/onFailure\?\.\(true\)/);assert.match(buyerPrice,/failed&&!price/);
+ assert.match(panel,/marketplaceRetry/);assert.match(panel,/updateMarketplaceFailure/);assert.match(panel,/setMarketplaceRetry\(value=>value\+1\)/);assert.match(panel,/pricingFailed\?productPriceUi\[locale\]\.verificationFailed/);
+ assert.match(detail,/detail\.failed!==undefined\)setFailed\(detail\.failed\)/);assert.match(detail,/failed\?text\.verificationFailed/);
+ assert.match(cards,/AbortSignal\.timeout\(15_000\)/);
 });
 
 test("checkout and shipping use one authoritative presentment currency",()=>{

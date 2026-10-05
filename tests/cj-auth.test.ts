@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CjAuthService } from "../lib/suppliers/cj-auth";
-import { CjCatalogProvider } from "../lib/suppliers/cj-client";
+import { CjCatalogProvider, CjRateLimitError } from "../lib/suppliers/cj-client";
 import { logCjFailure } from "../lib/suppliers/cj-diagnostics";
 
 const tokenResponse = (accessToken: string, accessExpiry: string, refreshToken = "refresh-secret", refreshExpiry = "2030-01-01T00:00:00.000Z") =>
@@ -115,6 +115,25 @@ test("CJ 429 responses retry twice with bounded backoff and then succeed",async(
 test("CJ non-429 failures are not retried",async()=>{
   let calls=0;const provider=new CjCatalogProvider({isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined},{minimumRequestIntervalMs:0,retryDelay:async()=>{throw new Error("unexpected retry");},fetcher:async()=>{calls++;return new Response(JSON.stringify({code:500,result:false,message:"Unavailable"}),{status:500});}});
   await assert.rejects(()=>provider.testConnection(),/CJ_UNAVAILABLE/);assert.equal(calls,1);
+});
+
+test("CJ identical variant reads deduplicate in flight and use a short success cache",async()=>{
+  let calls=0;const vid="HOTFIX-VARIANT-DEDUPE-2026";
+  const fetcher:typeof fetch=async()=>{calls++;await new Promise(resolve=>setTimeout(resolve,5));return new Response(JSON.stringify({code:200,result:true,success:true,data:{pid:"HOTFIX-PID",vid,variantNameEn:"Blue",variantSellPrice:"5.00",inventories:[{countryCode:"FR",totalInventory:3}]}}));};
+  const auth={isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  const provider=new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0,useVariantCache:true});
+  const [first,second]=await Promise.all([provider.getVariant(vid),provider.getVariant(vid.toLowerCase())]);
+  assert.equal(first,second);assert.equal(calls,1);assert.equal((await provider.getVariant(vid)).supplierVariantId,vid);assert.equal(calls,1);
+});
+
+test("CJ exhausted rate limits extend sibling request cooldown and suppress immediate duplicate retries",async()=>{
+  let calls=0;const delays:number[]=[];const vid="HOTFIX-VARIANT-429-2026";
+  const fetcher:typeof fetch=async()=>{calls++;return new Response(JSON.stringify({code:429,result:false,message:"Too Many Requests"}),{status:429,headers:{"Retry-After":"3"}});};
+  const auth={isConfigured:()=>true,getAccessToken:async()=>"access-secret",invalidateAccessToken:()=>undefined};
+  const provider=new CjCatalogProvider(auth,{fetcher,minimumRequestIntervalMs:0,useVariantCache:true,retryDelay:async attempt=>{delays.push(attempt);}});
+  await assert.rejects(()=>provider.getVariant(vid),(error:unknown)=>error instanceof CjRateLimitError&&error.retryAfterMs>=3000);
+  assert.equal(calls,3);assert.deepEqual(delays,[0,1]);
+  await assert.rejects(()=>provider.getVariant(vid),/CJ_UNAVAILABLE/);assert.equal(calls,3);
 });
 
 test("CJ SKU input resolves to canonical pid before variant and inventory requests", async () => {

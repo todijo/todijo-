@@ -6,6 +6,8 @@ import {CurrencyError} from "@/lib/currency";
 import {FxError} from "@/lib/fx";
 import {ShippingError} from "@/lib/shipping";
 import {CjFreightError} from "@/lib/suppliers/cj-freight";
+import {CjRateLimitError} from "@/lib/suppliers/cj-client";
+import {CjFreightResolutionError} from "@/lib/suppliers/cj-origin-freight";
 import {buyerSafeDropshippingResult,DropshippingCommerceError,resolveDropshippingPricing} from "@/lib/suppliers/commerce-pricing";
 import {SupplierPricingError} from "@/lib/suppliers/pricing";
 import {normalizeShoppingCountry} from "@/lib/suppliers/buyer-pricing";
@@ -23,7 +25,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   return NextResponse.json(buyerSafeDropshippingResult(result));
  }catch(error){
   if(error instanceof AdminAccessError)return NextResponse.json({error:error.code},{status:error.status});
-  const known=error instanceof DropshippingCommerceError||error instanceof CurrencyError||error instanceof FxError||error instanceof ShippingError||error instanceof CjFreightError||error instanceof SupplierPricingError;
-  return NextResponse.json({error:known?("code" in error?error.code:error.message):"DROPSHIPPING_PRICING_UNAVAILABLE"},{status:error instanceof DropshippingCommerceError&&error.code==="DROPSHIPPING_PRODUCT_NOT_FOUND"?404:409});
+  const retryAfterMs=error instanceof CjRateLimitError?error.retryAfterMs:error instanceof CjFreightResolutionError?error.retryAfterMs:0;
+  const known=error instanceof DropshippingCommerceError||error instanceof CurrencyError||error instanceof FxError||error instanceof ShippingError||error instanceof CjFreightError||error instanceof CjFreightResolutionError||error instanceof CjRateLimitError||error instanceof SupplierPricingError;
+  return NextResponse.json({error:known?("code" in error?error.code:error.message):"DROPSHIPPING_PRICING_UNAVAILABLE"},{status:error instanceof DropshippingCommerceError&&error.code==="DROPSHIPPING_PRODUCT_NOT_FOUND"?404:retryAfterMs?503:409,headers:retryAfterMs?{"Retry-After":String(Math.ceil(retryAfterMs/1000)),"Cache-Control":"no-store"}:undefined});
  }
 }

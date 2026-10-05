@@ -4,12 +4,14 @@ import { useCallback,useEffect,useLayoutEffect,useMemo,useState,type CSSProperti
 import Image from "next/image";
 import AddToCartButton from "@/components/AddToCartButton";
 import type { CartProduct } from "@/components/CartProvider";
-import { useTranslations } from "next-intl";
+import { useLocale,useTranslations } from "next-intl";
 import { isSelectedVariantAvailable } from "@/lib/product-availability";
 import DropshippingProductPricing from "@/components/DropshippingProductPricing";
 import ShareButton from "@/components/ShareButton";
 import type {BuyerDropshippingPricingResponse} from "@/lib/suppliers/buyer-pricing";
 import BuyerProductPrice from "@/components/BuyerProductPrice";
+import {productPriceUi} from "@/i18n/product-price-ui";
+import type {Locale} from "@/i18n/config";
 
 type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null;supplierVariantId?:string|null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
@@ -46,11 +48,14 @@ function optionColorStyle(label:string,colorOption=true):SelectedOptionStyle|und
 export default function ProductPurchasePanel({ product, colors, sizes, options = [], variants = [], availabilityLabel, dropshippingEligible = false, requiresAuthoritativePrice=false }: { product: CartProduct; colors: string[]; sizes: string[]; options?: Option[]; variants?: Variant[]; availabilityLabel: string; dropshippingEligible?: boolean;requiresAuthoritativePrice?:boolean }) {
   const t = useTranslations("Product");
   const detail = useTranslations("ProductDetail");
+  const locale=useLocale() as Locale;
   const genericOptions = useMemo(()=>options.filter((option) => option.values.length > 0).sort((a, b) => a.position - b.position),[options]);
   const initialVariant=variants.find((variant)=>variant.active&&variant.stock>0&&(!requiresAuthoritativePrice||Boolean(variant.supplierVariantId)));
   const [selection, setSelection] = useState<Record<string, string>>(()=>initialVariant?Object.fromEntries(initialVariant.values.map(({optionValue})=>[optionValue.option.id,optionValue.id])):{});
   const [quantity, setQuantity] = useState(1);
   const [verifiedPricing,setVerifiedPricing]=useState<BuyerDropshippingPricingResponse|null>(null);
+  const [pricingFailed,setPricingFailed]=useState(false);
+  const [marketplaceRetry,setMarketplaceRetry]=useState(0);
   const [marketplacePricing,setMarketplacePricing]=useState<{amount:string;currency:string}|null>(null);
   const colorChoices = colors.length ? colors : [t("standard")], sizeChoices = sizes.length ? sizes : [t("unique")];
   const [color, setColor] = useState(colorChoices[0]), [size, setSize] = useState(sizeChoices[0]);
@@ -64,11 +69,11 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const selectedCurrency = dropshippingEligible&&activePricing?activePricing.buyerCurrency:marketplacePricing?.currency??product.currency;
   const stock = isVariantProduct ? selectedVariant?.stock ?? 0 : product.stock;
   // Clear the previous marketplace price before the child resolves this variant in its passive effect.
-  useLayoutEffect(()=>{if(!dropshippingEligible)setMarketplacePricing(null)},[dropshippingEligible,selectedVariant?.id]);
+  useLayoutEffect(()=>{if(!dropshippingEligible)setMarketplacePricing(null);setPricingFailed(false)},[dropshippingEligible,quantity,selectedVariant?.id]);
 
   useLayoutEffect(() => {
-    window.dispatchEvent(new CustomEvent("todijo:variant-price", { detail: activePricing||!requiresAuthoritativePrice?{price:selectedPrice,currency:selectedCurrency,verified:true}:{verified:false} }));
-  }, [activePricing,requiresAuthoritativePrice,selectedCurrency,selectedPrice,selectedVariant?.id]);
+    window.dispatchEvent(new CustomEvent("todijo:variant-price", { detail: activePricing||!requiresAuthoritativePrice?{price:selectedPrice,currency:selectedCurrency,verified:true,failed:false}:{verified:false,failed:pricingFailed} }));
+  }, [activePricing,pricingFailed,requiresAuthoritativePrice,selectedCurrency,selectedPrice,selectedVariant?.id]);
 
   useEffect(()=>{
     const selectedValues=genericOptions.flatMap((option)=>option.values.filter((value)=>selection[option.id]===value.id));
@@ -92,11 +97,13 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   const pricingReady=dropshippingEligible?Boolean(activePricing):Boolean(marketplacePricing);
   const displayAvailable = isVariantProduct && !selectedVariant ? activeVariants.some((variant) => variant.stock > 0) : available;
   const selectionComplete = !isVariantProduct || genericOptions.every((option) => Boolean(selection[option.id]));
-  const disabledLabel = isVariantProduct && (!selectionComplete || (!selectedVariant && displayAvailable)) ? t("chooseOptions") : t("unavailable");
+  const disabledLabel = pricingFailed?productPriceUi[locale].verificationFailed:isVariantProduct && (!selectionComplete || (!selectedVariant && displayAvailable)) ? t("chooseOptions") : t("unavailable");
   // Checkout owns destination validation and authoritative repricing. Product
   // detail cart eligibility depends only on the real selected variant and stock.
-  const updatePricing=useCallback((pricing:BuyerDropshippingPricingResponse|null)=>{setVerifiedPricing(pricing);},[]);
+  const updatePricing=useCallback((pricing:BuyerDropshippingPricingResponse|null,_pending:boolean,failed=false)=>{setVerifiedPricing(pricing);setPricingFailed(failed);},[]);
   const updateMarketplacePricing=useCallback((pricing:{amount:string;currency:string})=>setMarketplacePricing(pricing),[]);
+  const updateMarketplaceFailure=useCallback((failed:boolean)=>setPricingFailed(failed),[]);
+  const purchaseDisabledLabel=pricingFailed?productPriceUi[locale].verificationFailed:!pricingReady?detail("pricingLoading"):disabledLabel;
 
   return <aside className="productPurchaseCard" aria-label={detail("purchaseOptions")}>
     <div className={`purchaseAvailability${displayAvailable ? " isAvailable" : " isUnavailable"}`}><span aria-hidden="true" /><span className="purchaseAvailabilityLabel">{displayAvailable ? availabilityLabel : t("unavailable")}</span><ShareButton title={product.name}/></div>
@@ -119,10 +126,11 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
         <div><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity <= 1} aria-label={detail("decreaseQuantity")}>−</button><output aria-live="polite">{quantity}</output><button type="button" onClick={() => setQuantity((value) => Math.min(stock, value + 1))} disabled={!available || quantity >= stock} aria-label={detail("increaseQuantity")}>+</button></div>
       </div>
       <DropshippingProductPricing enabled={dropshippingEligible} prefetchEnabled={requiresAuthoritativePrice} productId={product.id} variantId={selectedVariant?.id??null} availableVariantIds={availableVariantIds} quantity={quantity} onChange={updatePricing}/>
-      {!dropshippingEligible&&<BuyerProductPrice className="srOnly" productId={product.id} variantId={selectedVariant?.id??null} sourcePrice={selectedVariant?.priceOverride??product.price} sourceCurrency={product.currency} onResolved={updateMarketplacePricing}/>}
-      <AddToCartButton disabled={!available||!pricingReady} disabledLabel={!pricingReady?detail("pricingLoading"):disabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
+      {!dropshippingEligible&&<BuyerProductPrice className="srOnly" productId={product.id} variantId={selectedVariant?.id??null} sourcePrice={selectedVariant?.priceOverride??product.price} sourceCurrency={product.currency} retryToken={marketplaceRetry} onResolved={updateMarketplacePricing} onFailure={updateMarketplaceFailure}/>}
+      {!dropshippingEligible&&pricingFailed&&<button className="priceRetry" type="button" onClick={()=>{setPricingFailed(false);setMarketplaceRetry(value=>value+1)}}>{productPriceUi[locale].retry}</button>}
+      <AddToCartButton disabled={!available||!pricingReady} disabledLabel={purchaseDisabledLabel} quantity={quantity} product={{ ...product, price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} />
       </div>
     </div>
-    <div className="mobilePurchaseBar"><AddToCartButton compact disabled={!available||!pricingReady} disabledLabel={!pricingReady?detail("pricingLoading"):disabledLabel} quantity={quantity} product={{ ...product,price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
+    <div className="mobilePurchaseBar"><AddToCartButton compact disabled={!available||!pricingReady} disabledLabel={purchaseDisabledLabel} quantity={quantity} product={{ ...product,price: selectedPrice,currency:selectedCurrency, requiresAuthoritativePrice,authoritativePrice:!requiresAuthoritativePrice||Boolean(activePricing),freeShipping:activePricing?.freeShipping,deliveryMinDays:activePricing?.deliveryMinDays,deliveryMaxDays:activePricing?.deliveryMaxDays, stock: available ? stock : 0, variantId: selectedVariant?.id ?? null, selectedOptions, selectedColor: isVariantProduct ? null : colors.length ? color : null, selectedSize: isVariantProduct ? null : sizes.length ? size : null }} /></div>
   </aside>;
 }

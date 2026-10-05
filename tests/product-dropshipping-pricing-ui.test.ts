@@ -44,7 +44,14 @@ test("late requests are aborted and stale pricing cannot become active for a new
 });
 
 test("live PDP pricing has a bounded failure state and explicit retry",()=>{
- const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/PRICING_REQUEST_TIMEOUT_MS=12_000/);assert.match(ui,/window\.setTimeout\(abort,PRICING_REQUEST_TIMEOUT_MS\)/);assert.match(ui,/signal:controller\.signal/);assert.match(ui,/verificationFailed/);assert.match(ui,/role="alert"/);assert.match(ui,/setRetry\(value=>value\+1\)/);
+ const ui=source("components/DropshippingProductPricing.tsx");assert.match(ui,/PRICING_REQUEST_TIMEOUT_MS=12_000/);assert.match(ui,/window\.setTimeout\(abort,PRICING_REQUEST_TIMEOUT_MS\)/);assert.match(ui,/signal:controller\.signal/);assert.match(ui,/verificationFailed/);assert.match(ui,/role="alert"/);assert.match(ui,/setRetry\(value=>value\+1\)/);assert.match(ui,/catch\(error\)\{if\(!cancelled&&requestKey\.current===key\)/);assert.match(ui,/onChange\(null,false,true\)/);
+});
+
+test("cart and checkout expose authoritative-price failures with manual recovery but remain fail-closed",()=>{
+ const cart=source("components/CartProvider.tsx"),cartPage=source("app/cart/page.tsx"),checkout=source("app/checkout/page.tsx");
+ assert.match(cart,/AbortSignal\.timeout\(15_000\)/);assert.match(cart,/pricingFailed:true/);assert.match(cart,/retryPricing\(lineKey\)/);
+ assert.match(cartPage,/pricing\("verificationFailed"\)/);assert.match(cartPage,/retryPricing\(item\.lineKey!\)/);assert.match(cartPage,/aria-disabled=\{!pricingResolved\}/);
+ assert.match(checkout,/pricingFailed\?pricing\("verificationFailed"\):pricing\("pricingLoading"\)/);assert.match(checkout,/disabled=\{loading\|\|!quote\|\|!pricingResolved\}/);assert.match(checkout,/retryPricing\(lineKey\)/);
 });
 
 test("only exact successful authoritative quotes are cached and variant prefetch is sequential",()=>{
@@ -75,9 +82,9 @@ test("RTL pricing loading labels are valid Unicode on the initial authoritative-
  assert.equal(buyerPricingMessages.fa.pricingLoading,"در حال بررسی قیمت و تحویل…");
  for(const locale of ["ar","ku","fa"] as const)assert.doesNotMatch(buyerPricingMessages[locale].pricingLoading,/Ã|Â|â€¦|Ø|Ù|Ú|Û|�/);
  const panel=source("components/ProductPurchasePanel.tsx");
- assert.match(panel,/disabledLabel=\{!pricingReady\?detail\("pricingLoading"\):disabledLabel\}/);
+  assert.match(panel,/purchaseDisabledLabel=pricingFailed\?productPriceUi\[locale\]\.verificationFailed:!pricingReady\?detail\("pricingLoading"\):disabledLabel/);
 });
 
 test("manual override and errors cannot enable embedded shipping client-side",()=>{
- const service=source("lib/suppliers/commerce-pricing.ts"),ui=source("components/DropshippingProductPricing.tsx");assert.match(service,/shippingIncluded=mode==="AUTOMATIC"/);assert.match(ui,/data\.eligible===true/);assert.match(ui,/!validQuote\(data,input\)/);assert.match(ui,/setState\(\{status:"error",data:null\}\)/);
+ const service=source("lib/suppliers/commerce-pricing.ts"),ui=source("components/DropshippingProductPricing.tsx");assert.match(service,/shippingIncluded=mode==="AUTOMATIC"/);assert.match(ui,/data\.eligible===true/);assert.match(ui,/!validQuote\(data,input\)/);assert.match(ui,/setState\(\{status:"error",data:null,retryAt:/);
 });

@@ -24,6 +24,12 @@ function intervalFor(tier:CjRateTier){
 }
 function wait(ms:number){return new Promise((resolve)=>setTimeout(resolve,ms));}
 
+/** Extends the process-wide request-queue cooldown after a provider rate-limit response. */
+export function deferCjRequests(milliseconds:number){
+  const delay=positiveMs(String(milliseconds),0);
+  globalState.__todijoCjNextRequestAt=Math.max(globalState.__todijoCjNextRequestAt??0,Date.now()+delay);
+}
+
 async function drain(){
   if(globalState.__todijoCjQueueRunning)return;
   globalState.__todijoCjQueueRunning=true;

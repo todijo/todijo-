@@ -71,7 +71,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
     getTranslations("Common"), getTranslations("Orders"),
     getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"),getTranslations("SellerBusinessVerification"), getTranslations("Auth"),
-    getLocale(), readSession(),
+    getLocale(), dashboardData(readSession()),
   ]);
   if (!session) redirect("/login");
   const teamCopy=sellerTeamCopy(locale);

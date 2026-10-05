@@ -28,15 +28,39 @@ export async function parseEvidenceMultipart(request: Request): Promise<ParsedEv
   }
   if (!request.body) throw badRequest("Evidence image is required.");
 
+  const reader = request.body.getReader();
+  const requestChunks: Buffer[] = [];
+  let requestSize = 0;
+  const cancelOnAbort = () => { void reader.cancel().catch(() => undefined); };
+  request.signal.addEventListener("abort", cancelOnAbort, { once: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      requestSize += value.byteLength;
+      if (requestSize > MAX_MULTIPART_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw badRequest("Evidence upload is too large.");
+      }
+      requestChunks.push(Buffer.from(value));
+    }
+    if (request.signal.aborted) throw badRequest("Evidence upload was aborted.");
+  } catch (error) {
+    if (error instanceof RefundEvidenceError) throw error;
+    throw badRequest("Evidence upload could not be read.");
+  } finally {
+    request.signal.removeEventListener("abort", cancelOnAbort);
+  }
+  const rawBody = Buffer.concat(requestChunks, requestSize);
+
   return new Promise((resolve, reject) => {
     let settled = false;
     let sawFile = false;
     let fileEnded = false;
-    let totalBytes = 0;
     const chunks: Buffer[] = [];
     let size = 0;
     let fileInfo: BusboyFileInfo | null = null;
-    const input = Readable.fromWeb(request.body as never);
+    const input = Readable.from([rawBody]);
     let parser: Busboy | null = null;
     const stop = () => {
       request.signal.removeEventListener("abort", aborted);
@@ -61,11 +85,6 @@ export async function parseEvidenceMultipart(request: Request): Promise<ParsedEv
 
     const aborted = () => fail(badRequest("Evidence upload was aborted."));
     request.signal.addEventListener("abort", aborted, { once: true });
-    input.on("data", (chunk: Buffer) => {
-      if (settled) return;
-      totalBytes += chunk.length;
-      if (totalBytes > MAX_MULTIPART_BYTES) fail(badRequest("Evidence upload is too large."));
-    });
     busboy.on("file", (name, file, info) => {
       if (sawFile || name !== "file") {
         file.resume();

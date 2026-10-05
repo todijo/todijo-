@@ -50,6 +50,15 @@ test("dashboard database-backed readiness and principal lookups resolve through 
   assert.match(readFileSync("app/dashboard/error.tsx", "utf8"), /onClick=\{reset\}/);
 });
 
+test("dashboard session loading is time-bounded and visibility changes no longer trigger surprise refreshes", () => {
+  const dashboard = readFileSync("app/dashboard/page.tsx", "utf8");
+  const verificationNotice = readFileSync("components/EmailVerificationNotice.tsx", "utf8");
+  assert.match(dashboard, /dashboardData\(readSession\(\)\)/);
+  assert.doesNotMatch(verificationNotice, /visibilitychange|addEventListener\("focus"/);
+  assert.match(verificationNotice, /router\.refresh\(\)/);
+  assert.doesNotMatch(readFileSync("app/dashboard/loading.tsx", "utf8"), /router\.refresh|location\.reload|setInterval/);
+});
+
 test("seller product titles keep semantic foreground contrast on light cards", () => {
   const page = readFileSync("app/seller/products/SellerProductsList.tsx", "utf8");
   const css = readFileSync("app/globals.css", "utf8");

@@ -4,13 +4,17 @@ import { CjAuthService, cjAuth } from "./cj-auth";
 import { logCjFailure, logCjSkuResolution } from "./cj-diagnostics";
 import { isValidProductImageUrl, MAX_PRODUCT_IMAGES } from "../product-images";
 import { CjFreightError, countryCode, freightCacheKey, normalizeCjFreightMethods, readFreightCache, selectCjFreightMethod, writeFreightCache, type CjFreightQuote } from "./cj-freight";
-import { cjRetryAfterMs, cjRetryDelay, isCjRateLimitFailure, scheduleCjRequest } from "./cj-rate-limiter";
+import { cjRetryAfterMs, cjRetryDelay, deferCjRequests, isCjRateLimitFailure, scheduleCjRequest } from "./cj-rate-limiter";
 
 const CJ_BASE_URL = "https://developers.cjdropshipping.com/api2.0/v1";
 const PRODUCT_CACHE_TTL_MS=5*60*1000;
-const cjCacheGlobal=globalThis as typeof globalThis&{__todijoCjProductCache?:Map<string,{expiresAt:number;value:SupplierProductSnapshot}>;__todijoCjPendingProducts?:Map<string,Promise<SupplierProductSnapshot>>};
+const VARIANT_CACHE_TTL_MS=15_000;
+const cjCacheGlobal=globalThis as typeof globalThis&{__todijoCjProductCache?:Map<string,{expiresAt:number;value:SupplierProductSnapshot}>;__todijoCjPendingProducts?:Map<string,Promise<SupplierProductSnapshot>>;__todijoCjVariantCache?:Map<string,{expiresAt:number;value?:SupplierVariantDetailSnapshot;error?:Error}>;__todijoCjPendingVariants?:Map<string,Promise<SupplierVariantDetailSnapshot>>};
 const productCache=cjCacheGlobal.__todijoCjProductCache??=new Map();
 const pendingProducts=cjCacheGlobal.__todijoCjPendingProducts??=new Map();
+const variantCache=cjCacheGlobal.__todijoCjVariantCache??=new Map();
+const pendingVariants=cjCacheGlobal.__todijoCjPendingVariants??=new Map();
+export class CjRateLimitError extends Error{constructor(public readonly retryAfterMs:number){super("CJ_UNAVAILABLE");}}
 export function readCjProductCache(identifier:string):SupplierProductSnapshot|null{const key=identifier.trim().toUpperCase(),entry=productCache.get(key);if(!entry||entry.expiresAt<=Date.now()){productCache.delete(key);return null;}return entry.value;}
 
 function text(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
@@ -124,7 +128,7 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
   private nextRequestAt = 0;
   constructor(
     private readonly auth: Pick<CjAuthService, "isConfigured" | "getAccessToken" | "invalidateAccessToken"> = cjAuth,
-    private readonly options: { fetcher?:typeof fetch; minimumRequestIntervalMs?:number;useProductCache?:boolean;schedule?:(run:()=>Promise<Response>)=>Promise<Response>;retryDelay?:(attempt:number)=>Promise<void> } = {},
+    private readonly options: { fetcher?:typeof fetch; minimumRequestIntervalMs?:number;useProductCache?:boolean;useVariantCache?:boolean;schedule?:(run:()=>Promise<Response>)=>Promise<Response>;retryDelay?:(attempt:number)=>Promise<void> } = {},
   ) {}
   isConfigured() { return this.auth.isConfigured(); }
   private async throttle() {
@@ -156,7 +160,13 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
       const authFailed = response.status === 401 || payload.code === 1600001 || payload.code === 1600002;
       if (authFailed && authRetries++ === 0) { this.auth.invalidateAccessToken(); continue; }
       const rateLimited=isCjRateLimitFailure({httpStatus:response.status,code:payload.code,message:payload.message});
-      if(rateLimited&&rateRetries<2){logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);const attempt=rateRetries++,delay=Math.max(cjRetryDelay(attempt),cjRetryAfterMs(response)??0);await (this.options.retryDelay?.(attempt)??new Promise(resolve=>setTimeout(resolve,delay)));continue;}
+      if(rateLimited){
+        const retryAfter=cjRetryAfterMs(response),attempt=rateRetries,delay=Math.max(cjRetryDelay(attempt),retryAfter??0);
+        if(!this.options.schedule&&this.options.minimumRequestIntervalMs==null)deferCjRequests(delay);
+        if(rateRetries<2){logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);rateRetries++;await (this.options.retryDelay?.(attempt)??new Promise(resolve=>setTimeout(resolve,delay)));continue;}
+        logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);
+        throw new CjRateLimitError(Math.max(delay,1000));
+      }
       if (authFailed || !response.ok || payload.result === false || payload.success === false) {
         logCjFailure({operation,stage:"product-retrieval",path,httpStatus:response.status,responseCode:payload.code,responseMessage:payload.message,requestId:payload.requestId,context},[accessToken]);
         if (authFailed) throw new Error("CJ_AUTHENTICATION_FAILED");
@@ -182,10 +192,28 @@ export class CjCatalogProvider implements SupplierCatalogProvider {
   async getVariant(supplierVariantId:string):Promise<SupplierVariantDetailSnapshot>{
     const vid=supplierVariantId.trim();
     if(!/^[A-Za-z0-9-]{4,200}$/.test(vid))throw new Error("CJ_VARIANT_ID_INVALID");
-    const result=await this.get("get-product-variant",`/product/variant/queryByVid?vid=${encodeURIComponent(vid)}&features=enable_inventory`,{supplierVariantId:vid});
-    const variant=normalizeCjVariantDetail(result.data);
-    if(normalizedIdentifier(variant.supplierVariantId)!==normalizedIdentifier(vid))throw new Error("CJ_VARIANT_IDENTITY_MISMATCH");
-    return variant;
+    const key=normalizedIdentifier(vid),useCache=this.options.useVariantCache??!this.options.fetcher;
+    if(useCache){
+      const cached=variantCache.get(key);
+      if(cached&&cached.expiresAt>Date.now()){if(cached.error)throw cached.error;return cached.value!;}
+      if(cached)variantCache.delete(key);
+      const pending=pendingVariants.get(key);if(pending)return pending;
+    }
+    const load=async()=>{
+      try{
+        const result=await this.get("get-product-variant",`/product/variant/queryByVid?vid=${encodeURIComponent(vid)}&features=enable_inventory`,{supplierVariantId:vid});
+        const variant=normalizeCjVariantDetail(result.data);
+        if(normalizedIdentifier(variant.supplierVariantId)!==key)throw new Error("CJ_VARIANT_IDENTITY_MISMATCH");
+        if(useCache)variantCache.set(key,{expiresAt:Date.now()+VARIANT_CACHE_TTL_MS,value:variant});
+        return variant;
+      }catch(error){
+        const retryAfter=error instanceof CjRateLimitError?error.retryAfterMs:0;
+        if(useCache&&((error instanceof Error&&error.message==="CJ_UNAVAILABLE")||retryAfter>0))variantCache.set(key,{expiresAt:Date.now()+Math.max(2_000,retryAfter),error:error instanceof Error?error:new Error("CJ_UNAVAILABLE")});
+        throw error;
+      }
+    };
+    if(!useCache)return load();
+    const request=load().finally(()=>pendingVariants.delete(key));pendingVariants.set(key,request);return request;
   }
   private async loadProduct(identifier:string):Promise<SupplierProductSnapshot> {
     const isSku = /^CJ[A-Za-z0-9-]+$/i.test(identifier);

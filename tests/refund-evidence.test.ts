@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import sharp from "sharp";
 import { parseEvidenceMultipart, REFUND_EVIDENCE_MULTIPART_MAX_BYTES } from "../lib/refund-evidence-multipart";
 import { getBuyerRefundEvidence, getSellerRefundEvidence, listBuyerRefundEvidence, listSellerRefundEvidence, RefundEvidenceError, type RefundEvidenceDb, uploadBuyerRefundEvidence, validateRefundEvidenceFile } from "../lib/refund-evidence";
@@ -47,6 +48,7 @@ test("bounded multipart parser rejects oversized, unknown-length, extra-part, an
   await assert.rejects(() => parseEvidenceMultipart(unknownLengthOversizedTail), (error: unknown) => error instanceof RefundEvidenceError && error.message === "Evidence upload is too large.");
   await assert.rejects(() => parseEvidenceMultipart(multipart([{ name: "file", filename: "one.jpg", type: "image/jpeg", bytes: jpeg }, { name: "file", filename: "two.jpg", type: "image/jpeg", bytes: jpeg }])), RefundEvidenceError);
   await assert.rejects(() => parseEvidenceMultipart(multipart([{ name: "unexpected" }])), RefundEvidenceError);
+  assert.doesNotMatch(readFileSync("lib/refund-evidence-multipart.ts", "utf8"), /Readable\.fromWeb/);
 });
 
 test("sharp validates real JPEG, PNG, and WebP and rejects malformed data", async () => {
