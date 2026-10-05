@@ -71,6 +71,13 @@ test("seller dashboard readiness distinguishes INSEE outcomes from pending and t
   assert.equal(sellerBusinessVerificationMessage({businessState:"NOT_STARTED"}),"dashboardPending");
 });
 
+test("seller store settings never exposes a raw INSEE verification enum", () => {
+  const form = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
+  assert.match(form, /initialValues\.businessVerificationState==="VERIFIED"&&<p role="status">\{verification\("success"\)\}<\/p>/);
+  assert.doesNotMatch(form, /<p>\{initialValues\.businessVerificationState\}<\/p>/);
+  assert.match(form, /onChange=\{\(\)=>setVerificationMessage\(""\)\}/);
+});
+
 test("French professional publishing requires a verified establishment linked to the current SIRET", () => {
   assert.equal(isFrenchProfessional("PROFESSIONAL", "France"), true);
   assert.equal(isFrenchProfessional("PRIVATE", "FR"), false);

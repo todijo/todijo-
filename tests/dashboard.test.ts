@@ -40,6 +40,16 @@ test("dashboard polish preserves semantic loading and mobile touch targets", () 
   assert.match(css, /premiumDashboardMobileNav a span\{max-width:64px;[^}]*white-space:normal/);
 });
 
+test("dashboard database-backed readiness and principal lookups resolve through the controlled timeout boundary", () => {
+  const dashboard = readFileSync("app/dashboard/page.tsx", "utf8");
+  assert.match(dashboard, /const DASHBOARD_DATA_TIMEOUT_MS = 15_000/);
+  assert.match(dashboard, /dashboardData\(Promise\.all\(\[sellerStoreChoices\(prisma,session\.userId\),sellerPrincipals\(prisma,session\.userId\)\]\)\)/);
+  assert.match(dashboard, /dashboardData\(prisma\.store\.findUnique\(/);
+  assert.match(dashboard, /dashboardData\(sellerBusinessCommercialPlan\(/);
+  assert.match(dashboard, /dashboardData\(prisma\.sellerBenefitAccess\.findUnique\(/);
+  assert.match(readFileSync("app/dashboard/error.tsx", "utf8"), /onClick=\{reset\}/);
+});
+
 test("seller product titles keep semantic foreground contrast on light cards", () => {
   const page = readFileSync("app/seller/products/SellerProductsList.tsx", "utf8");
   const css = readFileSync("app/globals.css", "utf8");

@@ -89,12 +89,12 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
 
   const isSeller = dashboardAudience(user.role) === "seller";
   const requestedStore=(await searchParams).store;
-  const [storeChoices,principals]=isSeller?await Promise.all([sellerStoreChoices(prisma,session.userId),sellerPrincipals(prisma,session.userId)]):[[],[]];
+  const [storeChoices,principals]=isSeller?await dashboardData(Promise.all([sellerStoreChoices(prisma,session.userId),sellerPrincipals(prisma,session.userId)])):[[],[]];
   const principal=principals.find(item=>item.owner)??principals[0]??null;
   if(isSeller&&requestedStore&&requestedStore!=="all"&&!storeChoices.some(store=>store.id===requestedStore))redirect(`/${locale}/dashboard`);
   const ownedStoreChoices=principal?.owner?storeChoices.filter(store=>store.businessId===principal.businessId):[];
   const selectedStoreId=isSeller?(requestedStore&&requestedStore!=="all"?requestedStore:ownedStoreChoices.length===1?ownedStoreChoices[0]?.id:!principal?.owner?storeChoices[0]?.id:null):null;
-  const activeStore=selectedStoreId?await prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect}):user.store;
+  const activeStore=selectedStoreId?await dashboardData(prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect})):user.store;
   const selectedPrincipal=activeStore?principals.find(item=>item.storeIds.includes(activeStore.id))??null:principal;
   const hasSellerPermission=(permission:TeamPermission)=>Boolean(selectedPrincipal&&(selectedPrincipal.owner||selectedPrincipal.permissions.includes(permission)));
   const canViewProducts=hasSellerPermission("PRODUCT_VIEW");
@@ -120,8 +120,8 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     { label: common("cart"), href: paths.cart, icon: ShoppingCart },
     { label: privacy("privacyData"), href: `/${locale}/info/privacy-data`, icon: ShieldCheck },
   ];
-  const selectedCommercialPlan=selectedPrincipal?await sellerBusinessCommercialPlan(prisma,selectedPrincipal.businessId):null;
-  const sellerBenefitCatalogEnabled=Boolean(selectedPrincipal?.owner&&user.role==="SELLER"&&hasProSellerCapabilities(selectedCommercialPlan)&&(await prisma.sellerBenefitAccess.findUnique({where:{businessId:selectedPrincipal.businessId},select:{enabled:true}}))?.enabled);
+  const selectedCommercialPlan=selectedPrincipal?await dashboardData(sellerBusinessCommercialPlan(prisma,selectedPrincipal.businessId)):null;
+  const sellerBenefitCatalogEnabled=Boolean(selectedPrincipal?.owner&&user.role==="SELLER"&&hasProSellerCapabilities(selectedCommercialPlan)&&(await dashboardData(prisma.sellerBenefitAccess.findUnique({where:{businessId:selectedPrincipal.businessId},select:{enabled:true}})))?.enabled);
   const freeCopy = sellerFreeModelCopy(locale);
   const sellerCanAddProduct = Boolean(activeStore && canCreateProducts && canPublish(activeStore,new Date(),selectedCommercialPlan));
   const sellerNav = sellerDashboardNavItems({ locale, storeSlug: activeStore?.slug, publicStoreAvailable:sellerCanAddProduct, proImportAvailable:Boolean(selectedPrincipal?.owner&&hasProSellerCapabilities(selectedCommercialPlan)), ownerTools:Boolean(selectedPrincipal?.owner),permissions:selectedPrincipal?.owner?undefined:selectedPrincipal?.permissions??[],labels: { dashboard:p("nav.dashboard"), products:p("nav.products"), addProduct:p("nav.addProduct"), orders:p("nav.orders"), messages:p("nav.messages"), statistics:p("nav.statistics"), revenue:p("nav.revenue"), reviews:p("nav.reviews"), store:p("nav.store"), settings:p("nav.settings"), notifications:p("notifications"), eyebrow:p("seller.eyebrow"), logout:common("logout"), menu:s("menu"), collapse:s("collapse"), importProducts:freeCopy.importProducts }, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active: "dashboard", unreadMessages });
