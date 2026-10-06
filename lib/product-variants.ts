@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { replaceProductVariantImages } from "./product-variant-images";
 import { requireStoreCapability } from "./seller-business-access";
+import { requireProductCategoryScope } from "./seller-team-product-scope";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
 import {
   MAX_OPTION_VALUES,
@@ -174,10 +175,10 @@ export async function saveProductVariants(db: PrismaClient, sellerId: string, pr
   return db.$transaction(async (tx) => {
     const product = await tx.product.findFirst({
       where: { id: productId },
-      select: { id: true, storeId: true, price: true, options: { include: { values: true } }, variants: { include: { values: true } } },
+      select: { id: true, storeId: true, category: true, price: true, options: { include: { values: true } }, variants: { include: { values: true } } },
     });
     if (!product) throw new ProductVariantError("Product not found.", 404);
-    const principal=await requireStoreCapability(tx, sellerId, product.storeId, "PRODUCT_MANAGE_VARIANTS");
+    const principal=await requireProductCategoryScope(tx, sellerId, product.storeId, "PRODUCT_MANAGE_VARIANTS",product.category);
     const variantPermissions=new Set<"PRODUCT_CHANGE_PRICE"|"PRODUCT_CHANGE_STOCK">();
     if(Array.isArray(input.variants))for(const rawVariant of input.variants){
       const existing=product.variants.find(variant=>variant.combinationKey===String(rawVariant.combinationKey??""));

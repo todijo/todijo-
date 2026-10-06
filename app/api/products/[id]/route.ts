@@ -23,6 +23,7 @@ import {contentSourceLocale} from "@/lib/content-source-locale";
 import { productUpdatePermissions, requireProductPermissions } from "@/lib/seller-product-authorization";
 import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
 import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
+import { requireProductCategoryScope } from "@/lib/seller-team-product-scope";
 
 function normalizeList(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
@@ -83,6 +84,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     await prisma.$transaction(async (tx) => {
       await lockSellerProductQuota(tx, product.storeId);
       if (status === "PUBLISHED") await requireStorePublishingAccess(tx, session.userId, product.storeId, "PRODUCT_PUBLISH", id);
+      if(category!==product.category)await requireProductCategoryScope(tx,session.userId,product.storeId,"PRODUCT_EDIT_CONTENT",category);
       const currentSupplierLink = await tx.supplierProductLink.findUnique({ where: { productId: id }, select: { id: true } });
       await tx.product.update({ where: { id }, data: {
         name, description, sourceLocale:name!==product.name||description!==product.description?contentSourceLocale(request):product.sourceLocale, category, condition, status,

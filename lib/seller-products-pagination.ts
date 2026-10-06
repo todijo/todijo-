@@ -47,8 +47,8 @@ function automaticCjPrice(provider: unknown, metadata: unknown) {
 }
 
 type ProductDb = Pick<PrismaClient, "product">;
-export async function listSellerProducts(db: ProductDb, storeId: string, query: SellerProductsQuery) {
-  const base: Prisma.ProductWhereInput = { storeId, removedAt: null, dataClass: "PRODUCTION" };
+export async function listSellerProducts(db: ProductDb, storeId: string, query: SellerProductsQuery, allowedCategoryIds?: string[] | null) {
+  const base: Prisma.ProductWhereInput = { storeId, removedAt: null, dataClass: "PRODUCTION", ...(allowedCategoryIds != null ? { category: { in: allowedCategoryIds } } : {}) };
   const where: Prisma.ProductWhereInput = { ...base, ...(query.q ? { name: { contains: query.q, mode: "insensitive" } } : {}), ...(query.status !== "all" ? { status: query.status } : {}) };
   const [total, allTotal, published, lowStock] = await Promise.all([
     db.product.count({ where }),

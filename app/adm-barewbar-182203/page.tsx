@@ -17,6 +17,7 @@ import { siteContentMessages } from "@/i18n/site-content";
 import { loyaltyMessages } from "@/i18n/loyalty";
 import { readGlobalDropshippingMargin } from "@/lib/suppliers/global-margin";
 import { managedOwnerEligibility as ownerEligibility, managedOwnerSelect } from "@/lib/admin-store-owner-eligibility";
+import { pendingSellerReviewWhere } from "@/lib/seller-review-alerts";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -40,7 +41,7 @@ export default async function AdminPage() {
   }
 
   const now = new Date();
-  const [users, stores, pendingFinalRefundCount, globalDropshippingMargin] = await Promise.all([
+  const [users, stores, pendingFinalRefundCount, globalDropshippingMargin, pendingSellerReviewCount] = await Promise.all([
     prisma.user.findMany({
       orderBy: [{ role: "asc" }, { firstName: "asc" }],
       select: { ...managedOwnerSelect, store: { select: { id: true, ownerId: true, businessId: true } } },
@@ -57,6 +58,7 @@ export default async function AdminPage() {
     }),
     prisma.refundRequest.count({ where: { status: { in: ["SELLER_APPROVED", "SELLER_REJECTED"] } } }),
     readGlobalDropshippingMargin(prisma),
+    prisma.store.count({ where: pendingSellerReviewWhere() }),
   ]);
   const serializedStores = await Promise.all(stores.map(async (store) => {
     const state = await readManagedCommercialSummary(prisma, store.id, now);
@@ -81,7 +83,7 @@ export default async function AdminPage() {
     <section className="adminShell">
       <header className="adminHero">
         <div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{t("intro")}</p></div>
-        <nav className="adminHeroActions" aria-label={t("actions")}><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/seller-review">{authText("sellerReview")}</Link><Link href="/adm-barewbar-182203/products">Product catalog</Link><Link href="/adm-barewbar-182203/catalog-data">Test/demo catalog audit</Link><Link href="/adm-barewbar-182203/content">{contentText.title}</Link><Link href="/adm-barewbar-182203/news">Todijo Actualités</Link><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/connect-readiness">Stripe Connect readiness</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/subscription-changes">{adminSubscriptionChangesCopy(locale).title}</Link><Link href="/adm-barewbar-182203/benefits">Gestion des avantages Todijo PRO</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link><Link href="/adm-barewbar-182203/loyalty">{loyaltyMessages[isLocale(locale) ? locale : "fr"].title}</Link></nav>
+        <nav className="adminHeroActions" aria-label={t("actions")}><a href={`/${locale}/seller/products`}>{t("manageOwnProducts")}</a><Link href="/adm-barewbar-182203/seller-review">{authText("sellerReview")}{pendingSellerReviewCount > 0 && <span className="adminPendingCount" aria-label={String(pendingSellerReviewCount)}>{pendingSellerReviewCount}</span>}</Link><Link href="/adm-barewbar-182203/products">Product catalog</Link><Link href="/adm-barewbar-182203/catalog-data">Test/demo catalog audit</Link><Link href="/adm-barewbar-182203/content">{contentText.title}</Link><Link href="/adm-barewbar-182203/news">Todijo Actualités</Link><Link href="/adm-barewbar-182203/support">Support</Link><Link href="/adm-barewbar-182203/suppliers">{supplierText("adminSuppliers")}</Link><Link href="/adm-barewbar-182203/connect-readiness">Stripe Connect readiness</Link><Link href="/adm-barewbar-182203/moderation">{trustText("title")}</Link><Link href="/adm-barewbar-182203/orders">{ordersText("history.adminTitle")}</Link><Link href="/adm-barewbar-182203/users">{userManagementText.title}</Link><Link href="/adm-barewbar-182203/buyers">{t("buyersTitle")}</Link><Link href="/adm-barewbar-182203/subscription-changes">{adminSubscriptionChangesCopy(locale).title}</Link><Link href="/adm-barewbar-182203/benefits">Gestion des avantages Todijo PRO</Link><Link href="/adm-barewbar-182203/sellers">{t("sellersTitle")}</Link><Link href="/adm-barewbar-182203/loyalty">{loyaltyMessages[isLocale(locale) ? locale : "fr"].title}</Link></nav>
       </header>
       {pendingFinalRefundCount > 0 && <section className="subscriptionWarning adminRefundAlert" role="alert"><strong>{t(pendingFinalRefundCount === 1 ? "pendingFinalRefundSingular" : "pendingFinalRefundPlural", { count: pendingFinalRefundCount })}</strong><Link href="/adm-barewbar-182203/orders?view=refund">{t("reviewRefundRequests")}</Link></section>}
       <AdminDashboard

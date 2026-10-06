@@ -19,7 +19,7 @@ test("variant image assignments reject duplicate targets and invalid primary ima
 
 test("variant image assignment API scopes product lookup to the signed-in seller", async () => {
   const source = await import("node:fs/promises").then((fs) => fs.readFile("app/api/products/[id]/variant-images/route.ts", "utf8"));
-  assert.match(source, /requireStoreCapability\(prisma,session\.userId,product\.storeId,"PRODUCT_MANAGE_VARIANTS"\)/);
+  assert.match(source, /requireProductCategoryScope\(prisma,session\.userId,product\.storeId,"PRODUCT_MANAGE_VARIANTS",product\.category\)/);
   assert.match(source, /replaceProductVariantImages/);
 });
 

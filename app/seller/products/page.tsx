@@ -17,6 +17,7 @@ import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-po
 import { effectiveSellerPlan } from "@/lib/seller-subscription";
 import { hasProSellerCapabilities } from "@/lib/seller-commercial-access";
 import { dropshippingAccessMessages } from "@/i18n/dropshipping-access";
+import { sellerProductCategoryScope } from "@/lib/seller-team-product-scope";
 
 export const dynamic = "force-dynamic";
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -29,7 +30,7 @@ export default async function SellerProductsPage({ searchParams }: { searchParam
   const store = await prisma.store.findUnique({where:{id:storeContext.selected.id}, select: { id: true, name: true, slug: true, country:true,businessRegistrationId:true,currency: true, status: true, sellerType: true, vatStatus: true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}}, dropshippingEnabled: true, owner: { select: { firstName: true, lastName: true, role: true } }, subscription: { select: { status: true, plan: true, currentPeriodEnd:true } }, accessGrants: { select: { source: true, plan:true, startsAt: true, endsAt: true } } } });
   if (!store) redirect("/seller/create-store");
   const query = parseSellerProductsQuery(new URLSearchParams({ page: one(params?.page), q: one(params?.q), status: one(params?.status), sort: one(params?.sort) }));
-  const result = await listSellerProducts(prisma, store.id, query);
+  const result = await listSellerProducts(prisma, store.id, query, await sellerProductCategoryScope(prisma,session.userId,store.id));
   const commercialPlan=storeContext.selected.businessId?await sellerBusinessCommercialPlan(prisma,storeContext.selected.businessId):effectiveSellerPlan({role:store.owner.role,subscription:store.subscription,accessGrants:store.accessGrants});
   const dropshippingPro=hasProSellerCapabilities(commercialPlan);
   const dropshippingCopy=dropshippingAccessMessages[locale]??dropshippingAccessMessages.en;

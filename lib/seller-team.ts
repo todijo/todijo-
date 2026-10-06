@@ -5,6 +5,8 @@ import { generateRawAuthToken, hashAuthToken, validRawAuthToken } from "./auth-t
 import { appendSellerBusinessAudit } from "./seller-business-audit";
 import { lockSellerBusiness, sellerBusinessCapabilityTier } from "./seller-business";
 import { parseTeamPermissions, parseTeamRoleTemplate, permissionsForTemplate, teamSeatLimit } from "./seller-team-permissions";
+import { MIN_PASSWORD_LENGTH } from "./auth-registration";
+import { normalizeTeamStoreScopes } from "./seller-team-product-scope";
 
 export const TEAM_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -42,7 +44,7 @@ async function assertSeatAvailable(tx: Prisma.TransactionClient, businessId: str
   if (members + invitations >= teamSeatLimit) throw new SellerTeamError("TEAM_SEAT_LIMIT_REACHED", 409);
 }
 
-export async function issueSellerTeamInvitation(db: PrismaClient, input: { ownerId: string; email: unknown; locale: string; roleTemplate: unknown; permissions: unknown; storeIds: unknown }, now = new Date()) {
+export async function issueSellerTeamInvitation(db: PrismaClient, input: { ownerId: string; email: unknown; locale: string; roleTemplate: unknown; permissions: unknown; storeIds: unknown; productScopes?: unknown }, now = new Date()) {
   const email = normalizeTeamEmail(input.email);
   const roleTemplate = parseTeamRoleTemplate(input.roleTemplate);
   if (!roleTemplate) throw new SellerTeamError("INVALID_ROLE");
@@ -58,13 +60,14 @@ export async function issueSellerTeamInvitation(db: PrismaClient, input: { owner
     const previous = await tx.sellerTeamInvitation.findUnique({ where: { businessId_email: { businessId: business.id, email } }, select: { id: true } });
     await assertSeatAvailable(tx, business.id, now, previous?.id);
     const storeIds = await assertStoresBelongToBusiness(tx, business.id, input.storeIds);
+    const scopes = normalizeTeamStoreScopes(storeIds, input.productScopes);
     const invitation = await tx.sellerTeamInvitation.upsert({
       where: { businessId_email: { businessId: business.id, email } },
-      create: { businessId: business.id, email, tokenHash, locale: input.locale, roleTemplate, permissions, expiresAt: new Date(now.getTime() + TEAM_INVITATION_TTL_MS), stores: { create: storeIds.map(storeId => ({ storeId })) } },
-      update: { tokenHash, locale: input.locale, roleTemplate, permissions, expiresAt: new Date(now.getTime() + TEAM_INVITATION_TTL_MS), acceptedAt: null, acceptedById: null, revokedAt: null, stores: { deleteMany: {}, create: storeIds.map(storeId => ({ storeId })) } },
+      create: { businessId: business.id, email, tokenHash, locale: input.locale, roleTemplate, permissions, expiresAt: new Date(now.getTime() + TEAM_INVITATION_TTL_MS), stores: { create: storeIds.map(storeId => ({ storeId, ...scopes.get(storeId)! })) } },
+      update: { tokenHash, locale: input.locale, roleTemplate, permissions, expiresAt: new Date(now.getTime() + TEAM_INVITATION_TTL_MS), acceptedAt: null, acceptedById: null, revokedAt: null, stores: { deleteMany: {}, create: storeIds.map(storeId => ({ storeId, ...scopes.get(storeId)! })) } },
       select: { id: true, email: true, expiresAt: true },
     });
-    await appendSellerBusinessAudit(tx, { businessId: business.id, actorId: input.ownerId, category: "TEAM", action: previous ? "INVITATION_RESENT" : "INVITATION_CREATED", targetType: "SellerTeamInvitation", targetId: invitation.id, metadata: { email, roleTemplate, permissions, storeIds } });
+    await appendSellerBusinessAudit(tx, { businessId: business.id, actorId: input.ownerId, category: "TEAM", action: previous ? "INVITATION_RESENT" : "INVITATION_CREATED", targetType: "SellerTeamInvitation", targetId: invitation.id, metadata: { email, roleTemplate, permissions, storeIds, productScopes: Object.fromEntries(scopes) } });
     return invitation;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   return { ...result, rawToken };
@@ -74,7 +77,7 @@ export async function acceptSellerTeamInvitation(db: PrismaClient, input: { rawT
   if (!validRawAuthToken(input.rawToken)) throw new SellerTeamError("INVALID_INVITATION", 404);
   const tokenHash = hashAuthToken(input.rawToken as string);
   return db.$transaction(async tx => {
-    const invitation = await tx.sellerTeamInvitation.findUnique({ where: { tokenHash }, include: { business: { select: { id: true, ownerId: true } }, stores: { select: { storeId: true } } } });
+    const invitation = await tx.sellerTeamInvitation.findUnique({ where: { tokenHash }, include: { business: { select: { id: true, ownerId: true } }, stores: { select: { storeId: true, productScope: true, categoryKeys: true } } } });
     if (!invitation) throw new SellerTeamError("INVALID_INVITATION", 404);
     if (invitation.revokedAt) throw new SellerTeamError("INVITATION_REVOKED", 410);
     if (invitation.acceptedAt) throw new SellerTeamError("INVITATION_USED", 409);
@@ -97,19 +100,31 @@ export async function acceptSellerTeamInvitation(db: PrismaClient, input: { rawT
     if (userId === invitation.business.ownerId) throw new SellerTeamError("OWNER_CANNOT_BE_MEMBER", 409);
     const consumed = await tx.sellerTeamInvitation.updateMany({ where: { id: invitation.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } }, data: { acceptedAt: now, acceptedById: userId } });
     if (consumed.count !== 1) throw new SellerTeamError("INVITATION_USED", 409);
-    const membership = await tx.sellerTeamMembership.upsert({ where: { businessId_userId: { businessId: invitation.businessId, userId } }, create: { businessId: invitation.businessId, userId, status: "ACTIVE", roleTemplate: invitation.roleTemplate, permissions: invitation.permissions, assignments: { create: invitation.stores.map(item => ({ storeId: item.storeId })) } }, update: { status: "ACTIVE", suspendedAt: null, removedAt: null, roleTemplate: invitation.roleTemplate, permissions: invitation.permissions, assignments: { deleteMany: {}, create: invitation.stores.map(item => ({ storeId: item.storeId })) } }, select: { id: true } });
+    const membership = await tx.sellerTeamMembership.upsert({ where: { businessId_userId: { businessId: invitation.businessId, userId } }, create: { businessId: invitation.businessId, userId, status: "ACTIVE", roleTemplate: invitation.roleTemplate, permissions: invitation.permissions, assignments: { create: invitation.stores.map(item => ({ storeId: item.storeId, productScope: item.productScope, categoryKeys: item.categoryKeys })) } }, update: { status: "ACTIVE", suspendedAt: null, removedAt: null, roleTemplate: invitation.roleTemplate, permissions: invitation.permissions, assignments: { deleteMany: {}, create: invitation.stores.map(item => ({ storeId: item.storeId, productScope: item.productScope, categoryKeys: item.categoryKeys })) } }, select: { id: true } });
     await tx.user.update({ where: { id: userId }, data: { role: "SELLER", authVersion: { increment: 1 } } });
     await tx.mobileSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
-    await appendSellerBusinessAudit(tx, { businessId: invitation.businessId, actorId: userId, category: "TEAM", action: "INVITATION_ACCEPTED", targetType: "SellerTeamMembership", targetId: membership.id, metadata: { invitationId: invitation.id, storeIds: invitation.stores.map(item => item.storeId) } });
+    await tx.passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: now } });
+    await appendSellerBusinessAudit(tx, { businessId: invitation.businessId, actorId: userId, category: "TEAM", action: "INVITATION_ACCEPTED", targetType: "SellerTeamMembership", targetId: membership.id, metadata: { invitationId: invitation.id, storeIds: invitation.stores.map(item => item.storeId), productScopes: Object.fromEntries(invitation.stores.map(item => [item.storeId, { productScope: item.productScope, categoryKeys: item.categoryKeys }])) } });
     return { membershipId: membership.id, userId };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-export async function updateSellerTeamMember(db: PrismaClient, input: { ownerId: string; membershipId: string; action?: unknown; roleTemplate?: unknown; permissions?: unknown; storeIds?: unknown }, now = new Date()) {
+export async function updateSellerTeamMember(db: PrismaClient, input: { ownerId: string; membershipId: string; action?: unknown; roleTemplate?: unknown; permissions?: unknown; storeIds?: unknown; productScopes?: unknown; newPassword?: unknown }, now = new Date()) {
   return db.$transaction(async tx => {
     const membership = await tx.sellerTeamMembership.findUnique({ where: { id: input.membershipId }, select: { id: true, userId: true, businessId: true, status: true, business: { select: { ownerId: true } } } });
     if (!membership || membership.business.ownerId !== input.ownerId) throw new SellerTeamError("MEMBER_NOT_FOUND", 404);
     const action = typeof input.action === "string" ? input.action : "permissions";
+    if (action === "password") {
+      const password = typeof input.newPassword === "string" ? input.newPassword : "";
+      if (membership.status === "REMOVED") throw new SellerTeamError("INVALID_MEMBER_STATE", 409);
+      if (password.length < MIN_PASSWORD_LENGTH || password.length > 1024) throw new SellerTeamError("INVALID_PASSWORD");
+      await tx.user.update({ where: { id: membership.userId }, data: { passwordHash: await hash(password, 12), authVersion: { increment: 1 } } });
+      await tx.mobileSession.updateMany({ where: { userId: membership.userId, revokedAt: null }, data: { revokedAt: now } });
+      await tx.passwordResetToken.updateMany({ where: { userId: membership.userId, usedAt: null }, data: { usedAt: now } });
+      await tx.accountSecurityEvent.create({ data: { userId: membership.userId, type: "OWNER_PASSWORD_REPLACED" } });
+      await appendSellerBusinessAudit(tx, { businessId: membership.businessId, actorId: input.ownerId, category: "TEAM", action: "MEMBER_PASSWORD_REPLACED", targetType: "SellerTeamMembership", targetId: membership.id, metadata: { sessionsRevoked: true } });
+      return { status: membership.status, passwordChanged: true };
+    }
     if (action === "reactivate") {
       await lockSellerBusiness(tx, membership.businessId);
       if (await sellerBusinessCapabilityTier(tx, membership.businessId, now) !== "pro") throw new SellerTeamError("TEAM_PRO_REQUIRED", 403);
@@ -130,10 +145,11 @@ export async function updateSellerTeamMember(db: PrismaClient, input: { ownerId:
     if (!roleTemplate) throw new SellerTeamError("INVALID_ROLE");
     const permissions = invitationPermissions(roleTemplate, input.permissions);
     const storeIds = await assertStoresBelongToBusiness(tx, membership.businessId, input.storeIds);
-    await tx.sellerTeamMembership.update({ where: { id: membership.id }, data: { roleTemplate, permissions, assignments: { deleteMany: {}, create: storeIds.map(storeId => ({ storeId })) } } });
+    const scopes = normalizeTeamStoreScopes(storeIds, input.productScopes);
+    await tx.sellerTeamMembership.update({ where: { id: membership.id }, data: { roleTemplate, permissions, assignments: { deleteMany: {}, create: storeIds.map(storeId => ({ storeId, ...scopes.get(storeId)! })) } } });
     await tx.user.update({ where: { id: membership.userId }, data: { authVersion: { increment: 1 } } });
     await tx.mobileSession.updateMany({ where: { userId: membership.userId, revokedAt: null }, data: { revokedAt: now } });
-    await appendSellerBusinessAudit(tx, { businessId: membership.businessId, actorId: input.ownerId, category: "TEAM", action: "MEMBER_ACCESS_UPDATED", targetType: "SellerTeamMembership", targetId: membership.id, metadata: { roleTemplate, permissions, storeIds } });
+    await appendSellerBusinessAudit(tx, { businessId: membership.businessId, actorId: input.ownerId, category: "TEAM", action: "MEMBER_ACCESS_UPDATED", targetType: "SellerTeamMembership", targetId: membership.id, metadata: { roleTemplate, permissions, storeIds, productScopes: Object.fromEntries(scopes) } });
     return { status: membership.status };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

@@ -22,6 +22,7 @@ export async function issuePasswordResetToken(userId: string, now = new Date(), 
   const rawToken = generateRawAuthToken();
   const tokenHash = hashAuthToken(rawToken);
   const issued = await prisma.$transaction(async (tx) => {
+    if (await tx.sellerTeamMembership.findFirst({ where: { userId, status: { in: ["ACTIVE", "SUSPENDED"] } }, select: { id: true } })) return false;
     const latest = minimumIntervalMs > 0 ? await tx.passwordResetToken.findFirst({ where: { userId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }) : null;
     if (latest && latest.createdAt > new Date(now.getTime() - minimumIntervalMs)) return false;
     await tx.passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: now } });
@@ -54,6 +55,11 @@ export async function consumePasswordResetToken(rawToken: string, passwordHash: 
     const token = await tx.passwordResetToken.findUnique({ where: { tokenHash: hashAuthToken(rawToken) } });
     const state = authTokenState(token, now);
     if (state !== "success" || !token) return state;
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${token.userId} FOR UPDATE`;
+    if (await tx.sellerTeamMembership.findFirst({ where: { userId: token.userId, status: { in: ["ACTIVE", "SUSPENDED"] } }, select: { id: true } })) {
+      await tx.passwordResetToken.updateMany({ where: { userId: token.userId, usedAt: null }, data: { usedAt: now } });
+      return "invalid";
+    }
     const consumed = await tx.passwordResetToken.updateMany({ where: { id: token.id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now } });
     if (consumed.count !== 1) {
       const current = await tx.passwordResetToken.findUnique({ where: { id: token.id } });
@@ -63,7 +69,7 @@ export async function consumePasswordResetToken(rawToken: string, passwordHash: 
     await tx.accountSecurityEvent.create({ data: { userId: token.userId, type: "PASSWORD_RESET" } });
     await tx.passwordResetToken.updateMany({ where: { userId: token.userId, id: { not: token.id }, usedAt: null }, data: { usedAt: now } });
     return "success";
-  });
+  }, { isolationLevel: "Serializable" });
 }
 
 export async function issueEmailChangeToken(userId:string,newEmail:string,now=new Date()){

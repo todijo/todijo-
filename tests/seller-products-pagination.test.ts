@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { appendUniqueSellerProducts, listSellerProducts, parseSellerProductsQuery, sellerProductsHref, SELLER_PRODUCTS_PAGE_SIZE } from "../lib/seller-products-pagination";
+import { CANONICAL_LEAF_CATEGORIES } from "../lib/desktop-category-taxonomy";
 
-const rows = Array.from({ length: 295 }, (_, index) => ({ id: `product-${String(index).padStart(3, "0")}`, storeId: "mine", name: `Product ${String(index).padStart(3, "0")}`, createdAt: new Date("2026-01-01T00:00:00Z"), price: new Prisma.Decimal(10), currency: "EUR", stock: index % 8, status: index % 2 ? "DRAFT" as const : "PUBLISHED" as const, images: [] as string[], supplierLink: null, removedAt: null, dataClass: "PRODUCTION" as const }));
+const categoryA = CANONICAL_LEAF_CATEGORIES[0].id;
+const categoryB = CANONICAL_LEAF_CATEGORIES[1].id;
+const rows = Array.from({ length: 295 }, (_, index) => ({ id: `product-${String(index).padStart(3, "0")}`, storeId: "mine", category: index % 3 ? categoryA : categoryB, name: `Product ${String(index).padStart(3, "0")}`, createdAt: new Date("2026-01-01T00:00:00Z"), price: new Prisma.Decimal(10), currency: "EUR", stock: index % 8, status: index % 2 ? "DRAFT" as const : "PUBLISHED" as const, images: [] as string[], supplierLink: null, removedAt: null, dataClass: "PRODUCTION" as const }));
 const calls: { skip: number; take: number }[] = [];
 const db = { product: {
-  count: async ({ where }: { where: { storeId: string; status?: string; stock?: { lt: number }; name?: { contains: string } } }) => rows.filter((row) => row.storeId === where.storeId && (!where.status || row.status === where.status) && (!where.stock || row.stock < where.stock.lt) && (!where.name || row.name.toLowerCase().includes(where.name.contains.toLowerCase()))).length,
-  findMany: async ({ where, skip, take, orderBy }: { where: { storeId: string; status?: string; name?: { contains: string } }; skip: number; take: number; orderBy: Record<string, string>[] }) => { calls.push({ skip, take }); const filtered = rows.filter((row) => row.storeId === where.storeId && (!where.status || row.status === where.status) && (!where.name || row.name.toLowerCase().includes(where.name.contains.toLowerCase()))); const key = Object.keys(orderBy[0])[0] as "name" | "createdAt"; const direction = orderBy[0][key]; return filtered.sort((a, b) => (key === "name" ? a.name.localeCompare(b.name) : a.createdAt.getTime() - b.createdAt.getTime()) * (direction === "asc" ? 1 : -1) || a.id.localeCompare(b.id) * (orderBy[1].id === "asc" ? 1 : -1)).slice(skip, skip + take); },
+  count: async ({ where }: { where: { storeId: string; category?: { in: string[] }; status?: string; stock?: { lt: number }; name?: { contains: string } } }) => rows.filter((row) => row.storeId === where.storeId && (!where.category || where.category.in.includes(row.category)) && (!where.status || row.status === where.status) && (!where.stock || row.stock < where.stock.lt) && (!where.name || row.name.toLowerCase().includes(where.name.contains.toLowerCase()))).length,
+  findMany: async ({ where, skip, take, orderBy }: { where: { storeId: string; category?: { in: string[] }; status?: string; name?: { contains: string } }; skip: number; take: number; orderBy: Record<string, string>[] }) => { calls.push({ skip, take }); const filtered = rows.filter((row) => row.storeId === where.storeId && (!where.category || where.category.in.includes(row.category)) && (!where.status || row.status === where.status) && (!where.name || row.name.toLowerCase().includes(where.name.contains.toLowerCase()))); const key = Object.keys(orderBy[0])[0] as "name" | "createdAt"; const direction = orderBy[0][key]; return filtered.sort((a, b) => (key === "name" ? a.name.localeCompare(b.name) : a.createdAt.getTime() - b.createdAt.getTime()) * (direction === "asc" ? 1 : -1) || a.id.localeCompare(b.id) * (orderBy[1].id === "asc" ? 1 : -1)).slice(skip, skip + take); },
 } } as unknown as Pick<PrismaClient, "product">;
 
 test("seller catalog pages bound DB queries and cover 295 distinct product IDs without gaps", async () => {
@@ -45,11 +48,20 @@ test("seller status and search filters are applied to counts and bounded rows", 
   assert.ok(result.products.every((product) => product.status === "DRAFT" && product.name.includes("Product 01")));
 });
 
+test("seller category scope filters rows and every aggregate without leaking excluded-category counts", async () => {
+  const result = await listSellerProducts(db, "mine", { page: 1, q: "", status: "all", sort: "newest" }, [categoryA]);
+  assert.equal(result.total, rows.filter((row) => row.category === categoryA).length);
+  assert.equal(result.allTotal, result.total);
+  assert.equal(result.published, rows.filter((row) => row.category === categoryA && row.status === "PUBLISHED").length);
+  assert.equal(result.lowStock, rows.filter((row) => row.category === categoryA && row.stock < 5).length);
+  assert.ok(result.products.every((product) => rows.find((row) => row.id === product.id)?.category === categoryA));
+});
+
 test("mobile continuation endpoint scopes queries to the signed-in store", () => {
   const route = readFileSync("app/api/seller/products/page/route.ts", "utf8");
   assert.match(route, /readSession\(\)/);
   assert.match(route, /resolveSellerStoreContext\(prisma,session\.userId/);
-  assert.match(route, /listSellerProducts\(prisma,\s*context\.selected\.id,\s*query\)/);
+  assert.match(route, /listSellerProducts\(prisma,\s*context\.selected\.id,\s*query,\s*await sellerProductCategoryScope/);
   assert.match(route, /private, no-store/);
 });
 
