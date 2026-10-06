@@ -68,3 +68,13 @@ test("seller product titles keep semantic foreground contrast on light cards", (
   assert.match(css, /--ink:\s*#21163a/);
   assert.match(css, /\.sellerProductsGridPremium \.sellerProductCard\{color:var\(--ink\)\}/);
 });
+
+
+test("dashboard links do not prefetch rewritten dashboard routes", () => {
+  const ui = readFileSync("components/DashboardUI.tsx", "utf8");
+  const marketplaceHeader = readFileSync("components/MarketplaceHeader.tsx", "utf8");
+  const siteHeader = readFileSync("components/SiteHeader.tsx", "utf8");
+  assert.match(ui, /prefetch=\{href\.includes\("\/dashboard"\) \? false : undefined\}/);
+  assert.match(marketplaceHeader, /prefetch=\{accountName \? false : undefined\}/);
+  assert.match(siteHeader, /prefetch=\{accountName \? false : undefined\}/);
+});

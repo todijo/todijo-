@@ -9,11 +9,11 @@ export function DashboardSidebar({ items, mobileMenuItems = items, homeHref, log
   return <>
     <aside className={`premiumDashboardSidebar${seller ? " isSeller" : ""}`}>
       <TodijoLogo href={homeHref} inverse={seller} />
-      <details className="premiumSidebarDetails" open><summary aria-label={collapseLabel}><PanelLeftClose size={18}/><span>{collapseLabel}</span></summary><nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={19} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
+      <details className="premiumSidebarDetails" open><summary aria-label={collapseLabel}><PanelLeftClose size={18}/><span>{collapseLabel}</span></summary><nav aria-label={items[0]?.label}>{items.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} prefetch={href.includes("/dashboard") ? false : undefined} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={19} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
       <form action="/api/auth/logout" method="post"><button type="submit"><LogOut size={19} aria-hidden="true"/><span>{logoutLabel}</span></button></form>
     </aside>
-    <details className="premiumMobileDrawer"><summary><Menu size={20}/><span>{menuLabel}</span></summary><nav aria-label={mobileMenuItems[0]?.label}>{mobileMenuItems.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
-    <nav className={`premiumDashboardMobileNav${seller ? " isSeller" : ""}`} aria-label={items[0]?.label}>{items.slice(0, 5).map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav>
+    <details className="premiumMobileDrawer"><summary><Menu size={20}/><span>{menuLabel}</span></summary><nav aria-label={mobileMenuItems[0]?.label}>{mobileMenuItems.map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} prefetch={href.includes("/dashboard") ? false : undefined} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav></details>
+    <nav className={`premiumDashboardMobileNav${seller ? " isSeller" : ""}`} aria-label={items[0]?.label}>{items.slice(0, 5).map(({ label, href, icon: Icon, active, badge }) => <Link className={active ? "isActive" : ""} href={href} prefetch={href.includes("/dashboard") ? false : undefined} aria-current={active ? "page" : undefined} key={`${href}-${label}`}><Icon size={20} aria-hidden="true"/><span>{label}</span>{Boolean(badge) && <b>{badge}</b>}</Link>)}</nav>
   </>;
 }
 
@@ -24,7 +24,7 @@ export function DashboardHeader({ firstName, lastName, eyebrow, homeHref, notifi
 
 export function DashboardStatCard({ label, value, hint, href, icon: Icon, tone = "green" }: { label: string; value: string | number; hint?: string; href?: string; icon: ComponentType<LucideProps>; tone?: "green" | "mint" | "blue" | "amber" }) {
   const content = <><div className={`premiumStatIcon tone-${tone}`}><Icon size={21} aria-hidden="true"/></div><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</>;
-  return href ? <Link className="premiumStatCard" href={href}>{content}</Link> : <article className="premiumStatCard">{content}</article>;
+  return href ? <Link className="premiumStatCard" href={href} prefetch={href.includes("/dashboard") ? false : undefined}>{content}</Link> : <article className="premiumStatCard">{content}</article>;
 }
 
 export function DashboardSection({ title, description, action, children, id }: { title: string; description?: string; action?: ReactNode; children: ReactNode; id?: string }) {
@@ -32,7 +32,7 @@ export function DashboardSection({ title, description, action, children, id }: {
 }
 
 export function DashboardQuickAction({ label, description, href, icon: Icon, primary = false }: { label: string; description?: string; href: string; icon: ComponentType<LucideProps>; primary?: boolean }) {
-  return <Link className={`premiumQuickAction${primary ? " isPrimary" : ""}`} href={href}><span><Icon size={21} aria-hidden="true"/></span><div><strong>{label}</strong>{description && <small>{description}</small>}</div></Link>;
+  return <Link className={`premiumQuickAction${primary ? " isPrimary" : ""}`} href={href} prefetch={href.includes("/dashboard") ? false : undefined}><span><Icon size={21} aria-hidden="true"/></span><div><strong>{label}</strong>{description && <small>{description}</small>}</div></Link>;
 }
 
 export function DashboardEmptyState({ title, description, action, headingLevel = "h3" }: { title: string; description: string; action?: ReactNode; headingLevel?: "h1" | "h2" | "h3" }) {
