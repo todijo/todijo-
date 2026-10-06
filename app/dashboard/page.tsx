@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
+import { headers } from "next/headers";
 import { Bell, Boxes, CreditCard, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
 import { DashboardEmptyState, DashboardHeader, DashboardQuickAction, DashboardSection, DashboardSidebar, DashboardStatCard, DashboardStatusBadge, type DashboardNavItem } from "@/components/DashboardUI";
 import StripeConnectSection from "@/components/StripeConnectSection";
@@ -132,14 +133,16 @@ async function SellerDashboardSecondarySections({metrics,locale,activeStore,stor
   </>;
 }
 
-export default async function DashboardPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
+export default async function DashboardPage({
+  const traceHeaders = await headers();
+  console.info("[dashboard-trace]", JSON.stringify({ phase:"dashboard-enter", pathname:traceHeaders.get("x-todijo-pathname"), rsc:traceHeaders.get("rsc")==="1" }));searchParams}:{searchParams:Promise<{store?:string}>}) {
   const [t, p, s, common, ordersText, privacy, transparency, compliance, verification, auth, locale, session] = await Promise.all([
     getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
     getTranslations("Common"), getTranslations("Orders"),
     getTranslations("Privacy"), getTranslations("SellerTransparency"), getTranslations("Compliance"),getTranslations("SellerBusinessVerification"), getTranslations("Auth"),
     getLocale(), dashboardData(readSession()),
   ]);
-  if (!session) redirect("/login");
+  if (!session) { console.info("[dashboard-trace]", JSON.stringify({phase:"dashboard-redirect",reason:"no-session",target:"/login"})); redirect("/login"); }
   const teamCopy=sellerTeamCopy(locale);
 
   const user = await dashboardData(prisma.user.findUnique({
@@ -151,20 +154,24 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
       store: { select: sellerStoreSelect },
     },
   }));
-  if (!user) redirect("/login");
+  if (!user) { console.info("[dashboard-trace]", JSON.stringify({phase:"dashboard-redirect",reason:"no-user",target:"/login"})); redirect("/login"); }
 
   const isSeller = dashboardAudience(user.role) === "seller";
+  console.info("[dashboard-trace]", JSON.stringify({phase:"dashboard-user",role:user.role,isSeller,emailVerified:user.emailVerified}));
   const requestedStore=(await searchParams).store;
   const [storeChoices,principals]=isSeller?await dashboardData(Promise.all([sellerStoreChoices(prisma,session.userId),sellerPrincipals(prisma,session.userId)])):[[],[]];
   const principal=principals.find(item=>item.owner)??principals[0]??null;
-  if(isSeller&&requestedStore&&requestedStore!=="all"&&!storeChoices.some(store=>store.id===requestedStore))redirect(`/${locale}/dashboard`);
+  if(isSeller&&requestedStore&&requestedStore!=="all"&&!storeChoices.some(store=>store.id===requestedStore)){console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"invalid-store",target:`/${locale}/dashboard`}));redirect(`/${locale}/dashboard`);}
   const ownedStoreChoices=principal?.owner?storeChoices.filter(store=>store.businessId===principal.businessId):[];
   const selectedStoreId=isSeller?(requestedStore&&requestedStore!=="all"?requestedStore:ownedStoreChoices.length===1?ownedStoreChoices[0]?.id:!principal?.owner?storeChoices[0]?.id:null):null;
   const activeStore=selectedStoreId?await dashboardData(prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect})):user.store;
-  if (isSeller && !user.emailVerified) redirect(`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`);
+  if (isSeller && !user.emailVerified) { const target=`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`; console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-email-unverified",target})); redirect(target); }
   if (isSeller && (!activeStore || (activeStore.onboardingStep < 4 && activeStore.onboardingStatus !== "PENDING_REVIEW"))) {
-    redirect(`/${locale}/seller/onboarding`);
+    const target=`/${locale}/seller/onboarding`;
+    console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-onboarding-incomplete",target,hasActiveStore:Boolean(activeStore),onboardingStep:activeStore?.onboardingStep??null,onboardingStatus:activeStore?.onboardingStatus??null}));
+    redirect(target);
   }
+  console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-state",locale,isSeller,requestedStore:requestedStore??null,storeChoices:storeChoices.length,principals:principals.length,hasActiveStore:Boolean(activeStore),onboardingStep:activeStore?.onboardingStep??null,onboardingStatus:activeStore?.onboardingStatus??null}));
   const selectedPrincipal=activeStore?principals.find(item=>item.storeIds.includes(activeStore.id))??null:principal;
   const hasSellerPermission=(permission:TeamPermission)=>Boolean(selectedPrincipal&&(selectedPrincipal.owner||selectedPrincipal.permissions.includes(permission)));
   const canViewProducts=hasSellerPermission("PRODUCT_VIEW");
@@ -198,6 +205,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const sellerMobileNav = sellerNav;
 
   if (!isSeller) {
+    console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-render",audience:"buyer"}));
     const orders = await dashboardData(listBuyerOrders(prisma, session.userId));
     const pending = orders.filter((order) => ["PENDING", "PAID", "PROCESSING", "SHIPPED"].includes(order.status)).length;
     const delivered = orders.filter((order) => order.status === "DELIVERED").length;
@@ -232,6 +240,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   }
 
   if(principal?.owner&&ownedStoreChoices.length>1&&!selectedStoreId){
+    console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-render",audience:"seller-all-stores",storeCount:ownedStoreChoices.length}));
     const ids=ownedStoreChoices.map(store=>store.id);
     const [productCount,groups,orderCount,business,commercialPlan]=await dashboardData(Promise.all([
       prisma.product.count({where:{storeId:{in:ids}}}),
@@ -267,8 +276,9 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     </main>
   }
 
-  if (!activeStore) return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={paths.dashboard} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}<FreeSellerStartCard locale={locale} noStore/><DashboardEmptyState headingLevel="h1" title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/onboarding`}>{t("createShop")}</Link>}/>{principal?.owner&&<StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>}</div></div></main>;
+  if (!activeStore) { console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-render",audience:"seller-no-store"})); return <main className="premiumDashboard premiumSellerDashboard"><DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/><div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={paths.dashboard} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}<FreeSellerStartCard locale={locale} noStore/><DashboardEmptyState headingLevel="h1" title={t("openShop")} description={t("openShopText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/onboarding`}>{t("createShop")}</Link>}/>{principal?.owner&&<StripeConnectSection initialStatus={{ connected: Boolean(user.stripeAccountId), onboardingComplete: user.stripeOnboardingComplete, chargesEnabled: user.stripeChargesEnabled, payoutsEnabled: user.stripePayoutsEnabled }}/>}</div></div></main>; }
 
+  console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-render",audience:"seller-store",onboardingStep:activeStore.onboardingStep,onboardingStatus:activeStore.onboardingStatus}));
   const dashboardMetrics = loadSellerDashboardMetrics(session.userId, activeStore.id, { products: canViewProducts, orders: canViewOrders, analytics: canViewAnalytics, sales: canViewSales });
   const profileFields = [activeStore.name, activeStore.description, activeStore.logo, activeStore.banner, activeStore.city, activeStore.country];
   const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
