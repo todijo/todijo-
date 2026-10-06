@@ -140,11 +140,16 @@ test("authenticated Admin and seller dashboards leave skeleton loading and rende
     await authenticate(page, fixture.id);
     const response = await page.goto("/en/dashboard");
     expect(response?.ok(), `${fixture.id} dashboard response`).toBeTruthy();
-    await expect(page.getByRole("heading", { level: 1, name: new RegExp(fixture.firstName, "i") })).toBeVisible({ timeout: 20_000 });
-    if (fixture === dashboardFixtures[0]) await dismissCookieConsent(page);
+    if (fixture.role === "ADMIN") {
+      await expect(page).toHaveURL(/\/en\/adm-barewbar-182203$/);
+      await expect(page.locator("main.adminPage")).toBeVisible({ timeout: 20_000 });
+      await dismissCookieConsent(page);
+    } else {
+      await expect(page.getByRole("heading", { level: 1, name: new RegExp(fixture.firstName, "i") })).toBeVisible({ timeout: 20_000 });
+      await expect(page).toHaveURL(/\/en\/dashboard$/);
+    }
     await expect(page.locator("main[aria-busy='true']")).toHaveCount(0);
     await expect(page.locator(".dashboardSkeleton")).toHaveCount(0);
-    await expect(page).toHaveURL(/\/en\/dashboard$/);
   }
 
   await authenticate(page, "dashboard-pro");
