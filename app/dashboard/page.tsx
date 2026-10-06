@@ -155,6 +155,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     },
   }));
   if (!user) { console.info("[dashboard-trace]", JSON.stringify({phase:"dashboard-redirect",reason:"no-user",target:"/login"})); redirect("/login"); }
+  if (user.role === "ADMIN") { const target = `/${locale}/adm-barewbar-182203`; console.info("[dashboard-trace]", JSON.stringify({phase:"dashboard-redirect",reason:"admin-entry",target})); redirect(target); }
 
   const isSeller = dashboardAudience(user.role) === "seller";
   console.info("[dashboard-trace]", JSON.stringify({phase:"dashboard-user",role:user.role,isSeller,emailVerified:user.emailVerified}));
