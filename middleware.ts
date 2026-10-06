@@ -67,10 +67,11 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-todijo-locale", pathLocale);
   requestHeaders.set("x-todijo-pathname", request.nextUrl.pathname);
+  const isLocalizedDashboard = segments.length === 2 && segments[1] === "dashboard";
   const isLocalizedConnectCallback = segments.length === 3 && segments[1] === "connect" && ["success", "refresh"].includes(segments[2]);
   const isLocalizedBuyerOrders = [3, 4].includes(segments.length) && segments[1] === "account" && segments[2] === "orders";
   const isLocalizedBuyerAddresses = segments.length === 3 && segments[1] === "account" && segments[2] === "addresses";
-  const response = isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses
+  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   if (request.cookies.get(localeCookie)?.value !== pathLocale) {

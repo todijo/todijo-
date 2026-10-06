@@ -78,3 +78,16 @@ test("dashboard links do not prefetch rewritten dashboard routes", () => {
   assert.match(marketplaceHeader, /prefetch=\{accountName \? false : undefined\}/);
   assert.match(siteHeader, /prefetch=\{accountName \? false : undefined\}/);
 });
+
+
+test("localized dashboard bypasses middleware rewrite and reuses the canonical dashboard implementation", () => {
+  const middleware = readFileSync("middleware.ts", "utf8");
+  const localizedPage = readFileSync("app/[locale]/dashboard/page.tsx", "utf8");
+  const localizedLoading = readFileSync("app/[locale]/dashboard/loading.tsx", "utf8");
+  const localizedError = readFileSync("app/[locale]/dashboard/error.tsx", "utf8");
+  assert.match(middleware, /isLocalizedDashboard = segments\.length === 2 && segments\[1\] === "dashboard"/);
+  assert.match(middleware, /isLocalizedDashboard \|\| isLocalizedConnectCallback/);
+  assert.match(localizedPage, /export \{ dynamic, default \} from "\.\.\/\.\.\/dashboard\/page"/);
+  assert.match(localizedLoading, /export \{ default \} from "\.\.\/\.\.\/dashboard\/loading"/);
+  assert.match(localizedError, /"use client"/);
+});
