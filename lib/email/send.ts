@@ -56,6 +56,13 @@ export async function sendSellerTeamInvitationEmail(input:{to:string;locale:stri
   await sendTodijoMail({to:input.to,subject:copy.invitationSubject,...message});
 }
 
+export async function sendSellerReviewAdminEmail(input:{to:string}){
+  const subject="Nouvelle vérification vendeur en attente";
+  const body="Un vendeur a terminé son inscription et attend votre vérification dans l’administration Todijo.";
+  const message=layout("fr","Admin",{preview:subject,heading:"Demande de vérification vendeur",body,ctaLabel:"Vérification des vendeurs",ctaUrl:`${publicAppUrl()}/adm-barewbar-182203/seller-review`});
+  await sendTodijoMail({to:input.to,subject,...message});
+}
+
 export async function sendSellerSubscriptionReminderEmail(input:{to:string;firstName:string;locale:string;plan:string;periodEnd:Date;entitlementLost:boolean}){
   const locale=sellerSubscriptionReminderLocale(input.locale),copy=sellerSubscriptionReminderCopy(locale),values={plan:input.plan,date:new Intl.DateTimeFormat(locale,{dateStyle:"long",timeZone:"UTC"}).format(input.periodEnd)};
   const subject=formatSellerSubscriptionReminder(copy.subject,values),body=formatSellerSubscriptionReminder(input.entitlementLost?copy.lost:copy.upcoming,values);

@@ -1,5 +1,6 @@
 import {Prisma,type PrismaClient} from "@prisma/client";
-import {requireStoreCapability,SellerCapabilityError}from"./seller-business-access";
+import {SellerCapabilityError}from"./seller-business-access";
+import {requireProductCategoryScope}from"./seller-team-product-scope";
 import {appendSellerBusinessAudit}from"./seller-business-audit";
 
 export class ProductRemovalError extends Error{constructor(public readonly code:"AUTH_REQUIRED"|"PRODUCT_REMOVE_FORBIDDEN"|"PRODUCT_NOT_FOUND"|"SELLER_ACCOUNT_INACTIVE",public readonly status:number){super(code);}}
@@ -11,12 +12,12 @@ export async function removeProductListing(db:PrismaClient,session:{userId:strin
   return db.$transaction(async tx=>{
     const [actor,product]=await Promise.all([
       tx.user.findUnique({where:{id:session.userId},select:{id:true,role:true,deactivatedAt:true,sellerSuspendedAt:true}}),
-      tx.product.findUnique({where:{id:productId},select:{id:true,storeId:true,removedAt:true,store:{select:{ownerId:true}},_count:{select:{orderItems:true,conversations:true,reviews:true,reports:true}}}}),
+      tx.product.findUnique({where:{id:productId},select:{id:true,storeId:true,category:true,removedAt:true,store:{select:{ownerId:true}},_count:{select:{orderItems:true,conversations:true,reviews:true,reports:true}}}}),
     ]);
     if(!actor)throw new ProductRemovalError("AUTH_REQUIRED",401);
     if(!product)throw new ProductRemovalError("PRODUCT_NOT_FOUND",404);
     const admin=actor.role==="ADMIN";
-    let principal=null;if(!admin)try{principal=await requireStoreCapability(tx,actor.id,product.storeId,"PRODUCT_DELETE")}catch(error){if(error instanceof SellerCapabilityError)throw new ProductRemovalError("PRODUCT_REMOVE_FORBIDDEN",403);throw error}
+    let principal=null;if(!admin)try{principal=await requireProductCategoryScope(tx,actor.id,product.storeId,"PRODUCT_DELETE",product.category)}catch(error){if(error instanceof SellerCapabilityError)throw new ProductRemovalError("PRODUCT_REMOVE_FORBIDDEN",403);throw error}
     if(!admin&&(actor.role!=="SELLER"||actor.deactivatedAt||actor.sellerSuspendedAt))throw new ProductRemovalError("SELLER_ACCOUNT_INACTIVE",403);
     const protectedHistory=Object.values(product._count).some(count=>count>0);
     if(product.removedAt)return{productId,outcome:"ALREADY_REMOVED",protectedHistory};

@@ -61,7 +61,7 @@ test("Admin seller readiness displays localized known states and preserves unkno
   assert.equal(sellerReviewStateLabel("fr", "verification", "INSEE_NEW_STATE"), "État inconnu (INSEE_NEW_STATE)");
   assert.equal(sellerReviewStateLabel("en", "vat", "REGISTERED"), "Registered");
   const page = readFileSync(join(process.cwd(), "app/adm-barewbar-182203/seller-review/page.tsx"), "utf8");
-  assert.match(page, /stateLabel\("verification", store\.business\?\.inseeVerificationState\)/);
+  assert.match(page, /stateLabel\("verification",\s*store\.business\?\.inseeVerificationState\)/);
   assert.match(page, /countryLabel\(store\.country\)/);
   assert.doesNotMatch(page, /\{store\.onboardingStatus\}|\{store\.owner\.role\}|\{store\.vatStatus\}/);
 });

@@ -7,7 +7,7 @@ import { SellerPageHeader, SellerStatusBadge } from "@/components/SellerControlP
 import EditProductForm from "./EditProductForm";
 import ProductVariantEditor from "@/components/ProductVariantEditor";
 import { serializeProductVariantForEditor } from "@/lib/product-variants";
-import { requireStoreCapability } from "@/lib/seller-business-access";
+import { requireProductCategoryScope } from "@/lib/seller-team-product-scope";
 import { canPublish } from "@/lib/seller-subscription";
 import SupplierContentInspection from "@/components/SupplierContentInspection";
 import { proposedExistingSupplierContent } from "@/lib/product-content";
@@ -29,7 +29,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     store:{select:{id:true,name:true,slug:true,status:true,country:true,businessRegistrationId:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingMinDays:true,shippingMaxDays:true,shippingWorldwide:true,shippingCountries:true,subscription:{select:{status:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},owner:{select:{firstName:true,lastName:true}}}},
   }});
   if (!product) notFound();
-  try{await requireStoreCapability(prisma,session.userId,product.store.id,"PRODUCT_VIEW")}catch{notFound()}
+  try{await requireProductCategoryScope(prisma,session.userId,product.store.id,"PRODUCT_VIEW",product.category)}catch{notFound()}
   const supplierContent=product.supplierLink?proposedExistingSupplierContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink.sourceMetadata}):null;
   const labels = { dashboard:p("nav.dashboard"),products:p("nav.products"),orders:p("nav.orders"),messages:p("nav.messages"),statistics:p("nav.statistics"),revenue:p("nav.revenue"),reviews:p("nav.reviews"),store:p("nav.store"),settings:p("nav.settings"),notifications:p("notifications"),eyebrow:p("seller.eyebrow"),logout:common("logout"),menu:dashboardText("menu"),collapse:dashboardText("collapse"),addProduct:p("nav.addProduct") };
   return <SellerDashboardLayout locale={locale} storeSlug={product.store.slug} firstName={product.store.owner.firstName} lastName={product.store.owner.lastName} labels={labels} active="products" canAddProduct={canPublish(product.store)}>

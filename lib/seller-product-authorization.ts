@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma, PrismaClient, TeamPermission } from "@prisma/client";
 import { requireStoreCapability } from "./seller-business-access";
+import { requireProductCategoryScope } from "./seller-team-product-scope";
 
 type Db=PrismaClient|Prisma.TransactionClient;
 const same=(left:unknown,right:unknown)=>JSON.stringify(left)===JSON.stringify(right);
@@ -30,7 +31,8 @@ export function productUpdatePermissions(current:ProductAuthorizationSnapshot,bo
 }
 
 export async function requireProductPermissions(db:Db,userId:string|undefined|null,productId:string,permissions:TeamPermission[]){
- const product=await db.product.findUnique({where:{id:productId},select:{storeId:true}});if(!product)return null;
+ const product=await db.product.findUnique({where:{id:productId},select:{storeId:true,category:true}});if(!product)return null;
  for(const permission of permissions)await requireStoreCapability(db,userId,product.storeId,permission);
+ await requireProductCategoryScope(db,userId,product.storeId,permissions[0]??"PRODUCT_VIEW",product.category);
  return product;
 }
