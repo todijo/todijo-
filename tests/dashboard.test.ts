@@ -91,3 +91,13 @@ test("localized dashboard bypasses middleware rewrite and reuses the canonical d
   assert.match(localizedLoading, /export \{ default \} from "\.\.\/\.\.\/dashboard\/loading"/);
   assert.match(localizedError, /"use client"/);
 });
+
+
+test("admin dashboard entry bypasses seller onboarding logic", () => {
+  const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
+  const adminRedirect = 'if (user.role === "ADMIN")';
+  const sellerAudience = 'const isSeller = dashboardAudience(user.role) === "seller"';
+  assert.ok(dashboardPage.includes(adminRedirect));
+  assert.ok(dashboardPage.indexOf(adminRedirect) < dashboardPage.indexOf(sellerAudience));
+  assert.match(dashboardPage, /adm-barewbar-182203/);
+});
