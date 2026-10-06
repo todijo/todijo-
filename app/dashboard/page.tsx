@@ -133,9 +133,9 @@ async function SellerDashboardSecondarySections({metrics,locale,activeStore,stor
   </>;
 }
 
-export default async function DashboardPage({
+export default async function DashboardPage({searchParams}:{searchParams:Promise<{store?:string}>}) {
   const traceHeaders = await headers();
-  console.info("[dashboard-trace]", JSON.stringify({ phase:"dashboard-enter", pathname:traceHeaders.get("x-todijo-pathname"), rsc:traceHeaders.get("rsc")==="1" }));searchParams}:{searchParams:Promise<{store?:string}>}) {
+  console.info("[dashboard-trace]", JSON.stringify({ phase:"dashboard-enter", pathname:traceHeaders.get("x-todijo-pathname"), rsc:traceHeaders.get("rsc")==="1" }));
   const [t, p, s, common, ordersText, privacy, transparency, compliance, verification, auth, locale, session] = await Promise.all([
     getTranslations("Dashboard"), getTranslations("DashboardPremium"), getTranslations("SellerDashboard"),
     getTranslations("Common"), getTranslations("Orders"),
