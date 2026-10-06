@@ -10,5 +10,6 @@ export default async function VerifyEmailPage({searchParams}:{searchParams:Promi
   const [localeValue,params,session]=await Promise.all([getLocale(),searchParams,readSession()]);
   const locale=isLocale(localeValue)?localeValue:"en";
   const user=session?await prisma.user.findUnique({where:{id:session.userId},select:{email:true,emailVerified:true}}):null;
+  console.info("[dashboard-trace]",JSON.stringify({phase:"verify-email-render",authenticated:Boolean(user),verifiedNow:Boolean(user?.emailVerified),hasNext:Boolean(params.next)}));
   return <VerifyEmailClient locale={locale} status={params.status??"invalid"} authenticated={Boolean(user)} email={user?.email??null} verifiedNow={Boolean(user?.emailVerified)} next={params.next??null}/>;
 }
