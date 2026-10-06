@@ -61,10 +61,10 @@ export default function MarketplaceHeader({ showCategoryNav = true, showFilterDo
         <nav className="marketDesktopActions" aria-label={header("accountNavigation")}>
           <Link className="marketHeaderIconAction" href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined} aria-label={ux("favoritesNav")}><Heart size={20} aria-hidden="true"/><span>{ux("favoritesNav")}</span></Link>
           <CartLink label={common("cart")} className="homeCartLink" />
-          <Link className="marketAccountAction" href={localizedPath(locale, accountName ? "/dashboard" : "/login")}><UserRound size={20} aria-hidden="true"/><span><small>{header("hello")}</small><strong>{accountName ? accountCopy.me : accountCopy.guest}</strong></span><ChevronDown size={14} aria-hidden="true"/></Link>
+          <Link className="marketAccountAction" href={localizedPath(locale, accountName ? "/dashboard" : "/login")} prefetch={accountName ? false : undefined}><UserRound size={20} aria-hidden="true"/><span><small>{header("hello")}</small><strong>{accountName ? accountCopy.me : accountCopy.guest}</strong></span><ChevronDown size={14} aria-hidden="true"/></Link>
           <ShoppingCountrySwitcher className="marketHeaderLanguage"/>
         </nav>
-        <div className="marketMobileActions"><Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-label={accountName ? accountCopy.me : accountCopy.guest}><UserRound size={22} aria-hidden="true"/></Link><CartLink label={common("cart")} className="homeCartLink"/></div>
+        <div className="marketMobileActions"><Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} prefetch={accountName ? false : undefined} aria-label={accountName ? accountCopy.me : accountCopy.guest}><UserRound size={22} aria-hidden="true"/></Link><CartLink label={common("cart")} className="homeCartLink"/></div>
       </div></div>
       {showFilterDock ? <MarketplaceBrowseFilterBar/> : null}
       {showCategoryNav ? desktopPdp ? <div className="marketCategoryStickyBoundary marketHeaderDesktopPdpNavigation"><MarketplaceCategoryNavigation className="marketCategoryNavigationBelowFilters" compactHomepage showStores={false}/><span className="homepageNavTrust"><ShieldCheck size={17} aria-hidden="true"/>{discovery("confidenceTitle")}</span></div> : <MarketplaceCategoryNavigation className={showFilterDock ? "marketCategoryNavigationBelowFilters" : ""}/> : null}
