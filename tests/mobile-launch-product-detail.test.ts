@@ -27,7 +27,9 @@ test("mobile startup shows the complete approved artwork without crop, zoom or a
   assert.match(startup,/src="\/images\/brand\/todijo-pwa-startup\.png\?v=1"/);
   assert.match(startup,/width="941"/);
   assert.match(startup,/height="1672"/);
-  assert.doesNotMatch(startup,/setTimeout|setInterval|MINIMUM_VISIBLE|isExiting|\.decode\(/);\n  assert.match(startup,/document\.readyState === "complete" \|\| image\?\.complete/);\n  assert.match(startup,/image\?\.addEventListener\("error", dismiss/);
+  assert.doesNotMatch(startup,/setTimeout|setInterval|MINIMUM_VISIBLE|isExiting|\.decode\(/);
+  assert.match(startup,/document\.readyState === "complete" \|\| image\?\.complete/);
+  assert.match(startup,/image\?\.addEventListener\("error", dismiss/);
   assert.match(css,/\.mobileStartupArtwork\{display:none\}/);
   assert.match(css,/@media\(max-width:860px\)\{\.mobileStartupArtwork/);
   assert.match(css,/\.mobileStartupArtwork img\{[^}]*width:100%;height:100%[^}]*object-fit:contain;object-position:center/);
