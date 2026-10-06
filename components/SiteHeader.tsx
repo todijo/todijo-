@@ -57,7 +57,7 @@ function LegacySiteHeader({ storeName, storeSlug, buyerMobile = true }: { storeN
           {storeName && storeSlug ? <Link href={localizedPath(locale, `/store/${storeSlug}`)} aria-current={isNavigationActive(pathname, `/store/${storeSlug}`, true) ? "page" : undefined}>{storeName}</Link> : <Link href={`${localizedPath(locale, "/register")}?role=seller`}>{t("sell")}</Link>}
           <Link href={localizedPath(locale, "/messages")} aria-current={isNavigationActive(pathname, "/messages", true) ? "page" : undefined}>{t("messages")}</Link>
           {accountName ? <Link href={localizedPath(locale, "/favorites")} aria-current={isNavigationActive(pathname, "/favorites", true) ? "page" : undefined}>{ux("favoritesNav")}</Link> : null}
-          <Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} aria-current={isNavigationActive(pathname, accountName ? "/dashboard" : "/login", true) ? "page" : undefined}>{accountName ?? t("account")}</Link>
+          <Link href={localizedPath(locale, accountName ? "/dashboard" : "/login")} prefetch={accountName ? false : undefined} aria-current={isNavigationActive(pathname, accountName ? "/dashboard" : "/login", true) ? "page" : undefined}>{accountName ?? t("account")}</Link>
           <CartLink label={t("cart")} />
           <LanguageSwitcher />
         </nav>
