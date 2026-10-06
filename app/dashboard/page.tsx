@@ -8,7 +8,7 @@ import { Bell, Boxes, CreditCard, Home, MessageCircle, Package, Plus, ReceiptTex
 import { DashboardEmptyState, DashboardHeader, DashboardQuickAction, DashboardSection, DashboardSidebar, DashboardStatCard, DashboardStatusBadge, type DashboardNavItem } from "@/components/DashboardUI";
 import StripeConnectSection from "@/components/StripeConnectSection";
 import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer-orders";
-import { dashboardAudience, dashboardPaths } from "@/lib/dashboard";
+import { dashboardAudience, dashboardPaths, sellerDashboardGate } from "@/lib/dashboard";
 import { sellerOrderHistoryWhere } from "@/lib/order-history";
 import { prisma } from "@/lib/prisma";
 import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "@/lib/seller-dashboard";
@@ -165,8 +165,9 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const ownedStoreChoices=principal?.owner?storeChoices.filter(store=>store.businessId===principal.businessId):[];
   const selectedStoreId=isSeller?(requestedStore&&requestedStore!=="all"?requestedStore:ownedStoreChoices.length===1?ownedStoreChoices[0]?.id:!principal?.owner?storeChoices[0]?.id:null):null;
   const activeStore=selectedStoreId?await dashboardData(prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect})):user.store;
-  if (isSeller && !user.emailVerified) { const target=`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`; console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-email-unverified",target})); redirect(target); }
-  if (isSeller && (!activeStore || (activeStore.onboardingStep < 4 && activeStore.onboardingStatus !== "PENDING_REVIEW"))) {
+  const sellerGate=sellerDashboardGate(user.role,user.emailVerified,activeStore);
+  if (sellerGate === "verify-email") { const target=`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`; console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-email-unverified",target})); redirect(target); }
+  if (sellerGate === "seller-onboarding") {
     const target=`/${locale}/seller/onboarding`;
     console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-onboarding-incomplete",target,hasActiveStore:Boolean(activeStore),onboardingStep:activeStore?.onboardingStep??null,onboardingStatus:activeStore?.onboardingStatus??null}));
     redirect(target);

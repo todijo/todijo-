@@ -14,6 +14,7 @@ const databaseUsers = [
 ] as const;
 const dashboardFixtures = [
   { id: "dashboard-admin", firstName: "Dashboard", lastName: "Admin", email: "dashboard-admin@e2e.todijo.test", role: "ADMIN" as const, storeCount: 1, verification: null, pro: false },
+  { id: "dashboard-buyer", firstName: "Dashboard", lastName: "Buyer", email: "dashboard-buyer@e2e.todijo.test", role: "CUSTOMER" as const, storeCount: 0, verification: null, pro: false },
   { id: "dashboard-insee-pending", firstName: "Pending", lastName: "Verification", email: "dashboard-insee-pending@e2e.todijo.test", role: "SELLER" as const, storeCount: 1, verification: "PENDING" as const, pro: false },
   { id: "dashboard-pro", firstName: "Pro", lastName: "Seller", email: "dashboard-pro@e2e.todijo.test", role: "SELLER" as const, storeCount: 1, verification: "VERIFIED" as const, pro: true },
   { id: "dashboard-connect-incomplete", firstName: "Connect", lastName: "Incomplete", email: "dashboard-connect-incomplete@e2e.todijo.test", role: "SELLER" as const, storeCount: 1, verification: "VERIFIED" as const, pro: true },
@@ -38,16 +39,17 @@ test.beforeAll(async () => {
         create: { id: fixture.id, firstName: fixture.firstName, lastName: fixture.lastName, email: fixture.email, role: fixture.role, emailVerified: true, authVersion: 0 },
         update: { firstName: fixture.firstName, lastName: fixture.lastName, email: fixture.email, role: fixture.role, emailVerified: true, authVersion: 0, blockedAt: null, deactivatedAt: null },
       });
-      if (fixture.role !== "SELLER") {
+      if (fixture.role === "ADMIN") {
         const storeId = `${fixture.id}-store-1`;
         await tx.store.upsert({
           where: { id: storeId },
-          create: { id: storeId, name: "Admin managed store", slug: storeId, country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "VERIFIED", onboardingStep: 4 },
-          update: { name: "Admin managed store", country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "VERIFIED", onboardingStep: 4 },
+          create: { id: storeId, name: "Admin managed store", slug: storeId, country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "NOT_STARTED", onboardingStep: 0 },
+          update: { name: "Admin managed store", country: "FR", city: "Paris", contactEmail: fixture.email, ownerId: fixture.id, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "NOT_STARTED", onboardingStep: 0 },
         });
         await tx.user.update({ where: { id: fixture.id }, data: { primaryStoreId: storeId } });
         continue;
       }
+      if (fixture.role === "CUSTOMER") continue;
 
       const businessId = `${fixture.id}-business`;
       await tx.sellerBusiness.upsert({

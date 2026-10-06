@@ -1,12 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "../lib/seller-dashboard";
+import { sellerDashboardGate } from "../lib/dashboard";
 import { sellerOrderHistoryWhere } from "../lib/order-history";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const now = new Date("2026-07-22T12:00:00Z");
 const order = (daysAgo: number, amount: number, status = "PAID") => ({ status, buyerId: `buyer_${daysAgo}`, createdAt: new Date(now.getTime() - daysAgo * 86400000), paidAt: amount ? new Date() : null, stripePaymentIntentId: amount ? "pi" : null, sellerAmount: amount, items: [{ quantity: 2, product: { id: "p1", name: "Product" } }] });
+
+test("Admin with an incomplete managed store bypasses the seller onboarding redirect while incomplete sellers still redirect", () => {
+  const incompleteStore = { onboardingStep: 0, onboardingStatus: "NOT_STARTED" };
+  assert.equal(sellerDashboardGate("ADMIN", true, incompleteStore), null);
+  assert.equal(sellerDashboardGate("SELLER", true, incompleteStore), "seller-onboarding");
+  assert.equal(sellerDashboardGate("SELLER", false, incompleteStore), "verify-email");
+  assert.equal(sellerDashboardGate("SELLER", true, { onboardingStep: 4, onboardingStatus: "VERIFIED" }), null);
+  assert.equal(sellerDashboardGate("CUSTOMER", false, incompleteStore), null);
+});
 
 test("seller period metrics use real current and previous 30 day windows", () => {
   const metrics = sellerPeriodMetrics([order(2, 1200), order(40, 800)], now);
