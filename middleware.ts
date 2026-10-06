@@ -18,6 +18,15 @@ function detectLocale(request: NextRequest): Locale {
 }
 
 export function middleware(request: NextRequest) {
+  const dashboardTracePath = /\/(?:dashboard|seller\/onboarding|verify-email)(?:\/|$)/.test(request.nextUrl.pathname);
+  if (dashboardTracePath) console.info("[dashboard-trace]", JSON.stringify({
+    phase: "middleware-in",
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+    rsc: request.headers.get("rsc") === "1",
+    prefetch: Boolean(request.headers.get("next-router-prefetch") || request.headers.get("purpose") === "prefetch"),
+  }));
   if (request.nextUrl.pathname.startsWith("/api/")) {
     const unsafe = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     const exempt = request.nextUrl.pathname === "/api/stripe/webhook"
@@ -74,6 +83,13 @@ export function middleware(request: NextRequest) {
   const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  if (dashboardTracePath) console.info("[dashboard-trace]", JSON.stringify({
+    phase: "middleware-out",
+    pathname: request.nextUrl.pathname,
+    locale: pathLocale,
+    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses) ? "next" : "rewrite",
+    targetPath: url.pathname,
+  }));
   if (request.cookies.get(localeCookie)?.value !== pathLocale) {
     response.cookies.set(localeCookie, pathLocale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
   }
