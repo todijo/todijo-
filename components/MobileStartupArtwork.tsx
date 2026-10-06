@@ -14,20 +14,26 @@ export default function MobileStartupArtwork() {
     let cancelled = false;
     const image = imageRef.current;
     const dismiss = () => {
-      if (!cancelled) setVisible(false);
-    };
-    const finishWhenReady = async () => {
-      if (document.readyState !== "complete") {
-        await new Promise<void>((resolve) => window.addEventListener("load", () => resolve(), { once: true }));
-      }
-      if (image?.decode) {
-        try { await image.decode(); } catch { /* The loaded image can still paint when decode is unavailable. */ }
-      }
-      window.requestAnimationFrame(dismiss);
+      if (!cancelled) window.requestAnimationFrame(() => {
+        if (!cancelled) setVisible(false);
+      });
     };
 
-    void finishWhenReady();
-    return () => { cancelled = true; };
+    if (document.readyState === "complete" || image?.complete) {
+      dismiss();
+      return () => { cancelled = true; };
+    }
+
+    window.addEventListener("load", dismiss, { once: true });
+    image?.addEventListener("load", dismiss, { once: true });
+    image?.addEventListener("error", dismiss, { once: true });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", dismiss);
+      image?.removeEventListener("load", dismiss);
+      image?.removeEventListener("error", dismiss);
+    };
   }, []);
 
   if (!visible) return null;
