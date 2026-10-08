@@ -134,7 +134,7 @@ test("production-build closure confirmation, buyer access, reactivation and stoc
   await expect(page.getByText(/26\.99/)).toBeVisible();
   await expect(page.getByText(sellerLifecycleCopy("en").trialOffer)).toHaveCount(0);
   await page.getByRole("button", { name: sellerLifecycleCopy("en").restoreRenewal }).click();
-  const renewalPrompt = page.getByRole("group");
+  const renewalPrompt = page.locator(".sellerRenewalRestore [role=group]");
   await expect(renewalPrompt).toContainText(new Intl.DateTimeFormat("en", { dateStyle: "long" }).format(periodEnd));
   await expect(renewalPrompt).toContainText("€26.99 Monthly");
   expect((await db.sellerSubscription.findUniqueOrThrow({ where: { storeId } })).cancelAtPeriodEnd).toBe(true);
