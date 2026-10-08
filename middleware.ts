@@ -50,7 +50,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url, { status: 404, request: { headers: requestHeaders } });
   }
   const localRewriteLocale = request.nextUrl.searchParams.get("__todijo_local_locale");
-  if (process.env.NODE_ENV !== "production" && isLocale(localRewriteLocale)) {
+  if (isLocale(localRewriteLocale)) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-todijo-locale", localRewriteLocale);
     requestHeaders.set("x-todijo-pathname", `/${localRewriteLocale}${request.nextUrl.pathname}`);
@@ -72,7 +72,7 @@ export function middleware(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   url.pathname = `/${segments.slice(1).join("/")}`;
-  if (process.env.NODE_ENV !== "production") url.searchParams.set("__todijo_local_locale", pathLocale);
+  url.searchParams.set("__todijo_local_locale", pathLocale);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-todijo-locale", pathLocale);
   requestHeaders.set("x-todijo-pathname", request.nextUrl.pathname);

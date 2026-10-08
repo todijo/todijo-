@@ -11,8 +11,8 @@ import { defaultLocale, isLocale } from "@/i18n/config";
 import { createBuyerAddress } from "@/lib/buyer-addresses";
 import { anonymizedEmailHash } from "@/lib/account-status";
 import { allowAuthRequest, authRequestKey } from "@/lib/auth-rate-limit";
-import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
-import { localizedHome } from "@/lib/auth-redirects";
+import { sellerOnboardingPath } from "@/lib/seller-registration-intent";
+import { safeLoginDestination } from "@/lib/auth-redirects";
 
 export async function POST(request: Request) {
   try {
@@ -24,17 +24,17 @@ export async function POST(request: Request) {
     if (!validation.ok) {
       const error = validation.code === "PASSWORD_MISMATCH"
         ? "Les mots de passe ne correspondent pas."
-        : validation.code === "STORE_NAME_REQUIRED"
-          ? "Le nom de la boutique est obligatoire."
-          : "Veuillez compléter tous les champs. Le mot de passe doit contenir au moins 8 caractères.";
+        : "Veuillez compléter tous les champs. Le mot de passe doit contenir au moins 8 caractères.";
       return NextResponse.json({ error, code: validation.code }, { status: 400 });
     }
 
     const input = validation.value;
-    const explicitSellerIntent = input.role === "SELLER" ? explicitSellerRegistrationIntent(body?.plan, body?.interval) : null;
-    if (input.role === "SELLER" && (body?.plan != null || body?.interval != null) && !explicitSellerIntent) {
+    const explicitSellerIntent = input.sellerIntent;
+    if ((body?.plan != null || body?.interval != null) && !explicitSellerIntent) {
       return NextResponse.json({ error: "Choisissez une formule vendeur et une période de facturation valides.", code: "INVALID_SELLER_PLAN" }, { status: 400 });
     }
+    const requestedNext = typeof body?.next === "string" ? safeLoginDestination(body.next, locale) : null;
+    const next = requestedNext ?? (explicitSellerIntent ? sellerOnboardingPath(locale, false, explicitSellerIntent) : `/${locale}/dashboard`);
     if (!await allowAuthRequest(authRequestKey("register", input.email, request))) {
       return NextResponse.json({ error: "Veuillez réessayer plus tard.", code: "RATE_LIMITED" }, { status: 429 });
     }
@@ -45,7 +45,6 @@ export async function POST(request: Request) {
 
     const existing = await prisma.user.findFirst({ where: { OR:[{email: input.email},{anonymizedEmailHash:anonymizedEmailHash(input.email)}] } });
     if (existing) {
-      const next = input.role === "SELLER" ? sellerOnboardingPath(locale, Boolean(await prisma.store.findFirst({ where: { ownerId: existing.id }, select: { id: true } })), explicitSellerIntent) : localizedHome(locale);
       return NextResponse.json({ error: "Un compte existe déjà avec cette adresse e-mail.", code: "ACCOUNT_EXISTS", next: `/${locale}/login?next=${encodeURIComponent(next)}` }, { status: 409 });
     }
 
@@ -55,8 +54,6 @@ export async function POST(request: Request) {
       if (input.role === "CUSTOMER" && input.shippingAddress) await createBuyerAddress(tx, created.id, input.shippingAddress, true);
       return created;
     });
-    const next = user.role === "SELLER" ? sellerOnboardingPath(locale, false, explicitSellerIntent) : localizedHome(locale);
-
     try {
       const rawToken = await issueEmailVerificationToken(user.id);
       const deliveries = await Promise.allSettled([

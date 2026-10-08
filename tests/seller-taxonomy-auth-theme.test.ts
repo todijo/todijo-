@@ -47,12 +47,12 @@ test("seller workspace finishes on cream surfaces with forest navigation and gol
   assert.doesNotMatch(final,/#6d28d9|#7c3aed|#4c1d95|#f0e9ff/);
 });
 
-test("three original optimized authentication artworks are integrated without changing auth contracts",()=>{
+test("buyer-first registration uses the existing optimized buyer artwork and preserves secure auth controls",()=>{
   const assets=["seller-registration.webp","buyer-registration.webp","secure-login.webp"];
   for(const asset of assets){const path=`public/images/auth/${asset}`;assert.equal(existsSync(path),true);assert.ok(statSync(path).size<180_000)}
   const register=source("app/register/RegisterForm.tsx"),login=source("app/login/page.tsx");
-  assert.match(register,/role==="seller"\?"\/images\/auth\/seller-registration\.webp":"\/images\/auth\/buyer-registration\.webp"/);
-  assert.match(register,/setRole\("customer"\)/);assert.match(register,/setRole\("seller"\)/);
+  assert.match(register,/src="\/images\/auth\/buyer-registration\.webp"/);
+  assert.doesNotMatch(register,/setRole|name="role"|seller-registration\.webp/);
   assert.match(login,/\/images\/auth\/secure-login\.webp/);
   assert.match(register,/SocialLoginButtons/);assert.match(login,/postLoginDestination/);
 });

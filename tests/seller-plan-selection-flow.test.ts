@@ -46,11 +46,12 @@ test("canonical seller intent survives password and social auth, store creation,
   const createStore = source("app/seller/create-store/page.tsx");
   const onboardingForm = source("app/seller/onboarding/SellerAddressOnboardingForm.tsx");
   const subscription = source("app/seller/subscription/page.tsx");
-  assert.match(form, /sellerOnboardingPath\(locale, false, sellerIntent\)/);
+  assert.match(form, /sellerIntent \? sellerOnboardingPath\(safeLocale, false, sellerIntent\)/);
   assert.match(form, /<SocialLoginButtons next=/);
   assert.match(social, /explicitNext\?\?params\?\.get\("next"\)/);
   assert.match(route, /code: "ACCOUNT_EXISTS"/);
-  assert.match(route, /explicitSellerRegistrationIntent\(body\?\.plan, body\?\.interval\)/);
+  assert.match(route, /const explicitSellerIntent = input\.sellerIntent/);
+  assert.match(route, /safeLoginDestination\(body\.next, locale\)/);
   assert.match(createStore, /sellerOnboardingDestination/);
   assert.match(onboardingForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(subscription, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);

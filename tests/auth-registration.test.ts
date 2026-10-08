@@ -13,22 +13,21 @@ function validationCode(input: unknown) {
   return result.ok ? undefined : result.code;
 }
 
-test("registration validation requires matching passwords and never persists confirmation or Turnstile data", () => {
-  const result = validateRegistrationInput(validInput);
+test("simple registration creates only a normal buyer and does not require role, address, phone, or password confirmation", () => {
+  const result = validateRegistrationInput({ firstName: "Ada", lastName: "Lovelace", email: "ADA@EXAMPLE.COM", password: "password-123", turnstileToken: "token" });
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.value.role, "CUSTOMER");
   assert.equal(result.value.email, "ada@example.com");
-  assert.equal(result.value.shippingAddress?.country,"FR");
-  assert.deepEqual(registrationPersistenceData(result.value), { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", role: "CUSTOMER", storeName: null });
+  assert.equal(result.value.shippingAddress, null);
+  assert.deepEqual(registrationPersistenceData(result.value), { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", role: "CUSTOMER" });
   assert.equal("password" in registrationPersistenceData(result.value), false);
   assert.equal(validationCode({ ...validInput, confirmPassword: "different" }), "PASSWORD_MISMATCH");
-  assert.equal(validationCode({ ...validInput, confirmPassword: "" }), "INVALID_FIELDS");
-  assert.equal(validationCode({ ...validInput, role: "seller", storeName: "" }), "STORE_NAME_REQUIRED");
+  assert.equal(validationCode({ firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", password: "password-123", role: "seller", storeName: "Legacy Shop", turnstileToken: "token" }), undefined);
   assert.equal(validationCode({...validInput,shippingAddress:{...validInput.shippingAddress,postalCode:""}}),"INVALID_ADDRESS");
 });
 
-test("buyer registration creates a localized initial shipping address transactionally while seller registration remains unchanged",()=>{const form=readFileSync("app/register/RegisterForm.tsx","utf8"),route=readFileSync("app/api/auth/register/route.ts","utf8"),messages=readFileSync("i18n/buyer-address.ts","utf8");assert.match(form,/role === "customer"[\s\S]*shippingAddress/);assert.match(route,/prisma\.\$transaction/);assert.match(route,/createBuyerAddress\(tx, created\.id/);assert.match(messages,/Renseignez votre adresse avec précision/);assert.equal(validateRegistrationInput({...validInput,role:"seller",storeName:"Ada Shop",shippingAddress:undefined}).ok,true)});
+test("web registration stays simple while an explicitly supplied optional shipping address remains supported",()=>{const form=readFileSync("app/register/RegisterForm.tsx","utf8"),route=readFileSync("app/api/auth/register/route.ts","utf8");assert.doesNotMatch(form,/registrationAddress|addressLine1|recipientName|name="role"|storeName/);assert.match(route,/if \(input\.role === "CUSTOMER" && input\.shippingAddress\) await createBuyerAddress\(tx, created\.id, input\.shippingAddress, true\)/);assert.equal(validateRegistrationInput({...validInput,shippingAddress:undefined}).ok,true);assert.equal(validateRegistrationInput(validInput).ok,true)});
 
 test("Turnstile verification fails closed for missing, rejected, malformed, and unavailable verification", async () => {
   const accepted = await verifyTurnstileTokenWith("token", "secret", async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
@@ -52,7 +51,7 @@ test("registration consumes a Turnstile token once and keeps the server verifica
   assert.ok(route.indexOf("verifyTurnstileToken(input.turnstileToken)") < route.indexOf("prisma.user.findFirst"));
 });
 
-test("seller registration intent is canonical, localized, and fails closed for forged values", () => {
+test("legacy plan query remains validated and its seller intent is deferred without creating a seller account", () => {
   assert.deepEqual(sellerRegistrationIntent("pro", undefined), { plan: "pro", interval: "monthly" });
   assert.deepEqual(sellerRegistrationIntent("plus", "annual"), { plan: "plus", interval: "annual" });
   assert.equal(explicitSellerRegistrationIntent("pro", undefined), null);
@@ -62,10 +61,10 @@ test("seller registration intent is canonical, localized, and fails closed for f
   assert.equal(sellerRegistrationIntentQuery(null), "");
   assert.equal(sellerOnboardingPath("fr", false, { plan: "pro", interval: "annual" }), "/fr/seller/onboarding?plan=pro&interval=annual");
   assert.equal(sellerOnboardingPath("ku", true, { plan: "pro", interval: "monthly" }), "/ku/seller/subscription?plan=pro&interval=monthly");
-  assert.equal(validationCode({ ...validInput, role: "seller", storeName: "Ada Shop", plan: "forged", interval: "monthly", shippingAddress: undefined }), "INVALID_SELLER_PLAN");
+  assert.equal(validationCode({ ...validInput, plan: "forged", interval: "monthly", shippingAddress: undefined }), "INVALID_SELLER_PLAN");
   const accepted = validateRegistrationInput({ ...validInput, role: "seller", storeName: "Ada Shop", plan: "pro", interval: "annual", shippingAddress: undefined });
   assert.equal(accepted.ok, true);
-  if (accepted.ok) assert.deepEqual(accepted.value.sellerIntent, { plan: "pro", interval: "annual" });
+  if (accepted.ok) { assert.deepEqual(accepted.value.sellerIntent, { plan: "pro", interval: "annual" }); assert.equal(accepted.value.role,"CUSTOMER"); }
 });
 
 test("seller intent survives registration and onboarding without granting an entitlement", () => {
@@ -76,11 +75,12 @@ test("seller intent survives registration and onboarding without granting an ent
   const createForm = readFileSync("app/seller/create-store/CreateStoreForm.tsx", "utf8");
   const subscriptionPage = readFileSync("app/seller/subscription/page.tsx", "utf8");
   const checkout = readFileSync("app/api/seller/subscription/checkout/route.ts", "utf8");
-  assert.match(form, /plan: role === "seller" \? params\?\.get\("plan"\)/);
+  assert.match(form, /next: registrationNext/);
+  assert.doesNotMatch(form, /setRole|name="role"|role:\s*role/);
   assert.match(route, /code: "ACCOUNT_EXISTS"/);
-  assert.match(route, /sellerOnboardingPath\(locale, Boolean\(/);
-  assert.match(route, /sellerOnboardingPath\(locale, false, explicitSellerIntent\)/);
-  assert.match(registerPage, /session\.role !== "ADMIN"/);
+  assert.match(route, /safeLoginDestination\(body\.next, locale\)/);
+  assert.match(route, /createSession\(\{ userId: user\.id, role: user\.role/);
+  assert.match(registerPage, /query\.next \? safeLoginDestination/);
   assert.match(createPage, /explicitSellerRegistrationIntent\(query\.plan, query\.interval\)/);
   assert.match(createForm, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
   assert.match(subscriptionPage, /initialPlanId=\{sellerIntent\?\.plan \?\? null\}/);
@@ -112,7 +112,7 @@ test("login and registration entry points preserve localized defaults and canoni
   assert.match(loginPage, /postLoginDestination\(data\.role, params\?\.get\("next"\) \?\? null, locale as Locale\)/);
   assert.match(loginLayout, /redirect\(localizedHome\(await getLocale\(\)\)\)/);
   assert.match(registerForm, /router\.push\(data\.next \?\? localizedHome\(locale\)\)/);
-  assert.match(registerPage, /redirect\(localizedHome\(locale\)\)/);
+  assert.match(registerPage, /redirect\(query\.next \? safeLoginDestination/);
   assert.match(registerPage, /redirect\(sellerOnboardingPath\(locale, Boolean\(store\), intent\)\)/);
   assert.doesNotMatch(loginLayout, /redirect\("\/dashboard"\)/);
   assert.doesNotMatch(registerPage, /redirect\("\/dashboard"\)/);
