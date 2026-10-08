@@ -12,7 +12,7 @@ function database(order: any, stores = [{ id: "store_1" }], ownerId = "seller_1"
   const notifications: any[] = [];
   const storeOwners: string[] = [];
   const tx = {
-    store: { findUnique: async ({ where }: any) => { const store=stores.find((item)=>item.id===where.id);if(!store)return null;storeOwners.push(ownerId);return{businessId:"business_1",ownerId}; } },
+    store: { findUnique: async ({ where }: any) => { const store=stores.find((item)=>item.id===where.id);if(!store)return null;storeOwners.push(ownerId);return{businessId:"business_1",ownerId,business:null,owner:{role:ownerId.startsWith("admin")?"ADMIN":"SELLER"}}; } },
     order: {
       findUnique: async ({ where }: any) => { assert.equal(where.id, "order_1"); return order; },
       update: async ({ data }: any) => { updates.push(data); return { ...order, ...data, id: "order_1" }; },

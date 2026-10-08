@@ -94,7 +94,7 @@ test("foreign option and option-value identifiers are rejected inside the owned 
   let optionWrites = 0;
   const tx = {
     product: { findFirst: async () => ({ id: "product_a", storeId:"store_a", price:10, options: [], variants: [] }) },
-    store:{findUnique:async()=>({businessId:"business_a",ownerId:"seller_a"})},
+    store:{findUnique:async()=>({businessId:"business_a",ownerId:"seller_a",business:null,owner:{role:"SELLER"}})},
     sellerTeamMembership:{findFirst:async()=>null},
     productOption: { updateMany: async () => { optionWrites += 1; return { count: 0 }; } },
   };

@@ -462,6 +462,7 @@ model User {
   store               Store?   @relation("UserPrimaryStore", fields: [primaryStoreId], references: [id], onDelete: SetNull)
   stores              Store[]  @relation("StoreOwner")
   ownedBusiness       SellerBusiness?
+  sellerClosureTokens SellerClosureToken[]
   teamMemberships     SellerTeamMembership[]
   acceptedTeamInvitations SellerTeamInvitation[] @relation("AcceptedTeamInvitationUser")
   sellerBusinessAuditEvents SellerBusinessAuditEvent[] @relation("SellerBusinessAuditActor")
@@ -852,6 +853,24 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+model SellerClosureToken {
+  id         String    @id @default(cuid())
+  businessId String
+  userId     String
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  emailSentAt DateTime?
+  emailAttemptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  business SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([userId, expiresAt])
+}
+
 model Store {
   id               String       @id @default(cuid())
   name             String       @unique
@@ -945,6 +964,13 @@ model SellerBusiness {
   ownerId        String   @unique
   billingStoreId String?  @unique
   maxStores      Int      @default(1)
+  firstPaidTrialGrantedAt DateTime?
+  sellerClosedAt DateTime?
+  reactivationStockReviewRequired Boolean @default(false)
+  reactivationStockReviewedAt DateTime?
+  stripeCancellationPending Boolean @default(false)
+  stripeCancellationClaimToken String? @unique
+  stripeCancellationClaimedAt DateTime?
   siren          String?  @unique @db.VarChar(9)
   legalBusinessName String? @db.VarChar(160)
   sellerLegalForm SellerLegalForm?
@@ -974,6 +1000,7 @@ model SellerBusiness {
   benefitRequests    SellerBenefitRequest[]
   benefitAuditEvents SellerBenefitAuditEvent[]
   productImports SellerProductImportJob[]
+  closureTokens SellerClosureToken[]
 
   @@index([maxStores])
 }
@@ -1731,6 +1758,7 @@ model SellerSubscription {
   status               SubscriptionStatus @default(INCOMPLETE)
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
+  trialEnd             DateTime?
   cancelAtPeriodEnd    Boolean            @default(false)
   stripeCheckoutSessionId         String?   @unique
   stripeCheckoutUrl               String?

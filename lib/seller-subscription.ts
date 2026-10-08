@@ -13,14 +13,14 @@ export function canPublish(store: {
   sellerType?: SellerType;
   vatStatus?: SellerVatStatus;
   country?: string;
-  business?: { siren?: string | null; inseeVerificationState?: string | null } | null;
+  business?: { siren?: string | null; inseeVerificationState?: string | null; sellerClosedAt?:Date|null; reactivationStockReviewRequired?:boolean } | null;
   establishment?: { siret?: string | null; legalUnitSiren?: string | null; verificationState?: string | null } | null;
   subscription: { status: SubscriptionStatus; currentPeriodEnd?: Date | null } | null;
   accessGrants?: Array<{ source: "ADMIN_GRANTED" | "ADMIN_EXEMPT"; startsAt: Date; endsAt: Date | null }>;
 }, now = new Date(), businessPlan?: SellerPlanId | "admin-exempt" | null) {
   void now;
   const commercialAccess = businessPlan === undefined ? true : businessPlan !== null;
-  return store.status === "ACTIVE" && store.sellerType !== "UNKNOWN" && !(store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") && hasVerifiedFrenchBusiness(store) && commercialAccess;
+  return store.status === "ACTIVE" && !store.business?.sellerClosedAt && !store.business?.reactivationStockReviewRequired && store.sellerType !== "UNKNOWN" && !(store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") && hasVerifiedFrenchBusiness(store) && commercialAccess;
 }
 
 export class SellerSubscriptionError extends Error {
@@ -49,7 +49,7 @@ export async function requirePublishingAccess(db: PrismaClient, userId: string) 
     where: { ownerId: userId },
     select: {
   id: true, currency: true, country: true, businessRegistrationId:true, status: true, sellerType: true, vatStatus: true,
-      business: { select: { siren: true, inseeVerificationState: true } },
+      business: { select: { siren: true, inseeVerificationState: true, sellerClosedAt:true,reactivationStockReviewRequired:true } },
       establishment: { select: { siret: true, legalUnitSiren: true, verificationState: true } },
       owner: { select: { role: true } },
       subscription: { select: { status: true, currentPeriodEnd: true, plan: true } },
@@ -58,6 +58,8 @@ export async function requirePublishingAccess(db: PrismaClient, userId: string) 
     },
   });
   if (!store) throw Object.assign(new SellerSubscriptionError("Create your store first."), { code: "STORE_REQUIRED" });
+  if(store.business?.sellerClosedAt)throw Object.assign(new SellerSubscriptionError("Seller activity is closed."),{code:"SELLER_CLOSED"});
+  if(store.business?.reactivationStockReviewRequired)throw Object.assign(new SellerSubscriptionError("Stock review is required before republishing products."),{code:"REACTIVATION_STOCK_REVIEW_REQUIRED"});
   if (store.sellerType === "UNKNOWN") throw Object.assign(new SellerSubscriptionError("Confirm your seller status in store settings before publishing products."), { code: "SELLER_TYPE_REQUIRED" });
   if (store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") throw Object.assign(new SellerSubscriptionError("Confirm your VAT status in store settings before publishing products."), { code: "VAT_STATUS_REQUIRED" });
   if (!hasVerifiedFrenchBusiness(store)) throw Object.assign(new SellerSubscriptionError("French business verification is required before publishing products."), { code: "BUSINESS_VERIFICATION_REQUIRED" });
@@ -78,8 +80,10 @@ export async function requireProductCreationAccess(db: PrismaClient, userId: str
 export async function requireStorePublishingAccess(db: PrismaClient | Prisma.TransactionClient, userId: string, storeId: string, permission: "PRODUCT_CREATE"|"PRODUCT_PUBLISH" = "PRODUCT_CREATE", productId?: string) {
   await assertSellerActivity(db,userId);
   const principal=await requireStoreCapability(db,userId,storeId,permission);
-  const store=await db.store.findUnique({where:{id:storeId},select:{id:true,currency:true,country:true,businessRegistrationId:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},_count:{select:{products:true}}}});
+  const store=await db.store.findUnique({where:{id:storeId},select:{id:true,currency:true,country:true,businessRegistrationId:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},_count:{select:{products:true}}}});
   if(!store)throw Object.assign(new SellerSubscriptionError("Create your store first."),{code:"STORE_REQUIRED"});
+  if(store.business?.sellerClosedAt)throw Object.assign(new SellerSubscriptionError("Seller activity is closed."),{code:"SELLER_CLOSED"});
+  if(store.business?.reactivationStockReviewRequired)throw Object.assign(new SellerSubscriptionError("Stock review is required before republishing products."),{code:"REACTIVATION_STOCK_REVIEW_REQUIRED"});
   if(store.sellerType==="UNKNOWN")throw Object.assign(new SellerSubscriptionError("Confirm your seller status in store settings before publishing products."),{code:"SELLER_TYPE_REQUIRED"});
   if(store.sellerType==="PROFESSIONAL"&&store.vatStatus==="UNKNOWN")throw Object.assign(new SellerSubscriptionError("Confirm your VAT status in store settings before publishing products."),{code:"VAT_STATUS_REQUIRED"});
   if(!hasVerifiedFrenchBusiness(store))throw Object.assign(new SellerSubscriptionError("French business verification is required before publishing products."),{code:"BUSINESS_VERIFICATION_REQUIRED"});

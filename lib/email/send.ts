@@ -8,6 +8,7 @@ import { sendTodijoMail } from "./transport";
 import { formatSellerSaleCopy, sellerSaleCopy } from "../../i18n/seller-sale-notifications";
 import { sellerTeamCopy } from "../../i18n/seller-team";
 import {formatSellerSubscriptionReminder,sellerSubscriptionReminderCopy,sellerSubscriptionReminderLocale} from "../../i18n/seller-subscription-reminders";
+import { sellerLifecycleCopy } from "../../i18n/seller-lifecycle";
 
 function layout(locale: string, firstName: string, values: { preview: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }) {
   const common = emailCopy(locale);
@@ -54,6 +55,13 @@ export async function sendSellerTeamInvitationEmail(input:{to:string;locale:stri
   const copy=sellerTeamCopy(input.locale),url=new URL(`${localizedHome(input.locale)}/team-invitation`,publicAppUrl());url.searchParams.set("token",input.rawToken);
   const message=layout(input.locale,input.to.split("@")[0]??"",{preview:copy.invitationSubject,heading:copy.invitationHeading,body:copy.invitationBody,ctaLabel:copy.invitationCta,ctaUrl:url.toString()});
   await sendTodijoMail({to:input.to,subject:copy.invitationSubject,...message});
+}
+
+export async function sendSellerClosureConfirmationEmail(input:{to:string;firstName:string;locale:string;rawToken:string}){
+  const copy=sellerLifecycleCopy(input.locale),url=new URL(`${localizedHome(input.locale)}/seller/closure/confirm`,publicAppUrl());
+  url.hash=`token=${encodeURIComponent(input.rawToken)}`;
+  const message=layout(input.locale,input.firstName,{preview:copy.closureSubject,heading:copy.closureSubject,body:copy.closureEmailBody,ctaLabel:copy.closureConfirm,ctaUrl:url.toString()});
+  await sendTodijoMail({to:input.to,subject:copy.closureSubject,...message});
 }
 
 export async function sendSellerReviewAdminEmail(input:{to:string}){

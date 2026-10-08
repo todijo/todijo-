@@ -18,7 +18,7 @@ function accessDb(plan="pro",memberStatus="ACTIVE") {
   const membership = { id: "membership", businessId: "business-team", permissions: ["PRODUCT_VIEW", "ORDER_VIEW"], business: { ownerId: "other-owner",owner:{role:"SELLER"},billingStore:{subscription:{status:"ACTIVE",plan,currentPeriodEnd:new Date("2099-01-01")},accessGrants:[]} }, assignments: [{ storeId: "assigned" }] };
   return {
     store: {
-      findUnique: async ({ where }: any) => stores.find((store) => store.id === where.id) ?? null,
+      findUnique: async ({ where }: any) => {const store=stores.find((item)=>item.id===where.id);return store?{...store,business:null,owner:{role:"SELLER"}}:null;},
       findMany: async ({ where }: any) => where.ownerId?stores.filter((store) => store.ownerId === where.ownerId):stores.filter(store=>where.id.in.includes(store.id)),
     },
     sellerBusiness: { findUnique: async () => null },

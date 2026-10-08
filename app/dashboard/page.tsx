@@ -32,6 +32,7 @@ import { sellerMultiStoreTeaserCopy } from "@/i18n/seller-multi-store-teaser";
 import LockedMultiStoreTeaser from "@/components/LockedMultiStoreTeaser";
 import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
 import { sellerBusinessVerificationMessage } from "@/lib/seller-dashboard-readiness";
+import { sellerLifecycleCopy } from "@/i18n/seller-lifecycle";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -150,6 +151,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     select: {
       firstName: true, lastName: true, email: true, emailVerified: true, role: true,
       sellerOnboardingDraft: { select: { id: true } },
+      ownedBusiness:{select:{sellerClosedAt:true}},
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
       store: { select: sellerStoreSelect },
     },
@@ -232,7 +234,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
                 : <DashboardEmptyState title={p("buyer.emptyOrders")} description={p("buyer.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={homeHref}>{p("browseProducts")}</Link>}/>
               }
             </DashboardSection>
-            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={auth("becomeSeller")} href={`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
+            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={user.ownedBusiness?.sellerClosedAt?sellerLifecycleCopy(locale).reactivationTitle:auth("becomeSeller")} href={user.ownedBusiness?.sellerClosedAt?`/${locale}/seller/reactivate`:`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
           </div>
           <section className="premiumDiscoveryBanner"><div><span>{p("discoverBadge")}</span><h2>{p("discoverTitle")}</h2><p>{p("discoverText")}</p></div><Link href={homeHref}>{p("exploreNow")}</Link></section>
         </div>

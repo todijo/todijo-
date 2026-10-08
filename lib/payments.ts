@@ -336,14 +336,14 @@ async function syncSellerSubscription(
   if (!customerId) throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} has no customer ID.`);
   const existing = await tx.sellerSubscription.findFirst({
     where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: customerId } }, ...(hint.storeId ? [{ storeId: hint.storeId }] : [])] },
-    select: { storeId: true, plan: true, stripePriceId: true, stripeSubscriptionId: true, stripeCheckoutSessionId: true, status: true },
+    select: { storeId: true, plan: true, stripePriceId: true, stripeSubscriptionId: true, stripeCheckoutSessionId: true, status: true,trialEnd:true,cancelAtPeriodEnd:true },
   });
   const authorizedCheckoutReplacement = existing?.status === "INCOMPLETE" && hint.checkoutSessionId && existing.stripeCheckoutSessionId === hint.checkoutSessionId;
   if (existing?.stripeSubscriptionId && existing.stripeSubscriptionId !== subscription.id && !authorizedCheckoutReplacement) throw new Error(`[Stripe webhook ${eventId}] Superseded subscription cannot overwrite the current subscription.`);
   console.info(`[Stripe webhook ${eventId}] Local subscription lookup completed (found=${Boolean(existing)}).`);
   const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
   if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);
-  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true, businessId:true } });
+  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true, businessId:true, business:{select:{sellerClosedAt:true}} } });
   if (!store) throw new Error(`[Stripe webhook ${eventId}] Store ${storeId} does not exist.`);
   if (hint.userId && store.ownerId !== hint.userId) throw new Error(`[Stripe webhook ${eventId}] Checkout user does not own store ${storeId}.`);
   if (store.stripeCustomerId && store.stripeCustomerId !== customerId) throw new Error(`[Stripe webhook ${eventId}] Stripe customer does not match store ${storeId}.`);
@@ -356,16 +356,38 @@ async function syncSellerSubscription(
   const item = subscription.items?.data?.[0];
   const currentPeriodStart = stripeDate(subscription.current_period_start ?? item?.current_period_start);
   const currentPeriodEnd = stripeDate(subscription.current_period_end ?? item?.current_period_end);
+  const trialEnd = stripeDate(subscription.trial_end ?? undefined);
   if (active && !currentPeriodEnd) throw new Error(`[Stripe webhook ${eventId}] Active subscription ${subscription.id} has no current period end.`);
   const commerciallyActive=active&&Boolean(currentPeriodEnd&&currentPeriodEnd>new Date());
+
+  let preserveScheduledCancellation = false;
+  if (existing?.cancelAtPeriodEnd && !subscription.cancel_at_period_end && !["CANCELED", "EXPIRED"].includes(status)) {
+    const latestRenewalDecision = store.businessId ? await tx.sellerBusinessAuditEvent.findFirst({
+      where: { businessId: store.businessId, action: { in: ["SELLER_RENEWAL_CANCELED", "SELLER_RENEWAL_CANCELLATION_SCHEDULED", "SELLER_RENEWAL_RESTORED"] } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { action: true },
+    }) : null;
+    preserveScheduledCancellation = latestRenewalDecision?.action !== "SELLER_RENEWAL_RESTORED";
+  }
+
+  if (store.businessId && (store.business?.sellerClosedAt || preserveScheduledCancellation)) {
+    await tx.sellerBusiness.updateMany({ where: { id: store.businessId, ...(store.business?.sellerClosedAt ? { sellerClosedAt: { not: null } } : {}) }, data: { stripeCancellationPending: !["CANCELED", "EXPIRED"].includes(status) } });
+  }
+
+  if ((status === "TRIALING" || Boolean(subscription.trial_end && existing?.trialEnd)) && store.businessId) {
+    await tx.sellerBusiness.updateMany({
+      where: { id: store.businessId, firstPaidTrialGrantedAt: null },
+      data: { firstPaidTrialGrantedAt: currentPeriodStart ?? new Date() },
+    });
+  }
 
   console.info(`[Stripe webhook ${eventId}] Updating local seller subscription state to ${status}.`);
   const storeUpdate = await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) }, select: { id: true, status: true, stripeCustomerId: true } });
   console.info(`[Stripe webhook ${eventId}] Store subscription state updated (status=${storeUpdate.status}).`);
   const subscriptionUpdate = await tx.sellerSubscription.upsert({
     where: { storeId },
-    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
-    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end) || preserveScheduledCancellation, currentPeriodStart, currentPeriodEnd,trialEnd },
+    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end) || preserveScheduledCancellation, currentPeriodStart, currentPeriodEnd,trialEnd },
   });
   console.info(`[Stripe webhook ${eventId}] Seller subscription record updated (status=${subscriptionUpdate.status}).`);
   const products = commerciallyActive && configuredPlan.plan === "pro" ? { count: 0 } : await enforceSellerPublicationCapacity(tx, storeId, store.businessId);

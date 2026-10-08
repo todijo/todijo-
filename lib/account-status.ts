@@ -61,6 +61,6 @@ export async function performAdminUserAction(db:PrismaClient,session:{userId:str
   return{changed:result.changed,status:result.status};
 }
 
-export async function assertSellerActivity(db:Database,userId:string){const user=await db.user.findUnique({where:{id:userId},select:{sellerSuspendedAt:true,deactivatedAt:true,blockedAt:true,blockExpiresAt:true}});if(!user||user.deactivatedAt||isEffectiveBlock(user)||user.sellerSuspendedAt)throw new AdminAccessError("Seller activity is suspended.",403,"SELLER_SUSPENDED");}
+export async function assertSellerActivity(db:Database,userId:string){const user=await db.user.findUnique({where:{id:userId},select:{sellerSuspendedAt:true,deactivatedAt:true,blockedAt:true,blockExpiresAt:true,ownedBusiness:{select:{sellerClosedAt:true}}}});if(!user||user.deactivatedAt||isEffectiveBlock(user)||user.sellerSuspendedAt)throw new AdminAccessError("Seller activity is suspended.",403,"SELLER_SUSPENDED");if(user.ownedBusiness?.sellerClosedAt)throw new AdminAccessError("Seller activity is closed.",403,"SELLER_CLOSED");}
 
 export function rejectPhysicalUserDeletion():never{throw new AdminAccessError("Physical user deletion is disabled because protected records may exist.",409,"HARD_DELETE_UNSAFE")}
