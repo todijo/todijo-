@@ -69,7 +69,7 @@ test("plan chooser has no checkbox-driven PRO recommendation and marketing copy 
 test("FREE and paid onboarding progress show different step-three meanings while paid review remains explicit", () => {
   const form = source("app/seller/onboarding/SellerAddressOnboardingForm.tsx");
   assert.match(form, /sellerIntent \? journeyCopy\.subscription : journeyCopy\.verification/);
-  assert.match(form, /sellerIntent \? <>{journeyCopy\.noPaymentYet}<br\/>\{journeyCopy\.nextStripe\}<\/> : journeyCopy\.nextFree/);
+  assert.match(form, /sellerIntent \? <>\{journeyCopy\.noPaymentYet\}<br\s*\/>\{journeyCopy\.nextStripe\}<\/>\s*:\s*journeyCopy\.nextFree/);
   assert.match(source("app/seller/subscription/page.tsx"), /journeyCopy\.subscription/);
 });
 

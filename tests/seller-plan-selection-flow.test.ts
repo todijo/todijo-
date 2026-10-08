@@ -5,6 +5,7 @@ import { locales } from "../i18n/config";
 import { sellerPlanSelectionMessages } from "../i18n/seller-plan-selection";
 import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "../lib/seller-registration-intent";
 import { configuredSellerPlan } from "../lib/seller-plans";
+import { sellerRegistrationRequirements } from "../lib/seller-registration-requirements";
 
 const source = (path: string) => readFileSync(path, "utf8");
 
@@ -37,6 +38,16 @@ test("direct seller entry starts FREE without forced paid selection", () => {
   assert.doesNotMatch(source("app/register/page.tsx"), /query\.role === "seller" && !intent/);
   assert.doesNotMatch(source("app/seller/create-store/page.tsx"), /if \(!intent\) redirect/);
   assert.match(source("app/dashboard/page.tsx"), /FreeSellerStartCard/);
+  assert.match(source("app/seller/onboarding/SellerAddressOnboardingForm.tsx"), /sellerIntent \? sellerOnboardingPath\(locale, true, sellerIntent\) : `\/\$\{locale\}\/seller\/subscription`/);
+  assert.match(source("app/seller/subscription/page.tsx"), /<SubscriptionPlans/);
+});
+
+test("FREE, PLUS and PRO share the same seller identity requirements", () => {
+  assert.deepEqual(sellerRegistrationRequirements("FR", "PROFESSIONAL"), { registrationRequired: true, registrationLabel: "siret", vatSupported: true, format: "FR_SIRET" });
+  assert.deepEqual(sellerRegistrationRequirements("FR", "PRIVATE"), { registrationRequired: false, registrationLabel: "siret", vatSupported: true, format: "FR_SIRET" });
+  const onboardingApi = source("app/api/seller/onboarding/route.ts");
+  assert.match(onboardingApi, /sellerRegistrationRequirements\(country, sellerType\)/);
+  assert.doesNotMatch(onboardingApi, /sellerRegistrationRequirements\([^)]*plan/);
 });
 
 test("canonical seller intent survives password and social auth, store creation, and subscription", () => {
