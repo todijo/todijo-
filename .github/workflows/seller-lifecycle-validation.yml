@@ -27,7 +27,7 @@ jobs:
         postgres: ["16", "18"]
     services:
       postgres:
-        image: postgres:${{ matrix.postgres }}
+        image: public.ecr.aws/docker/library/postgres:${{ matrix.postgres }}
         env:
           POSTGRES_USER: lifecycle
           POSTGRES_PASSWORD: lifecycle
@@ -74,7 +74,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey'
     services:
       postgres:
-        image: postgres:16
+        image: public.ecr.aws/docker/library/postgres:16
         env:
           POSTGRES_USER: lifecycle
           POSTGRES_PASSWORD: lifecycle
