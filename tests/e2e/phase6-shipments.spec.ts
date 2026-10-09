@@ -149,6 +149,7 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   await expect(page.getByText("Alpha shipment item", { exact: true })).toHaveCount(0);
   const betaQuantity = betaShipmentForm.locator(".sellerShipmentItem input[type=number]");
   await betaQuantity.fill("1");
+  await betaShipmentForm.getByRole("textbox").nth(1).fill(`PHASE6-BETA-${suffix}`);
   const finalShipmentResponse = page.waitForResponse((response) => response.url().includes(`/api/seller/orders/${orderId}/shipments`) && response.request().method() === "POST");
   await page.getByRole("button", { name: "حفظ الشحنة" }).click();
   expect((await finalShipmentResponse).status()).toBe(200);
