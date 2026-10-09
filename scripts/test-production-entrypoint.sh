@@ -30,6 +30,9 @@ cleanup() {
   if test "${postgres_owned}" = "true" && docker inspect "${postgres_container}" >/dev/null 2>&1; then
     docker rm --force "${postgres_container}" >/dev/null
   fi
+  if test "${postgres_owned}" = "false" && test -n "${POSTGRES_CONTAINER_ID:-}" && docker network inspect "${network}" >/dev/null 2>&1; then
+    docker network disconnect "${network}" "${postgres_container}" >/dev/null 2>&1
+  fi
   if docker network inspect "${network}" >/dev/null 2>&1; then
     docker network rm "${network}" >/dev/null
   fi
@@ -145,9 +148,9 @@ if docker exec "${valid_app_container}" curl --fail --silent --show-error http:/
 fi
 test "$(docker inspect --format '{{.State.Status}}' "${valid_app_container}")" = "running"
 wait_for_health "${valid_app_container}"
-docker exec "${postgres_container}" psql -U todijo -d valid_startup -v ON_ERROR_STOP=1 -Atc \
+docker exec "${postgres_container}" psql -U "${postgres_user}" -d valid_startup -v ON_ERROR_STOP=1 -Atc \
   "SELECT to_regclass('\"DeploymentPipelineProbe\"') IS NOT NULL;" | grep -Fx t
-docker exec "${postgres_container}" psql -U todijo -d valid_startup -v ON_ERROR_STOP=1 -Atc \
+docker exec "${postgres_container}" psql -U "${postgres_user}" -d valid_startup -v ON_ERROR_STOP=1 -Atc \
   "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${valid_migration}' AND finished_at IS NOT NULL;" | grep -Fx 1
 
 concurrent_migration="29990101001000_deployment_pipeline_concurrency"
@@ -169,7 +172,7 @@ docker run --detach --name "todijo-entrypoint-runner-b-${suffix}" --network "${n
   "${concurrent_image}" migrate deploy >/dev/null
 test "$(docker wait "todijo-entrypoint-runner-a-${suffix}")" = "0"
 test "$(docker wait "todijo-entrypoint-runner-b-${suffix}")" = "0"
-docker exec "${postgres_container}" psql -U todijo -d concurrent_startup -v ON_ERROR_STOP=1 -Atc \
+docker exec "${postgres_container}" psql -U "${postgres_user}" -d concurrent_startup -v ON_ERROR_STOP=1 -Atc \
   "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${concurrent_migration}' AND finished_at IS NOT NULL;" | grep -Fx 1
 
 invalid_migration="29990101002000_deployment_pipeline_failure"
