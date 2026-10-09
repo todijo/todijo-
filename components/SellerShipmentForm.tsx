@@ -13,10 +13,11 @@ export function SellerShipmentForm({ orderId, storeId, items }: { orderId: strin
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [shipmentItems, setShipmentItems] = useState(items);
   const [carrier, setCarrier] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
   const requestKey = useRef<string | null>(null);
-  const selectable = items.filter((item) => item.remaining > 0);
+  const selectable = shipmentItems.filter((item) => item.remaining > 0);
 
   function selectAllRemaining() {
     setQuantities(Object.fromEntries(selectable.map((item) => [item.id, item.remaining])));
@@ -37,6 +38,11 @@ export function SellerShipmentForm({ orderId, storeId, items }: { orderId: strin
       });
       if (!response.ok) { if (response.status < 500) requestKey.current = null; setError(orderT("fulfillment.updateError")); return; }
       requestKey.current = null;
+      setShipmentItems((current) => current.map((item) => {
+        const shipped = selected.find((line) => line.orderItemId === item.id)?.quantity ?? 0;
+        return shipped > 0 ? { ...item, previouslyShipped: item.previouslyShipped + shipped, remaining: Math.max(0, item.remaining - shipped) } : item;
+      }));
+      setQuantities((current) => Object.fromEntries(Object.entries(current).map(([itemId, quantity]) => [itemId, selected.some((line) => line.orderItemId === itemId) ? 0 : quantity])));
       router.refresh();
     } catch {
       setError(orderT("fulfillment.updateError"));
