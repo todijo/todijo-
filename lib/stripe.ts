@@ -49,10 +49,15 @@ export type StripeInvoice = {
   created?: number;
   paid?: boolean;
   billing_reason?: string;
+  number?: string | null;
+  amount_paid?: number;
   amount_due?: number;
   currency?: string;
   hosted_invoice_url?: string | null;
+  invoice_pdf?: string | null;
 };
+
+export type StripeInvoicePage = { data: StripeInvoice[]; has_more: boolean };
 
 export type StripeSchedulePhase = {
   start_date: number;
@@ -231,6 +236,12 @@ export function voidSellerUpgradeInvoice(invoiceId: string, idempotencyKey: stri
 
 export function retrieveStripeInvoice(id: string) {
   return stripeRequest<StripeInvoice>(`/invoices/${encodeURIComponent(id)}`);
+}
+
+export function listStripeCustomerInvoices(input: { customerId: string; subscriptionId: string; startingAfter?: string | null; limit?: number }) {
+  const query = new URLSearchParams({ customer: input.customerId, subscription: input.subscriptionId, status: "paid", limit: String(Math.max(1, Math.min(input.limit ?? 100, 100))) });
+  if (input.startingAfter) query.set("starting_after", input.startingAfter);
+  return stripeRequest<StripeInvoicePage>(`/invoices?${query.toString()}`);
 }
 
 export function upgradeSellerStripeSubscription(input: { subscriptionId: string; itemId: string; priceId: string; prorationAt: Date; idempotencyKey: string }) {

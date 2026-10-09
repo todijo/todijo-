@@ -69,6 +69,12 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   const response = await page.goto(`/en/seller/orders?store=${storeA}`);
   expect(response?.ok()).toBeTruthy();
   await expect(page.getByRole("heading", { name: "Record a shipment" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Subscription invoices" })).toBeVisible();
+  const invoiceArchiveResponse = await page.goto("/en/account/invoices");
+  expect(invoiceArchiveResponse?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Subscription invoices" })).toBeVisible();
+  await expect(page.getByText("No subscription invoices are available.", { exact: true })).toBeVisible();
+  await page.goto(`/en/seller/orders?store=${storeA}`);
   const shipmentForm = page.getByRole("region", { name: "Record a shipment" });
   await expect(shipmentForm.getByText("Alpha shipment item", { exact: true })).toBeVisible();
   await expect(page.getByText("Private Beta shipment item", { exact: true })).toHaveCount(0);
@@ -169,4 +175,13 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   const betaShipment = page.locator(".shipmentTrackingCard:visible").filter({ hasText: `PHASE6-BETA-${suffix}` });
   await expect(betaShipment).toContainText("Private Beta shipment item × 1");
   await expect(betaShipment).not.toContainText("Alpha shipment item");
+
+  await db.sellerBusiness.update({ where: { id: businessA }, data: { sellerClosedAt: new Date() } });
+  await db.user.update({ where: { id: sellerA }, data: { role: "CUSTOMER" } });
+  await setSession(page, sellerA, "CUSTOMER");
+  const formerSellerInvoiceResponse = await page.goto("/en/account/invoices");
+  expect(formerSellerInvoiceResponse?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Subscription invoices" })).toBeVisible();
+  await expect(page.getByText("No subscription invoices are available.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Subscription invoices" })).toBeVisible();
 });

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Bell, Home, MessageCircle, ReceiptText, Settings, ShieldCheck, ShoppingCart, Store } from "lucide-react";
+import { Bell, CreditCard, Home, MessageCircle, ReceiptText, Settings, ShieldCheck, ShoppingCart, Store } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { isLocale } from "@/i18n/config";
@@ -7,13 +7,14 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { DashboardHeader, DashboardQuickAction, DashboardSidebar, type DashboardNavItem } from "./DashboardUI";
 import EmailVerificationNotice from "./EmailVerificationNotice";
+import { sellerInvoiceArchiveCopy } from "@/i18n/seller-invoice-archive";
 
-export type BuyerNavigationActive = "dashboard"|"orders"|"messages"|"notifications"|"account"|"cart";
+export type BuyerNavigationActive = "dashboard"|"orders"|"messages"|"notifications"|"account"|"cart"|"invoices";
 
 export default async function BuyerDashboardLayout({children,locale,active}:{children:ReactNode;locale:string;active:BuyerNavigationActive}) {
   const session=await readSession(); if(!session)redirect(`/${locale}/login`);
   const [user,p,s,common,privacy]=await Promise.all([
-    prisma.user.findUnique({where:{id:session.userId},select:{role:true,firstName:true,lastName:true,email:true,emailVerified:true,_count:{select:{notifications:{where:{readAt:null}}}}}}),
+    prisma.user.findUnique({where:{id:session.userId},select:{role:true,firstName:true,lastName:true,email:true,emailVerified:true,ownedBusiness:{select:{id:true}},_count:{select:{notifications:{where:{readAt:null}}}}}}),
     getTranslations("DashboardPremium"),getTranslations("SellerDashboard"),getTranslations("Common"),getTranslations("Privacy"),
   ]);
   if(!user)redirect(`/${locale}/login`); if(user.role!=="CUSTOMER")redirect(`/${locale}/dashboard`);
@@ -21,6 +22,7 @@ export default async function BuyerDashboardLayout({children,locale,active}:{chi
   const items:DashboardNavItem[]=[
     {label:p("nav.dashboard"),href:`/${locale}/dashboard`,icon:Home,active:active==="dashboard"},
     {label:p("nav.orders"),href:`/${locale}/account/orders`,icon:ReceiptText,active:active==="orders"},
+    ...(user.ownedBusiness?[{label:sellerInvoiceArchiveCopy(locale).title,href:`/${locale}/account/invoices`,icon:CreditCard,active:active==="invoices"}]:[]),
     {label:p("nav.messages"),href:`/${locale}/messages`,icon:MessageCircle,badge:unreadMessages,active:active==="messages"},
     {label:p("notifications"),href:`/${locale}/notifications`,icon:Bell,badge:user._count.notifications,active:active==="notifications"},
     {label:common("account"),href:`/${locale}/account`,icon:Settings,active:active==="account"},
