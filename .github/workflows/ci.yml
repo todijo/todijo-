@@ -17,7 +17,7 @@ jobs:
   quality:
     name: Quality gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/todijo_ci?schema=public
       APP_URL: http://localhost:3000
@@ -67,6 +67,29 @@ jobs:
 
       - name: Build production application
         run: npm run build
+
+      - name: Build production image
+        run: docker build --tag todijo-security-phase1 .
+
+      - name: Verify production runtime contents
+        run: |
+          docker run --rm --entrypoint sh todijo-security-phase1 -c '
+            test "$(id -u)" = "1001"
+            test "$(id -g)" = "1001"
+            test -x ./scripts/production-entrypoint.sh
+            test -x ./node_modules/.bin/prisma
+            test -f ./prisma/schema.prisma
+            test -d ./prisma/migrations
+            command -v curl
+          '
+
+      - name: Test migration-gated production startup
+        env:
+          POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: todijo_ci
+        run: bash scripts/test-production-entrypoint.sh todijo-security-phase1
 
   e2e:
     name: Browser smoke tests
@@ -122,29 +145,3 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
-
-  container:
-    name: Container smoke test
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Build production image
-        run: docker build --tag todijo-security-phase1 .
-
-      - name: Verify production runtime contents
-        run: |
-          docker run --rm --entrypoint sh todijo-security-phase1 -c '
-            test "$(id -u)" = "1001"
-            test "$(id -g)" = "1001"
-            test -x ./scripts/production-entrypoint.sh
-            test -x ./node_modules/.bin/prisma
-            test -f ./prisma/schema.prisma
-            test -d ./prisma/migrations
-            command -v curl
-          '
-
-      - name: Test migration-gated production startup
-        run: bash scripts/test-production-entrypoint.sh todijo-security-phase1

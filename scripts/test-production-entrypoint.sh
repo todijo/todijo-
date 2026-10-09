@@ -4,7 +4,12 @@ set -euo pipefail
 image="${1:-todijo-production-entrypoint-test}"
 suffix="${GITHUB_RUN_ID:-local}-${RANDOM}"
 network="todijo-entrypoint-${suffix}"
-postgres_container="todijo-entrypoint-postgres-${suffix}"
+postgres_container="${POSTGRES_CONTAINER_ID:-todijo-entrypoint-postgres-${suffix}}"
+postgres_host="todijo-entrypoint-postgres"
+postgres_owned="false"
+postgres_user="${POSTGRES_USER:-todijo}"
+postgres_password="${POSTGRES_PASSWORD:-todijo}"
+postgres_database="${POSTGRES_DB:-postgres}"
 old_app_container="todijo-entrypoint-old-${suffix}"
 valid_app_container="todijo-entrypoint-valid-${suffix}"
 invalid_app_container="todijo-entrypoint-invalid-${suffix}"
@@ -17,12 +22,14 @@ cleanup() {
     "${valid_app_container}" \
     "${old_app_container}" \
     "todijo-entrypoint-runner-a-${suffix}" \
-    "todijo-entrypoint-runner-b-${suffix}" \
-    "${postgres_container}"; do
+    "todijo-entrypoint-runner-b-${suffix}"; do
     if docker inspect "${container}" >/dev/null 2>&1; then
       docker rm --force "${container}" >/dev/null
     fi
   done
+  if test "${postgres_owned}" = "true" && docker inspect "${postgres_container}" >/dev/null 2>&1; then
+    docker rm --force "${postgres_container}" >/dev/null
+  fi
   if docker network inspect "${network}" >/dev/null 2>&1; then
     docker network rm "${network}" >/dev/null
   fi
@@ -32,7 +39,7 @@ trap cleanup EXIT
 
 wait_for_postgres() {
   for _ in {1..30}; do
-    if docker exec "${postgres_container}" pg_isready -U todijo -d postgres >/dev/null 2>&1; then
+    if docker exec "${postgres_container}" pg_isready -U "${postgres_user}" -d "${postgres_database}" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -58,11 +65,11 @@ wait_for_health() {
 }
 
 database_url() {
-  printf 'postgresql://todijo:todijo@%s:5432/%s?schema=public' "${postgres_container}" "$1"
+  printf 'postgresql://%s:%s@%s:5432/%s?schema=public' "${postgres_user}" "${postgres_password}" "${postgres_host}" "$1"
 }
 
 create_database() {
-  docker exec "${postgres_container}" createdb -U todijo "$1"
+  docker exec "${postgres_container}" createdb -U "${postgres_user}" "$1"
 }
 
 build_probe_image() {
@@ -84,11 +91,17 @@ EOF
 }
 
 docker network create "${network}" >/dev/null
-docker run --detach --name "${postgres_container}" --network "${network}" \
-  --env POSTGRES_USER=todijo \
-  --env POSTGRES_PASSWORD=todijo \
-  --env POSTGRES_DB=postgres \
-  public.ecr.aws/docker/library/postgres:16 >/dev/null
+if test -n "${POSTGRES_CONTAINER_ID:-}"; then
+  docker network connect --alias "${postgres_host}" "${network}" "${postgres_container}"
+else
+  postgres_host="${postgres_container}"
+  postgres_owned="true"
+  docker run --detach --name "${postgres_container}" --network "${network}" \
+    --env "POSTGRES_USER=${postgres_user}" \
+    --env "POSTGRES_PASSWORD=${postgres_password}" \
+    --env "POSTGRES_DB=${postgres_database}" \
+    public.ecr.aws/docker/library/postgres:16 >/dev/null
+fi
 wait_for_postgres
 
 create_database no_pending
