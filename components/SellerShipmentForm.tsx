@@ -54,7 +54,7 @@ export function SellerShipmentForm({ orderId, storeId, items }: { orderId: strin
     <h3>{t("title")}</h3>
     <p>{t("instruction")}</p>
     <button className="sellerControlButton secondary" type="button" onClick={selectAllRemaining} disabled={saving}>{t("selectAllRemaining")}</button>
-    <div className="sellerShipmentItems">{items.map((item) => <div className="sellerShipmentItem" key={item.id}>
+    <div className="sellerShipmentItems">{shipmentItems.map((item) => <div className="sellerShipmentItem" key={item.id}>
       <strong>{item.name}</strong>
       {item.variant && <small>{item.variant}</small>}
       <span>{t("ordered")}: {item.ordered}</span>
