@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import migrationPlanModule from "./seller-lifecycle-migration-plan.cjs";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const prismaRoot = join(repositoryRoot, "prisma");
@@ -12,6 +13,7 @@ const migrationNames = [
   "20261008100000_seller_subscription_trial",
   "20261008103000_seller_closure_and_reactivation",
 ];
+const { buildMigrationPlan } = migrationPlanModule;
 const databaseUrl = new URL(process.env.DATABASE_URL ?? "");
 const databaseName = decodeURIComponent(databaseUrl.pathname.slice(1));
 
@@ -98,7 +100,7 @@ function assertSql(schemaName, sql, label) {
   if (result !== "PASS") throw new Error(`${label} did not pass (database assertion returned ${result || "no result"}).`);
 }
 
-function copyPrismaTree(destination, excludedMigrations = []) {
+function copyPrismaTree(destination, includedMigrations) {
   mkdirSync(destination, { recursive: true });
   cpSync(join(prismaRoot, "schema.prisma"), join(destination, "schema.prisma"));
   const sourceMigrations = join(prismaRoot, "migrations");
@@ -109,8 +111,9 @@ function copyPrismaTree(destination, excludedMigrations = []) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  for (const name of directories) {
-    if (!excludedMigrations.includes(name)) cpSync(join(sourceMigrations, name), join(destinationMigrations, name), { recursive: true });
+  for (const name of includedMigrations) {
+    if (!directories.includes(name)) throw new Error(`Cannot stage missing migration: ${name}`);
+    cpSync(join(sourceMigrations, name), join(destinationMigrations, name), { recursive: true });
   }
   return join(destination, "schema.prisma");
 }
@@ -203,6 +206,12 @@ function verifyMigrationHistory(schemaName) {
   if (result !== "2") throw new Error(`Expected both Phase 3 migrations applied in ${schemaName}; found ${result || "no history"}.`);
 }
 
+function verifyCompleteMigrationHistory(schemaName, expectedMigrations) {
+  const names = expectedMigrations.map((name) => `'${name.replaceAll("'", "''")}'`).join(",");
+  const result = runPsqlInSchema(schemaName, `SELECT CASE WHEN (SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) = ${expectedMigrations.length} AND (SELECT count(*) FROM "_prisma_migrations" WHERE migration_name IN (${names}) AND finished_at IS NOT NULL AND rolled_back_at IS NULL) = ${expectedMigrations.length} THEN 'PASS' ELSE 'FAIL' END`);
+  if (result !== "PASS") throw new Error(`Expected exactly ${expectedMigrations.length} successful migrations with the complete ordered history in ${schemaName}.`);
+}
+
 try {
   if (!existsSync(join(repositoryRoot, "node_modules"))) throw new Error("node_modules is missing; run npm ci first.");
   const migrationDirectories = readdirSync(join(prismaRoot, "migrations"), { withFileTypes: true })
@@ -211,10 +220,7 @@ try {
   for (const migration of migrationNames) {
     if (!migrationDirectories.includes(migration)) throw new Error(`Required migration is missing: ${migration}`);
   }
-  const sorted = [...migrationDirectories].sort();
-  if (sorted.slice(-migrationNames.length).join("\n") !== [...migrationNames].sort().join("\n")) {
-    throw new Error("Phase 3 migrations are not the final ordered migrations; review the upgrade fixture before running.");
-  }
+  const migrationPlan = buildMigrationPlan(migrationDirectories, migrationNames[0], migrationNames[1]);
 
   for (const schema of schemas) createSchema(schema);
 
@@ -223,22 +229,24 @@ try {
   runPrisma(freshSchemaFile, schemas[0], ["migrate", "deploy"]);
   runPrisma(freshSchemaFile, schemas[0], ["migrate", "status"]);
   verifyMigrationHistory(schemas[0]);
+  verifyCompleteMigrationHistory(schemas[0], migrationPlan.ordered);
 
-  console.log("Applying the pre-Phase-3 history, seeding synthetic prior data, then applying the two Phase 3 migrations.");
+  console.log(`Applying ${migrationPlan.prePhase3.length} pre-Phase-3 migrations, seeding synthetic prior data, then applying Phase 3 and all ${migrationPlan.phase3AndLater.length - migrationNames.length} subsequent migrations in chronological order.`);
   const stagedPrisma = join(tempRoot, "prisma");
-  const stagedSchema = copyPrismaTree(stagedPrisma, migrationNames);
+  const stagedSchema = copyPrismaTree(stagedPrisma, migrationPlan.prePhase3);
   runPrisma(stagedSchema, schemas[1], ["migrate", "deploy"]);
   runPrisma(stagedSchema, schemas[1], ["migrate", "status"]);
   seedPrePhase3Records(schemas[1]);
   const stagedMigrations = join(stagedPrisma, "migrations");
-  for (const name of migrationNames) {
+  for (const name of migrationPlan.phase3AndLater) {
     cpSync(join(prismaRoot, "migrations", name), join(stagedMigrations, name), { recursive: true });
   }
   runPrisma(stagedSchema, schemas[1], ["migrate", "deploy"]);
   runPrisma(stagedSchema, schemas[1], ["migrate", "status"]);
   verifyMigrationHistory(schemas[1]);
+  verifyCompleteMigrationHistory(schemas[1], migrationPlan.ordered);
   verifyUpgrade(schemas[1]);
-  console.log(`Migration validation passed on PostgreSQL ${process.env.POSTGRES_VERSION ?? "CI service"}: full chain plus synthetic pre-Phase-3 upgrade.`);
+  console.log(`Migration validation passed on PostgreSQL ${process.env.POSTGRES_VERSION ?? "CI service"}: all ${migrationPlan.ordered.length} migrations on a fresh schema and synthetic pre-Phase-3 upgrade.`);
 } finally {
   for (const schema of schemas) {
     try {
