@@ -35,7 +35,8 @@ test("seller dashboard action center shows real simple and variant stock alerts 
   const desktop = await page.goto("/en/dashboard");
   expect(desktop?.ok()).toBeTruthy();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const alerts = page.locator(".sellerStockActionAlerts");
+  const alerts = page.locator(".sellerStockActionAlerts:visible");
+  await expect(alerts).toHaveCount(1);
   await expect(alerts).toBeVisible();
   const lowStockCard=alerts.getByRole("link").filter({hasText:sellerActionCenterCopy("en").lowStock});
   const outOfStockCard=alerts.getByRole("link").filter({hasText:sellerActionCenterCopy("en").outOfStock});
@@ -47,7 +48,9 @@ test("seller dashboard action center shows real simple and variant stock alerts 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ar/dashboard");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.locator(".sellerStockActionAlerts")).toBeVisible();
+  const rtlAlerts = page.locator(".sellerStockActionAlerts:visible");
+  await expect(rtlAlerts).toHaveCount(1);
+  await expect(rtlAlerts).toBeVisible();
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewport);
 });

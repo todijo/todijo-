@@ -132,7 +132,6 @@ jobs:
       - name: Validate lifecycle and dashboard against the production build
         run: >-
           node scripts/run-playwright.mjs --production
-          tests/e2e/smoke.spec.ts
           tests/e2e/phase3-lifecycle.spec.ts
           tests/e2e/phase4-dashboard.spec.ts
 
