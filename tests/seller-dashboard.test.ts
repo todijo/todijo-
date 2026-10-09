@@ -2,6 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "../lib/seller-dashboard";
 import { sellerDashboardGate } from "../lib/dashboard";
+import { resolveSellerLifecycleStatus } from "../lib/seller-lifecycle-state";
+import { sellerStockAlerts } from "../lib/seller-stock-alerts";
+import { locales } from "../i18n/config";
+import { sellerActionCenterCopy } from "../i18n/seller-action-center";
+import { sellerLifecycleCopy } from "../i18n/seller-lifecycle";
 import { sellerOrderHistoryWhere } from "../lib/order-history";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,6 +21,53 @@ test("Admin with an incomplete managed store bypasses the seller onboarding redi
   assert.equal(sellerDashboardGate("SELLER", false, incompleteStore), "verify-email");
   assert.equal(sellerDashboardGate("SELLER", true, { onboardingStep: 4, onboardingStatus: "VERIFIED" }), null);
   assert.equal(sellerDashboardGate("CUSTOMER", false, incompleteStore), null);
+});
+
+test("seller lifecycle state resolves from server role, closure, onboarding and billing records", () => {
+  const now = new Date("2026-10-08T12:00:00Z");
+  const completeStore = { onboardingStep: 4, onboardingStatus: "VERIFIED" };
+  assert.equal(resolveSellerLifecycleStatus({ role: "CUSTOMER" }), "BUYER");
+  assert.equal(resolveSellerLifecycleStatus({ role: "CUSTOMER", sellerSetupDraftExists: true }), "SELLER_SETUP");
+  assert.equal(resolveSellerLifecycleStatus({ role: "SELLER", store: { onboardingStep: 1, onboardingStatus: "IN_PROGRESS" } }), "SELLER_SETUP");
+  assert.equal(resolveSellerLifecycleStatus({ role: "SELLER", store: completeStore }), "ACTIVE_SELLER");
+  assert.equal(resolveSellerLifecycleStatus({ role: "SELLER", store: completeStore, subscription: { status: "ACTIVE", cancelAtPeriodEnd: true, currentPeriodEnd: new Date(now.getTime() + 1_000) }, now }), "RENEWAL_CANCELLED");
+  assert.equal(resolveSellerLifecycleStatus({ role: "CUSTOMER", sellerClosedAt: now }), "SELLER_CLOSED");
+  assert.equal(resolveSellerLifecycleStatus({ role: "SELLER", store: completeStore, reactivationStockReviewRequired: true }), "REACTIVATION_PENDING");
+  assert.equal(resolveSellerLifecycleStatus({ role: "ADMIN", store: { onboardingStep: 0, onboardingStatus: "NOT_STARTED" } }), "ADMIN");
+  assert.equal(sellerDashboardGate("SELLER", true, { onboardingStep: 0, onboardingStatus: "NOT_STARTED" }, { sellerClosedAt: now }), null);
+});
+
+test("seller stock alert counts use only published simple-product and active-variant inventory", async () => {
+  const calls: Array<{ kind: string; where: any }> = [];
+  const result = await sellerStockAlerts({
+    product: { count: async ({ where }: any) => { calls.push({ kind: "product", where }); return where.stock === 0 ? 2 : 3; } },
+    productVariant: { count: async ({ where }: any) => { calls.push({ kind: "variant", where }); return where.stock === 0 ? 4 : 5; } },
+  } as any, "store-1");
+  assert.deepEqual(result, { lowStock: 8, outOfStock: 6 });
+  assert.equal(calls.length, 4);
+  for (const call of calls) {
+    const product = call.kind === "product" ? call.where : call.where.product;
+    assert.equal(product.storeId, "store-1");
+    assert.equal(product.status, "PUBLISHED");
+    assert.equal(product.dataClass, "PRODUCTION");
+    assert.equal(product.removedAt, null);
+    if (call.kind === "product") assert.deepEqual(product.variants, { none: {} });
+    else assert.equal(call.where.active, true);
+  }
+});
+
+test("seller setup and stock alert copy is available for every supported locale", () => {
+  for (const locale of locales) {
+    assert.ok(sellerActionCenterCopy(locale).lowStock);
+    assert.ok(sellerActionCenterCopy(locale).outOfStock);
+    assert.ok(sellerLifecycleCopy(locale).resumeSetup);
+  }
+  assert.equal(sellerActionCenterCopy("fr").lowStock, "Stock faible");
+  assert.equal(sellerActionCenterCopy("en").lowStock, "Low stock");
+  assert.equal(sellerActionCenterCopy("fr").outOfStock, "Rupture de stock");
+  assert.equal(sellerActionCenterCopy("en").outOfStock, "Out of stock");
+  assert.equal(sellerLifecycleCopy("fr").resumeSetup, "Reprendre ma configuration vendeur");
+  assert.equal(sellerLifecycleCopy("en").resumeSetup, "Resume seller setup");
 });
 
 test("seller period metrics use real current and previous 30 day windows", () => {

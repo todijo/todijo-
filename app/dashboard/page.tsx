@@ -33,6 +33,9 @@ import LockedMultiStoreTeaser from "@/components/LockedMultiStoreTeaser";
 import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
 import { sellerBusinessVerificationMessage } from "@/lib/seller-dashboard-readiness";
 import { sellerLifecycleCopy } from "@/i18n/seller-lifecycle";
+import { resolveSellerLifecycleStatus } from "@/lib/seller-lifecycle-state";
+import { sellerStockAlerts } from "@/lib/seller-stock-alerts";
+import { sellerActionCenterCopy } from "@/i18n/seller-action-center";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -67,7 +70,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 async function loadSellerDashboardMetrics(userId:string,storeId:string,permissions:{products:boolean;orders:boolean;analytics:boolean;sales:boolean}) {
   const sellerOrdersWhere = sellerOrderHistoryWhere(userId, storeId, "");
@@ -104,6 +107,20 @@ async function SellerDashboardHeroMetrics({metrics,locale,currency,canViewSales,
   for(const order of analyticsOrders){const first=firstOrderByBuyer.get(order.buyerId);if(!first||order.createdAt<first)firstOrderByBuyer.set(order.buyerId,order.createdAt);}
   const newCustomers=[...firstOrderByBuyer.values()].filter(date=>date>=startToday).length;
   return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{money(locale,todayRevenue,currency)}</strong></div>}{canViewOrders&&<><div><small>{labels.pendingOrders}</small><strong>{pendingOrders}</strong></div><div><small>{labels.newCustomers}</small><strong>{newCustomers}</strong></div></>}{canViewMessages&&<div><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></div>}</div>;
+}
+
+async function SellerStockActionAlerts({storeId,locale,canViewProducts}:{storeId:string;locale:string;canViewProducts:boolean}) {
+  if(!canViewProducts)return null;
+  let alerts;
+  try { alerts=await dashboardData(sellerStockAlerts(prisma,storeId)); }
+  catch { return null; }
+  if(!alerts.lowStock&&!alerts.outOfStock)return null;
+  const copy=sellerActionCenterCopy(locale);
+  const href=`/${locale}/seller/products?store=${storeId}&status=PUBLISHED`;
+  return <section className="premiumStatsGrid sellerStockActionAlerts">
+    {alerts.lowStock>0&&<DashboardStatCard label={copy.lowStock} value={alerts.lowStock} href={href} icon={Boxes} tone="amber"/>}
+    {alerts.outOfStock>0&&<DashboardStatCard label={copy.outOfStock} value={alerts.outOfStock} href={href} icon={Package} tone="blue"/>}
+  </section>;
 }
 
 async function SellerDashboardSecondarySections({metrics,locale,activeStore,storeChoices,sellerCanAddProduct,readinessAction,readinessHref,subscriptionActive,commercialPlan,owner,role,canViewProducts,canViewOrders,canViewAnalytics,canViewSales,canViewMessages,canEditStore,readinessUsesSettings}:{metrics:SellerDashboardMetricsPromise;locale:string;activeStore:NonNullable<Prisma.StoreGetPayload<{select:typeof sellerStoreSelect}>>;storeChoices:Array<{id:string;name:string;slug:string;businessId:string|null}>;sellerCanAddProduct:boolean;readinessAction:string;readinessHref:string;subscriptionActive:boolean;commercialPlan:string|null;owner:boolean;role:string;canViewProducts:boolean;canViewOrders:boolean;canViewAnalytics:boolean;canViewSales:boolean;canViewMessages:boolean;canEditStore:boolean;readinessUsesSettings:boolean}) {
@@ -151,7 +168,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     select: {
       firstName: true, lastName: true, email: true, emailVerified: true, role: true,
       sellerOnboardingDraft: { select: { id: true } },
-      ownedBusiness:{select:{sellerClosedAt:true}},
+      ownedBusiness:{select:{sellerClosedAt:true,reactivationStockReviewRequired:true}},
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
       store: { select: sellerStoreSelect },
     },
@@ -167,7 +184,8 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const ownedStoreChoices=principal?.owner?storeChoices.filter(store=>store.businessId===principal.businessId):[];
   const selectedStoreId=isSeller?(requestedStore&&requestedStore!=="all"?requestedStore:ownedStoreChoices.length===1?ownedStoreChoices[0]?.id:!principal?.owner?storeChoices[0]?.id:null):null;
   const activeStore=selectedStoreId?await dashboardData(prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect})):user.store;
-  const sellerGate=sellerDashboardGate(user.role,user.emailVerified,activeStore);
+  const lifecycleStatus=resolveSellerLifecycleStatus({role:user.role,sellerClosedAt:user.ownedBusiness?.sellerClosedAt??activeStore?.business?.sellerClosedAt,sellerSetupDraftExists:Boolean(user.sellerOnboardingDraft),store:activeStore,reactivationStockReviewRequired:user.ownedBusiness?.reactivationStockReviewRequired??activeStore?.business?.reactivationStockReviewRequired,subscription:activeStore?.subscription});
+  const sellerGate=sellerDashboardGate(user.role,user.emailVerified,activeStore,{sellerClosedAt:user.ownedBusiness?.sellerClosedAt??activeStore?.business?.sellerClosedAt,sellerSetupDraftExists:Boolean(user.sellerOnboardingDraft),reactivationStockReviewRequired:user.ownedBusiness?.reactivationStockReviewRequired??activeStore?.business?.reactivationStockReviewRequired,subscription:activeStore?.subscription});
   if (sellerGate === "verify-email") { const target=`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`; console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-email-unverified",target})); redirect(target); }
   if (sellerGate === "seller-onboarding") {
     const target=`/${locale}/seller/onboarding`;
@@ -234,7 +252,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
                 : <DashboardEmptyState title={p("buyer.emptyOrders")} description={p("buyer.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={homeHref}>{p("browseProducts")}</Link>}/>
               }
             </DashboardSection>
-            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={user.ownedBusiness?.sellerClosedAt?sellerLifecycleCopy(locale).reactivationTitle:auth("becomeSeller")} href={user.ownedBusiness?.sellerClosedAt?`/${locale}/seller/reactivate`:`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
+            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={lifecycleStatus==="SELLER_CLOSED"?sellerLifecycleCopy(locale).reactivationTitle:lifecycleStatus==="SELLER_SETUP"?sellerLifecycleCopy(locale).resumeSetup:auth("becomeSeller")} href={lifecycleStatus==="SELLER_CLOSED"?`/${locale}/seller/reactivate`:`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
           </div>
           <section className="premiumDiscoveryBanner"><div><span>{p("discoverBadge")}</span><h2>{p("discoverTitle")}</h2><p>{p("discoverText")}</p></div><Link href={homeHref}>{p("exploreNow")}</Link></section>
         </div>
@@ -298,9 +316,12 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}
+      {lifecycleStatus==="RENEWAL_CANCELLED"&&activeStore.subscription?.currentPeriodEnd&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).cancelConfirmation.replace("{date}",new Intl.DateTimeFormat(locale,{dateStyle:"long"}).format(activeStore.subscription.currentPeriodEnd))}</strong><Link href={`/${locale}/seller/subscription`}>{sellerLifecycleCopy(locale).restoreRenewal}</Link></section>}
+      {lifecycleStatus==="REACTIVATION_PENDING"&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).stockReview}</strong><Link href={`/${locale}/seller/reactivate`}>{sellerLifecycleCopy(locale).reactivationTitle}</Link></section>}
       {showReadinessWarning && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
       <SellerStoreSwitcher stores={storeChoices} selectedId={activeStore.id} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll={Boolean(principal?.owner&&ownedStoreChoices.length>1)}/>
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<Suspense fallback={null}><SellerDashboardHeroMetrics metrics={dashboardMetrics} locale={locale} currency={activeStore.currency} canViewSales={canViewSales} canViewOrders={canViewOrders} canViewMessages={canViewMessages} unreadMessages={unreadMessages} labels={{todayRevenue:s("todayRevenue"),pendingOrders:s("pendingOrders"),newCustomers:s("newCustomers"),unreadMessages:s("unreadMessages")}}/></Suspense>}<Link href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`}>{t("viewShop")} <Store size={18}/></Link></section>
+      <Suspense fallback={null}><SellerStockActionAlerts storeId={activeStore.id} locale={locale} canViewProducts={canViewProducts}/></Suspense>
       <Suspense fallback={null}><SellerDashboardSecondarySections metrics={dashboardMetrics} locale={locale} activeStore={activeStore} storeChoices={ownedStoreChoices} sellerCanAddProduct={sellerCanAddProduct} readinessAction={readinessAction} readinessHref={readinessHref} subscriptionActive={subscriptionActive} commercialPlan={selectedCommercialPlan} owner={Boolean(selectedPrincipal?.owner)} role={user.role} canViewProducts={canViewProducts} canViewOrders={canViewOrders} canViewAnalytics={canViewAnalytics} canViewSales={canViewSales} canViewMessages={canViewMessages} canEditStore={canEditStore} readinessUsesSettings={sellerTypeRequired||vatStatusRequired}/></Suspense>
       {sellerBenefitCatalogEnabled && <section className="storeSetupCard"><h2>Les cadeaux Todijo pour vous</h2><p>Découvrez les cadeaux et avantages sélectionnés par Todijo pour votre activité. Les disponibilités, quantités et tarifs sont indiqués pour chaque article.</p><Link href={`/${locale}/seller/benefits?store=${activeStore.id}`}>Découvrir mes avantages</Link></section>}
       {selectedPrincipal?.owner&&<StripeConnectSection
