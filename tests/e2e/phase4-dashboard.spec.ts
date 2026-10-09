@@ -54,3 +54,28 @@ test("seller dashboard action center shows real simple and variant stock alerts 
   const dimensions = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(dimensions.width).toBeLessThanOrEqual(dimensions.viewport);
 });
+
+test("seller report downloads are localized and remain scoped to the authorized store", async ({ page }) => {
+  await addSession(page);
+  await page.goto("/fr/dashboard");
+  await expect(page.getByRole("link", { name: "Télécharger le rapport" })).toHaveAttribute("href", `/api/seller/reports/export?type=finance&store=${storeId}&locale=fr`);
+  await expect(page.getByRole("link", { name: "Télécharger le stock" })).toHaveAttribute("href", `/api/seller/reports/export?type=stock&store=${storeId}&locale=fr`);
+
+  const finance = await page.request.get(`/api/seller/reports/export?type=finance&store=${storeId}&locale=fr&month=2026-10`);
+  expect(finance.status()).toBe(200);
+  expect(finance.headers()["content-type"]).toContain("text/csv");
+  expect(finance.headers()["content-disposition"]).toContain(`todijo-finance-2026-10-${storeId}.csv`);
+  expect(await finance.text()).toContain("Date de paiement,Commande,Devise");
+
+  const stock = await page.request.get(`/api/seller/reports/export?type=stock&store=${storeId}&locale=en`);
+  expect(stock.status()).toBe(200);
+  const stockCsv = await stock.text();
+  expect(stockCsv).toContain("Product,Variant,SKU,Stock,Price,Status");
+  expect(stockCsv).toContain("Low-stock fixture");
+  expect(stockCsv).toContain("Variant-stock fixture,low");
+  expect(stockCsv).toContain("Variant-stock fixture,out");
+
+  const otherStore = await page.request.get("/api/seller/reports/export?type=stock&store=unowned-store&locale=en");
+  expect(otherStore.status()).toBe(403);
+  expect(await otherStore.text()).not.toContain("Low-stock fixture");
+});
