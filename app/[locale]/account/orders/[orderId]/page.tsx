@@ -62,7 +62,7 @@ export default async function BuyerOrderDetailsPage({ params }: { params: Promis
             <div className="buyerOrderDetailSummary">
               <div><span>{t("orderDate")}</span><strong>{date}</strong></div>
               <div><span>{t("paymentStatus")}</span><strong>{t(`payment.${paymentState}`)}</strong></div>
-              <div><span>{t("orderStatus")}</span><strong>{fulfillmentStep ? t(`fulfillment.${fulfillmentStep.toLowerCase()}`) : t(`status.${order.status}`)}</strong></div>
+              <div><span>{t("orderStatus")}</span><strong>{order.fulfillmentStatus === "PARTIALLY_SHIPPED" ? t("shipment.partialStatus") : fulfillmentStep ? t(`fulfillment.${fulfillmentStep.toLowerCase()}`) : t(`status.${order.status}`)}</strong></div>
               <div><span>{t("store")}</span><strong>{store ?? t("unknownStore")}</strong></div>
             </div>
 

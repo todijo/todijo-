@@ -6,6 +6,7 @@ import { automaticCjFulfillmentEnabled, processOrderSupplierFulfillments } from 
 import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
 import { dispatchSellerSaleDeliveriesBestEffort } from "@/lib/seller-sale-notifications";
 import { processSellerClosureCancellation } from "@/lib/seller-closure";
+import { dispatchBuyerOrderEmailDeliveriesBestEffort } from "@/lib/buyer-order-email-deliveries";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,7 @@ async function processAuthenticatedStripeEvent(event: StripeEvent) {
       : null;
     if(paidOrderId){const notification=await prisma.notification.findFirst({where:{type:"ORDER_PAID",href:`/account/orders/${paidOrderId}`},orderBy:{createdAt:"desc"},select:{id:true}});if(notification)dispatchNotificationPushBestEffort(notification.id);}
     if(paidOrderId)dispatchSellerSaleDeliveriesBestEffort(paidOrderId);
+    if(paidOrderId)dispatchBuyerOrderEmailDeliveriesBestEffort(paidOrderId);
     if (paidOrderId && automaticCjFulfillmentEnabled()) {
       try {
         const fulfillment = await processOrderSupplierFulfillments(paidOrderId);

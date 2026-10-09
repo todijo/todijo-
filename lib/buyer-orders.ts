@@ -11,6 +11,16 @@ const buyerOrderInclude = Prisma.validator<Prisma.OrderInclude>()({
     },
     orderBy: { createdAt: "asc" },
   },
+  shipments: {
+    where: { status: { not: "CANCELLED" } },
+    select: {
+      id: true, status: true, carrier: true, trackingNumber: true, trackingUrl: true,
+      sellerReportedAt: true, carrierAcceptedAt: true, deliveredAt: true,
+      store: { select: { name: true } },
+      items: { select: { quantity: true, orderItem: { select: { id: true, productNameSnapshot: true, product: { select: { name: true } } } } } },
+    },
+    orderBy: { createdAt: "asc" },
+  },
   items: {
     select: { id: true, quantity: true, unitPrice: true, lineTotal: true, selectedColor: true, selectedSize: true, selectedOptions: true, productNameSnapshot: true, productImageUrlSnapshot: true,
       product: {

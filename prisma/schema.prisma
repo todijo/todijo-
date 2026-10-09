@@ -312,6 +312,27 @@ enum SellerSaleEmailStatus {
   FAILED
 }
 
+enum ShipmentStatus {
+  SELLER_REPORTED
+  CARRIER_CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+enum BuyerOrderEmailKind {
+  PAYMENT_CONFIRMED
+  ORDER_SHIPPED
+  SHIPMENT_RECORDED
+}
+
+enum BuyerOrderEmailStatus {
+  QUEUED
+  PROCESSING
+  RETRYABLE
+  SENT
+  FAILED
+}
+
 enum SellerSubscriptionReminderKind {
   DAYS_30
   DAYS_7
@@ -478,6 +499,7 @@ model User {
   notifications       Notification[]
   sellerSaleDeliveries SellerSaleDelivery[]
   sellerSaleRecipientDeliveries SellerSaleRecipientDelivery[]
+  shipmentsCreated Shipment[] @relation("ShipmentCreator")
   pushSubscriptions   PushSubscription[]
   mobileSessions      MobileSession[]
   mobileOAuthAttempts MobileOAuthAttempt[]
@@ -950,6 +972,7 @@ model Store {
   loyaltyAccounts LoyaltyAccount[]
   loyaltyChanges LoyaltyStoreChange[]
   sellerReviewEmails SellerReviewEmailDelivery[]
+  shipments Shipment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1288,6 +1311,7 @@ enum FulfillmentStatus {
   PENDING
   PROCESSING
   PACKED
+  PARTIALLY_SHIPPED
   SHIPPED
   DELIVERED
 }
@@ -1905,6 +1929,7 @@ model Order {
   sellerInvoiceReference   String?
   sellerInvoiceUrl         String?
   sellerInvoiceIssuedAt    DateTime?
+  buyerLocale              String?     @db.VarChar(10)
   buyerNameSnapshot        String?
   buyerEmailSnapshot       String?
   buyerPhoneSnapshot       String?
@@ -1948,11 +1973,14 @@ model Order {
   lifecycleEvents    OrderLifecycleEvent[]
   supplierFulfillments SupplierFulfillment[]
   groups OrderGroup[]
+  shipments Shipment[]
+  buyerOrderEmailDeliveries BuyerOrderEmailDelivery[]
   refundOperations RefundOperation[]
   loyaltyLedgerEntries LoyaltyLedgerEntry[]
   loyaltyFundingSnapshot LoyaltyOrderFundingSnapshot?
 
   @@unique([buyerId, checkoutRequestId])
+  @@unique([id, buyerId], map: "Order_id_buyerId_key")
   @@index([buyerId, status, createdAt])
   @@index([status, checkoutExpiresAt])
   @@index([checkoutExpiredAt, createdAt])
@@ -2020,6 +2048,7 @@ model OrderGroup {
   transferErrorCode String? @db.VarChar(120)
   transferErrorMessage String? @db.VarChar(500)
   shipmentVerifiedAt DateTime?
+  sellerDispatchReportedAt DateTime?
   transferEligibleAt DateTime?
   transferredAt DateTime?
   createdAt DateTime @default(now())
@@ -2035,7 +2064,9 @@ model OrderGroup {
   loyaltyReserveReversedMinor Int @default(0)
   sellerSaleDelivery SellerSaleDelivery?
   sellerSaleRecipientDeliveries SellerSaleRecipientDelivery[]
+  shipments Shipment[]
   @@unique([orderId,groupKey])
+  @@unique([id, orderId, storeId], map: "OrderGroup_id_orderId_storeId_key")
   @@index([storeId,transferStatus])
   @@index([transferStatus,nextTransferAttemptAt])
 }
@@ -2106,6 +2137,86 @@ model SellerSaleRecipientDelivery {
   @@unique([orderGroupId, recipientId])
   @@index([status, nextAttemptAt, createdAt])
   @@index([recipientId, createdAt])
+}
+
+model Shipment {
+  id                String         @id @default(cuid())
+  orderId           String
+  orderGroupId      String
+  storeId           String
+  createdById       String?
+  idempotencyKey    String         @db.VarChar(120)
+  status            ShipmentStatus @default(SELLER_REPORTED)
+  carrier           String?        @db.VarChar(120)
+  trackingNumber    String?        @db.VarChar(160)
+  trackingUrl       String?        @db.VarChar(500)
+  sellerReportedAt  DateTime       @default(now())
+  carrierAcceptedAt DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderGroup OrderGroup  @relation(fields: [orderGroupId, orderId, storeId], references: [id, orderId, storeId], onDelete: Cascade)
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  createdBy  User?       @relation("ShipmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items      ShipmentItem[]
+  emailDelivery BuyerOrderEmailDelivery?
+
+  @@unique([orderGroupId, idempotencyKey], map: "Shipment_orderGroupId_idempotencyKey_key")
+  @@unique([id, orderGroupId], map: "Shipment_id_orderGroupId_key")
+  @@unique([id, orderId], map: "Shipment_id_orderId_key")
+  @@index([orderId, createdAt])
+  @@index([storeId, sellerReportedAt])
+  @@index([orderGroupId, status])
+}
+
+model ShipmentItem {
+  id           String   @id @default(cuid())
+  shipmentId   String
+  orderGroupId String
+  orderItemId  String
+  quantity     Int
+  createdAt    DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId, orderGroupId], references: [id, orderGroupId], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId, orderGroupId], references: [id, orderGroupId], onDelete: Restrict)
+
+  @@unique([shipmentId, orderItemId], map: "ShipmentItem_shipmentId_orderItemId_key")
+  @@index([orderItemId, createdAt])
+}
+
+model BuyerOrderEmailDelivery {
+  id             String                @id @default(cuid())
+  eventKey       String                @unique @db.VarChar(240)
+  kind           BuyerOrderEmailKind
+  orderId        String
+  buyerId        String
+  shipmentId     String?               @unique
+  locale         String                @db.VarChar(10)
+  recipientEmail String                @db.VarChar(320)
+  recipientName  String                @db.VarChar(200)
+  orderReference String                @db.VarChar(200)
+  storeName      String?               @db.VarChar(200)
+  items          Json?
+  status         BuyerOrderEmailStatus @default(QUEUED)
+  attemptCount   Int                   @default(0)
+  nextAttemptAt  DateTime?
+  claimToken     String?               @unique
+  claimedAt      DateTime?
+  sentAt         DateTime?
+  errorCode      String?               @db.VarChar(120)
+  errorMessage   String?               @db.VarChar(500)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  order    Order     @relation(fields: [orderId, buyerId], references: [id, buyerId], onDelete: Cascade)
+  shipment Shipment? @relation(fields: [shipmentId, orderId], references: [id, orderId], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([buyerId, createdAt])
+  @@index([orderId, kind])
+  @@unique([shipmentId, orderId], map: "BuyerOrderEmailDelivery_shipmentId_orderId_key")
 }
 
 model ProductReport {
@@ -2192,11 +2303,13 @@ model OrderItem {
   restockEvents InventoryRestockEvent[]
   loyaltyGrant LoyaltyGrant?
   loyaltyRedemptionAllocations LoyaltyRedemptionAllocation[]
+  shipmentItems ShipmentItem[]
 
   @@unique([orderId, lineKey])
   @@index([productId])
   @@index([variantId])
   @@index([orderGroupId])
+  @@unique([id, orderGroupId], map: "OrderItem_id_orderGroupId_key")
 }
 
 model RefundOperation {

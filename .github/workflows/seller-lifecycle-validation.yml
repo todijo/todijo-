@@ -133,6 +133,7 @@ jobs:
         run: >-
           node scripts/run-playwright.mjs --production
           tests/e2e/phase3-lifecycle.spec.ts
+          tests/e2e/phase6-shipments.spec.ts
           tests/e2e/phase4-dashboard.spec.ts
 
       - name: Upload Playwright failure report

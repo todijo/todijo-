@@ -102,28 +102,19 @@ test("seller dashboard reuses the strict order ownership filter and retains five
   assert.match(source, /const sellerOrdersWhere = sellerOrderHistoryWhere\(userId, storeId, ""\)/);
   assert.match(source, /prisma\.order\.findMany\(\{ where: sellerOrdersWhere,/);
   assert.match(source, /permissions\.orders \? prisma\.order\.findMany\(\{ where: sellerOrdersWhere, take: 5/);
-  const branches: any[] = (sellerOrderHistoryWhere("seller_1", "store_1", "") as any).AND[0].OR;
-  assert.deepEqual(branches[0], { storeIdSnapshot: "store_1" });
-  assert.equal(branches[1].storeIdSnapshot, null);
-  assert.equal(branches[1].items.some.product.storeId, "store_1");
-  assert.equal(branches[1].items.every.product.storeId, "store_1");
+  assert.match(source, /groups: \{ where: \{ storeId \}, select: \{ sellerNetAmountMinor/);
+  assert.match(source, /items: \{ where: \{ orderGroupId: null, product: \{ storeId \} \}/);
+  assert.match(source, /total: order\.groups\.length \? order\.groups\.reduce/);
+  assert.doesNotMatch(source, /SellerFulfillmentControl/);
 });
 
-test("seller dashboard scope excludes every legacy multi-store order before rendering", () => {
-  const branches: any[] = (sellerOrderHistoryWhere("seller_1", "store_1", "") as any).AND[0].OR;
-  const legacy = branches[1];
-  const allows = (storeIdSnapshot: string | null, itemOwnerIds: string[]) =>
-    storeIdSnapshot === branches[0].storeIdSnapshot || (
-      storeIdSnapshot === legacy.storeIdSnapshot
-      && itemOwnerIds.some((storeId) => storeId === legacy.items.some.product.storeId)
-      && itemOwnerIds.every((storeId) => storeId === legacy.items.every.product.storeId)
-    );
-
-  assert.equal(allows(null, ["store_1", "store_1"]), true);
-  assert.equal(allows(null, ["store_1", "store_2"]), false);
-  assert.equal(allows(null, ["store_2", "store_1"]), false);
-  assert.equal(allows("store_1", ["store_2"]), true);
-  assert.equal(allows("store_2", ["store_1"]), false);
+test("seller dashboard routes shipment actions to item-level store-filtered order management", () => {
+  const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
+  assert.match(source, /seller\/orders\?store=\$\{activeStore\.id\}&q=\$\{encodeURIComponent\(order\.id\)\}/);
+  assert.doesNotMatch(source, /SellerFulfillmentControl/);
+  const where: any = sellerOrderHistoryWhere("seller_1", "store_1", "");
+  assert.equal(where.AND[0].OR[0].groups.some.storeId, "store_1");
+  assert.equal(where.AND[0].OR[1].AND[2].items.every.product.storeId, "store_1");
 });
 
 test("seller dashboard keeps its primary hero and operational content ahead of secondary benefits", () => {
