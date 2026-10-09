@@ -40,21 +40,8 @@ const server = spawn(process.execPath, [
   "3100",
 ], {
   env: serverEnvironment,
-  stdio: process.env.CI === "true" ? ["ignore", "ignore", "pipe"] : "ignore",
+  stdio: "ignore",
 });
-
-if (process.env.CI === "true" && server.stderr) {
-  const diagnosticPrefix = "[seller-shipment] unexpected request failure ";
-  let pendingDiagnostic = "";
-  server.stderr.on("data", (chunk) => {
-    pendingDiagnostic += chunk.toString("utf8");
-    const lines = pendingDiagnostic.split(/\r?\n/);
-    pendingDiagnostic = lines.pop() ?? "";
-    for (const line of lines) {
-      if (line.startsWith(diagnosticPrefix)) process.stderr.write(`${line}\n`);
-    }
-  });
-}
 
 async function waitForServer() {
   const deadline = Date.now() + 120_000;

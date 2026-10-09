@@ -27,16 +27,6 @@ export async function POST(request: Request, context: { params: Promise<{ orderI
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof SellerShipmentError) return NextResponse.json({ error: error.message }, { status: error.status });
-    if (process.env.CI === "true") {
-      const prismaCode = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : undefined;
-      const metadata = error && typeof error === "object" && "meta" in error && error.meta && typeof error.meta === "object" ? error.meta : undefined;
-      const databaseCode = metadata && "code" in metadata && typeof metadata.code === "string" && /^[0-9A-Z]{5}$/.test(metadata.code) ? metadata.code : undefined;
-      console.error("[seller-shipment] unexpected request failure", JSON.stringify({
-        errorName: error instanceof Error ? error.name : "UnknownError",
-        ...(prismaCode ? { prismaCode } : {}),
-        ...(databaseCode ? { databaseCode } : {}),
-      }));
-    }
     return NextResponse.json({ error: "Unable to record shipment." }, { status: 500 });
   }
 }

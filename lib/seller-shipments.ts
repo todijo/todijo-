@@ -43,8 +43,12 @@ function completedRefundQuantity(item: { refundAllocations: Array<{ quantity: nu
 export function remainingShipmentQuantity(ordered: number, shipped: number, heldForRefund: number) {
   return Math.max(0, ordered - shipped - heldForRefund);
 }
-function retryableShipmentConflict(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034");
+export function retryableShipmentConflict(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code === "P2002" || error.code === "P2034") return true;
+  // PostgreSQL can report a serialization failure from the locking raw query as
+  // Prisma P2010 with SQLSTATE 40001 instead of the usual P2034 transaction code.
+  return error.code === "P2010" && error.meta?.code === "40001";
 }
 
 /** Store-scoped, item-level shipment report. A report is seller-provided information, not carrier confirmation. */
