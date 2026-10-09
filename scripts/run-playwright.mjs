@@ -8,7 +8,6 @@ const testArguments = process.argv.slice(2).filter((argument) => argument !== "-
 const databaseURL = process.env.PLAYWRIGHT_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public";
 const serverEnvironment = {
   ...process.env,
-  TODIJO_E2E_DIAGNOSTICS: process.env.CI === "true" ? "1" : "",
   DATABASE_URL: databaseURL,
   APP_URL: baseURL,
   SESSION_SECRET: "e2e-only-placeholder-secret-at-least-32-characters",

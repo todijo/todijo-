@@ -98,7 +98,7 @@ export async function recordSellerShipment(db: PrismaClient, actorId: string, or
       if (available == null || line.quantity > available) throw new SellerShipmentError("Shipment quantity exceeds the remaining quantity.", 409);
     }
 
-    const shipment = await tx.shipment.create({ data: { orderId, orderGroupId: group.id, storeId, createdById: actorId, idempotencyKey, carrier, trackingNumber, trackingUrl, status: "SELLER_REPORTED", items: { create: lines.map((line) => ({ orderGroupId: group!.id, orderItemId: line.orderItemId, quantity: line.quantity })) } }, include: { items: { select: { orderItemId: true, quantity: true } } } });
+    const shipment = await tx.shipment.create({ data: { orderId, orderGroupId: group.id, storeId, createdById: actorId, idempotencyKey, carrier, trackingNumber, trackingUrl, status: "SELLER_REPORTED", items: { create: lines.map((line) => ({ orderItem: { connect: { id_orderGroupId: { id: line.orderItemId, orderGroupId: group!.id } } }, quantity: line.quantity })) } }, include: { items: { select: { orderItemId: true, quantity: true } } } });
     const now = new Date();
     await tx.orderGroup.updateMany({ where: { id: group.id, sellerDispatchReportedAt: null }, data: { sellerDispatchReportedAt: now } });
     await tx.orderLifecycleEvent.create({ data: { orderId, type: "SELLER_SHIPMENT_REPORTED", actorId, createdAt: now, metadata: { shipmentId: shipment.id, storeId, itemCount: lines.length } } });
