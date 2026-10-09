@@ -48,7 +48,7 @@ const tempRoot = mkdtempSync(join(tmpdir(), "todijo-seller-lifecycle-migrations-
 const safeOutput = (value) => value.replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[DATABASE_URL]");
 
 function runPsql(args) {
-  const result = spawnSync("psql", ["--no-psqlrc", "--no-align", "--tuples-only", "--set=ON_ERROR_STOP=1", ...args], {
+  const result = spawnSync("psql", ["--no-psqlrc", "--quiet", "--no-align", "--tuples-only", "--set=ON_ERROR_STOP=1", ...args], {
     cwd: repositoryRoot,
     env: psqlEnvironment,
     encoding: "utf8",
