@@ -22,5 +22,7 @@
   "performanceEmpty": "Показатели эффективности появятся после того, как магазин получит заказы и отзывы.",
   "pendingRefundRequestSingular": "У вас {count} запрос на возврат ожидает рассмотрения.",
   "pendingRefundRequestPlural": "У вас {count} запросов на возврат ожидают рассмотрения.",
-  "reviewRefundRequests": "Проверить запросы на возврат"
+  "reviewRefundRequests": "Проверить запросы на возврат",
+  "lateDispatches": "Просроченные отправки (последние 30 дней)",
+  "ordersWithRefunds": "Заказы с возвратами (последние 30 дней)"
 }

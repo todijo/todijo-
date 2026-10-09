@@ -147,6 +147,31 @@ test("seller dashboard keeps its primary hero and operational content ahead of s
   assert.ok(secondaryComponent.indexOf("<FreeSellerStartCard") < secondaryComponent.indexOf("<LockedMultiStoreTeaser"));
 });
 
+test("seller health uses verified dispatch and cash-refund metrics instead of checkout cancellations", () => {
+  const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
+  const secondary = source.slice(source.indexOf("async function SellerDashboardSecondarySections"), source.indexOf("export default async function DashboardPage"));
+  assert.match(secondary, /loadSellerDispatchHealth\(prisma,activeStore\.id,now\)/);
+  assert.match(secondary, /dispatchHealth\.lateDispatches/);
+  assert.match(secondary, /dispatchHealth\.unknownDispatches/);
+  assert.match(secondary, /dispatchHealth\.ordersWithCashRefunds/);
+  assert.doesNotMatch(secondary, /cancellationRate|status===\"CANCELLED\"/);
+  const helper = readFileSync(join(process.cwd(), "lib", "seller-dispatch-health.ts"), "utf8");
+  assert.match(helper, /shipmentVerifiedAt/);
+  assert.match(helper, /storeId/);
+  assert.match(helper, /refundedCashMerchandiseMinor/);
+});
+
+test("seller health labels have exact key and placeholder parity in every supported locale", () => {
+  const folder=join(process.cwd(),"messages","seller-dashboard");
+  const english=JSON.parse(readFileSync(join(folder,"en.json"),"utf8"));
+  for(const locale of locales){
+    const translated=JSON.parse(readFileSync(join(folder,`${locale}.json`),"utf8"));
+    assert.deepEqual(Object.keys(translated).sort(),Object.keys(english).sort(),`${locale} key parity`);
+    assert.ok(translated.lateDispatches,`${locale} late dispatch label`);
+    assert.ok(translated.ordersWithRefunds,`${locale} refund label`);
+  }
+});
+
 test("Admin dashboard hero, summary metrics and management content retain their ordered structure", () => {
   const page = readFileSync(join(process.cwd(), "app", "adm-barewbar-182203", "page.tsx"), "utf8");
   const dashboard = readFileSync(join(process.cwd(), "app", "adm-barewbar-182203", "AdminDashboard.tsx"), "utf8");

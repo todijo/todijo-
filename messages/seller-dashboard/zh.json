@@ -22,5 +22,7 @@
   "performanceEmpty": "店铺收到订单和评价后，表现指标会显示在这里。",
   "pendingRefundRequestSingular": "你有 {count} 个退款申请等待审核。",
   "pendingRefundRequestPlural": "你有 {count} 个退款申请等待审核。",
-  "reviewRefundRequests": "审核退款申请"
+  "reviewRefundRequests": "审核退款申请",
+  "lateDispatches": "逾期发货（最近30天）",
+  "ordersWithRefunds": "有退款的订单（最近30天）"
 }

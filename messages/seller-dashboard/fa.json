@@ -22,5 +22,7 @@
   "performanceEmpty": "پس از دریافت سفارش و نظر توسط فروشگاه، شاخص‌های عملکرد نمایش داده می‌شوند.",
   "pendingRefundRequestSingular": "شما {count} درخواست بازپرداخت در انتظار بررسی دارید.",
   "pendingRefundRequestPlural": "شما {count} درخواست بازپرداخت در انتظار بررسی دارید.",
-  "reviewRefundRequests": "بررسی درخواست‌های بازپرداخت"
+  "reviewRefundRequests": "بررسی درخواست‌های بازپرداخت",
+  "lateDispatches": "ارسال‌های دیرهنگام (۳۰ روز گذشته)",
+  "ordersWithRefunds": "سفارش‌های دارای بازپرداخت (۳۰ روز گذشته)"
 }
