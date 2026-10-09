@@ -124,7 +124,7 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   await setSession(page, buyerId, "CUSTOMER");
   await page.goto(`/en/account/orders/${orderId}`);
   await expect(page.locator(".buyerOrderDetailSummary strong:visible").filter({ hasText: "Partially shipped" })).toHaveText("Partially shipped");
-  const firstShipmentCard = page.locator(".shipmentTrackingCard").filter({ hasText: `PHASE6-${suffix}` });
+  const firstShipmentCard = page.locator(".shipmentTrackingCard:visible").filter({ hasText: `PHASE6-${suffix}` });
   await expect(firstShipmentCard).toContainText("Alpha shipment item × 1");
   await expect(firstShipmentCard).not.toContainText("Private Beta shipment item");
 
@@ -163,10 +163,10 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   const buyerResponse = await page.goto(`/en/account/orders/${orderId}`);
   expect(buyerResponse?.ok()).toBeTruthy();
   await expect(page.locator(".buyerOrderDetailSummary").getByText("Shipped", { exact: true })).toBeVisible();
-  const alphaShipment = page.locator(".shipmentTrackingCard").filter({ hasText: `PHASE6-${suffix}` });
+  const alphaShipment = page.locator(".shipmentTrackingCard:visible").filter({ hasText: `PHASE6-${suffix}` });
   await expect(alphaShipment).toContainText("Alpha shipment item × 1");
   await expect(alphaShipment).not.toContainText("Private Beta shipment item");
-  const betaShipment = page.locator(".shipmentTrackingCard").filter({ hasText: `PHASE6-BETA-${suffix}` });
+  const betaShipment = page.locator(".shipmentTrackingCard:visible").filter({ hasText: `PHASE6-BETA-${suffix}` });
   await expect(betaShipment).toContainText("Private Beta shipment item × 1");
   await expect(betaShipment).not.toContainText("Alpha shipment item");
 });
