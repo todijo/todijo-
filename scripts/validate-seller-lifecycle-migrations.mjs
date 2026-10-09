@@ -78,8 +78,19 @@ function runPrisma(schemaFile, schemaName, command) {
   if (output) process.stdout.write(`${output}\n`);
 }
 
+function createSchema(name) {
+  if (!/^seller_lifecycle_(fresh|upgrade)_[a-z0-9_]+$/.test(name)) {
+    throw new Error("Refusing to create a schema outside the helper's temporary namespace.");
+  }
+  runPsql(["--command", `CREATE SCHEMA "${name}"`]);
+}
+
+function schemaSql(name, sql) {
+  return `SET search_path TO "${name}";\n${sql}`;
+}
+
 function runPsqlInSchema(schemaName, sql) {
-  return runPsql(["--command", `SET search_path TO "${schemaName}"`, "--command", sql]);
+  return runPsql(["--command", schemaSql(schemaName, sql)]);
 }
 
 function assertSql(schemaName, sql, label) {
