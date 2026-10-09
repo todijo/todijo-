@@ -88,7 +88,7 @@ docker run --detach --name "${postgres_container}" --network "${network}" \
   --env POSTGRES_USER=todijo \
   --env POSTGRES_PASSWORD=todijo \
   --env POSTGRES_DB=postgres \
-  postgres:16 >/dev/null
+  public.ecr.aws/docker/library/postgres:16 >/dev/null
 wait_for_postgres
 
 create_database no_pending
