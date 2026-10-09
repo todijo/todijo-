@@ -32,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ orderI
       return NextResponse.json({ error: "Unable to record shipment.", diagnostic: {
         name: error instanceof Error ? error.name : "UNKNOWN_ERROR",
         ...(error instanceof Prisma.PrismaClientKnownRequestError ? { code: error.code, target: error.meta?.target } : {}),
-        ...(error instanceof Error && !(error instanceof Prisma.PrismaClientKnownRequestError) ? { message: error.message.slice(0, 4000) } : {}),
+        ...(error instanceof Error && !(error instanceof Prisma.PrismaClientKnownRequestError) ? { message: error.message.slice(-2000) } : {}),
       } }, { status: 500 });
     }
     return NextResponse.json({ error: "Unable to record shipment." }, { status: 500 });
