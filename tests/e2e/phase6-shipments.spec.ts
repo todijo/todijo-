@@ -99,7 +99,9 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   await page.getByRole("textbox", { name: "Tracking number (optional)" }).fill(`PHASE6-${suffix}`);
   const shipmentResponse = page.waitForResponse((candidate) => candidate.url().includes(`/api/seller/orders/${orderId}/shipments`) && candidate.request().method() === "POST");
   await page.getByRole("button", { name: "Save shipment" }).click();
-  expect((await shipmentResponse).status()).toBe(200);
+  const shipmentResponseValue = await shipmentResponse;
+  const shipmentResponseBody = await shipmentResponseValue.json();
+  expect(shipmentResponseValue.status(), JSON.stringify(shipmentResponseBody)).toBe(200);
   await expect(page.getByText("Previously shipped: 1", { exact: true })).toBeVisible();
   await expect(page.getByText("Remaining to ship: 1", { exact: true })).toBeVisible();
 

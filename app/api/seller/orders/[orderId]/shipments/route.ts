@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { dispatchBuyerOrderEmailDeliveriesBestEffort } from "@/lib/buyer-order-email-deliveries";
 import { isTrustedMutationRequest } from "@/lib/request-security";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +28,13 @@ export async function POST(request: Request, context: { params: Promise<{ orderI
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof SellerShipmentError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (process.env.TODIJO_E2E_DIAGNOSTICS === "1") {
+      return NextResponse.json({ error: "Unable to record shipment.", diagnostic: {
+        name: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+        ...(error instanceof Prisma.PrismaClientKnownRequestError ? { code: error.code, target: error.meta?.target } : {}),
+        ...(error instanceof Error && !(error instanceof Prisma.PrismaClientKnownRequestError) ? { message: error.message.slice(0, 400) } : {}),
+      } }, { status: 500 });
+    }
     return NextResponse.json({ error: "Unable to record shipment." }, { status: 500 });
   }
 }
