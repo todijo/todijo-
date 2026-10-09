@@ -123,7 +123,7 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   expect(await db.shipment.count({ where: { orderGroupId: groupA } })).toBe(1);
   await setSession(page, buyerId, "CUSTOMER");
   await page.goto(`/en/account/orders/${orderId}`);
-  await expect(page.locator(".buyerOrderDetailSummary").getByText("Partially shipped", { exact: true })).toBeVisible();
+  await expect(page.locator(".buyerOrderDetailSummary strong:visible").filter({ hasText: "Partially shipped" })).toHaveText("Partially shipped");
   const firstShipmentCard = page.locator(".shipmentTrackingCard").filter({ hasText: `PHASE6-${suffix}` });
   await expect(firstShipmentCard).toContainText("Alpha shipment item × 1");
   await expect(firstShipmentCard).not.toContainText("Private Beta shipment item");
