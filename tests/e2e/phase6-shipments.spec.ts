@@ -144,7 +144,7 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   await setSession(page, sellerB, "SELLER");
   await page.goto(`/ar/seller/orders?store=${storeB}`);
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  const betaShipmentForm = page.locator(".sellerFulfillmentControl").filter({ hasText: "Private Beta shipment item" });
+  const betaShipmentForm = page.locator(".sellerFulfillmentControl:visible").filter({ hasText: "Private Beta shipment item" });
   await expect(betaShipmentForm.getByText("Private Beta shipment item", { exact: true })).toBeVisible();
   await expect(page.getByText("Alpha shipment item", { exact: true })).toHaveCount(0);
   const betaQuantity = betaShipmentForm.locator(".sellerShipmentItem input[type=number]");
