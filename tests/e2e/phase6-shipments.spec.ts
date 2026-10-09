@@ -161,7 +161,7 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   await setSession(page, buyerId, "CUSTOMER");
   const buyerResponse = await page.goto(`/en/account/orders/${orderId}`);
   expect(buyerResponse?.ok()).toBeTruthy();
-  await expect(page.getByText("Shipped", { exact: true })).toBeVisible();
+  await expect(page.locator(".buyerOrderDetailSummary").getByText("Shipped", { exact: true })).toBeVisible();
   const alphaShipment = page.locator(".shipmentTrackingCard").filter({ hasText: `PHASE6-${suffix}` });
   await expect(alphaShipment).toContainText("Alpha shipment item × 1");
   await expect(alphaShipment).not.toContainText("Private Beta shipment item");
