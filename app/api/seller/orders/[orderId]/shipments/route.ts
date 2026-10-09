@@ -27,6 +27,13 @@ export async function POST(request: Request, context: { params: Promise<{ orderI
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof SellerShipmentError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (process.env.CI === "true") {
+      const prismaCode = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : undefined;
+      console.error("[seller-shipment] unexpected request failure", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        ...(prismaCode ? { prismaCode } : {}),
+      });
+    }
     return NextResponse.json({ error: "Unable to record shipment." }, { status: 500 });
   }
 }

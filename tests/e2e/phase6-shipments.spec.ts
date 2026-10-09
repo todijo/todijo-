@@ -134,7 +134,7 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
     const response = await fetch(`/api/seller/orders/${encodeURIComponent(orderId)}/shipments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, idempotencyKey: key, items: [{ orderItemId: itemId, quantity: 1 }], carrier: "UPS", trackingNumber: tracking }) });
     return { status: response.status, body: await response.json() };
   })), { orderId, storeId: storeA, itemId: itemA, key: `concurrent-${suffix}`, tracking: `PHASE6-SECOND-${suffix}` });
-  expect(concurrent.map((result) => result.status)).toEqual([200, 200]);
+  expect(concurrent.map((result) => result.status), `Concurrent shipment responses: ${JSON.stringify(concurrent)}`).toEqual([200, 200]);
   expect(concurrent.map((result) => result.body.idempotent).sort()).toEqual([false, true]);
   expect(await db.shipment.count({ where: { orderGroupId: groupA } })).toBe(2);
   const persistedOrder = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true, fulfillmentStatus: true } });
