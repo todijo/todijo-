@@ -7,7 +7,15 @@ import { validateRegistrationInput, registrationPersistenceData } from "../lib/a
 import { createBuyerAddress } from "../lib/buyer-addresses.js";
 import { createMobileSession } from "../lib/mobile-session.js";
 
-const disposable = process.env.DATABASE_URL?.includes("127.0.0.1:55432/todijo_e2e") === true;
+const disposable = (() => {
+  if (process.env.TODIJO_CI_DISPOSABLE_DATABASE !== "1" || !process.env.DATABASE_URL) return false;
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    return ["postgres:", "postgresql:"].includes(url.protocol) && url.hostname === "127.0.0.1" && url.port === "5432" && url.pathname === "/todijo_e2e";
+  } catch {
+    return false;
+  }
+})();
 
 test("mobile registration uses a fixed three-minute attempt and fixed callback", () => {
   assert.equal(MOBILE_REGISTRATION_TTL_MS, 180000);

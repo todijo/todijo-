@@ -8,7 +8,7 @@ import { processStripeEvent } from "../lib/payments";
 const databaseUrl = process.env.SELLER_SUBSCRIPTION_TRANSITION_TEST_DATABASE_URL;
 test("PostgreSQL advisory locking and partial uniqueness prevent concurrent live change attempts", { skip: !databaseUrl }, async () => {
   const target = new URL(databaseUrl!);
-  assert.equal(target.hostname, "127.0.0.1"); assert.equal(target.port, "65431");
+  assert.equal(target.hostname, "127.0.0.1"); assert.equal(target.port, "5432");
   assert.equal(target.pathname, "/todijo_transition_test"); assert.equal(target.username, "validation");
   const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
   const keys = ["STRIPE_SELLER_PLUS_MONTHLY_PRICE_ID", "STRIPE_SELLER_PRO_MONTHLY_PRICE_ID"];

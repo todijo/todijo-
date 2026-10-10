@@ -10,7 +10,7 @@ const databaseUrl = process.env.SELLER_STATEMENT_TEST_DATABASE_URL;
 test("PostgreSQL monthly statements are append-only/idempotent and subscription invoices survive replacement, provider outage, and closure", { skip: !databaseUrl }, async () => {
   const target = new URL(databaseUrl!);
   assert.equal(target.hostname, "127.0.0.1");
-  assert.equal(target.port, "65431");
+  assert.equal(target.port, "5432");
   assert.equal(target.username, "validation");
   assert.equal(target.password, "validation");
   assert.equal(target.pathname, "/todijo_statement_test");

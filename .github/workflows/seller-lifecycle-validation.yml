@@ -81,8 +81,6 @@ jobs:
           POSTGRES_DB: todijo_lifecycle_validation
         ports:
           - 5432:5432
-          - 55432:5432
-          - 65431:5432
         options: >-
           --health-cmd "pg_isready -U lifecycle -d todijo_lifecycle_validation"
           --health-interval 10s
@@ -126,11 +124,11 @@ jobs:
           createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_transition_test
           createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_dashboard_test
           createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_statement_test
-          DATABASE_URL=postgresql://lifecycle:lifecycle@127.0.0.1:55432/todijo_e2e?schema=public npx prisma migrate deploy
-          DATABASE_URL=postgresql://validation:validation@127.0.0.1:65431/todijo_free_test?schema=public npx prisma migrate deploy
-          DATABASE_URL=postgresql://validation:validation@127.0.0.1:65431/todijo_transition_test?schema=public npx prisma migrate deploy
-          DATABASE_URL=postgresql://validation:validation@127.0.0.1:65431/todijo_dashboard_test?schema=public npx prisma migrate deploy
-          DATABASE_URL=postgresql://validation:validation@127.0.0.1:65431/todijo_statement_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_e2e?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_free_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_transition_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_dashboard_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_statement_test?schema=public npx prisma migrate deploy
 
       - name: Type-check
         run: npm run typecheck
@@ -140,12 +138,13 @@ jobs:
 
       - name: Run full repository test suite
         env:
-          DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:55432/todijo_e2e?schema=public
-          FREE_SELLER_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:65431/todijo_free_test?schema=public
-          SELLER_SUBSCRIPTION_TRANSITION_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:65431/todijo_transition_test?schema=public
-          SELLER_DASHBOARD_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:65431/todijo_dashboard_test?schema=public
-          SELLER_STATEMENT_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:65431/todijo_statement_test?schema=public
+          DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_e2e?schema=public
+          FREE_SELLER_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_free_test?schema=public
+          SELLER_SUBSCRIPTION_TRANSITION_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_transition_test?schema=public
+          SELLER_DASHBOARD_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_dashboard_test?schema=public
+          SELLER_STATEMENT_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_statement_test?schema=public
           TODIJO_FREE_EPHEMERAL: "1"
+          TODIJO_CI_DISPOSABLE_DATABASE: "1"
         run: npm test
 
       - name: Run production-flow and dashboard browser tests

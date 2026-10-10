@@ -4,7 +4,15 @@ import { prisma } from "../lib/prisma.js";
 import { exchangeMobileOAuthAttempt } from "../lib/mobile-oauth-exchange.js";
 import { mobileOAuthHash, mobileOAuthSecret } from "../lib/mobile-oauth.js";
 
-const disposable=process.env.DATABASE_URL?.includes("127.0.0.1:55432/todijo_e2e")===true;
+const disposable = (() => {
+  if (process.env.TODIJO_CI_DISPOSABLE_DATABASE !== "1" || !process.env.DATABASE_URL) return false;
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    return ["postgres:", "postgresql:"].includes(url.protocol) && url.hostname === "127.0.0.1" && url.port === "5432" && url.pathname === "/todijo_e2e";
+  } catch {
+    return false;
+  }
+})();
 const databaseTest={skip:!disposable};
 process.env.MOBILE_SESSION_SECRET ||= "todijo-disposable-mobile-session-secret-only";
 
