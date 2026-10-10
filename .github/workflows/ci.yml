@@ -63,10 +63,10 @@ jobs:
           PGPASSWORD: ci
         run: |
           psql -h 127.0.0.1 -p 5432 -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
-          createdb -h 127.0.0.1 -p 5432 -U ci -d postgres -O ci todijo_e2e
-          createdb -h 127.0.0.1 -p 5432 -U ci -d postgres -O validation todijo_free_test
-          createdb -h 127.0.0.1 -p 5432 -U ci -d postgres -O validation todijo_transition_test
-          createdb -h 127.0.0.1 -p 5432 -U ci -d postgres -O validation todijo_dashboard_test
+          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O ci todijo_e2e
+          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_free_test
+          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_transition_test
+          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_dashboard_test
           DATABASE_URL=postgresql://ci:ci@127.0.0.1:55432/todijo_e2e?schema=public npx prisma migrate deploy
           FREE_SELLER_TEST_DATABASE_URL=postgresql://validation:validation@127.0.0.1:65431/todijo_free_test?schema=public npx prisma migrate deploy
           SELLER_SUBSCRIPTION_TRANSITION_TEST_DATABASE_URL=postgresql://validation:validation@127.0.0.1:65431/todijo_transition_test?schema=public npx prisma migrate deploy
