@@ -56,10 +56,23 @@ function eligibleOrders(storeId: string, now: Date) {
   ` };
 }
 
-function safeInt(value: bigint | number | null | undefined) {
-  const number = typeof value === "bigint" ? Number(value) : value ?? 0;
-  if (!Number.isSafeInteger(number)) throw new Error("Seller dashboard aggregate exceeded safe integer bounds");
-  return number;
+function safeInt(value: unknown) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("Seller dashboard aggregate exceeded safe integer bounds");
+    return value;
+  }
+
+  // PostgreSQL SUM(bigint) returns numeric, which Prisma decodes as Decimal.
+  // Convert through a decimal integer string so bounds are checked exactly
+  // before converting to the dashboard's number-based view model.
+  const integerText = typeof value === "bigint" ? value.toString() : value instanceof Prisma.Decimal && value.isInteger() ? value.toFixed(0) : "";
+  if (!/^-?\d+$/.test(integerText)) throw new Error("Seller dashboard aggregate exceeded safe integer bounds");
+  const integer = BigInt(integerText);
+  if (integer > BigInt(Number.MAX_SAFE_INTEGER) || integer < BigInt(Number.MIN_SAFE_INTEGER)) {
+    throw new Error("Seller dashboard aggregate exceeded safe integer bounds");
+  }
+  return Number(integer);
 }
 
 export async function loadSellerDashboardAggregate(db: Db, storeId: string, now = new Date()): Promise<SellerDashboardAggregate> {

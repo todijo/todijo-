@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Prisma } from "@prisma/client";
 import { loadSellerDashboardAggregate } from "../lib/seller-dashboard-aggregate";
 
 function database(rows: Array<unknown[]>) {
@@ -10,7 +11,7 @@ function database(rows: Array<unknown[]>) {
   };
 }
 
-const summary = (currency: string, values: Partial<Record<string, bigint>> = {}) => ({
+const summary = (currency: string, values: Partial<Record<string, bigint | Prisma.Decimal>> = {}) => ({
   currency, totalOrders: BigInt("0"), pendingOrders: BigInt("0"), customers: BigInt("0"), newCustomersToday: BigInt("0"),
   currentCustomers: BigInt("0"), previousCustomers: BigInt("0"), revenueMinor: BigInt("0"), todayRevenueMinor: BigInt("0"),
   currentRevenueMinor: BigInt("0"), previousRevenueMinor: BigInt("0"), currentOrders: BigInt("0"), previousOrders: BigInt("0"), ...values,
@@ -60,4 +61,14 @@ test("large aggregate counts remain database-side and reject unsafe monetary int
   assert.equal(result.revenueByCurrency[0].amountMinor, 250_000_000_000);
   const overflow = database([[summary("EUR", { revenueMinor: BigInt(Number.MAX_SAFE_INTEGER) + BigInt("1") })], [], [], []]);
   await assert.rejects(() => loadSellerDashboardAggregate(overflow.db, "large-store"), /safe integer bounds/);
+});
+
+test("PostgreSQL numeric SUM results decode from Prisma Decimal without losing integer precision", async () => {
+  const f = database([[summary("EUR", { revenueMinor: new Prisma.Decimal("125000"), todayRevenueMinor: new Prisma.Decimal("4500") })], [], [], []]);
+  const result = await loadSellerDashboardAggregate(f.db, "decimal-store", new Date("2026-10-10T12:00:00Z"));
+  assert.deepEqual(result.revenueByCurrency, [{ currency: "EUR", amountMinor: 125000 }]);
+  assert.deepEqual(result.todayRevenueByCurrency, [{ currency: "EUR", amountMinor: 4500 }]);
+
+  const decimalOverflow = database([[summary("EUR", { revenueMinor: new Prisma.Decimal((BigInt(Number.MAX_SAFE_INTEGER) + BigInt("1")).toString()) })], [], [], []]);
+  await assert.rejects(() => loadSellerDashboardAggregate(decimalOverflow.db, "decimal-store"), /safe integer bounds/);
 });

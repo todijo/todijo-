@@ -26,10 +26,12 @@ test("monthly statement CSV is a stable snapshot and labels refunds/commission w
 test("monthly statement generation snapshots empty completed months and is idempotent", async () => {
   const saved = new Map<string, any>();
   let creates = 0;
+  let advisoryLocks = 0;
   const db = {
     store: { findUnique: async () => ({ id: "store_1", businessId: "biz_1", currency: "EUR", createdAt: new Date("2025-10-01T00:00:00Z") }) },
     orderGroup: { findMany: async () => [] },
     $transaction: async (fn: any) => fn({
+      $executeRaw: async () => { advisoryLocks++; return 1; },
       $queryRaw: async () => [],
       orderGroup: { findMany: async () => [] },
       sellerMonthlyStatement: {
@@ -43,7 +45,9 @@ test("monthly statement generation snapshots empty completed months and is idemp
   assert.equal(first.length, 12);
   assert.ok(first.every((statement) => statement.currency === "EUR" && statement.rowCount === 0 && statement.revision === 1));
   assert.equal(creates, 12);
+  assert.equal(advisoryLocks, 12);
   await createSellerMonthlyStatementRevisions(db, { businessId: "biz_1", storeId: "store_1", now: new Date("2026-10-10T00:00:00Z") });
   assert.equal(creates, 12);
+  assert.equal(advisoryLocks, 24);
   await assert.rejects(() => createSellerMonthlyStatementRevisions(db, { businessId: "other", storeId: "store_1", now: new Date("2026-10-10T00:00:00Z") }), /STATEMENT_STORE_BUSINESS_MISMATCH/);
 });
