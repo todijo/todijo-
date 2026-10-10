@@ -97,15 +97,21 @@ test("seller recent orders prefer snapshots and retain relation fallbacks", () =
   assert.match(source, /recipientName\s*\?\?\s*order\.buyerNameSnapshot\s*\?\?/);
 });
 
-test("seller dashboard reuses the strict order ownership filter and retains five recent orders", () => {
+test("seller dashboard uses database aggregates and retains a stable bounded recent-order preview", () => {
   const source = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
   assert.match(source, /const sellerOrdersWhere = sellerOrderHistoryWhere\(userId, storeId, ""\)/);
-  assert.match(source, /prisma\.order\.findMany\(\{ where: sellerOrdersWhere,/);
+  assert.match(source, /loadSellerDashboardAggregate\(prisma,storeId,now\)/);
   assert.match(source, /permissions\.orders \? prisma\.order\.findMany\(\{ where: sellerOrdersWhere, take: 5/);
-  assert.match(source, /groups: \{ where: \{ storeId \}, select: \{ sellerNetAmountMinor/);
+  assert.match(source, /orderBy: \[\{ createdAt: "desc" \}, \{ id: "desc" \}\]/);
   assert.match(source, /items: \{ where: \{ orderGroupId: null, product: \{ storeId \} \}/);
-  assert.match(source, /total: order\.groups\.length \? order\.groups\.reduce/);
   assert.doesNotMatch(source, /SellerFulfillmentControl/);
+  const aggregates = readFileSync(join(process.cwd(), "lib", "seller-dashboard-aggregate.ts"), "utf8");
+  assert.match(aggregates, /SUM\(g\."sellerNetAmountMinor"\)/);
+  assert.match(aggregates, /COUNT\(DISTINCT/);
+  assert.match(aggregates, /DATE_TRUNC\('day'/);
+  assert.match(aggregates, /LIMIT \$\{TOP_PRODUCTS_LIMIT\}/);
+  assert.match(aggregates, /g\."storeId" = \$\{storeId\}/);
+  assert.match(aggregates, /NOT EXISTS \(SELECT 1 FROM "OrderGroup" g WHERE g\."orderId" = o\."id"\)/);
 });
 
 test("seller dashboard routes shipment actions to item-level store-filtered order management", () => {

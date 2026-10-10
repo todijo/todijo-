@@ -11,7 +11,8 @@ import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer
 import { dashboardAudience, dashboardPaths, sellerDashboardGate } from "@/lib/dashboard";
 import { sellerOrderHistoryWhere } from "@/lib/order-history";
 import { prisma } from "@/lib/prisma";
-import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "@/lib/seller-dashboard";
+import { comparisonPercent } from "@/lib/seller-dashboard";
+import { loadSellerDashboardAggregate } from "@/lib/seller-dashboard-aggregate";
 import { readSession } from "@/lib/session";
 import SellerAnalytics from "@/components/SellerAnalytics";
 import { fulfillmentStepFor } from "@/lib/order-status";
@@ -60,6 +61,29 @@ function money(locale: string, amount: number, currency: string) {
   }
 }
 
+function minorAmount(amountMinor: number, currency: string) {
+  const zeroDecimalCurrencies = new Set(["BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "VND", "VUV", "XAF", "XOF", "XPF"]);
+  return amountMinor / (zeroDecimalCurrencies.has(currency.toUpperCase()) ? 1 : 100);
+}
+
+function moneyBreakdown(locale: string, values: Array<{ currency: string; amountMinor: number }>, fallbackCurrency: string) {
+  if (!values.length) return money(locale, 0, fallbackCurrency);
+  return values.map(({ currency, amountMinor }) => {
+    try { return new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "code" }).format(minorAmount(amountMinor, currency)); }
+    catch { return `${minorAmount(amountMinor, currency)} ${currency}`; }
+  }).join(" · ");
+}
+
+function comparisonBreakdown(current: Array<{ currency: string; amountMinor: number }>, previous: Array<{ currency: string; amountMinor: number }>, translate: (value: number) => string, noComparison: string) {
+  const previousByCurrency = new Map(previous.map((row) => [row.currency, row.amountMinor]));
+  const changes = current.flatMap((row) => {
+    const before = previousByCurrency.get(row.currency) ?? 0;
+    const percent = comparisonPercent(minorAmount(row.amountMinor, row.currency), minorAmount(before, row.currency));
+    return percent == null ? [] : [`${row.currency} ${translate(percent)}`];
+  });
+  return changes.length ? changes.join(" · ") : noComparison;
+}
+
 function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }: { order: BuyerOrder; locale: string; detailsLabel: string; unknownStore: string; statusLabel: string }) {
   const item = order.items[0];
   return <article className="premiumRecentOrder">
@@ -80,8 +104,8 @@ async function loadSellerDashboardMetrics(userId:string,storeId:string,permissio
   const productPreviousStart = new Date(now); productPreviousStart.setDate(productPreviousStart.getDate() - 60);
   try {
     return await dashboardData(Promise.all([
-      permissions.analytics||permissions.sales ? prisma.order.findMany({ where: sellerOrdersWhere, select: { status: true, buyerId: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, sellerAmount: true, groups: { where: { storeId }, select: { sellerNetAmountMinor: true, items: { select: { quantity: true, productNameSnapshot: true, product: { select: { id: true, name: true } } } } } }, items: { where: { orderGroupId: null, product: { storeId } }, select: { quantity: true, productNameSnapshot: true, lineTotal: true, product: { select: { id: true, name: true } } } } }, orderBy: { createdAt: "desc" } }).then((orders) => orders.map((order) => ({ ...order, sellerAmount: order.groups.length ? order.groups.reduce((sum, group) => sum + group.sellerNetAmountMinor, 0) : order.sellerAmount, items: [...order.groups.flatMap((group) => group.items), ...order.items] }))) : Promise.resolve([]),
-      permissions.orders ? prisma.order.findMany({ where: sellerOrdersWhere, take: 5, select: { id: true, status: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, recipientName: true, buyerNameSnapshot: true, buyer: { select: { firstName: true, lastName: true } }, groups: { where: { storeId }, select: { itemSubtotalMinor: true, shippingAmountMinor: true, items: { take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } } }, items: { where: { orderGroupId: null, product: { storeId } }, take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } }, orderBy: { createdAt: "desc" } }).then((orders) => orders.map((order) => ({ ...order, total: order.groups.length ? order.groups.reduce((sum, group) => sum + group.itemSubtotalMinor + group.shippingAmountMinor, 0) / 100 : Number(order.total), items: [...order.groups.flatMap((group) => group.items), ...order.items].slice(0, 1) }))) : Promise.resolve([]),
+      permissions.analytics||permissions.sales||permissions.orders ? loadSellerDashboardAggregate(prisma,storeId,now) : Promise.resolve(null),
+      permissions.orders ? prisma.order.findMany({ where: sellerOrdersWhere, take: 5, select: { id: true, status: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, recipientName: true, buyerNameSnapshot: true, buyer: { select: { firstName: true, lastName: true } }, groups: { where: { storeId }, select: { itemSubtotalMinor: true, shippingAmountMinor: true, items: { take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } } }, items: { where: { orderGroupId: null, product: { storeId } }, take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }).then((orders) => orders.map((order) => ({ ...order, total: order.groups.length ? minorAmount(order.groups.reduce((sum, group) => sum + group.itemSubtotalMinor + group.shippingAmountMinor, 0), order.currency) : Number(order.total), items: [...order.groups.flatMap((group) => group.items), ...order.items].slice(0, 1) }))) : Promise.resolve([]),
       permissions.orders ? prisma.refundRequest.count({ where: { status: "PENDING", order: sellerOrdersWhere } }) : Promise.resolve(0),
       permissions.products ? prisma.product.count({ where: { storeId, createdAt: { gte: productCurrentStart } } }) : Promise.resolve(0),
       permissions.products ? prisma.product.count({ where: { storeId, createdAt: { gte: productPreviousStart, lt: productCurrentStart } } }) : Promise.resolve(0),
@@ -99,15 +123,9 @@ type SellerDashboardMetricsPromise = Promise<SellerDashboardMetrics|null>;
 async function SellerDashboardHeroMetrics({metrics,locale,currency,canViewSales,canViewOrders,canViewMessages,unreadMessages,labels}:{metrics:SellerDashboardMetricsPromise;locale:string;currency:string;canViewSales:boolean;canViewOrders:boolean;canViewMessages:boolean;unreadMessages:number;labels:{todayRevenue:string;pendingOrders:string;newCustomers:string;unreadMessages:string}}) {
   const data=await metrics;
   if(!data)return null;
-  const [analyticsOrders]=data;
-  const paid=analyticsOrders.filter(order=>order.paidAt||order.stripePaymentIntentId);
-  const startToday=new Date();startToday.setHours(0,0,0,0);
-  const todayRevenue=paid.filter(order=>(order.paidAt??order.createdAt)>=startToday).reduce((sum,order)=>sum+(order.sellerAmount??0)/100,0);
-  const pendingOrders=analyticsOrders.filter(order=>["PENDING","PAID","PROCESSING"].includes(order.status)).length;
-  const firstOrderByBuyer=new Map<string,Date>();
-  for(const order of analyticsOrders){const first=firstOrderByBuyer.get(order.buyerId);if(!first||order.createdAt<first)firstOrderByBuyer.set(order.buyerId,order.createdAt);}
-  const newCustomers=[...firstOrderByBuyer.values()].filter(date=>date>=startToday).length;
-  return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{money(locale,todayRevenue,currency)}</strong></div>}{canViewOrders&&<><div><small>{labels.pendingOrders}</small><strong>{pendingOrders}</strong></div><div><small>{labels.newCustomers}</small><strong>{newCustomers}</strong></div></>}{canViewMessages&&<div><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></div>}</div>;
+  const [aggregate]=data;
+  if(!aggregate)return null;
+  return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{moneyBreakdown(locale,aggregate.todayRevenueByCurrency,currency)}</strong></div>}{canViewOrders&&<><div><small>{labels.pendingOrders}</small><strong>{aggregate.pendingOrders}</strong></div><div><small>{labels.newCustomers}</small><strong>{aggregate.newCustomersToday}</strong></div></>}{canViewMessages&&<div><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></div>}</div>;
 }
 
 async function SellerStockActionAlerts({storeId,locale,canViewProducts}:{storeId:string;locale:string;canViewProducts:boolean}) {
@@ -127,27 +145,25 @@ async function SellerStockActionAlerts({storeId,locale,canViewProducts}:{storeId
 async function SellerDashboardSecondarySections({metrics,locale,activeStore,storeChoices,sellerCanAddProduct,readinessAction,readinessHref,subscriptionActive,commercialPlan,owner,role,canViewProducts,canViewOrders,canViewAnalytics,canViewSales,canViewMessages,canEditStore,readinessUsesSettings}:{metrics:SellerDashboardMetricsPromise;locale:string;activeStore:NonNullable<Prisma.StoreGetPayload<{select:typeof sellerStoreSelect}>>;storeChoices:Array<{id:string;name:string;slug:string;businessId:string|null}>;sellerCanAddProduct:boolean;readinessAction:string;readinessHref:string;subscriptionActive:boolean;commercialPlan:string|null;owner:boolean;role:string;canViewProducts:boolean;canViewOrders:boolean;canViewAnalytics:boolean;canViewSales:boolean;canViewMessages:boolean;canEditStore:boolean;readinessUsesSettings:boolean}) {
   const data=await metrics;
   if(!data||!activeStore)return null;
-  const [analyticsOrders,sellerOrders,pendingRefundCount,currentProducts,previousProducts,reviewStats]=data;
+  const [aggregate,sellerOrders,pendingRefundCount,currentProducts,previousProducts,reviewStats]=data;
+  if(!aggregate)return null;
   const [t,p,s,ordersText]=await Promise.all([getTranslations("Dashboard"),getTranslations("DashboardPremium"),getTranslations("SellerDashboard"),getTranslations("Orders")]);
   const reportCopy=sellerReportCopy(locale);
   const now=new Date();
-  const paidSellerOrders=analyticsOrders.filter(order=>order.paidAt||order.stripePaymentIntentId);
-  const revenue=paidSellerOrders.reduce((sum,order)=>sum+(order.sellerAmount??0)/100,0);
-  const customers=new Set(paidSellerOrders.map(order=>order.buyerId)).size;
-  const periods=sellerPeriodMetrics(analyticsOrders,now);
   const comparison=(current:number,previous:number)=>{const percent=comparisonPercent(current,previous);return percent==null?s("noComparison"):s("comparison",{value:percent>0?`+${percent}`:String(percent)});};
-  const analytics=sellerAnalytics(analyticsOrders,locale,now);
-  const analyticsStatuses=analytics.statuses.map(item=>({label:ordersText(`status.${item.status}`),value:item.value}));
+  const analyticsStatuses=aggregate.statuses.map(item=>({label:ordersText(`status.${item.status}`),value:item.value}));
+  const analyticsTrends=aggregate.trends.map(point=>({label:new Intl.DateTimeFormat(locale,{month:"short",day:"numeric",timeZone:"UTC"}).format(new Date(`${point.date}T00:00:00Z`)),orders:point.orders,revenueByCurrency:Object.fromEntries(Object.entries(point.revenueByCurrency).map(([currency,minor])=>[currency,minorAmount(minor,currency)]))}));
+  const revenueComparison=comparisonBreakdown(aggregate.currentRevenueByCurrency,aggregate.previousRevenueByCurrency,value=>s("comparison",{value:value>0?`+${value}`:String(value)}),s("noComparison"));
   let dispatchHealth:Awaited<ReturnType<typeof loadSellerDispatchHealth>>|null=null;
   if(canViewAnalytics){try{dispatchHealth=await dashboardData(loadSellerDispatchHealth(prisma,activeStore.id,now));}catch{dispatchHealth=null;}}
   return <>
     {pendingRefundCount>0&&<section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount===1?"pendingRefundRequestSingular":"pendingRefundRequestPlural",{count:pendingRefundCount})}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
-    {(canViewProducts||canViewOrders||canViewSales||canViewAnalytics)&&<section className="premiumStatsGrid">{canViewProducts&&<DashboardStatCard label={p("nav.products")} value={activeStore._count.products} hint={comparison(currentProducts,previousProducts)} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewOrders&&<DashboardStatCard label={p("stats.orders")} value={sellerOrders.length} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText} tone="blue"/>} {canViewSales&&<DashboardStatCard label={p("nav.revenue")} value={money(locale,revenue,activeStore.currency)} hint={comparison(periods.current.revenue,periods.previous.revenue)} href={`/${locale}/dashboard?store=${activeStore.id}#analytics`} icon={TrendingUp} tone="mint"/>} {canViewAnalytics&&<DashboardStatCard label={p("stats.customers")} value={customers} hint={comparison(periods.current.customers,periods.previous.customers)} icon={Users} tone="amber"/>}</section>}
+    {(canViewProducts||canViewOrders||canViewSales||canViewAnalytics)&&<section className="premiumStatsGrid">{canViewProducts&&<DashboardStatCard label={p("nav.products")} value={activeStore._count.products} hint={comparison(currentProducts,previousProducts)} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewOrders&&<DashboardStatCard label={p("stats.orders")} value={aggregate.totalOrders} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText} tone="blue"/>} {canViewSales&&<DashboardStatCard label={p("nav.revenue")} value={moneyBreakdown(locale,aggregate.revenueByCurrency,activeStore.currency)} hint={revenueComparison} href={`/${locale}/dashboard?store=${activeStore.id}#analytics`} icon={TrendingUp} tone="mint"/>} {canViewAnalytics&&<DashboardStatCard label={p("stats.customers")} value={aggregate.customers} hint={comparison(aggregate.currentCustomers,aggregate.previousCustomers)} icon={Users} tone="amber"/>}</section>}
     <div className="premiumDashboardColumns sellerColumns">
       {canViewOrders&&<DashboardSection id="recent-orders" title={p("recentOrders")} description={p("seller.recentDescription")}>{sellerOrders.length?<div className="premiumRecentOrders">{sellerOrders.map(order=>{const item=order.items[0];const image=item?.productImageUrlSnapshot??item?.product.images[0];const name=item?.productNameSnapshot??item?.product.name;const buyerName=order.recipientName??order.buyerNameSnapshot??`${order.buyer.firstName} ${order.buyer.lastName}`;const step=fulfillmentStepFor(order.status);return <article className="premiumRecentOrder sellerRecentOrder" key={order.id}><div className="premiumRecentImage">{image?<Image src={image} alt="" width={68} height={68} unoptimized/>:<Package size={26} aria-hidden="true"/>}</div><div className="premiumRecentProduct"><strong>{name??ordersText("details")}</strong><span>{buyerName} · {new Intl.DateTimeFormat(locale,{dateStyle:"medium"}).format(order.createdAt)}</span></div><div className="sellerOrderStatuses"><DashboardStatusBadge label={buyerPaymentState(order)==="paid"?ordersText("payment.paid"):ordersText(`payment.${buyerPaymentState(order)}`)} status={buyerPaymentState(order)}/><DashboardStatusBadge label={step?ordersText(`fulfillment.${step.toLowerCase()}`):ordersText(`status.${order.status}`)} status={order.status}/></div><strong className="premiumRecentTotal">{money(locale,Number(order.total),order.currency)}</strong><Link className="premiumTextLink" href={`/${locale}/seller/orders?store=${activeStore.id}&q=${encodeURIComponent(order.id)}`}>{p("viewOrders")}</Link></article>;})}</div>:<DashboardEmptyState title={p("seller.emptyOrders")} description={p("seller.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/products`}>{t("manageProducts")}</Link>}/>}</DashboardSection>}
       <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid">{sellerCanAddProduct&&<DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new?store=${activeStore.id}`} icon={Plus} primary/>}{owner&&!subscriptionActive&&<DashboardQuickAction label={readinessAction} href={readinessHref} icon={readinessUsesSettings?Settings:CreditCard} primary/>}{canViewOrders&&<DashboardQuickAction label={p("viewOrders")} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText}/>} {canViewProducts&&<DashboardQuickAction label={t("manageProducts")} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewSales&&<DashboardQuickAction label={reportCopy.downloadReport} href={`/api/seller/reports/export?type=finance&store=${encodeURIComponent(activeStore.id)}&locale=${encodeURIComponent(locale)}`} icon={Download}/>} {canViewProducts&&<DashboardQuickAction label={reportCopy.downloadStock} href={`/api/seller/reports/export?type=stock&store=${encodeURIComponent(activeStore.id)}&locale=${encodeURIComponent(locale)}`} icon={Download}/>} {canViewMessages&&<DashboardQuickAction label={p("myMessages")} href={dashboardPaths(locale).messages} icon={MessageCircle}/>} {canEditStore&&<DashboardQuickAction label={p("nav.settings")} href={`/${locale}/seller/store-settings?store=${activeStore.id}`} icon={Settings}/>}<DashboardQuickAction label={t("viewShop")} href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`} icon={Store}/></div></DashboardSection>
     </div>
-    {canViewAnalytics&&<DashboardSection id="analytics" title={s("analyticsTitle")} description={s("analyticsDescription")}>{sellerOrders.length?<SellerAnalytics trends={analytics.trends} products={analytics.products} statuses={analyticsStatuses} currency={activeStore.currency} labels={{revenue:s("revenue30"),orders:s("orders30"),topProducts:s("topProducts"),statuses:s("statusDistribution")}}/>:<DashboardEmptyState title={p("noRevenue")} description={p("noRevenueText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/orders`}>{p("viewOrders")}</Link>}/>}</DashboardSection>}
+    {canViewAnalytics&&<DashboardSection id="analytics" title={s("analyticsTitle")} description={s("analyticsDescription")}>{aggregate.totalOrders?<SellerAnalytics trends={analyticsTrends} products={aggregate.products} statuses={analyticsStatuses} labels={{revenue:s("revenue30"),orders:s("orders30"),topProducts:s("topProducts"),statuses:s("statusDistribution")}}/>:<DashboardEmptyState title={p("noRevenue")} description={p("noRevenueText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/orders`}>{p("viewOrders")}</Link>}/>}</DashboardSection>}
     {canViewAnalytics&&<DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating>0&&<article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{dispatchHealth&&<><article><Truck size={20}/><span>{s("lateDispatches")}</span><strong>{dispatchHealth.lateDispatches}</strong>{dispatchHealth.unknownDispatches>0&&<small>{s("notEnoughData")}: {dispatchHealth.unknownDispatches}</small>}</article><article><ReceiptText size={20}/><span>{s("ordersWithRefunds")}</span><strong>{dispatchHealth.ordersWithCashRefunds}</strong></article></>}{reviewStats._count.rating===0&&!dispatchHealth&&<DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>}
     {owner&&commercialPlan==="free"&&<FreeSellerStartCard locale={locale}/>}
     {owner&&role==="SELLER"&&storeChoices.length>0&&hasLockedSellerMultiStoreTeaser(commercialPlan)&&sellerMultiStoreTeaserCopy(locale)&&<LockedMultiStoreTeaser copy={sellerMultiStoreTeaserCopy(locale)!}/>}

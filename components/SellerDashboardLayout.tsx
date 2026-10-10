@@ -15,6 +15,7 @@ import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 import { hasProSellerCapabilities } from "@/lib/seller-commercial-access";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { sellerInvoiceArchiveCopy } from "@/i18n/seller-invoice-archive";
+import { sellerMonthlyStatementCopy } from "@/i18n/seller-monthly-statements";
 
 type Labels = {
   dashboard: string; products: string; orders: string; messages: string; statistics: string; importProducts?: string;
@@ -22,7 +23,7 @@ type Labels = {
   eyebrow: string; logout: string; menu: string; collapse: string; addProduct: string;
 };
 
-export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "import-products" | "orders" | "messages" | "notifications" | "settings" | "subscription" | "invoices" | "loyalty" | "reviews" | "account";
+export type SellerNavigationActive = "dashboard" | "products" | "new-product" | "import-products" | "orders" | "messages" | "notifications" | "settings" | "subscription" | "invoices" | "statements" | "loyalty" | "reviews" | "account";
 
 export function sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailable=true, proImportAvailable=false, labels, accountLabel, privacyLabel, active, unreadMessages = 0,ownerTools=false,permissions }: { locale: string; storeSlug?: string; publicStoreAvailable?: boolean; proImportAvailable?: boolean; labels: Labels; accountLabel: string; privacyLabel: string; active: SellerNavigationActive; unreadMessages?: number;ownerTools?:boolean;permissions?:TeamPermission[] }): DashboardNavItem[] {
   const team=sellerTeamCopy(locale);
@@ -43,6 +44,7 @@ export function sellerDashboardNavItems({ locale, storeSlug, publicStoreAvailabl
     ...(can("STORE_VIEW_SETTINGS")?[{ label: labels.settings, href: `/${locale}/seller/store-settings`, icon: Settings, active: active === "settings" }]:[]),
     ...(ownerTools?[{ label: sellerEntitlementSubscriptionMessages[isLocale(locale) ? locale : "en"].title, href: `/${locale}/seller/subscription`, icon: CreditCard, active: active === "subscription" },
     { label: sellerInvoiceArchiveCopy(locale).title, href: `/${locale}/account/invoices`, icon: ReceiptText, active: active === "invoices" },
+    { label: sellerMonthlyStatementCopy(locale).title, href: `/${locale}/account/statements`, icon: ReceiptText, active: active === "statements" },
     { label: loyaltyMessages[isLocale(locale) ? locale : "fr"].title, href: `/${locale}/seller/loyalty`, icon: Gift, active: active === "loyalty" }]:[]),
     ...(ownerTools?[{label:team.title,href:`/${locale}/seller/team`,icon:Users},{label:team.audit,href:`/${locale}/seller/audit`,icon:FileClock}]:[]),
     { label: accountLabel, href: `/${locale}/account`, icon: UserRound, active: active === "account" },

@@ -973,6 +973,7 @@ model Store {
   loyaltyChanges LoyaltyStoreChange[]
   sellerReviewEmails SellerReviewEmailDelivery[]
   shipments Shipment[]
+  monthlyStatements SellerMonthlyStatement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1024,6 +1025,8 @@ model SellerBusiness {
   benefitAuditEvents SellerBenefitAuditEvent[]
   productImports SellerProductImportJob[]
   closureTokens SellerClosureToken[]
+  billingInvoices SellerBusinessInvoice[]
+  monthlyStatements SellerMonthlyStatement[]
 
   @@index([maxStores])
 }
@@ -1056,6 +1059,48 @@ model SellerBusinessEstablishment {
   @@unique([id, businessId])
   @@index([businessId, verificationState])
   @@index([siret])
+}
+
+model SellerBusinessInvoice {
+  id                   String   @id @default(cuid())
+  businessId           String
+  stripeInvoiceId      String   @unique
+  sourceEventId        String?  @unique
+  stripeCustomerId     String
+  stripeSubscriptionId String
+  invoiceNumber        String?
+  createdAt            DateTime
+  amountPaidMinor      BigInt
+  currency             String   @db.VarChar(3)
+  hostedInvoiceUrl     String?
+  invoicePdfUrl        String?
+  recordedAt           DateTime @default(now())
+  business             SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Restrict)
+
+  @@index([businessId, createdAt, stripeInvoiceId])
+  @@index([stripeCustomerId, createdAt])
+  @@index([stripeSubscriptionId])
+}
+
+model SellerMonthlyStatement {
+  id          String   @id @default(cuid())
+  businessId  String
+  storeId     String
+  year        Int
+  month       Int
+  currency    String   @db.VarChar(3)
+  revision    Int      @default(1)
+  contentHash String   @db.Char(64)
+  rowCount    Int
+  snapshot    Json
+  createdAt   DateTime @default(now())
+  business    SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  store       Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@unique([storeId, year, month, currency, revision], map: "SellerMonthlyStatement_store_period_currency_revision_key")
+  @@unique([storeId, year, month, currency, contentHash], map: "SellerMonthlyStatement_store_period_currency_hash_key")
+  @@index([businessId, year, month])
+  @@index([storeId, year, month])
 }
 
 model SellerTeamMembership {
@@ -2068,6 +2113,8 @@ model OrderGroup {
   @@unique([orderId,groupKey])
   @@unique([id, orderId, storeId], map: "OrderGroup_id_orderId_storeId_key")
   @@index([storeId,transferStatus])
+  @@index([orderId, storeId])
+  @@index([storeId, orderId])
   @@index([transferStatus,nextTransferAttemptAt])
 }
 

@@ -5,8 +5,8 @@ export type StripeCheckoutSession = {
   status?: "open" | "complete" | "expired";
   expires_at?: number;
   mode?: string;
-  customer?: string | { id: string } | null;
-  subscription?: string | { id: string } | null;
+  customer?: string;
+  subscription?: string | null;
   payment_intent: string | null;
   payment_status: string;
   client_reference_id: string | null;
@@ -238,8 +238,9 @@ export function retrieveStripeInvoice(id: string) {
   return stripeRequest<StripeInvoice>(`/invoices/${encodeURIComponent(id)}`);
 }
 
-export function listStripeCustomerInvoices(input: { customerId: string; subscriptionId: string; startingAfter?: string | null; limit?: number }) {
-  const query = new URLSearchParams({ customer: input.customerId, subscription: input.subscriptionId, status: "paid", limit: String(Math.max(1, Math.min(input.limit ?? 100, 100))) });
+export function listStripeCustomerInvoices(input: { customerId: string; subscriptionId?: string | null; startingAfter?: string | null; limit?: number }) {
+  const query = new URLSearchParams({ customer: input.customerId, status: "paid", limit: String(Math.max(1, Math.min(input.limit ?? 100, 100))) });
+  if (input.subscriptionId) query.set("subscription", input.subscriptionId);
   if (input.startingAfter) query.set("starting_after", input.startingAfter);
   return stripeRequest<StripeInvoicePage>(`/invoices?${query.toString()}`);
 }

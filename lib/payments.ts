@@ -16,6 +16,7 @@ import { isLocale } from "../i18n/config";
 import { sellerBusinessCommercialEntitlement } from "./seller-business";
 import {configuredSellerPlanForPriceId} from "./seller-plans";
 import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
+import { persistPaidSellerInvoice } from "./seller-invoice-persistence";
 import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
 
 export class CheckoutError extends Error {
@@ -220,6 +221,7 @@ export async function processStripeEvent(
   const previouslyProcessed = webhookDelegate?.findUnique
     ? await webhookDelegate.findUnique({ where: { id: event.id }, select: { id: true } })
     : null;
+  if (event.type === "invoice.paid") await persistPaidSellerInvoice(db, event, event.data.object as StripeInvoice);
   if (previouslyProcessed && !sellerCheckout) {
     console.info(`[Stripe webhook ${event.id}] Event was already processed; no repair is required.`);
     return { duplicate: true };

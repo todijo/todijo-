@@ -37,7 +37,7 @@ export default async function SellerInvoiceArchivePage({ params, searchParams }:
       db: prisma,
       ownerId: session.userId,
       cursor: query.after ?? null,
-      listInvoices: (customerId, subscriptionId, cursor, limit) => listStripeCustomerInvoices({ customerId, subscriptionId, startingAfter: cursor, limit }),
+      listInvoices: (customerId, cursor, limit) => listStripeCustomerInvoices({ customerId, startingAfter: cursor, limit }),
     });
   } catch {
     // Keep the archive page useful when Stripe is unavailable; never leak provider diagnostics.
@@ -51,7 +51,7 @@ export default async function SellerInvoiceArchivePage({ params, searchParams }:
           <div><span>{compliance("transactionDate")}</span><strong>{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(invoice.createdAt)}</strong></div>
           {invoice.number && <div><span>{compliance("invoiceReference")}</span><strong>{invoice.number}</strong></div>}
           <div><span>{compliance("transactionTotal")}</span><strong>{formatInvoiceAmount(locale, invoice.amountPaid, invoice.currency)}</strong></div>
-          <a className="quickActionLink primary" href={invoice.invoiceUrl} target="_blank" rel="noopener noreferrer">{copy.open}</a>
+          <a className="quickActionLink primary" href={`/api/seller/invoices/${encodeURIComponent(invoice.id)}`} target="_blank" rel="noopener noreferrer">{copy.open}</a>
         </article>)}
       </section>
       {invoices.nextCursor && <nav className="sellerInvoiceArchivePagination" aria-label={copy.title}><Link className="quickActionLink secondary" href={`/${locale}/account/invoices?after=${encodeURIComponent(invoices.nextCursor)}`}>{orders("next")}</Link></nav>}

@@ -26,12 +26,23 @@ export type SellerStockExportRow = {
   status: string;
 };
 
+type FinanceGroup = { id: string; itemSubtotalMinor: number; shippingAmountMinor: number; platformFeeAmountMinor: number; commissionReversedMinor: number; refundedCashMerchandiseMinor: number; refundedShippingMinor: number; sellerNetAmountMinor: number; sellerRecoveredMinor: number; transferStatus: string; transferredAt: Date | null; order: { id: string; currency: string; paidAt: Date | null } };
+
 export async function loadSellerFinanceExportRows(db: Pick<PrismaClient, "orderGroup">, storeId: string, start: Date, end: Date): Promise<SellerFinanceExportRow[]> {
-  const groups = await db.orderGroup.findMany({
-    where: { storeId, kind: "MARKETPLACE", order: { paidAt: { gte: start, lt: end } } },
-    orderBy: [{ order: { paidAt: "asc" } }, { id: "asc" }],
-    select: { itemSubtotalMinor: true, shippingAmountMinor: true, platformFeeAmountMinor: true, commissionReversedMinor: true, refundedCashMerchandiseMinor: true, refundedShippingMinor: true, sellerNetAmountMinor: true, sellerRecoveredMinor: true, transferStatus: true, transferredAt: true, order: { select: { id: true, currency: true, paidAt: true } } },
-  });
+  const groups: FinanceGroup[] = [];
+  let cursor: string | undefined;
+  while (true) {
+    const page = await db.orderGroup.findMany({
+      where: { storeId, kind: "MARKETPLACE", order: { paidAt: { gte: start, lt: end } } },
+      orderBy: [{ order: { paidAt: "asc" } }, { id: "asc" }], take: 250,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: { id: true, itemSubtotalMinor: true, shippingAmountMinor: true, platformFeeAmountMinor: true, commissionReversedMinor: true, refundedCashMerchandiseMinor: true, refundedShippingMinor: true, sellerNetAmountMinor: true, sellerRecoveredMinor: true, transferStatus: true, transferredAt: true, order: { select: { id: true, currency: true, paidAt: true } } },
+    });
+    groups.push(...page);
+    if (page.length < 250) break;
+    cursor = page.at(-1)?.id;
+    if (!cursor) break;
+  }
   return groups.map((group) => ({ paymentDate: group.order.paidAt, orderId: group.order.id, currency: group.order.currency, itemSubtotalMinor: group.itemSubtotalMinor, shippingMinor: group.shippingAmountMinor, commissionMinor: group.platformFeeAmountMinor, commissionReversedMinor: group.commissionReversedMinor, refundedCashMerchandiseMinor: group.refundedCashMerchandiseMinor, refundedShippingMinor: group.refundedShippingMinor, sellerNetMinor: group.sellerNetAmountMinor, sellerRecoveredMinor: group.sellerRecoveredMinor, transferStatus: group.transferStatus, transferredAt: group.transferredAt }));
 }
 

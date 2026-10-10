@@ -8,8 +8,9 @@ import { readSession } from "@/lib/session";
 import { DashboardHeader, DashboardQuickAction, DashboardSidebar, type DashboardNavItem } from "./DashboardUI";
 import EmailVerificationNotice from "./EmailVerificationNotice";
 import { sellerInvoiceArchiveCopy } from "@/i18n/seller-invoice-archive";
+import { sellerMonthlyStatementCopy } from "@/i18n/seller-monthly-statements";
 
-export type BuyerNavigationActive = "dashboard"|"orders"|"messages"|"notifications"|"account"|"cart"|"invoices";
+export type BuyerNavigationActive = "dashboard"|"orders"|"messages"|"notifications"|"account"|"cart"|"invoices"|"statements";
 
 export default async function BuyerDashboardLayout({children,locale,active}:{children:ReactNode;locale:string;active:BuyerNavigationActive}) {
   const session=await readSession(); if(!session)redirect(`/${locale}/login`);
@@ -23,6 +24,7 @@ export default async function BuyerDashboardLayout({children,locale,active}:{chi
     {label:p("nav.dashboard"),href:`/${locale}/dashboard`,icon:Home,active:active==="dashboard"},
     {label:p("nav.orders"),href:`/${locale}/account/orders`,icon:ReceiptText,active:active==="orders"},
     ...(user.ownedBusiness?[{label:sellerInvoiceArchiveCopy(locale).title,href:`/${locale}/account/invoices`,icon:CreditCard,active:active==="invoices"}]:[]),
+    ...(user.ownedBusiness?[{label:sellerMonthlyStatementCopy(locale).title,href:`/${locale}/account/statements`,icon:CreditCard,active:active==="statements"}]:[]),
     {label:p("nav.messages"),href:`/${locale}/messages`,icon:MessageCircle,badge:unreadMessages,active:active==="messages"},
     {label:p("notifications"),href:`/${locale}/notifications`,icon:Bell,badge:user._count.notifications,active:active==="notifications"},
     {label:common("account"),href:`/${locale}/account`,icon:Settings,active:active==="account"},

@@ -40,6 +40,18 @@ test("finance export query is store-scoped, marketplace-only and bounded by paym
   assert.equal(query.where.kind, "MARKETPLACE");
   assert.deepEqual(query.where.order.paidAt, { gte: start, lt: end });
   assert.match(query.orderBy[0].order.paidAt, /asc/);
+  assert.equal(query.take, 250);
+});
+
+test("finance export advances with a stable cursor instead of loading an unbounded page", async () => {
+  const queries: any[] = [];
+  let pages = 0;
+  const db = { orderGroup: { findMany: async (input: any) => { queries.push(input); pages++; return pages === 1 ? Array.from({ length: 250 }, (_, index) => ({ id: `g${index}`, itemSubtotalMinor: 1, shippingAmountMinor: 0, platformFeeAmountMinor: 0, commissionReversedMinor: 0, refundedCashMerchandiseMinor: 0, refundedShippingMinor: 0, sellerNetAmountMinor: 1, sellerRecoveredMinor: 0, transferStatus: "NONE", transferredAt: null, order: { id: `o${index}`, currency: "EUR", paidAt: new Date("2026-01-01Z") } })) : []; } } } as any;
+  const rows = await loadSellerFinanceExportRows(db, "store", new Date("2026-01-01Z"), new Date("2026-02-01Z"));
+  assert.equal(rows.length, 250);
+  assert.equal(queries.length, 2);
+  assert.deepEqual(queries[1].cursor, { id: "g249" });
+  assert.equal(queries[1].skip, 1);
 });
 
 test("stock export includes simple products and actual variant keys without removed products", async () => {
