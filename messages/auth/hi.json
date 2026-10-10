@@ -102,10 +102,10 @@
   "yes": "Yes",
   "no": "No",
   "vatNumber": "VAT number",
-  "submitSellerOnboarding": "Submit for review",
+  "submitSellerOnboarding": "विक्रेता सेटअप पूरा करें",
   "verifyBeforeSelling": "Verify your email before submitting seller onboarding.",
   "sellerReview": "Seller verification review",
-  "sellerReviewIntro": "Review seller-declared identity, registration and VAT information. Format-valid data is not government verification.",
+  "sellerReviewIntro": "यह कतार उन मामलों के लिए है जिनकी अतिरिक्त समीक्षा आवश्यक है। पूरी जानकारी और पहचान सत्यापन वाले विक्रेता Admin की मंज़ूरी के बिना आगे बढ़ सकते हैं; बिक्री की सुविधा लागू पात्रता, सदस्यता, पहचान और भुगतान सेटअप की शर्तों के अधीन रहेगी।",
   "unlink": "Unlink",
   "continueWith": {
     "google": "Continue with Google",
@@ -114,8 +114,8 @@
   },
   "saveDraft": "Save and continue later",
   "draftSaved": "Draft saved.",
-  "sameAsPersonalAddress":"मेरी दुकान का पता मेरे व्यक्तिगत पते के समान है",
-  "sameAsPersonalAddressHelp":"सहेजे गए व्यक्तिगत पते को एक बार दुकान के विवरण में कॉपी करें। बाद के बदलाव स्वतंत्र रहेंगे।",
-  "noPersonalAddress":"कोई सहेजा गया व्यक्तिगत पता उपलब्ध नहीं है। आप दुकान का अलग पता दर्ज कर सकते हैं या अपने खाते में पता जोड़ सकते हैं।",
-  "managePersonalAddress":"व्यक्तिगत पते प्रबंधित करें"
+  "sameAsPersonalAddress": "मेरी दुकान का पता मेरे व्यक्तिगत पते के समान है",
+  "sameAsPersonalAddressHelp": "सहेजे गए व्यक्तिगत पते को एक बार दुकान के विवरण में कॉपी करें। बाद के बदलाव स्वतंत्र रहेंगे।",
+  "noPersonalAddress": "कोई सहेजा गया व्यक्तिगत पता उपलब्ध नहीं है। आप दुकान का अलग पता दर्ज कर सकते हैं या अपने खाते में पता जोड़ सकते हैं।",
+  "managePersonalAddress": "व्यक्तिगत पते प्रबंधित करें"
 }

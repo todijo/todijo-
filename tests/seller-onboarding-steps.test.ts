@@ -15,6 +15,10 @@ test("approved French and English step copy is exact", () => {
   assert.equal(sellerOnboardingStepCopy.en.continue, "Continue");
   assert.equal(sellerOnboardingStepCopy.fr.saveLater, "Enregistrer et continuer plus tard");
   assert.equal(sellerOnboardingStepCopy.en.saveLater, "Save and continue later");
+  assert.equal(sellerOnboardingStepCopy.fr.finish, "Terminer la configuration vendeur");
+  assert.equal(sellerOnboardingStepCopy.en.finish, "Complete seller setup");
+  assert.equal(sellerOnboardingStepCopy.fr.inseeVerificationNote, "Les SIREN et SIRET sont vérifiés à partir des données officielles de l’INSEE. Certaines situations peuvent nécessiter un examen complémentaire.");
+  assert.equal(sellerOnboardingStepCopy.en.inseeVerificationNote, "SIREN and SIRET are checked against official INSEE data. Some cases may require additional review.");
   assert.equal(sellerOnboardingStepCopy.fr.requiredNote, "Les champs marqués d’un * sont obligatoires.");
   assert.equal(sellerOnboardingStepCopy.en.requiredNote, "Fields marked with * are required.");
   assert.equal(sellerOnboardingStepCopy.fr.requiredField, "Ce champ est obligatoire.");
@@ -29,9 +33,9 @@ test("every supported locale has all approved Phase 2 copy fields and RTL locale
   for (const locale of locales) {
     const copy = sellerOnboardingStepCopy[locale];
     assert.equal(copy.titles.length, 4, `${locale}: four step labels`);
-    assert.ok(copy.back && copy.continue && copy.saveLater && copy.requiredNote && copy.requiredField, `${locale}: controls`);
+    assert.ok(copy.back && copy.continue && copy.finish && copy.inseeVerificationNote && copy.saveLater && copy.requiredNote && copy.requiredField, `${locale}: controls and verification note`);
     assert.deepEqual(Object.keys(copy.help).sort(), keys, `${locale}: contextual help parity`);
-    for (const value of [...copy.titles, copy.back, copy.continue, copy.saveLater, copy.requiredNote, copy.requiredField, ...Object.values(copy.help)]) assert.ok(value.trim().length > 0, `${locale}: no empty copy`);
+    for (const value of [...copy.titles, copy.back, copy.continue, copy.finish, copy.inseeVerificationNote, copy.saveLater, copy.requiredNote, copy.requiredField, ...Object.values(copy.help)]) assert.ok(value.trim().length > 0, `${locale}: no empty copy`);
   }
   for (const locale of ["ar", "fa", "ku"] as const) assert.ok(/[\u0600-\u06FF]/.test(sellerOnboardingStepCopy[locale].titles[0]), `${locale}: RTL text is localized`);
 });
@@ -45,7 +49,9 @@ test("seller onboarding resumes its saved step, autosaves changes, and reviews e
   assert.match(form, /hidden=\{currentStep !== 4\}/);
   assert.match(form, /sellerOnboardingStepCopy/);
   assert.doesNotMatch(form, /PENDING_REVIEW|Admin approval|submit for review/i);
-  assert.match(form, /t\("createShop"\)/);
+  assert.match(form, /stepCopy\.finish/);
+  assert.match(form, /stepCopy\.inseeVerificationNote/);
+  assert.match(form, /t\("formatNotVerification"\)/);
 });
 
 test("incomplete French SIREN values are not persisted in drafts while valid values remain reusable", () => {
