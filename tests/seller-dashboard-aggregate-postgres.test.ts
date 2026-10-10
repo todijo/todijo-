@@ -32,9 +32,10 @@ test("PostgreSQL dashboard aggregates are currency-safe, date-bounded, and isola
     const productB = await db.product.create({ data: { storeId: storeB.id, name: marker + " product B", slug: marker + "-pb", description: "Synthetic aggregate fixture", price: 20, category: "fixture", condition: "NEUF", images: [] } });
     products.push(productA.id, productB.id);
     const now = new Date();
-    const orderA = await db.order.create({ data: { buyerId: buyer.id, checkoutRequestId: marker + "-checkout-a", status: "PAID", currency: "EUR", total: 12, paidAt: now, sellerAmount: 1000 } });
-    const orderB = await db.order.create({ data: { buyerId: buyer.id, checkoutRequestId: marker + "-checkout-b", status: "PAID", currency: "USD", total: 22, paidAt: now, sellerAmount: 2000 } });
-    const orderOther = await db.order.create({ data: { buyerId: buyer.id, checkoutRequestId: marker + "-checkout-other", status: "PAID", currency: "EUR", total: 25, paidAt: now, sellerAmount: 2500 } });
+    const createdAt = new Date(now.getTime() - 60_000);
+    const orderA = await db.order.create({ data: { buyerId: buyer.id, checkoutRequestId: marker + "-checkout-a", status: "PAID", currency: "EUR", total: 12, createdAt, paidAt: createdAt, sellerAmount: 1000 } });
+    const orderB = await db.order.create({ data: { buyerId: buyer.id, checkoutRequestId: marker + "-checkout-b", status: "PAID", currency: "USD", total: 22, createdAt, paidAt: createdAt, sellerAmount: 2000 } });
+    const orderOther = await db.order.create({ data: { buyerId: buyer.id, checkoutRequestId: marker + "-checkout-other", status: "PAID", currency: "EUR", total: 25, createdAt, paidAt: createdAt, sellerAmount: 2500 } });
     orders.push(orderA.id, orderB.id, orderOther.id);
     const groupA = await db.orderGroup.create({ data: { orderId: orderA.id, groupKey: marker + "-group-a", kind: "MARKETPLACE", storeId: storeA.id, maturitySnapshot: "STANDARD", maturityEvidence: {}, itemSubtotalMinor: 1000, shippingAmountMinor: 200, platformFeeAmountMinor: 100, sellerNetAmountMinor: 1100 } });
     const groupB = await db.orderGroup.create({ data: { orderId: orderA.id, groupKey: marker + "-group-b", kind: "MARKETPLACE", storeId: storeB.id, maturitySnapshot: "STANDARD", maturityEvidence: {}, itemSubtotalMinor: 2000, shippingAmountMinor: 200, platformFeeAmountMinor: 200, sellerNetAmountMinor: 2000 } });
