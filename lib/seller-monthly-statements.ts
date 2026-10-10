@@ -47,7 +47,7 @@ export async function createSellerMonthlyStatementRevisions(db: PrismaClient, in
     for (const currency of currencies.sort()) {
       const statement = await db.$transaction(async (tx) => {
         const lockKey = `${store.id}:${year}-${String(month).padStart(2, "0")}:${currency}`;
-        await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+        await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
         // Read after acquiring the period lock so a slower request cannot
         // append an older pre-refund snapshot after a newer corrected one.
         const currentRows = await loadSellerFinanceExportRows(tx, store.id, bounds.start, bounds.end);
