@@ -42,6 +42,7 @@ test("PostgreSQL dashboard aggregates are currency-safe, date-bounded, and isola
     await db.orderItem.createMany({ data: [
       { orderId: orderA.id, orderGroupId: groupA.id, productId: productA.id, quantity: 2, unitPrice: 5, lineTotal: 10, productNameSnapshot: marker + " Product A snapshot" },
       { orderId: orderA.id, orderGroupId: groupB.id, productId: productB.id, quantity: 1, unitPrice: 20, lineTotal: 20, productNameSnapshot: marker + " Product B snapshot" },
+      { orderId: orderOther.id, productId: productA.id, quantity: 1, unitPrice: 25, lineTotal: 25 },
     ] });
     const otherGroup = await db.orderGroup.create({ data: { orderId: orderB.id, groupKey: marker + "-group-usd", kind: "MARKETPLACE", storeId: storeA.id, maturitySnapshot: "STANDARD", maturityEvidence: {}, itemSubtotalMinor: 2000, shippingAmountMinor: 200, platformFeeAmountMinor: 200, sellerNetAmountMinor: 2000 } });
     await db.orderItem.create({ data: { orderId: orderB.id, orderGroupId: otherGroup.id, productId: productA.id, quantity: 1, unitPrice: 20, lineTotal: 20, productNameSnapshot: marker + " Product A snapshot" } });
