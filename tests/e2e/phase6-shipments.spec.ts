@@ -71,7 +71,7 @@ test("localized seller subscription invoice archive route renders for an authent
   const response = await page.goto("/en/account/invoices");
   expect(response?.status(), `Invoice archive returned ${response?.status()} at ${response?.url()}; location=${response?.headers()["location"] ?? "none"}`).toBe(200);
   await expect(page.getByRole("heading", { name: "Subscription invoices" })).toBeVisible();
-  await expect(page.getByText("No subscription invoices are available.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("No subscription invoices are available.");
 });
 
 test("production-build seller reports one store-scoped partial shipment; buyer sees only that shipment's items and partial status", async ({ page }) => {
@@ -188,6 +188,6 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   const formerSellerInvoiceResponse = await page.goto("/en/account/invoices");
   expect(formerSellerInvoiceResponse?.ok()).toBeTruthy();
   await expect(page.getByRole("heading", { name: "Subscription invoices" })).toBeVisible();
-  await expect(page.getByText("No subscription invoices are available.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("No subscription invoices are available.");
   await expect(page.getByRole("link", { name: "Subscription invoices" })).toBeVisible();
 });
