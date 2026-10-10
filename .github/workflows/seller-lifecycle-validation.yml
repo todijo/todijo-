@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/buyer-seller-journey
+      - codex/seller-journey-repair
   pull_request:
     branches:
       - main
@@ -71,7 +72,7 @@ jobs:
     name: PostgreSQL 16 application and browser validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey'
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey' || github.event.pull_request.head.ref == 'codex/seller-journey-repair'
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
