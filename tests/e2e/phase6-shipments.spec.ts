@@ -62,6 +62,18 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => { await db.$disconnect(); });
 
+test("localized seller subscription invoice archive route renders for an authenticated owner", async ({ page }) => {
+  await setSession(page, sellerA, "SELLER");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/en/seller/orders?store=${storeA}`);
+  await expect(page.getByRole("link", { name: "Subscription invoices" })).toBeVisible();
+
+  const response = await page.goto("/en/account/invoices");
+  expect(response?.status(), `Invoice archive returned ${response?.status()} at ${response?.url()}; location=${response?.headers()["location"] ?? "none"}`).toBe(200);
+  await expect(page.getByRole("heading", { name: "Subscription invoices" })).toBeVisible();
+  await expect(page.getByText("No subscription invoices are available.", { exact: true })).toBeVisible();
+});
+
 test("production-build seller reports one store-scoped partial shipment; buyer sees only that shipment's items and partial status", async ({ page }) => {
   test.setTimeout(120_000);
   await setSession(page, sellerA, "SELLER");
@@ -69,12 +81,6 @@ test("production-build seller reports one store-scoped partial shipment; buyer s
   const response = await page.goto(`/en/seller/orders?store=${storeA}`);
   expect(response?.ok()).toBeTruthy();
   await expect(page.getByRole("heading", { name: "Record a shipment" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Subscription invoices" })).toBeVisible();
-  const invoiceArchiveResponse = await page.goto("/en/account/invoices");
-  expect(invoiceArchiveResponse?.ok()).toBeTruthy();
-  await expect(page.getByRole("heading", { name: "Subscription invoices" })).toBeVisible();
-  await expect(page.getByText("No subscription invoices are available.", { exact: true })).toBeVisible();
-  await page.goto(`/en/seller/orders?store=${storeA}`);
   const shipmentForm = page.getByRole("region", { name: "Record a shipment" });
   await expect(shipmentForm.getByText("Alpha shipment item", { exact: true })).toBeVisible();
   await expect(page.getByText("Private Beta shipment item", { exact: true })).toHaveCount(0);

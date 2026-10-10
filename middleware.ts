@@ -80,14 +80,15 @@ export function middleware(request: NextRequest) {
   const isLocalizedConnectCallback = segments.length === 3 && segments[1] === "connect" && ["success", "refresh"].includes(segments[2]);
   const isLocalizedBuyerOrders = [3, 4].includes(segments.length) && segments[1] === "account" && segments[2] === "orders";
   const isLocalizedBuyerAddresses = segments.length === 3 && segments[1] === "account" && segments[2] === "addresses";
-  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses
+  const isLocalizedBuyerInvoices = segments.length === 3 && segments[1] === "account" && segments[2] === "invoices";
+  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   if (dashboardTracePath) console.info("[dashboard-trace]", JSON.stringify({
     phase: "middleware-out",
     pathname: request.nextUrl.pathname,
     locale: pathLocale,
-    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses) ? "next" : "rewrite",
+    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices) ? "next" : "rewrite",
     targetPath: url.pathname,
   }));
   if (request.cookies.get(localeCookie)?.value !== pathLocale) {
