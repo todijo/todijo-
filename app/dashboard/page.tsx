@@ -4,18 +4,18 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getLocale, getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
-import { Bell, Boxes, CreditCard, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
+import { Bell, Boxes, CreditCard, Download, Home, MessageCircle, Package, Plus, ReceiptText, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Star, Store, TrendingUp, Truck, Users } from "lucide-react";
 import { DashboardEmptyState, DashboardHeader, DashboardQuickAction, DashboardSection, DashboardSidebar, DashboardStatCard, DashboardStatusBadge, type DashboardNavItem } from "@/components/DashboardUI";
 import StripeConnectSection from "@/components/StripeConnectSection";
 import { buyerPaymentState, listBuyerOrders, type BuyerOrder } from "@/lib/buyer-orders";
 import { dashboardAudience, dashboardPaths, sellerDashboardGate } from "@/lib/dashboard";
 import { sellerOrderHistoryWhere } from "@/lib/order-history";
 import { prisma } from "@/lib/prisma";
-import { comparisonPercent, sellerAnalytics, sellerPeriodMetrics } from "@/lib/seller-dashboard";
+import { comparisonPercent } from "@/lib/seller-dashboard";
+import { loadSellerDashboardAggregate } from "@/lib/seller-dashboard-aggregate";
 import { readSession } from "@/lib/session";
 import SellerAnalytics from "@/components/SellerAnalytics";
-import { SellerFulfillmentControl } from "@/components/SellerFulfillmentControl";
-import { fulfillmentStepFor, sellerFulfillmentActionFor } from "@/lib/order-status";
+import { fulfillmentStepFor } from "@/lib/order-status";
 import { canPublish } from "@/lib/seller-subscription";
 import { sellerDashboardNavItems } from "@/components/SellerDashboardLayout";
 import EmailVerificationNotice from "@/components/EmailVerificationNotice";
@@ -32,6 +32,12 @@ import { sellerMultiStoreTeaserCopy } from "@/i18n/seller-multi-store-teaser";
 import LockedMultiStoreTeaser from "@/components/LockedMultiStoreTeaser";
 import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
 import { sellerBusinessVerificationMessage } from "@/lib/seller-dashboard-readiness";
+import { sellerLifecycleCopy } from "@/i18n/seller-lifecycle";
+import { resolveSellerLifecycleStatus } from "@/lib/seller-lifecycle-state";
+import { sellerStockAlerts } from "@/lib/seller-stock-alerts";
+import { sellerActionCenterCopy } from "@/i18n/seller-action-center";
+import { sellerReportCopy } from "@/i18n/seller-reports";
+import { loadSellerDispatchHealth } from "@/lib/seller-dispatch-health";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -55,6 +61,29 @@ function money(locale: string, amount: number, currency: string) {
   }
 }
 
+function minorAmount(amountMinor: number, currency: string) {
+  const zeroDecimalCurrencies = new Set(["BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "VND", "VUV", "XAF", "XOF", "XPF"]);
+  return amountMinor / (zeroDecimalCurrencies.has(currency.toUpperCase()) ? 1 : 100);
+}
+
+function moneyBreakdown(locale: string, values: Array<{ currency: string; amountMinor: number }>, fallbackCurrency: string) {
+  if (!values.length) return money(locale, 0, fallbackCurrency);
+  return values.map(({ currency, amountMinor }) => {
+    try { return new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "code" }).format(minorAmount(amountMinor, currency)); }
+    catch { return `${minorAmount(amountMinor, currency)} ${currency}`; }
+  }).join(" · ");
+}
+
+function comparisonBreakdown(current: Array<{ currency: string; amountMinor: number }>, previous: Array<{ currency: string; amountMinor: number }>, translate: (value: number) => string, noComparison: string) {
+  const previousByCurrency = new Map(previous.map((row) => [row.currency, row.amountMinor]));
+  const changes = current.flatMap((row) => {
+    const before = previousByCurrency.get(row.currency) ?? 0;
+    const percent = comparisonPercent(minorAmount(row.amountMinor, row.currency), minorAmount(before, row.currency));
+    return percent == null ? [] : [`${row.currency} ${translate(percent)}`];
+  });
+  return changes.length ? changes.join(" · ") : noComparison;
+}
+
 function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }: { order: BuyerOrder; locale: string; detailsLabel: string; unknownStore: string; statusLabel: string }) {
   const item = order.items[0];
   return <article className="premiumRecentOrder">
@@ -66,7 +95,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 async function loadSellerDashboardMetrics(userId:string,storeId:string,permissions:{products:boolean;orders:boolean;analytics:boolean;sales:boolean}) {
   const sellerOrdersWhere = sellerOrderHistoryWhere(userId, storeId, "");
@@ -75,8 +104,8 @@ async function loadSellerDashboardMetrics(userId:string,storeId:string,permissio
   const productPreviousStart = new Date(now); productPreviousStart.setDate(productPreviousStart.getDate() - 60);
   try {
     return await dashboardData(Promise.all([
-      permissions.analytics||permissions.sales ? prisma.order.findMany({ where: sellerOrdersWhere, select: { status: true, buyerId: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, sellerAmount: true, items: { select: { quantity: true, productNameSnapshot: true, product: { select: { id: true, name: true } } } } }, orderBy: { createdAt: "desc" } }) : Promise.resolve([]),
-      permissions.orders ? prisma.order.findMany({ where: sellerOrdersWhere, take: 5, select: { id: true, status: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, recipientName: true, buyerNameSnapshot: true, buyer: { select: { firstName: true, lastName: true } }, items: { take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } }, orderBy: { createdAt: "desc" } }) : Promise.resolve([]),
+      permissions.analytics||permissions.sales||permissions.orders ? loadSellerDashboardAggregate(prisma,storeId,now) : Promise.resolve(null),
+      permissions.orders ? prisma.order.findMany({ where: sellerOrdersWhere, take: 5, select: { id: true, status: true, total: true, currency: true, createdAt: true, paidAt: true, stripePaymentIntentId: true, recipientName: true, buyerNameSnapshot: true, buyer: { select: { firstName: true, lastName: true } }, groups: { where: { storeId }, select: { itemSubtotalMinor: true, shippingAmountMinor: true, items: { take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } } }, items: { where: { orderGroupId: null, product: { storeId } }, take: 1, orderBy: { createdAt: "asc" }, select: { productNameSnapshot: true, productImageUrlSnapshot: true, product: { select: { name: true, images: true } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }).then((orders) => orders.map((order) => ({ ...order, total: order.groups.length ? minorAmount(order.groups.reduce((sum, group) => sum + group.itemSubtotalMinor + group.shippingAmountMinor, 0), order.currency) : Number(order.total), items: [...order.groups.flatMap((group) => group.items), ...order.items].slice(0, 1) }))) : Promise.resolve([]),
       permissions.orders ? prisma.refundRequest.count({ where: { status: "PENDING", order: sellerOrdersWhere } }) : Promise.resolve(0),
       permissions.products ? prisma.product.count({ where: { storeId, createdAt: { gte: productCurrentStart } } }) : Promise.resolve(0),
       permissions.products ? prisma.product.count({ where: { storeId, createdAt: { gte: productPreviousStart, lt: productCurrentStart } } }) : Promise.resolve(0),
@@ -94,40 +123,48 @@ type SellerDashboardMetricsPromise = Promise<SellerDashboardMetrics|null>;
 async function SellerDashboardHeroMetrics({metrics,locale,currency,canViewSales,canViewOrders,canViewMessages,unreadMessages,labels}:{metrics:SellerDashboardMetricsPromise;locale:string;currency:string;canViewSales:boolean;canViewOrders:boolean;canViewMessages:boolean;unreadMessages:number;labels:{todayRevenue:string;pendingOrders:string;newCustomers:string;unreadMessages:string}}) {
   const data=await metrics;
   if(!data)return null;
-  const [analyticsOrders]=data;
-  const paid=analyticsOrders.filter(order=>order.paidAt||order.stripePaymentIntentId);
-  const startToday=new Date();startToday.setHours(0,0,0,0);
-  const todayRevenue=paid.filter(order=>(order.paidAt??order.createdAt)>=startToday).reduce((sum,order)=>sum+(order.sellerAmount??0)/100,0);
-  const pendingOrders=analyticsOrders.filter(order=>["PENDING","PAID","PROCESSING"].includes(order.status)).length;
-  const firstOrderByBuyer=new Map<string,Date>();
-  for(const order of analyticsOrders){const first=firstOrderByBuyer.get(order.buyerId);if(!first||order.createdAt<first)firstOrderByBuyer.set(order.buyerId,order.createdAt);}
-  const newCustomers=[...firstOrderByBuyer.values()].filter(date=>date>=startToday).length;
-  return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{money(locale,todayRevenue,currency)}</strong></div>}{canViewOrders&&<><div><small>{labels.pendingOrders}</small><strong>{pendingOrders}</strong></div><div><small>{labels.newCustomers}</small><strong>{newCustomers}</strong></div></>}{canViewMessages&&<div><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></div>}</div>;
+  const [aggregate]=data;
+  if(!aggregate)return null;
+  return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{moneyBreakdown(locale,aggregate.todayRevenueByCurrency,currency)}</strong></div>}{canViewOrders&&<><div><small>{labels.pendingOrders}</small><strong>{aggregate.pendingOrders}</strong></div><div><small>{labels.newCustomers}</small><strong>{aggregate.newCustomersToday}</strong></div></>}{canViewMessages&&<div><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></div>}</div>;
+}
+
+async function SellerStockActionAlerts({storeId,locale,canViewProducts}:{storeId:string;locale:string;canViewProducts:boolean}) {
+  if(!canViewProducts)return null;
+  let alerts;
+  try { alerts=await dashboardData(sellerStockAlerts(prisma,storeId)); }
+  catch { return null; }
+  if(!alerts.lowStock&&!alerts.outOfStock)return null;
+  const copy=sellerActionCenterCopy(locale);
+  const href=`/${locale}/seller/products?store=${storeId}&status=PUBLISHED`;
+  return <section className="premiumStatsGrid sellerStockActionAlerts">
+    {alerts.lowStock>0&&<DashboardStatCard label={copy.lowStock} value={alerts.lowStock} href={href} icon={Boxes} tone="amber"/>}
+    {alerts.outOfStock>0&&<DashboardStatCard label={copy.outOfStock} value={alerts.outOfStock} href={href} icon={Package} tone="blue"/>}
+  </section>;
 }
 
 async function SellerDashboardSecondarySections({metrics,locale,activeStore,storeChoices,sellerCanAddProduct,readinessAction,readinessHref,subscriptionActive,commercialPlan,owner,role,canViewProducts,canViewOrders,canViewAnalytics,canViewSales,canViewMessages,canEditStore,readinessUsesSettings}:{metrics:SellerDashboardMetricsPromise;locale:string;activeStore:NonNullable<Prisma.StoreGetPayload<{select:typeof sellerStoreSelect}>>;storeChoices:Array<{id:string;name:string;slug:string;businessId:string|null}>;sellerCanAddProduct:boolean;readinessAction:string;readinessHref:string;subscriptionActive:boolean;commercialPlan:string|null;owner:boolean;role:string;canViewProducts:boolean;canViewOrders:boolean;canViewAnalytics:boolean;canViewSales:boolean;canViewMessages:boolean;canEditStore:boolean;readinessUsesSettings:boolean}) {
   const data=await metrics;
   if(!data||!activeStore)return null;
-  const [analyticsOrders,sellerOrders,pendingRefundCount,currentProducts,previousProducts,reviewStats]=data;
+  const [aggregate,sellerOrders,pendingRefundCount,currentProducts,previousProducts,reviewStats]=data;
+  if(!aggregate)return null;
   const [t,p,s,ordersText]=await Promise.all([getTranslations("Dashboard"),getTranslations("DashboardPremium"),getTranslations("SellerDashboard"),getTranslations("Orders")]);
+  const reportCopy=sellerReportCopy(locale);
   const now=new Date();
-  const paidSellerOrders=analyticsOrders.filter(order=>order.paidAt||order.stripePaymentIntentId);
-  const revenue=paidSellerOrders.reduce((sum,order)=>sum+(order.sellerAmount??0)/100,0);
-  const customers=new Set(paidSellerOrders.map(order=>order.buyerId)).size;
-  const periods=sellerPeriodMetrics(analyticsOrders,now);
   const comparison=(current:number,previous:number)=>{const percent=comparisonPercent(current,previous);return percent==null?s("noComparison"):s("comparison",{value:percent>0?`+${percent}`:String(percent)});};
-  const analytics=sellerAnalytics(analyticsOrders,locale,now);
-  const analyticsStatuses=analytics.statuses.map(item=>({label:ordersText(`status.${item.status}`),value:item.value}));
-  const cancellationRate=analyticsOrders.length?analyticsOrders.filter(order=>order.status==="CANCELLED").length/analyticsOrders.length*100:null;
+  const analyticsStatuses=aggregate.statuses.map(item=>({label:ordersText(`status.${item.status}`),value:item.value}));
+  const analyticsTrends=aggregate.trends.map(point=>({label:new Intl.DateTimeFormat(locale,{month:"short",day:"numeric",timeZone:"UTC"}).format(new Date(`${point.date}T00:00:00Z`)),orders:point.orders,revenueByCurrency:Object.fromEntries(Object.entries(point.revenueByCurrency).map(([currency,minor])=>[currency,minorAmount(minor,currency)]))}));
+  const revenueComparison=comparisonBreakdown(aggregate.currentRevenueByCurrency,aggregate.previousRevenueByCurrency,value=>s("comparison",{value:value>0?`+${value}`:String(value)}),s("noComparison"));
+  let dispatchHealth:Awaited<ReturnType<typeof loadSellerDispatchHealth>>|null=null;
+  if(canViewAnalytics){try{dispatchHealth=await dashboardData(loadSellerDispatchHealth(prisma,activeStore.id,now));}catch{dispatchHealth=null;}}
   return <>
     {pendingRefundCount>0&&<section className="subscriptionWarning" role="alert"><strong>{s(pendingRefundCount===1?"pendingRefundRequestSingular":"pendingRefundRequestPlural",{count:pendingRefundCount})}</strong><Link href={`/${locale}/seller/orders`}>{s("reviewRefundRequests")}</Link></section>}
-    {(canViewProducts||canViewOrders||canViewSales||canViewAnalytics)&&<section className="premiumStatsGrid">{canViewProducts&&<DashboardStatCard label={p("nav.products")} value={activeStore._count.products} hint={comparison(currentProducts,previousProducts)} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewOrders&&<DashboardStatCard label={p("stats.orders")} value={sellerOrders.length} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText} tone="blue"/>} {canViewSales&&<DashboardStatCard label={p("nav.revenue")} value={money(locale,revenue,activeStore.currency)} hint={comparison(periods.current.revenue,periods.previous.revenue)} href={`/${locale}/dashboard?store=${activeStore.id}#analytics`} icon={TrendingUp} tone="mint"/>} {canViewAnalytics&&<DashboardStatCard label={p("stats.customers")} value={customers} hint={comparison(periods.current.customers,periods.previous.customers)} icon={Users} tone="amber"/>}</section>}
+    {(canViewProducts||canViewOrders||canViewSales||canViewAnalytics)&&<section className="premiumStatsGrid">{canViewProducts&&<DashboardStatCard label={p("nav.products")} value={activeStore._count.products} hint={comparison(currentProducts,previousProducts)} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewOrders&&<DashboardStatCard label={p("stats.orders")} value={aggregate.totalOrders} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText} tone="blue"/>} {canViewSales&&<DashboardStatCard label={p("nav.revenue")} value={moneyBreakdown(locale,aggregate.revenueByCurrency,activeStore.currency)} hint={revenueComparison} href={`/${locale}/dashboard?store=${activeStore.id}#analytics`} icon={TrendingUp} tone="mint"/>} {canViewAnalytics&&<DashboardStatCard label={p("stats.customers")} value={aggregate.customers} hint={comparison(aggregate.currentCustomers,aggregate.previousCustomers)} icon={Users} tone="amber"/>}</section>}
     <div className="premiumDashboardColumns sellerColumns">
-      {canViewOrders&&<DashboardSection id="recent-orders" title={p("recentOrders")} description={p("seller.recentDescription")}>{sellerOrders.length?<div className="premiumRecentOrders">{sellerOrders.map(order=>{const item=order.items[0];const image=item?.productImageUrlSnapshot??item?.product.images[0];const name=item?.productNameSnapshot??item?.product.name;const buyerName=order.recipientName??order.buyerNameSnapshot??`${order.buyer.firstName} ${order.buyer.lastName}`;const action=sellerFulfillmentActionFor(order.status);const step=fulfillmentStepFor(order.status);return <article className="premiumRecentOrder sellerRecentOrder" key={order.id}><div className="premiumRecentImage">{image?<Image src={image} alt="" width={68} height={68} unoptimized/>:<Package size={26} aria-hidden="true"/>}</div><div className="premiumRecentProduct"><strong>{name??ordersText("details")}</strong><span>{buyerName} · {new Intl.DateTimeFormat(locale,{dateStyle:"medium"}).format(order.createdAt)}</span></div><div className="sellerOrderStatuses"><DashboardStatusBadge label={buyerPaymentState(order)==="paid"?ordersText("payment.paid"):ordersText(`payment.${buyerPaymentState(order)}`)} status={buyerPaymentState(order)}/><DashboardStatusBadge label={step?ordersText(`fulfillment.${step.toLowerCase()}`):ordersText(`status.${order.status}`)} status={order.status}/>{action&&<SellerFulfillmentControl orderId={order.id} action={action}/>}</div><strong className="premiumRecentTotal">{money(locale,Number(order.total),order.currency)}</strong></article>;})}</div>:<DashboardEmptyState title={p("seller.emptyOrders")} description={p("seller.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/products`}>{t("manageProducts")}</Link>}/>}</DashboardSection>}
-      <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid">{sellerCanAddProduct&&<DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new?store=${activeStore.id}`} icon={Plus} primary/>}{owner&&!subscriptionActive&&<DashboardQuickAction label={readinessAction} href={readinessHref} icon={readinessUsesSettings?Settings:CreditCard} primary/>}{canViewOrders&&<DashboardQuickAction label={p("viewOrders")} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText}/>} {canViewProducts&&<DashboardQuickAction label={t("manageProducts")} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewMessages&&<DashboardQuickAction label={p("myMessages")} href={dashboardPaths(locale).messages} icon={MessageCircle}/>} {canEditStore&&<DashboardQuickAction label={p("nav.settings")} href={`/${locale}/seller/store-settings?store=${activeStore.id}`} icon={Settings}/>}<DashboardQuickAction label={t("viewShop")} href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`} icon={Store}/></div></DashboardSection>
+      {canViewOrders&&<DashboardSection id="recent-orders" title={p("recentOrders")} description={p("seller.recentDescription")}>{sellerOrders.length?<div className="premiumRecentOrders">{sellerOrders.map(order=>{const item=order.items[0];const image=item?.productImageUrlSnapshot??item?.product.images[0];const name=item?.productNameSnapshot??item?.product.name;const buyerName=order.recipientName??order.buyerNameSnapshot??`${order.buyer.firstName} ${order.buyer.lastName}`;const step=fulfillmentStepFor(order.status);return <article className="premiumRecentOrder sellerRecentOrder" key={order.id}><div className="premiumRecentImage">{image?<Image src={image} alt="" width={68} height={68} unoptimized/>:<Package size={26} aria-hidden="true"/>}</div><div className="premiumRecentProduct"><strong>{name??ordersText("details")}</strong><span>{buyerName} · {new Intl.DateTimeFormat(locale,{dateStyle:"medium"}).format(order.createdAt)}</span></div><div className="sellerOrderStatuses"><DashboardStatusBadge label={buyerPaymentState(order)==="paid"?ordersText("payment.paid"):ordersText(`payment.${buyerPaymentState(order)}`)} status={buyerPaymentState(order)}/><DashboardStatusBadge label={step?ordersText(`fulfillment.${step.toLowerCase()}`):ordersText(`status.${order.status}`)} status={order.status}/></div><strong className="premiumRecentTotal">{money(locale,Number(order.total),order.currency)}</strong><Link className="premiumTextLink" href={`/${locale}/seller/orders?store=${activeStore.id}&q=${encodeURIComponent(order.id)}`}>{p("viewOrders")}</Link></article>;})}</div>:<DashboardEmptyState title={p("seller.emptyOrders")} description={p("seller.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/products`}>{t("manageProducts")}</Link>}/>}</DashboardSection>}
+      <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid">{sellerCanAddProduct&&<DashboardQuickAction label={t("addProduct")} href={`/${locale}/seller/products/new?store=${activeStore.id}`} icon={Plus} primary/>}{owner&&!subscriptionActive&&<DashboardQuickAction label={readinessAction} href={readinessHref} icon={readinessUsesSettings?Settings:CreditCard} primary/>}{canViewOrders&&<DashboardQuickAction label={p("viewOrders")} href={`/${locale}/seller/orders?store=${activeStore.id}`} icon={ReceiptText}/>} {canViewProducts&&<DashboardQuickAction label={t("manageProducts")} href={`/${locale}/seller/products?store=${activeStore.id}`} icon={Boxes}/>} {canViewSales&&<DashboardQuickAction label={reportCopy.downloadReport} href={`/api/seller/reports/export?type=finance&store=${encodeURIComponent(activeStore.id)}&locale=${encodeURIComponent(locale)}`} icon={Download}/>} {canViewProducts&&<DashboardQuickAction label={reportCopy.downloadStock} href={`/api/seller/reports/export?type=stock&store=${encodeURIComponent(activeStore.id)}&locale=${encodeURIComponent(locale)}`} icon={Download}/>} {canViewMessages&&<DashboardQuickAction label={p("myMessages")} href={dashboardPaths(locale).messages} icon={MessageCircle}/>} {canEditStore&&<DashboardQuickAction label={p("nav.settings")} href={`/${locale}/seller/store-settings?store=${activeStore.id}`} icon={Settings}/>}<DashboardQuickAction label={t("viewShop")} href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`} icon={Store}/></div></DashboardSection>
     </div>
-    {canViewAnalytics&&<DashboardSection id="analytics" title={s("analyticsTitle")} description={s("analyticsDescription")}>{sellerOrders.length?<SellerAnalytics trends={analytics.trends} products={analytics.products} statuses={analyticsStatuses} currency={activeStore.currency} labels={{revenue:s("revenue30"),orders:s("orders30"),topProducts:s("topProducts"),statuses:s("statusDistribution")}}/>:<DashboardEmptyState title={p("noRevenue")} description={p("noRevenueText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/orders`}>{p("viewOrders")}</Link>}/>}</DashboardSection>}
-    {canViewAnalytics&&<DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating>0&&<article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{cancellationRate!=null&&<article><ReceiptText size={20}/><span>{s("cancellationRate")}</span><strong>{cancellationRate.toFixed(1)}%</strong></article>}{reviewStats._count.rating===0&&cancellationRate==null&&<DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>}
+    {canViewAnalytics&&<DashboardSection id="analytics" title={s("analyticsTitle")} description={s("analyticsDescription")}>{aggregate.totalOrders?<SellerAnalytics trends={analyticsTrends} products={aggregate.products} statuses={analyticsStatuses} labels={{revenue:s("revenue30"),orders:s("orders30"),topProducts:s("topProducts"),statuses:s("statusDistribution")}}/>:<DashboardEmptyState title={p("noRevenue")} description={p("noRevenueText")} action={<Link className="premiumPrimaryButton" href={`/${locale}/seller/orders`}>{p("viewOrders")}</Link>}/>}</DashboardSection>}
+    {canViewAnalytics&&<DashboardSection id="performance" title={s("performanceTitle")} description={s("performanceDescription")}><div className="sellerPerformanceGrid">{reviewStats._count.rating>0&&<article><Star size={20}/><span>{s("sellerRating")}</span><strong>{reviewStats._avg.rating?.toFixed(1)} / 5</strong></article>}{dispatchHealth&&<><article><Truck size={20}/><span>{s("lateDispatches")}</span><strong>{dispatchHealth.lateDispatches}</strong>{dispatchHealth.unknownDispatches>0&&<small>{s("notEnoughData")}: {dispatchHealth.unknownDispatches}</small>}</article><article><ReceiptText size={20}/><span>{s("ordersWithRefunds")}</span><strong>{dispatchHealth.ordersWithCashRefunds}</strong></article></>}{reviewStats._count.rating===0&&!dispatchHealth&&<DashboardEmptyState title={s("notEnoughData")} description={s("performanceEmpty")}/>}</div></DashboardSection>}
     {owner&&commercialPlan==="free"&&<FreeSellerStartCard locale={locale}/>}
     {owner&&role==="SELLER"&&storeChoices.length>0&&hasLockedSellerMultiStoreTeaser(commercialPlan)&&sellerMultiStoreTeaserCopy(locale)&&<LockedMultiStoreTeaser copy={sellerMultiStoreTeaserCopy(locale)!}/>}
   </>;
@@ -150,6 +187,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     select: {
       firstName: true, lastName: true, email: true, emailVerified: true, role: true,
       sellerOnboardingDraft: { select: { id: true } },
+      ownedBusiness:{select:{sellerClosedAt:true,reactivationStockReviewRequired:true}},
       stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true,
       store: { select: sellerStoreSelect },
     },
@@ -165,7 +203,8 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const ownedStoreChoices=principal?.owner?storeChoices.filter(store=>store.businessId===principal.businessId):[];
   const selectedStoreId=isSeller?(requestedStore&&requestedStore!=="all"?requestedStore:ownedStoreChoices.length===1?ownedStoreChoices[0]?.id:!principal?.owner?storeChoices[0]?.id:null):null;
   const activeStore=selectedStoreId?await dashboardData(prisma.store.findUnique({where:{id:selectedStoreId},select:sellerStoreSelect})):user.store;
-  const sellerGate=sellerDashboardGate(user.role,user.emailVerified,activeStore);
+  const lifecycleStatus=resolveSellerLifecycleStatus({role:user.role,sellerClosedAt:user.ownedBusiness?.sellerClosedAt??activeStore?.business?.sellerClosedAt,sellerSetupDraftExists:Boolean(user.sellerOnboardingDraft),store:activeStore,reactivationStockReviewRequired:user.ownedBusiness?.reactivationStockReviewRequired??activeStore?.business?.reactivationStockReviewRequired,subscription:activeStore?.subscription});
+  const sellerGate=sellerDashboardGate(user.role,user.emailVerified,activeStore,{sellerClosedAt:user.ownedBusiness?.sellerClosedAt??activeStore?.business?.sellerClosedAt,sellerSetupDraftExists:Boolean(user.sellerOnboardingDraft),reactivationStockReviewRequired:user.ownedBusiness?.reactivationStockReviewRequired??activeStore?.business?.reactivationStockReviewRequired,subscription:activeStore?.subscription});
   if (sellerGate === "verify-email") { const target=`/${locale}/verify-email?next=${encodeURIComponent(`/${locale}/seller/onboarding`)}`; console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-redirect",reason:"seller-email-unverified",target})); redirect(target); }
   if (sellerGate === "seller-onboarding") {
     const target=`/${locale}/seller/onboarding`;
@@ -232,7 +271,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
                 : <DashboardEmptyState title={p("buyer.emptyOrders")} description={p("buyer.emptyOrdersText")} action={<Link className="premiumPrimaryButton" href={homeHref}>{p("browseProducts")}</Link>}/>
               }
             </DashboardSection>
-            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={auth("becomeSeller")} href={`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
+            <DashboardSection title={p("quickActions")}><div className="premiumQuickGrid"><DashboardQuickAction label={lifecycleStatus==="SELLER_CLOSED"?sellerLifecycleCopy(locale).reactivationTitle:lifecycleStatus==="SELLER_SETUP"?sellerLifecycleCopy(locale).resumeSetup:auth("becomeSeller")} href={lifecycleStatus==="SELLER_CLOSED"?`/${locale}/seller/reactivate`:`/${locale}/seller/onboarding`} icon={Store} primary/><DashboardQuickAction label={common("account")} href={`/${locale}/account`} icon={Settings}/><DashboardQuickAction label={p("myOrders")} href={buyerOrdersHref} icon={ReceiptText}/><DashboardQuickAction label={p("myMessages")} href={paths.messages} icon={MessageCircle}/></div></DashboardSection>
           </div>
           <section className="premiumDiscoveryBanner"><div><span>{p("discoverBadge")}</span><h2>{p("discoverTitle")}</h2><p>{p("discoverText")}</p></div><Link href={homeHref}>{p("exploreNow")}</Link></section>
         </div>
@@ -296,9 +335,12 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}
+      {lifecycleStatus==="RENEWAL_CANCELLED"&&activeStore.subscription?.currentPeriodEnd&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).cancelConfirmation.replace("{date}",new Intl.DateTimeFormat(locale,{dateStyle:"long"}).format(activeStore.subscription.currentPeriodEnd))}</strong><Link href={`/${locale}/seller/subscription`}>{sellerLifecycleCopy(locale).restoreRenewal}</Link></section>}
+      {lifecycleStatus==="REACTIVATION_PENDING"&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).stockReview}</strong><Link href={`/${locale}/seller/reactivate`}>{sellerLifecycleCopy(locale).reactivationTitle}</Link></section>}
       {showReadinessWarning && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
       <SellerStoreSwitcher stores={storeChoices} selectedId={activeStore.id} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll={Boolean(principal?.owner&&ownedStoreChoices.length>1)}/>
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<Suspense fallback={null}><SellerDashboardHeroMetrics metrics={dashboardMetrics} locale={locale} currency={activeStore.currency} canViewSales={canViewSales} canViewOrders={canViewOrders} canViewMessages={canViewMessages} unreadMessages={unreadMessages} labels={{todayRevenue:s("todayRevenue"),pendingOrders:s("pendingOrders"),newCustomers:s("newCustomers"),unreadMessages:s("unreadMessages")}}/></Suspense>}<Link href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`}>{t("viewShop")} <Store size={18}/></Link></section>
+      <Suspense fallback={null}><SellerStockActionAlerts storeId={activeStore.id} locale={locale} canViewProducts={canViewProducts}/></Suspense>
       <Suspense fallback={null}><SellerDashboardSecondarySections metrics={dashboardMetrics} locale={locale} activeStore={activeStore} storeChoices={ownedStoreChoices} sellerCanAddProduct={sellerCanAddProduct} readinessAction={readinessAction} readinessHref={readinessHref} subscriptionActive={subscriptionActive} commercialPlan={selectedCommercialPlan} owner={Boolean(selectedPrincipal?.owner)} role={user.role} canViewProducts={canViewProducts} canViewOrders={canViewOrders} canViewAnalytics={canViewAnalytics} canViewSales={canViewSales} canViewMessages={canViewMessages} canEditStore={canEditStore} readinessUsesSettings={sellerTypeRequired||vatStatusRequired}/></Suspense>
       {sellerBenefitCatalogEnabled && <section className="storeSetupCard"><h2>Les cadeaux Todijo pour vous</h2><p>Découvrez les cadeaux et avantages sélectionnés par Todijo pour votre activité. Les disponibilités, quantités et tarifs sont indiqués pour chaque article.</p><Link href={`/${locale}/seller/benefits?store=${activeStore.id}`}>Découvrir mes avantages</Link></section>}
       {selectedPrincipal?.owner&&<StripeConnectSection

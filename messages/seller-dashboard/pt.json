@@ -22,5 +22,7 @@
   "performanceEmpty": "As métricas de desempenho aparecerão depois de a sua loja receber encomendas e avaliações.",
   "pendingRefundRequestSingular": "Tem {count} pedido de reembolso a aguardar revisão.",
   "pendingRefundRequestPlural": "Tem {count} pedidos de reembolso a aguardar revisão.",
-  "reviewRefundRequests": "Rever pedidos de reembolso"
+  "reviewRefundRequests": "Rever pedidos de reembolso",
+  "lateDispatches": "Envios atrasados (últimos 30 dias)",
+  "ordersWithRefunds": "Pedidos com reembolsos (últimos 30 dias)"
 }

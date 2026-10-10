@@ -22,5 +22,7 @@
   "performanceEmpty": "आपके स्टोर को ऑर्डर और समीक्षाएँ मिलने के बाद प्रदर्शन मेट्रिक्स दिखाई देंगे।",
   "pendingRefundRequestSingular": "आपके पास {count} रिफंड अनुरोध समीक्षा की प्रतीक्षा में है।",
   "pendingRefundRequestPlural": "आपके पास {count} रिफंड अनुरोध समीक्षा की प्रतीक्षा में हैं।",
-  "reviewRefundRequests": "रिफंड अनुरोधों की समीक्षा करें"
+  "reviewRefundRequests": "रिफंड अनुरोधों की समीक्षा करें",
+  "lateDispatches": "देर से भेजे गए ऑर्डर (पिछले 30 दिन)",
+  "ordersWithRefunds": "रिफंड वाले ऑर्डर (पिछले 30 दिन)"
 }

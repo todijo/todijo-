@@ -4,7 +4,8 @@ import test from "node:test";
 import { locales } from "../i18n/config";
 import { sellerLegalFormMessages } from "../i18n/seller-legal-forms";
 import { franceCompanySubtypes, sellerLegalIdentity } from "../lib/seller-legal-forms";
-import { sellerRegistrationRequirements } from "../lib/seller-registration-requirements";
+import { sellerRegistrationRequirements, validBusinessRegistration } from "../lib/seller-registration-requirements";
+import { selectSellerOnboardingType } from "../lib/seller-onboarding-seller-type";
 
 const source = (path: string) => readFileSync(path, "utf8");
 const professional = (country: string | null, legalForm: unknown, companySubtype: unknown) => sellerLegalIdentity({ sellerType: "PROFESSIONAL", country, legalForm, companySubtype });
@@ -43,13 +44,43 @@ test("private sellers reject forged professional identity fields", () => {
   assert.equal(sellerLegalIdentity({ sellerType: "PRIVATE", country: "FR", legalForm: null, companySubtype: "SAS" }).error, "INVALID_COMPANY_SUBTYPE");
 });
 
+test("switching professional to private clears professional identity from the draft payload", () => {
+  const professional = { sellerType: "PROFESSIONAL" as const, legalForm: "COMPANY", companySubtype: "SAS" };
+  const privateSeller = selectSellerOnboardingType(professional, "PRIVATE");
+  assert.deepEqual(privateSeller, { sellerType: "PRIVATE", legalForm: "", companySubtype: "" });
+
+  const draftPayload = { storeName: "Fixture Store", ...privateSeller };
+  assert.equal(draftPayload.legalForm, "");
+  assert.equal(draftPayload.companySubtype, "");
+  assert.deepEqual(sellerLegalIdentity({ sellerType: draftPayload.sellerType, country: "FR", legalForm: draftPayload.legalForm, companySubtype: draftPayload.companySubtype }), {
+    identity: { legalForm: "PRIVATE", companySubtype: null }, error: null,
+  });
+  const privateRequirements = sellerRegistrationRequirements("FR", "PRIVATE");
+  assert.equal(validBusinessRegistration("", privateRequirements), true);
+  const requiredPrivateFields = { storeName: "Fixture Store", country: "FR", city: "Paris", phone: "+33123456789", address: "1 rue Test", postalCode: "75001", vatStatus: "NOT_REGISTERED_OR_NOT_APPLICABLE" };
+  assert.ok(Object.values(requiredPrivateFields).every(Boolean));
+  assert.ok(["REGISTERED", "NOT_REGISTERED_OR_NOT_APPLICABLE"].includes(requiredPrivateFields.vatStatus));
+  const route = source("app/api/seller/onboarding/route.ts");
+  assert.match(route, /!sellerType \|\| !country \|\| !storeName \|\| !city \|\| !phone \|\| !address \|\| !postalCode \|\| !legal\.identity \|\| !vatStatus/);
+  assert.match(route, /!validBusinessRegistration\(registration \?\? "", requirements\)/);
+
+  const switchedBack = selectSellerOnboardingType(privateSeller, "PROFESSIONAL");
+  assert.equal(switchedBack.legalForm, "");
+  assert.equal(switchedBack.companySubtype, "");
+  assert.equal(sellerLegalIdentity({ sellerType: switchedBack.sellerType, country: "FR", legalForm: switchedBack.legalForm, companySubtype: switchedBack.companySubtype }).error, "LEGAL_FORM_REQUIRED");
+
+  const component = source("app/seller/onboarding/SellerAddressOnboardingForm.tsx");
+  assert.match(component, /selectSellerOnboardingType\(\{ sellerType, legalForm, companySubtype \}, "PRIVATE"\)/);
+  assert.match(component, /setLegalForm\(next\.legalForm\); setCompanySubtype\(next\.companySubtype\)/);
+});
+
 test("draft and store persistence retain nullable subtype without rewriting old COMPANY rows", () => {
   const schema = source("prisma/schema.prisma"), migration = source("prisma/migrations/20261001223000_add_seller_company_subtype/migration.sql"), route = source("app/api/seller/onboarding/route.ts"), page = source("app/seller/onboarding/page.tsx");
   assert.match(schema, /enum SellerCompanySubtype/);
   assert.equal((schema.match(/companySubtype\s+SellerCompanySubtype\?/g) ?? []).length, 3);
   assert.doesNotMatch(migration, /UPDATE|NOT NULL|DEFAULT/);
-  assert.match(route, /companySubtype:\(legal\.identity\?\.companySubtype\?\?null\)/);
-  assert.match(route, /companySubtype:identity\.companySubtype/);
+  assert.match(route, /companySubtype:\s*\(legal\.identity\?\.companySubtype\s*\?\?\s*null\)/);
+  assert.match(route, /companySubtype:\s*identity\.companySubtype/);
   assert.match(page, /companySubtype: store\?\.companySubtype \?\? draft\?\.companySubtype \?\? ""/);
 });
 
@@ -66,5 +97,5 @@ test("Phase 3, Phase 4, Phase 5 and Admin authority remain wired", () => {
   assert.match(source("app/seller/onboarding/page.tsx"), /defaultBuyerAddress\(prisma, session\.userId\)/);
   assert.match(source("app/seller/onboarding/page.tsx"), /sellerOnboardingDestination/);
   assert.match(source("app/seller/subscription/page.tsx"), /resolveSellerCommercialAccess/);
-  assert.match(source("app/api/seller/onboarding/route.ts"), /const store=user\.store\?await tx\.store\.update/);
+  assert.match(source("app/api/seller/onboarding/route.ts"), /const store = user\.store\s*\?\s*await tx\.store\.update/);
 });

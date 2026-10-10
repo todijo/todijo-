@@ -28,11 +28,11 @@ OAuth state is HMAC-protected and expires after ten minutes. Access/refresh toke
 
 Provider-side application creation, consent-screen review, domain verification, credentials and safe production smoke tests remain required. Status remains CODE-READY / CONFIGURATION-PENDING until those steps are complete.
 
-## Seller onboarding
+## Seller onboarding and verification
 
-/{locale}/seller/onboarding is resumable from persisted Store fields and preserves the same User.id. Private sellers do not need a business registration number, including in France. Professional French sellers receive the SIRET label and a format-only 14-digit check; this is not government verification. Other countries use a generic business-registration identifier. VAT declaration is separate from verification.
+/{locale}/seller/onboarding is a resumable, four-step flow backed by the seller onboarding draft and Store fields; it preserves the same User.id and reuses saved buyer profile/address data when available. Private sellers do not need professional registration identifiers, including in France. French professional sellers provide the SellerBusiness SIREN and an establishment SIRET. Todijo validates their length/check digits, confirms the SIRET-to-SIREN relationship, and checks the legal unit and establishment against the official INSEE Sirene API. Restricted or incomplete public data and temporary upstream failures remain distinguishable from invalid/not-found identifiers. Professional sellers elsewhere provide the registration details required for their country. VAT declaration remains separate from business verification.
 
-Submission creates a PENDING store only when needed and records PENDING_REVIEW. It never grants admin, verification, subscription, Stripe Connect completion or dropshipping access. Admin review data is visible at /adm-barewbar-182203/seller-review under the existing database-authorized admin guard.
+Completed ordinary onboarding activates the store without redundant Admin approval once its applicable identity/legal and verification checks pass. The exceptional INSEE manual-review path may leave a store PENDING with PENDING_REVIEW; only those reviewable cases enter the database-authorized Admin queue at /adm-barewbar-182203/seller-review. Seller onboarding does not grant Admin privileges, paid subscription entitlement, Stripe Connect readiness or supplier/dropshipping access. FREE sellers do not require a paid subscription; any applicable payment setup/readiness remains a separate gate.
 
 ## Operations and future security
 

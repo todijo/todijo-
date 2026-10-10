@@ -5,8 +5,8 @@ export type StripeCheckoutSession = {
   status?: "open" | "complete" | "expired";
   expires_at?: number;
   mode?: string;
-  customer?: string | { id: string } | null;
-  subscription?: string | { id: string } | null;
+  customer?: string;
+  subscription?: string | null;
   payment_intent: string | null;
   payment_status: string;
   client_reference_id: string | null;
@@ -31,6 +31,7 @@ export type StripeSubscription = {
   cancel_at_period_end?: boolean;
   current_period_start?: number;
   current_period_end?: number;
+  trial_end?: number | null;
   collection_method?: string;
   latest_invoice?: string | StripeInvoice | null;
   schedule?: string | StripeSubscriptionSchedule | null;
@@ -48,10 +49,15 @@ export type StripeInvoice = {
   created?: number;
   paid?: boolean;
   billing_reason?: string;
+  number?: string | null;
+  amount_paid?: number;
   amount_due?: number;
   currency?: string;
   hosted_invoice_url?: string | null;
+  invoice_pdf?: string | null;
 };
+
+export type StripeInvoicePage = { data: StripeInvoice[]; has_more: boolean };
 
 export type StripeSchedulePhase = {
   start_date: number;
@@ -204,8 +210,39 @@ export function retrieveSellerStripeSubscription(id: string) {
   return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(id)}?expand[]=latest_invoice`);
 }
 
+export function cancelSellerStripeSubscriptionAtPeriodEnd(subscriptionId: string, idempotencyKey: string) {
+  return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "POST", idempotencyKey, body: new URLSearchParams({ cancel_at_period_end: "true" }),
+  });
+}
+
+export function restoreSellerStripeSubscriptionRenewal(subscriptionId: string, idempotencyKey: string) {
+  return stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "POST", idempotencyKey, body: new URLSearchParams({ cancel_at_period_end: "false" }),
+  });
+}
+
+export function expireSellerSubscriptionCheckoutSession(sessionId: string, idempotencyKey: string) {
+  return stripeRequest<StripeCheckoutSession>(`/checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {
+    method: "POST", idempotencyKey, body: new URLSearchParams(),
+  });
+}
+
+export function voidSellerUpgradeInvoice(invoiceId: string, idempotencyKey: string) {
+  return stripeRequest<StripeInvoice>(`/invoices/${encodeURIComponent(invoiceId)}/void`, {
+    method: "POST", idempotencyKey, body: new URLSearchParams(),
+  });
+}
+
 export function retrieveStripeInvoice(id: string) {
   return stripeRequest<StripeInvoice>(`/invoices/${encodeURIComponent(id)}`);
+}
+
+export function listStripeCustomerInvoices(input: { customerId: string; subscriptionId?: string | null; startingAfter?: string | null; limit?: number }) {
+  const query = new URLSearchParams({ customer: input.customerId, status: "paid", limit: String(Math.max(1, Math.min(input.limit ?? 100, 100))) });
+  if (input.subscriptionId) query.set("subscription", input.subscriptionId);
+  if (input.startingAfter) query.set("starting_after", input.startingAfter);
+  return stripeRequest<StripeInvoicePage>(`/invoices?${query.toString()}`);
 }
 
 export function upgradeSellerStripeSubscription(input: { subscriptionId: string; itemId: string; priceId: string; prorationAt: Date; idempotencyKey: string }) {
@@ -394,7 +431,7 @@ export async function createStripeCustomer(input: { storeId: string; userId: str
   });
 }
 
-export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string;interval:string;locale:string;idempotencyKey:string }) {
+export async function createSellerSubscriptionCheckout(input: { storeId: string; userId: string; customerId: string; priceId: string; plan: string;interval:string;locale:string;idempotencyKey:string;trialEnd?:Date|null }) {
   const origin = appUrl();
   const body = new URLSearchParams({
     mode: "subscription",
@@ -414,6 +451,7 @@ export async function createSellerSubscriptionCheckout(input: { storeId: string;
     "subscription_data[metadata][userId]": input.userId,
     "subscription_data[metadata][plan]": input.plan,
     "subscription_data[metadata][interval]": input.interval,
+    ...(input.trialEnd ? { "subscription_data[trial_end]": String(Math.floor(input.trialEnd.getTime() / 1000)) } : {}),
   });
   const session = await stripeRequest<{ id: string; url: string; expires_at?:number }>("/checkout/sessions", {
     method: "POST", idempotencyKey: input.idempotencyKey, body,

@@ -5,6 +5,8 @@ import { handleStripeWebhookRequest } from "@/lib/stripe-webhook-request";
 import { automaticCjFulfillmentEnabled, processOrderSupplierFulfillments } from "@/lib/suppliers/supplier-fulfillment";
 import { dispatchNotificationPushBestEffort } from "@/lib/web-push-delivery";
 import { dispatchSellerSaleDeliveriesBestEffort } from "@/lib/seller-sale-notifications";
+import { processSellerClosureCancellation } from "@/lib/seller-closure";
+import { dispatchBuyerOrderEmailDeliveriesBestEffort } from "@/lib/buyer-order-email-deliveries";
 
 export const runtime = "nodejs";
 
@@ -39,11 +41,16 @@ async function processAuthenticatedStripeEvent(event: StripeEvent) {
       console.info(`[Stripe webhook ${event.id}] Subscription lookup completed (found=${Boolean(initialRecord)}).`);
     }
     const result = await processStripeEvent(prisma, event);
+    if ("storeId" in result && typeof result.storeId === "string") {
+      const closedBusiness = await prisma.sellerBusiness.findFirst({ where: { stores: { some: { id: result.storeId } }, stripeCancellationPending: true }, select: { id: true } });
+      if (closedBusiness) await processSellerClosureCancellation(prisma, closedBusiness.id);
+    }
     const paidOrderId = !sellerCheckout && "paid" in result && result.paid === true
       ? session.metadata?.orderId ?? session.client_reference_id
       : null;
     if(paidOrderId){const notification=await prisma.notification.findFirst({where:{type:"ORDER_PAID",href:`/account/orders/${paidOrderId}`},orderBy:{createdAt:"desc"},select:{id:true}});if(notification)dispatchNotificationPushBestEffort(notification.id);}
     if(paidOrderId)dispatchSellerSaleDeliveriesBestEffort(paidOrderId);
+    if(paidOrderId)dispatchBuyerOrderEmailDeliveriesBestEffort(paidOrderId);
     if (paidOrderId && automaticCjFulfillmentEnabled()) {
       try {
         const fulfillment = await processOrderSupplierFulfillments(paidOrderId);

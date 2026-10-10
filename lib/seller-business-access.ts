@@ -10,7 +10,7 @@ export function hasProTeamEntitlement(business:TeamBusinessEntitlement,now=new D
 }
 
 export class SellerCapabilityError extends Error {
-  constructor(public readonly code: "AUTH_REQUIRED"|"OWNER_REQUIRED"|"STORE_ACCESS_DENIED"|"PERMISSION_DENIED"|"TEAM_ACCESS_SUSPENDED"|"BUSINESS_NOT_FOUND", public readonly status = 403) { super(code); }
+  constructor(public readonly code: "AUTH_REQUIRED"|"OWNER_REQUIRED"|"STORE_ACCESS_DENIED"|"PERMISSION_DENIED"|"TEAM_ACCESS_SUSPENDED"|"BUSINESS_NOT_FOUND"|"BUSINESS_CLOSED", public readonly status = 403) { super(code); }
 }
 
 export type SellerPrincipal = {
@@ -28,11 +28,11 @@ export async function sellerPrincipal(db: Db, userId: string): Promise<SellerPri
 }
 
 export async function sellerPrincipals(db: Db, userId: string): Promise<SellerPrincipal[]> {
-  const owned = await db.sellerBusiness.findUnique({ where: { ownerId: userId }, select: { id: true, ownerId: true, stores: { select: { id: true } } } });
-  const memberships = await db.sellerTeamMembership.findMany({ where: { userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true, businessId: true, permissions: true, business: { select: { ownerId: true,owner:{select:{role:true}},billingStore:{select:{subscription:{select:{status:true,plan:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,plan:true,startsAt:true,endsAt:true}}}} } }, assignments: { select: { storeId: true } } } });
+  const owned = await db.sellerBusiness.findUnique({ where: { ownerId: userId }, select: { id: true, ownerId: true, sellerClosedAt:true, stores: { select: { id: true } } } });
+  const memberships = await db.sellerTeamMembership.findMany({ where: { userId, status: "ACTIVE", business:{sellerClosedAt:null} }, orderBy: { createdAt: "asc" }, select: { id: true, businessId: true, permissions: true, business: { select: { sellerClosedAt:true,ownerId: true,owner:{select:{role:true}},billingStore:{select:{subscription:{select:{status:true,plan:true,currentPeriodEnd:true}},accessGrants:{select:{source:true,plan:true,startsAt:true,endsAt:true}}}} } }, assignments: { select: { storeId: true } } } });
   return [
-    ...(owned ? [{ userId, businessId: owned.id, ownerId: owned.ownerId, owner: true, membershipId: null, permissions: [] as TeamPermission[], storeIds: owned.stores.map(store => store.id) }] : []),
-    ...memberships.filter(membership=>hasProTeamEntitlement(membership.business)).map(membership => ({ userId, businessId: membership.businessId, ownerId: membership.business.ownerId, owner: false, membershipId: membership.id, permissions: membership.permissions, storeIds: membership.assignments.map(item => item.storeId) })),
+    ...(owned && !owned.sellerClosedAt ? [{ userId, businessId: owned.id, ownerId: owned.ownerId, owner: true, membershipId: null, permissions: [] as TeamPermission[], storeIds: owned.stores.map(store => store.id) }] : []),
+    ...memberships.filter(membership=>!membership.business.sellerClosedAt&&hasProTeamEntitlement(membership.business)).map(membership => ({ userId, businessId: membership.businessId, ownerId: membership.business.ownerId, owner: false, membershipId: membership.id, permissions: membership.permissions, storeIds: membership.assignments.map(item => item.storeId) })),
   ];
 }
 
@@ -51,9 +51,11 @@ export async function requireBusinessOwner(db: Db, userId: string | null | undef
 
 export async function requireStoreCapability(db: Db, userId: string | null | undefined, storeId: string, permission: TeamPermission) {
   if (!userId) throw new SellerCapabilityError("AUTH_REQUIRED", 401);
-  const store = await db.store.findUnique({ where: { id: storeId }, select: { businessId: true, ownerId: true } });
+  const store = await db.store.findUnique({ where: { id: storeId }, select: { businessId: true, ownerId: true, business:{select:{sellerClosedAt:true}},owner:{select:{role:true}} } });
   if (!store) throw new SellerCapabilityError("STORE_ACCESS_DENIED", 403);
+  if(store.business?.sellerClosedAt)throw new SellerCapabilityError("BUSINESS_CLOSED",403);
   if (store.ownerId === userId) {
+    if(!["SELLER","ADMIN"].includes(store.owner.role))throw new SellerCapabilityError("STORE_ACCESS_DENIED",403);
     if (!store.businessId) throw new SellerCapabilityError("BUSINESS_NOT_FOUND", 403);
     return { userId, businessId: store.businessId, ownerId: userId, owner: true, membershipId: null, permissions: [], storeIds: [storeId] } satisfies SellerPrincipal;
   }

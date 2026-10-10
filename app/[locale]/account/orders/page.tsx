@@ -54,7 +54,7 @@ export default async function BuyerOrdersPage({ params }: { params: Promise<{ lo
                     <div><span>{t("orderNumber")}</span><strong>#{order.id}</strong></div>
                     <div className="buyerOrderBadges">
                       <span className={`orderBadge payment-${paymentState}`}>{t(`payment.${paymentState}`)}</span>
-                      <span className={`orderBadge status-${order.status.toLowerCase()}`}>{fulfillmentStep ? t(`fulfillment.${fulfillmentStep.toLowerCase()}`) : t(`status.${order.status}`)}</span>
+                      <span className={`orderBadge status-${order.status.toLowerCase()}`}>{order.fulfillmentStatus === "PARTIALLY_SHIPPED" ? t("shipment.partialStatus") : fulfillmentStep ? t(`fulfillment.${fulfillmentStep.toLowerCase()}`) : t(`status.${order.status}`)}</span>
                     </div>
                   </header>
                   <div className="buyerOrderMeta">

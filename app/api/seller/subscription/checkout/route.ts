@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       await prisma.store.update({ where: { id: store.id }, data: { stripeCustomerId: customerId } });
       console.info(`[Seller subscription] Saved Stripe customer ${customerId} for store ${store.id}.`);
     }
-    const checkout=await createOrReuseSellerSubscriptionCheckout({db:prisma,storeId:store.id,userId:session.userId,customerId,locale,plan:{id:plan.id,interval:plan.interval,priceId:plan.priceId}});
+    const checkout=await createOrReuseSellerSubscriptionCheckout({db:prisma,storeId:store.id,userId:session.userId,customerId,locale,plan:{id:plan.id,interval:plan.interval,priceId:plan.priceId},allowTrial:body.skipTrial!==true});
     console.info(`[Seller subscription] Created Checkout session ${checkout.id} for store ${store.id}.`);
     return NextResponse.json({ url: checkout.url });
   } catch (error) {

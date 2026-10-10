@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {processStripeEvent} from "../lib/payments";
 import {configuredSellerPlanForPriceId,sellerPlans} from "../lib/seller-plans";
-import {createOrReuseSellerSubscriptionCheckout,hasCurrentSellerSubscriptionEntitlement,SellerSubscriptionCheckoutError,sellerSubscriptionCheckoutIdempotencyKey} from "../lib/seller-subscription-checkout";
+import {createOrReuseSellerSubscriptionCheckout,hasCurrentSellerSubscriptionEntitlement,SellerSubscriptionCheckoutError,sellerSubscriptionCheckoutIdempotencyKey,sellerTrialEnd} from "../lib/seller-subscription-checkout";
 import {StripeTransportError,type StripeEvent,type StripeSubscription} from "../lib/stripe";
 import {sellerBusinessCommercialEntitlement} from "../lib/seller-business";
 import {requireSellerSupplierAccess} from "../lib/suppliers/supplier-access";
@@ -21,10 +21,11 @@ async function withPrices<T>(run:()=>Promise<T>|T){
 }
 
 type Attempt=Record<string,any>|null;
-function checkoutDb(initial:Attempt=null,failSessionPersistOnce=false){
-  let state=initial?structuredClone(initial):null,queue=Promise.resolve(),failPersist=failSessionPersistOnce;
+function checkoutDb(initial:Attempt=null,failSessionPersistOnce=false,trialConsumedAt:Date|null=null){
+  let state=initial?structuredClone(initial):null,queue=Promise.resolve(),failPersist=failSessionPersistOnce;const businessUpdates:any[]=[];
   const tx:any={
     $queryRaw:async()=>[{locked:true}],
+    sellerBusiness:{findFirst:async()=>({id:"business",firstPaidTrialGrantedAt:trialConsumedAt}),updateMany:async(args:any)=>{businessUpdates.push(args);return{count:1}}},
     sellerSubscription:{
       findUnique:async()=>state?structuredClone(state):null,
       updateMany:async({where,data}:any)=>{if(!state||state.stripeCheckoutAttemptGeneration!==where.stripeCheckoutAttemptGeneration)return{count:0};state={...state,stripeCheckoutAttemptGeneration:state.stripeCheckoutAttemptGeneration+1,stripeCheckoutSessionId:null,stripeCheckoutUrl:null,stripeCheckoutExpiresAt:null,stripeCheckoutIdempotencyKey:null,...Object.fromEntries(Object.entries(data).filter(([key])=>key!=="stripeCheckoutAttemptGeneration"))};return{count:1}},
@@ -33,7 +34,7 @@ function checkoutDb(initial:Attempt=null,failSessionPersistOnce=false){
     },
   };
   const db:any={$transaction:(callback:any)=>{const run=queue.then(async()=>{const snapshot=state?structuredClone(state):null;try{return await callback(tx)}catch(error){state=snapshot;throw error}});queue=run.then(()=>undefined,()=>undefined);return run}};
-  return{db,state:()=>state};
+  return{db,state:()=>state,businessUpdates:()=>businessUpdates};
 }
 
 const intended={id:"pro" as const,interval:"annual" as const,priceId:"price_proannual"};
@@ -94,6 +95,29 @@ test("persistence failure retries the accepted Stripe Session with the same dura
   assert.equal(fixture.state()?.stripeCheckoutAttemptGeneration,0);
 });
 
+test("first PLUS or PRO checkout receives one durable three-calendar-month trial end",async()=>{
+  const fixture=checkoutDb(),ends:Date[]=[];
+  const create=async(input:any)=>{ends.push(input.trialEnd);return checkoutResult};
+  await createOrReuseSellerSubscriptionCheckout({...baseInput,db:fixture.db,createCheckout:create});
+  assert.equal(ends.length,1);
+  assert.equal(ends[0].toISOString(),"2027-01-03T12:00:00.000Z");
+  assert.equal(fixture.state()?.trialEnd.toISOString(),ends[0].toISOString());
+  assert.equal(sellerTrialEnd(new Date("2026-10-31T08:00:00Z")).toISOString(),"2027-01-31T08:00:00.000Z");
+});
+
+test("an already-granted seller/business trial is never added to a later Checkout",async()=>{
+  const fixture=checkoutDb(null,false,new Date("2026-08-01T00:00:00Z")),ends:unknown[]=[];
+  await createOrReuseSellerSubscriptionCheckout({...baseInput,db:fixture.db,createCheckout:async(input:any)=>{ends.push(input.trialEnd??null);return checkoutResult}});
+  assert.deepEqual(ends,[null]);
+  assert.equal(fixture.state()?.trialEnd,null);
+});
+
+test("explicitly skipping a first trial does not consume the one-time trial grant",async()=>{
+  const fixture=checkoutDb(),ends:unknown[]=[];
+  await createOrReuseSellerSubscriptionCheckout({...baseInput,db:fixture.db,allowTrial:false,createCheckout:async(input:any)=>{ends.push(input.trialEnd??null);return checkoutResult}});
+  assert.deepEqual(ends,[null]);assert.deepEqual(fixture.businessUpdates(),[]);assert.equal(fixture.state()?.trialEnd,null);
+});
+
 test("definitively expired attempt advances generation and simultaneous clicks share one new session",async()=>{
   const fixture=checkoutDb({id:"local-subscription",storeId:"store",status:"INCOMPLETE",plan:"pro",billingInterval:"annual",stripePriceId:"price_proannual",currentPeriodEnd:null,stripeCheckoutAttemptGeneration:0,stripeCheckoutIdempotencyKey:"seller-subscription:store:price_proannual",stripeCheckoutSessionId:"cs_old",stripeCheckoutUrl:"https://checkout.stripe.test/old",stripeCheckoutExpiresAt:new Date("2026-10-02T12:00:00Z")});
   let creates=0;const create=async(input:any)=>{creates++;assert.equal(input.idempotencyKey,sellerSubscriptionCheckoutIdempotencyKey("store","price_proannual",1));await new Promise(resolve=>setTimeout(resolve,5));return checkoutResult};
@@ -110,10 +134,11 @@ test("future active entitlement blocks Checkout while expired ACTIVE state can r
   assert.equal((await createOrReuseSellerSubscriptionCheckout({...baseInput,db:stale.db,createCheckout:async()=>checkoutResult})).id,"cs_1");
 });
 
-function subscriptionDb(){
+function subscriptionDb(options:{cancelAtPeriodEnd?:boolean;latestRenewalDecision?:string|null;sellerClosedAt?:Date|null}={}){
   let upsert:any,demoted=0,creates=0;
-  const tx:any={$queryRaw:async()=>[],sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store",subscription:upsert?.update??null,accessGrants:[]}})},stripeWebhookEvent:{create:async()=>{creates++;}},sellerSubscription:{findFirst:async()=>({storeId:"store",plan:"plus",stripePriceId:"price_plusmonthly"}),findUnique:async()=>({storeId:"store",currentPeriodEnd:new Date("2026-10-01T00:00:00Z"),store:{sellerType:"PROFESSIONAL",businessId:"business"}}),upsert:async(args:any)=>{upsert=args;return args.update},update:async()=>({})},store:{findMany:async()=>[{id:"store"}],findUnique:async()=>({id:"store",ownerId:"seller",stripeCustomerId:"cus",sellerType:"PROFESSIONAL",businessId:"business"}),update:async()=>({id:"store",status:"ACTIVE",stripeCustomerId:"cus"})},product:{updateMany:async()=>{demoted++;return{count:2}}}};
-  return{db:{$transaction:async(fn:any)=>fn(tx)} as any,upsert:()=>upsert,demoted:()=>demoted,creates:()=>creates};
+  const businessUpdates:any[]=[];
+  const tx:any={$queryRaw:async()=>[],sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},sellerClosedAt:options.sellerClosedAt??null,billingStore:{id:"store",subscription:upsert?.update??null,accessGrants:[]}}),updateMany:async(args:any)=>{businessUpdates.push(args);return{count:1}}},sellerBusinessAuditEvent:{findFirst:async()=>options.latestRenewalDecision?{action:options.latestRenewalDecision}:null},stripeWebhookEvent:{create:async()=>{creates++;}},sellerSubscription:{findFirst:async()=>({storeId:"store",plan:"plus",stripePriceId:"price_plusmonthly",cancelAtPeriodEnd:options.cancelAtPeriodEnd??false,trialEnd:null}),findUnique:async()=>({storeId:"store",currentPeriodEnd:new Date("2026-10-01T00:00:00Z"),store:{sellerType:"PROFESSIONAL",businessId:"business"}}),upsert:async(args:any)=>{upsert=args;return args.update},update:async()=>({})},store:{findMany:async()=>[{id:"store"}],findUnique:async()=>({id:"store",ownerId:"seller",stripeCustomerId:"cus",sellerType:"PROFESSIONAL",businessId:"business",business:{sellerClosedAt:options.sellerClosedAt??null}}),update:async()=>({id:"store",status:"ACTIVE",stripeCustomerId:"cus"})},product:{updateMany:async()=>{demoted++;return{count:2}}}};
+  return{db:{$transaction:async(fn:any)=>fn(tx)} as any,upsert:()=>upsert,demoted:()=>demoted,creates:()=>creates,businessUpdates:()=>businessUpdates};
 }
 function stripeSubscription(overrides:Partial<StripeSubscription>={}):StripeSubscription{return{id:"sub",object:"subscription",customer:"cus",status:"active",metadata:{storeId:"store",plan:"plus",interval:"monthly"},items:{data:[{price:{id:"price_proannual"},current_period_start:1_799_000_000,current_period_end:1_830_536_000}]},...overrides};}
 
@@ -143,4 +168,24 @@ test("unknown subscription Price fails closed and genuine payment failure demote
 test("cancel at period end preserves entitlement until final cancellation and never auto-republishes",()=>withPrices(async()=>{
   const pending=subscriptionDb(),active=stripeSubscription({cancel_at_period_end:true});await processStripeEvent(pending.db,{id:"evt_cancel_pending",type:"customer.subscription.updated",data:{object:active}});assert.equal(pending.upsert().update.cancelAtPeriodEnd,true);assert.equal(pending.demoted(),0);
   const final=subscriptionDb(),canceled=stripeSubscription({status:"canceled"});await processStripeEvent(final.db,{id:"evt_deleted",type:"customer.subscription.deleted",data:{object:canceled}});assert.equal(final.upsert().update.status,"CANCELED");assert.equal(final.demoted(),1);
+}));
+
+test("a stale Stripe webhook cannot undo scheduled renewal cancellation after reactivation",()=>withPrices(async()=>{
+  const fixture=subscriptionDb({cancelAtPeriodEnd:true,latestRenewalDecision:"SELLER_RENEWAL_CANCELED"}),stale=stripeSubscription({cancel_at_period_end:false});
+  await processStripeEvent(fixture.db,{id:"evt_stale_renewal",type:"customer.subscription.updated",data:{object:stale}},async()=>stale);
+  assert.equal(fixture.upsert().update.cancelAtPeriodEnd,true);
+  assert.deepEqual(fixture.businessUpdates(),[{where:{id:"business"},data:{stripeCancellationPending:true}}]);
+}));
+
+test("an explicit renewal restoration audit permits the authoritative webhook to clear cancellation",()=>withPrices(async()=>{
+  const fixture=subscriptionDb({cancelAtPeriodEnd:true,latestRenewalDecision:"SELLER_RENEWAL_RESTORED"}),restored=stripeSubscription({cancel_at_period_end:false});
+  await processStripeEvent(fixture.db,{id:"evt_explicit_restore",type:"customer.subscription.updated",data:{object:restored}},async()=>restored);
+  assert.equal(fixture.upsert().update.cancelAtPeriodEnd,false);
+  assert.deepEqual(fixture.businessUpdates(),[]);
+}));
+
+test("authoritative first TRIALING webhook consumes the SellerBusiness trial only once",()=>withPrices(async()=>{
+  const fixture=subscriptionDb(),event:StripeEvent={id:"evt_trial",type:"checkout.session.completed",data:{object:{id:"cs_trial",mode:"subscription",customer:"cus",subscription:"sub",payment_intent:null,payment_status:"no_payment_required",client_reference_id:"store",metadata:{kind:"seller_subscription",storeId:"store",userId:"seller",plan:"pro",interval:"annual"}}}};
+  await processStripeEvent(fixture.db,event,async()=>stripeSubscription({status:"trialing",current_period_start:1_799_000_000,current_period_end:1_807_000_000}));
+  assert.deepEqual(fixture.businessUpdates(),[{where:{id:"business",firstPaidTrialGrantedAt:null},data:{firstPaidTrialGrantedAt:new Date(1_799_000_000_000)}}]);
 }));

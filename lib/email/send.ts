@@ -8,6 +8,9 @@ import { sendTodijoMail } from "./transport";
 import { formatSellerSaleCopy, sellerSaleCopy } from "../../i18n/seller-sale-notifications";
 import { sellerTeamCopy } from "../../i18n/seller-team";
 import {formatSellerSubscriptionReminder,sellerSubscriptionReminderCopy,sellerSubscriptionReminderLocale} from "../../i18n/seller-subscription-reminders";
+import { sellerLifecycleCopy } from "../../i18n/seller-lifecycle";
+import { orderShipmentCopy } from "../../i18n/order-shipment";
+import type { BuyerOrderEmailKind } from "@prisma/client";
 
 function layout(locale: string, firstName: string, values: { preview: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }) {
   const common = emailCopy(locale);
@@ -56,6 +59,13 @@ export async function sendSellerTeamInvitationEmail(input:{to:string;locale:stri
   await sendTodijoMail({to:input.to,subject:copy.invitationSubject,...message});
 }
 
+export async function sendSellerClosureConfirmationEmail(input:{to:string;firstName:string;locale:string;rawToken:string}){
+  const copy=sellerLifecycleCopy(input.locale),url=new URL(`${localizedHome(input.locale)}/seller/closure/confirm`,publicAppUrl());
+  url.hash=`token=${encodeURIComponent(input.rawToken)}`;
+  const message=layout(input.locale,input.firstName,{preview:copy.closureSubject,heading:copy.closureSubject,body:copy.closureEmailBody,ctaLabel:copy.closureConfirm,ctaUrl:url.toString()});
+  await sendTodijoMail({to:input.to,subject:copy.closureSubject,...message});
+}
+
 export async function sendSellerReviewAdminEmail(input:{to:string}){
   const subject="Nouvelle vérification vendeur en attente";
   const body="Un vendeur a terminé son inscription et attend votre vérification dans l’administration Todijo.";
@@ -67,5 +77,16 @@ export async function sendSellerSubscriptionReminderEmail(input:{to:string;first
   const locale=sellerSubscriptionReminderLocale(input.locale),copy=sellerSubscriptionReminderCopy(locale),values={plan:input.plan,date:new Intl.DateTimeFormat(locale,{dateStyle:"long",timeZone:"UTC"}).format(input.periodEnd)};
   const subject=formatSellerSubscriptionReminder(copy.subject,values),body=formatSellerSubscriptionReminder(input.entitlementLost?copy.lost:copy.upcoming,values);
   const message=layout(locale,input.firstName,{preview:subject,heading:copy.heading,body,ctaLabel:copy.cta,ctaUrl:`${publicAppUrl()}${localizedHome(locale)}/seller/subscription`});
+  await sendTodijoMail({to:input.to,subject,...message});
+}
+
+export async function sendBuyerOrderEmail(input:{to:string;firstName:string;locale:string;kind:BuyerOrderEmailKind;orderReference:string;storeName?:string|null;items?:Array<{name:string;quantity:number}>}){
+  const copy=orderShipmentCopy(input.locale),values={order:input.orderReference,store:input.storeName??"",items:(input.items??[]).map(item=>`${item.name} × ${item.quantity}`).join(", ")};
+  const payment=input.kind==="PAYMENT_CONFIRMED",full=input.kind==="ORDER_SHIPPED";
+  const subject=payment?copy.paymentSubject:full?copy.shippedSubject:copy.partialSubject;
+  const body=(payment?copy.paymentBody:full?copy.shippedBody:copy.partialBody).replace(/\{(\w+)\}/g,(_,key:string)=>String(values[key as keyof typeof values]??`{${key}}`));
+  const locale= isLocale(input.locale)?input.locale:"en";
+  const orderUrl=new URL(`/${locale}/account/orders/${encodeURIComponent(input.orderReference)}`,publicAppUrl()).toString();
+  const message=layout(input.locale,input.firstName,{preview:subject,heading:subject,body,ctaLabel:orderShipmentCopy(input.locale).orderDetails,ctaUrl:orderUrl});
   await sendTodijoMail({to:input.to,subject,...message});
 }

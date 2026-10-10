@@ -7,7 +7,7 @@ const orderHistoryInclude = Prisma.validator<Prisma.OrderInclude>()({
   buyer: { select: { firstName: true, lastName: true } },
   items: {
     select: {
-      id: true, quantity: true, productNameSnapshot: true,
+      id: true, quantity: true, productNameSnapshot: true, variantTitleSnapshot: true, selectedColor: true, selectedSize: true, lineTotal: true, unitPrice: true,
       product: { select: { name: true, store: { select: { name: true } } } },
     },
     orderBy: { createdAt: "asc" },
@@ -16,6 +16,15 @@ const orderHistoryInclude = Prisma.validator<Prisma.OrderInclude>()({
 
 const sellerOrderHistoryInclude = Prisma.validator<Prisma.OrderInclude>()({
   ...orderHistoryInclude,
+  items: {
+    select: {
+      id: true, quantity: true, productNameSnapshot: true, variantTitleSnapshot: true, selectedColor: true, selectedSize: true, lineTotal: true, unitPrice: true,
+      product: { select: { id: true, name: true, storeId: true, store: { select: { name: true } } } },
+      orderGroup: { select: { id: true, storeId: true, itemSubtotalMinor: true, shippingAmountMinor: true, shipments: { where: { status: { not: "CANCELLED" } }, select: { items: { select: { orderItemId: true, quantity: true } } } } } },
+      refundAllocations: { select: { quantity: true, refundOperation: { select: { status: true } } } },
+    },
+    orderBy: { createdAt: "asc" },
+  },
   refundRequest: {
     select: {
       id: true,
@@ -80,18 +89,20 @@ export function sellerOrderHistoryWhere(sellerId: string, storeId: string, query
   return {
     AND: [
       { OR: [
-        { storeIdSnapshot: storeId },
-        {
-          storeIdSnapshot: null,
-          items: {
-            some: { product: { storeId } },
-            every: { product: { storeId } },
-          },
-        },
+        { groups: { some: { storeId } } },
+        { AND: [
+          { groups: { none: {} } },
+          { items: { some: { product: { storeId } } } },
+          { items: { every: { product: { storeId } } } },
+        ] },
       ] },
       referenceFilter(query),
     ],
   };
+}
+
+export function sellerOrderItemBelongsToStore(item: { orderGroup?: { storeId: string | null } | null; product: { storeId?: string } }, storeId: string) {
+  return item.orderGroup ? item.orderGroup.storeId === storeId : item.product.storeId === storeId;
 }
 
 export async function listSellerOrderHistory(db: OrderHistoryDb, sellerId: string, storeId: string, query: unknown, pageInputValue: unknown) {
@@ -101,7 +112,10 @@ export async function listSellerOrderHistory(db: OrderHistoryDb, sellerId: strin
   const total = await db.order.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / ORDER_HISTORY_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
-  const orders = await db.order.findMany({ where, include: sellerOrderHistoryInclude, orderBy: { createdAt: "desc" }, ...pageInput(page) });
+  const orders = (await db.order.findMany({ where, include: sellerOrderHistoryInclude, orderBy: { createdAt: "desc" }, ...pageInput(page) })).map((order) => ({
+    ...order,
+    items: order.items.filter((item) => sellerOrderItemBelongsToStore(item, storeId)),
+  }));
   return { orders, total, page, search, pageSize: ORDER_HISTORY_PAGE_SIZE };
 }
 

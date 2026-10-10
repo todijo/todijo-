@@ -50,7 +50,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url, { status: 404, request: { headers: requestHeaders } });
   }
   const localRewriteLocale = request.nextUrl.searchParams.get("__todijo_local_locale");
-  if (process.env.NODE_ENV !== "production" && isLocale(localRewriteLocale)) {
+  if (isLocale(localRewriteLocale)) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-todijo-locale", localRewriteLocale);
     requestHeaders.set("x-todijo-pathname", `/${localRewriteLocale}${request.nextUrl.pathname}`);
@@ -72,7 +72,7 @@ export function middleware(request: NextRequest) {
 
   const url = request.nextUrl.clone();
   url.pathname = `/${segments.slice(1).join("/")}`;
-  if (process.env.NODE_ENV !== "production") url.searchParams.set("__todijo_local_locale", pathLocale);
+  url.searchParams.set("__todijo_local_locale", pathLocale);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-todijo-locale", pathLocale);
   requestHeaders.set("x-todijo-pathname", request.nextUrl.pathname);
@@ -80,14 +80,15 @@ export function middleware(request: NextRequest) {
   const isLocalizedConnectCallback = segments.length === 3 && segments[1] === "connect" && ["success", "refresh"].includes(segments[2]);
   const isLocalizedBuyerOrders = [3, 4].includes(segments.length) && segments[1] === "account" && segments[2] === "orders";
   const isLocalizedBuyerAddresses = segments.length === 3 && segments[1] === "account" && segments[2] === "addresses";
-  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses
+  const isLocalizedBuyerInvoices = segments.length === 3 && segments[1] === "account" && segments[2] === "invoices";
+  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   if (dashboardTracePath) console.info("[dashboard-trace]", JSON.stringify({
     phase: "middleware-out",
     pathname: request.nextUrl.pathname,
     locale: pathLocale,
-    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses) ? "next" : "rewrite",
+    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices) ? "next" : "rewrite",
     targetPath: url.pathname,
   }));
   if (request.cookies.get(localeCookie)?.value !== pathLocale) {

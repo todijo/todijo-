@@ -36,7 +36,8 @@ test("important actions expose progress and friendly inline or toast feedback", 
   const product = readFileSync("app/seller/products/new/NewProductForm.tsx", "utf8");
   const settings = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
   assert.match(login, /aria-busy=\{loading\}/);
-  assert.match(register, /getElementById\("confirmPassword"\)\?\.focus\(\)/);
+  assert.match(register, /name="password"/);
+  assert.doesNotMatch(register, /confirmPassword/);
   assert.match(messages, /showToast\(\{ message: text, tone: "error" \}\)/);
   assert.match(product, /showToast\(\{ message: t\("productPublishedSuccess"\), tone: "success" \}\)/);
   assert.match(settings, /finally \{ setSaving\(false\); \}/);

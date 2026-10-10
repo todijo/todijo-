@@ -19,6 +19,7 @@ import {categoryNavigationMessages} from "./category-navigation";
 import { legalPhase5Messages } from "./legal-phase5";
 import {globalDropshippingMarginMessages} from "./global-dropshipping-margin";
 import {productReviewMessages} from "./product-reviews";
+import {orderShipmentMessages} from "./order-shipment";
 
 export default getRequestConfig(async () => {
   const requested = (await headers()).get("x-todijo-locale");
@@ -32,7 +33,7 @@ export default getRequestConfig(async () => {
   messages.CategoryNavigation = categoryNavigationMessages[locale];
   messages.CartRecommendations = (await import(`../messages/cart-recommendations/${locale}.json`)).default;
   messages.DashboardPremium = (await import(`../messages/dashboard-premium/${locale}.json`)).default;
-  messages.Orders = (await import(`../messages/orders/${locale}.json`)).default;
+  messages.Orders = { ...(await import(`../messages/orders/${locale}.json`)).default, shipment: orderShipmentMessages(locale) };
   messages.SellerDashboard = (await import(`../messages/seller-dashboard/${locale}.json`)).default;
   messages.SellerControl = ["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
     ? (await import(`../messages/seller-control/${locale}.json`)).default

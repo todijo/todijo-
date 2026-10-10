@@ -1,0 +1,172 @@
+name: Seller lifecycle validation
+
+on:
+  push:
+    branches:
+      - codex/buyer-seller-journey
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: seller-lifecycle-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  migration-validation:
+    name: PostgreSQL ${{ matrix.postgres }} migration validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ["16", "18"]
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: lifecycle
+          POSTGRES_PASSWORD: lifecycle
+          POSTGRES_DB: todijo_lifecycle_validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lifecycle -d todijo_lifecycle_validation"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
+      POSTGRES_VERSION: ${{ matrix.postgres }}
+    steps:
+      - name: Check out validation branch
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Validate fresh migration chain and synthetic pre-Phase-3 upgrade
+        run: node scripts/validate-seller-lifecycle-migrations.mjs
+
+  application-validation:
+    name: PostgreSQL 16 application and browser validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey'
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:16
+        env:
+          POSTGRES_USER: lifecycle
+          POSTGRES_PASSWORD: lifecycle
+          POSTGRES_DB: todijo_lifecycle_validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lifecycle -d todijo_lifecycle_validation"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CI: true
+      DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
+      PLAYWRIGHT_DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
+      APP_URL: http://localhost:3100
+      SESSION_SECRET: ci-only-placeholder-secret-at-least-32-characters
+    steps:
+      - name: Check out validation branch
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Install Chromium browser only
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare disposable browser-test database
+        run: npx prisma migrate deploy
+
+      - name: Prepare isolated PostgreSQL regression databases
+        env:
+          PGPASSWORD: lifecycle
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U lifecycle -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O lifecycle todijo_e2e
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_free_test
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_transition_test
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_dashboard_test
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_statement_test
+          DATABASE_URL=postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_e2e?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_free_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_transition_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_dashboard_test?schema=public npx prisma migrate deploy
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_statement_test?schema=public npx prisma migrate deploy
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run full repository test suite
+        env:
+          DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_e2e?schema=public
+          FREE_SELLER_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_free_test?schema=public
+          SELLER_SUBSCRIPTION_TRANSITION_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_transition_test?schema=public
+          SELLER_DASHBOARD_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_dashboard_test?schema=public
+          SELLER_STATEMENT_TEST_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_statement_test?schema=public
+          TODIJO_FREE_EPHEMERAL: "1"
+          TODIJO_CI_DISPOSABLE_DATABASE: "1"
+        run: npm test
+
+      - name: Run production-flow and dashboard browser tests
+        run: npm run test:e2e
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Validate lifecycle and dashboard against the production build
+        run: >-
+          node scripts/run-playwright.mjs --production
+          tests/e2e/phase3-lifecycle.spec.ts
+          tests/e2e/phase6-shipments.spec.ts
+          tests/e2e/phase4-dashboard.spec.ts
+
+      - name: Upload Playwright failure report
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: seller-lifecycle-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

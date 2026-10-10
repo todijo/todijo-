@@ -107,7 +107,7 @@ test("FREE does not bypass pending, suspended or missing legal status",()=>{
 });
 test("sixth FREE product is rejected by authoritative store creation gate",async()=>{
   const db:any={user:{findUnique:async()=>({role:"SELLER",sellerSuspendedAt:null,deactivatedAt:null,blockedAt:null,blockExpiresAt:null})},
-    store:{findUnique:async()=>({id:"store",businessId:"business",ownerId:"seller",currency:"EUR",status:"ACTIVE",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE",_count:{products:5}})},
+    store:{findUnique:async()=>({id:"store",businessId:"business",ownerId:"seller",business:null,owner:{role:"SELLER"},currency:"EUR",status:"ACTIVE",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE",_count:{products:5}})},
     sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store",subscription:null,accessGrants:[]}})}};
   await assert.rejects(()=>requireStorePublishingAccess(db,"seller","store","PRODUCT_CREATE"),(e:any)=>e.code==="SELLER_PRODUCT_LIMIT_REACHED");
   assert.equal(sellerProductQuota({role:"SELLER",plan:"free",productCount:4}).blocked,false);

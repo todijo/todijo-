@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { localizedHome, postLoginDestination } from "@/lib/auth-redirects";
+import { localizedHome, postLoginDestination, safeLoginDestination } from "@/lib/auth-redirects";
 import type { Locale } from "@/i18n/config";
 import SocialLoginButtons from "@/components/SocialLoginButtons";
 import Image from "next/image";
@@ -23,6 +23,10 @@ export default function LoginPage() {
       ? { cancelled: "تم إلغاء تسجيل الدخول. يمكنك المحاولة مجددًا أو المتابعة بالبريد الإلكتروني.", failed: "تعذّر إكمال تسجيل الدخول بأمان. يرجى المحاولة مجددًا." }
       : { cancelled: "Authentication was cancelled. You can try again or continue with email.", failed: "Authentication could not be completed safely. Please try again." };
   const socialMessage = socialFailure === "CANCELLED" ? socialCopy.cancelled : socialFailure ? socialCopy.failed : "";
+  const signupNext = params?.get("next");
+  const signupHref = signupNext
+    ? `${localizedHome(locale)}/register?next=${encodeURIComponent(safeLoginDestination(signupNext, locale as Locale))}`
+    : `${localizedHome(locale)}/register`;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,7 +58,7 @@ export default function LoginPage() {
     </section>
     <section className="authPanel"><div className="authBox">
       <a className="authBack" href={localizedHome(locale)}>← {t("back")}</a><h2>{t("login")}</h2><p className="authIntro">{t("loginIntro")}</p>
-      <SocialLoginButtons/>
+      <SocialLoginButtons next={signupNext ?? undefined}/>
       <form className="authForm" onSubmit={submit} aria-busy={loading}>
         <div className="formField"><label htmlFor="email">{t("email")}</label><input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></div>
         <div className="formField"><div className="passwordLine"><label htmlFor="password">{t("password")}</label><a href={`${localizedHome(locale)}/forgot-password`}>{t("forgot")}</a></div><input id="password" name="password" type="password" autoComplete="current-password" minLength={10} required /></div>
@@ -63,7 +67,7 @@ export default function LoginPage() {
         {message && <p className="authMessage" role="alert">{message}</p>}
         <button className="authSubmit" type="submit" disabled={loading} aria-busy={loading}>{loading ? t("signingIn") : t("login")}</button>
       </form>
-      <p className="authSwitch">{t("noAccount")} <a href={`${localizedHome(locale)}/register`}>{t("create")}</a></p>
+      <p className="authSwitch">{t("noAccount")} <a href={signupHref}>{t("create")}</a></p>
     </div></section>
   </main>;
 }

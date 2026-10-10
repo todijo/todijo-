@@ -13,6 +13,7 @@ import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
 import { canSellerSelfCreateStore } from "@/lib/seller-commercial-access";
 import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
 import { sellerTeamCopy } from "@/i18n/seller-team";
+import SellerClosureControls from "./SellerClosureControls";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,7 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
       <SellerSection id="notifications" icon={BellRing} title={t("notifications")} description={t("notificationsHelp")}><p className="sellerSettingsInfo"><BellRing size={18}/>{t("notificationsStatus")}</p></SellerSection>
       <SellerSection id="billing" icon={CreditCard} title={t("billing")} description={t("billingHelp")}>
         <div className="sellerBillingCard"><div><span>{t("currentPlan")}</span><strong>{store.subscription?.plan?.toUpperCase() ?? "—"}</strong><small>{t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</small></div><Link href={`/${locale}/seller/subscription`}>{t("managePlan")}</Link></div>
+        <SellerClosureControls locale={locale}/>
       </SellerSection>
       <SellerSection id="security" icon={ShieldCheck} title={t("security")} description={t("securityHelp")}><p className="sellerSettingsInfo"><ShieldCheck size={18}/>{t("securityStatus")}</p></SellerSection>
     </div>}

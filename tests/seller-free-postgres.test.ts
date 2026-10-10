@@ -8,7 +8,7 @@ import { proHomepageDiscovery } from "../lib/pro-homepage-discovery";
 const databaseUrl=process.env.FREE_SELLER_TEST_DATABASE_URL;
 test("PostgreSQL FREE visibility, quota concurrency and expiry retain data without auto-republishing",{skip:!databaseUrl},async()=>{
   const url=new URL(databaseUrl!);
-  assert.equal(process.env.TODIJO_FREE_EPHEMERAL,"1");assert.equal(url.hostname,"127.0.0.1");assert.equal(url.port,"65431");assert.equal(url.pathname,"/todijo_free_test");assert.equal(url.username,"validation");
+  assert.equal(process.env.TODIJO_FREE_EPHEMERAL,"1");assert.equal(url.hostname,"127.0.0.1");assert.equal(url.port,"5432");assert.equal(url.pathname,"/todijo_free_test");assert.equal(url.username,"validation");
   const db=new PrismaClient({datasources:{db:{url:databaseUrl}}});
   try{
     const owner=await db.user.create({data:{firstName:"Free",lastName:"Seller",email:"free@example.invalid",role:"SELLER",emailVerified:true,stripeAccountId:"acct_mock",stripeOnboardingComplete:true,stripeChargesEnabled:true,stripePayoutsEnabled:true}});

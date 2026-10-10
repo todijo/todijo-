@@ -40,7 +40,7 @@ for(const role of ["CUSTOMER","SELLER","ADMIN"] as const){
     const response=await patch(request(hostilePayload));
     assert.equal(response.status,200);
     assert.deepEqual(await response.json(),{ok:true});
-    assert.deepEqual(updates,[{where:{id:"authenticated-user"},data:role==="CUSTOMER"?{firstName:"Ada",lastName:"Lovelace"}:allowedProfile}]);
+    assert.deepEqual(updates,[{where:{id:"authenticated-user"},data:allowedProfile}]);
     for(const field of ["role","isAdmin","permissions","sellerVerified","dropshippingEnabled","dropshippingAuthorized","stripeAccountId","authVersion","blockedAt","store"]){
       assert.equal(Object.hasOwn(updates[0].data,field),false,`${role} must not write ${field}`);
     }

@@ -14,6 +14,7 @@ import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { requireBusinessOwner } from "@/lib/seller-business-access";
 import { sellerOnboardingJourneyCopy } from "@/i18n/seller-onboarding-journey";
+import { sellerLifecycleCopy } from "@/i18n/seller-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
   let principal;
   try { principal = await requireBusinessOwner(prisma, session.userId); }
   catch { redirect(`/${locale}/dashboard`); }
-  const business = await prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { billingStoreId: true } });
+  const business = await prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { billingStoreId: true, firstPaidTrialGrantedAt:true } });
   const store = business?.billingStoreId ? await prisma.store.findFirst({ where: { id: business.billingStoreId, ownerId: session.userId }, select: { name: true, slug:true, owner: { select: { role: true, firstName:true, lastName:true,stripeAccountId:true,stripeOnboardingComplete:true,stripeChargesEnabled:true,stripePayoutsEnabled:true } }, subscription: true, accessGrants: { select: { source: true, plan: true, startsAt: true, endsAt: true } } } }) : null;
   if (!store) redirect(sellerIntent ? sellerOnboardingPath(locale, false, sellerIntent) : `/${locale}/sell#plans`);
   const commercial = resolveSellerCommercialAccess({ role: store.owner.role, subscription: store.subscription, accessGrants: store.accessGrants });
@@ -40,6 +41,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     redirect(connectReady?`/${locale}/dashboard`:`/${locale}/seller/payment-setup`);
   }
   const resolvedLocale=isLocale(locale)?locale:"en";
+  const lifecycleCopy=sellerLifecycleCopy(resolvedLocale);
   const copy={...sellerEntitlementSubscriptionMessages[resolvedLocale],...sellerPlanSelectionMessages[resolvedLocale]};
   const journeyCopy=sellerOnboardingJourneyCopy(resolvedLocale);
   const freeCopy = sellerFreeModelCopy(locale);
@@ -49,7 +51,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     features:[plan.productLimit?copy.upTo(plan.productLimit):copy.unlimited,copy.sellerDashboard,copy.ordersRevenue, ...(plan.id === "pro" ? [freeCopy.proHelp, freeCopy.resurfacing, freeCopy.suppliesHelp, freeCopy.proImport] : [freeCopy.oneStore, plan.id === "free" ? freeCopy.freeHelp : freeCopy.plusHelp])],
     available: { monthly: Boolean(priceIds.monthly), annual: Boolean(priceIds.annual) },
   }));
-  const clientCopy={monthly:copy.monthly,annual:copy.annual,save20:copy.save20,perMonth:copy.perMonth,perYear:copy.perYear,opening:copy.opening,active:copy.active,anotherActive:copy.anotherActive,subscribe:copy.subscribe,unavailable:copy.unavailable,checkoutError:copy.checkoutError};
+  const clientCopy={monthly:copy.monthly,annual:copy.annual,save20:copy.save20,perMonth:copy.perMonth,perYear:copy.perYear,opening:copy.opening,active:copy.active,anotherActive:copy.anotherActive,subscribe:copy.subscribe,unavailable:copy.unavailable,checkoutError:copy.checkoutError,trialOffer:lifecycleCopy.trialOffer,trialOnce:lifecycleCopy.trialOnce,continueWithoutTrial:lifecycleCopy.continueWithoutTrial,restoreRenewal:lifecycleCopy.restoreRenewal,restoreRenewalPrompt:lifecycleCopy.restoreRenewalPrompt,confirmRenewal:lifecycleCopy.confirmRenewal,keepCancellation:lifecycleCopy.keepCancellation,cancelRenewal:lifecycleCopy.cancelRenewal,cancelConfirmation:lifecycleCopy.cancelConfirmation};
   const activePlanId = canonicalActiveSellerPlanId(store.subscription) ?? (commercial.plan === "admin-exempt" ? "pro" : commercial.plan);
   const pendingChange = store.subscription ? await prisma.sellerSubscriptionChange.findFirst({ where: { sellerSubscriptionId: store.subscription.id, status: { in: ["PREPARED", "AWAITING_PAYMENT"] } }, select: { operation: true, targetPlan: true, targetBillingInterval: true, status: true } }) : null;
   const productLimit = sellerPlanEntitlement(activePlanId)?.productLimit;
@@ -59,6 +61,11 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
     currentInterval: store.subscription?.billingInterval ?? "monthly", periodEnd: store.subscription?.currentPeriodEnd?.toISOString() ?? null,
     scheduledPlan: store.subscription?.scheduledPlan ?? null, scheduledInterval: store.subscription?.scheduledBillingInterval ?? null,
     scheduledAt: store.subscription?.scheduledChangeAt?.toISOString() ?? null, pending: Boolean(pendingChange), retry: pendingChange?.status === "PREPARED" ? { planId: pendingChange.targetPlan, interval: pendingChange.targetBillingInterval, cancel: pendingChange.operation === "CANCEL_SCHEDULE" } : null, overQuota };
+  const renewalPrice=store.subscription&&active&&store.subscription.cancelAtPeriodEnd&&store.subscription.currentPeriodEnd
+    ? (()=>{const plan=sellerPlans().find(item=>item.id===store.subscription!.plan);if(!plan)return null;const interval=store.subscription!.billingInterval;return `${new Intl.NumberFormat(resolvedLocale,{style:"currency",currency:plan.currency}).format((interval==="annual"?plan.annualAmountMinor:plan.monthlyAmountMinor)/100)} ${interval==="annual"?copy.annual:copy.monthly}`})()
+    : null;
+  const renewalDate=store.subscription?.currentPeriodEnd?.toISOString()??null;
+  const renewalCancel=active&&store.subscription?.stripeSubscriptionId&&["ACTIVE","TRIALING"].includes(store.subscription.status)&&!store.subscription.cancelAtPeriodEnd&&store.subscription.currentPeriodEnd&&store.subscription.currentPeriodEnd>new Date()?{date:store.subscription.currentPeriodEnd.toISOString()}:null;
   return <SellerDashboardLayout locale={locale} storeSlug={store.slug} firstName={store.owner.firstName} lastName={store.owner.lastName} active="subscription"><div className="storeSetupPage"><section className="storeSetupCard subscriptionShell">
     <a className="authBack" href={`/${locale}/dashboard`}>← {copy.dashboard}</a><p className="dashboardBadge">{store.name}</p>
     <h1>{copy.title}</h1><p className="storeSetupIntro">{freeCopy.intro}</p>
@@ -66,7 +73,7 @@ export default async function SellerSubscriptionPage({ searchParams }: { searchP
       {store.subscription && <div className={`subscriptionStatus ${active ? "isActive" : ""}`}>{copy.currentStatus} <strong>{store.subscription.status}</strong>{store.subscription.cancelAtPeriodEnd && ` · ${copy.cancels}`}</div>}
       {(store.owner.role==="ADMIN"||accessSource==="ADMIN_GRANTED"||accessSource==="ADMIN_EXEMPT")&&<div className="subscriptionStatus isActive">{copy.adminAccess}</div>}
       {sellerIntent && <><ol className="sellerJourneyProgress"><li className="isComplete">1 · {journeyCopy.account}</li><li className="isComplete">2 · {journeyCopy.information}</li><li className="isCurrent">3 · {journeyCopy.subscription}</li><li>4 · {journeyCopy.paymentSetup}</li><li>5 · {journeyCopy.ready}</li></ol><p className="sellerPaymentReassurance">🔒 {journeyCopy.secureStripe}</p></>}
-      <SubscriptionPlans transition={transition} locale={locale} plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} copy={clientCopy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"} productCount={usage.reduce((sum, store) => sum + store._count.products, 0)} checkoutCanceled={query.checkout === "cancel"}/>
+      <SubscriptionPlans transition={transition} locale={locale} plans={plans} activePlanId={activePlanId} hasActiveSubscription={hasActiveEntitlement} trialAvailable={!business?.firstPaidTrialGrantedAt} renewalCancel={renewalCancel} renewalRestore={renewalPrice&&renewalDate?{date:renewalDate,price:renewalPrice}:null} copy={clientCopy} initialPlanId={sellerIntent?.plan ?? null} initialInterval={sellerIntent?.interval ?? "monthly"} productCount={usage.reduce((sum, store) => sum + store._count.products, 0)} checkoutCanceled={query.checkout === "cancel"}/>
     </>}
   </section></div></SellerDashboardLayout>;
 }

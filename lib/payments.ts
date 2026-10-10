@@ -11,9 +11,12 @@ import { resolveSellerMaturity } from "./seller-maturity";
 import {convertMarketplacePrice} from "./marketplace-presentment";
 import {readGlobalDropshippingMargin} from "./suppliers/global-margin";
 import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
+import { enqueueBuyerPaymentConfirmation } from "./buyer-order-email-deliveries";
+import { isLocale } from "../i18n/config";
 import { sellerBusinessCommercialEntitlement } from "./seller-business";
 import {configuredSellerPlanForPriceId} from "./seller-plans";
 import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
+import { persistPaidSellerInvoice } from "./seller-invoice-persistence";
 import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
 
 export class CheckoutError extends Error {
@@ -166,7 +169,7 @@ export async function createCheckout(
   if (!order) {
     try {
       const store = products[0].store;
-      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: paymentCurrency, total, subtotal, shippingMethod: shipping.method, shippingCost: shipping.amount, shippingCurrency: paymentCurrency, shippingCountry: shipping.destinationCountry, shippingEstimatedMinDays: shipping.estimatedMinDays, shippingEstimatedMaxDays: shipping.estimatedMaxDays, shippingCarrier: shipping.carrier, shippingProvider: shipping.provider, shippingExternalServiceId: shipping.externalServiceId, taxTotal: new Prisma.Decimal(0), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: paymentCurrency, lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null, supplierPricingSnapshot: line.pricingSnapshot ? { create: { snapshot: line.pricingSnapshot as unknown as Prisma.InputJsonValue } } : undefined })) } }, include: { items: true } });
+      order = await db.order.create({ data: { buyerId, checkoutRequestId: requestId, currency: paymentCurrency, total, subtotal, shippingMethod: shipping.method, shippingCost: shipping.amount, shippingCurrency: paymentCurrency, shippingCountry: shipping.destinationCountry, shippingEstimatedMinDays: shipping.estimatedMinDays, shippingEstimatedMaxDays: shipping.estimatedMaxDays, shippingCarrier: shipping.carrier, shippingProvider: shipping.provider, shippingExternalServiceId: shipping.externalServiceId, taxTotal: new Prisma.Decimal(0), snapshotSource: "CHECKOUT_CAPTURED", snapshotCapturedAt: new Date(), fulfillmentStatus: "PENDING", buyerLocale: isLocale(pricingDependencies.returnLocale) ? pricingDependencies.returnLocale : null, buyerNameSnapshot: [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || null, buyerEmailSnapshot: buyer.email, storeIdSnapshot: store.id, storeNameSnapshot: store.name, sellerTypeSnapshot: store.sellerType, storeSnapshot: { id: store.id, name: store.name, slug: store.slug, city: store.city, country: store.country, contactEmail: store.contactEmail, phone: store.phone, sellerType: store.sellerType, legalBusinessName: store.legalBusinessName, businessRegistrationId: store.businessRegistrationId, businessAddress: store.businessAddress, businessPostalCode: store.businessPostalCode, vatNumber: store.vatNumber }, stripeConnectedAccountId: seller.stripeAccountId, platformFeeAmount, sellerAmount, items: { create: resolvedLines.map((line) => ({ productId: line.product.id, variantId: line.variant?.id ?? null, quantity: line.quantity, unitPrice: line.unitPrice, lineKey: line.lineKey, productNameSnapshot: line.product.name, productDescriptionSnapshot: line.product.description ?? null, productImageUrlSnapshot: line.product.images?.[0] ?? null, currency: paymentCurrency, lineTotal: line.unitPrice.mul(line.quantity), selectedColor: line.selectedColor, selectedSize: line.selectedSize, selectedOptions: line.selectedOptions, variantTitleSnapshot: line.variant ? line.selectedOptions.map((value) => `${value.name}: ${value.value}`).join(" / ") : null, variantSkuSnapshot: line.variant?.sku ?? null, supplierPricingSnapshot: line.pricingSnapshot ? { create: { snapshot: line.pricingSnapshot as unknown as Prisma.InputJsonValue } } : undefined })) } }, include: { items: true } });
     } catch (error) {
       if (!isPrismaCode(error, "P2002")) throw error;
       order = await db.order.findUniqueOrThrow({ where: { buyerId_checkoutRequestId: { buyerId, checkoutRequestId: requestId } }, include: { items: true } });
@@ -218,6 +221,7 @@ export async function processStripeEvent(
   const previouslyProcessed = webhookDelegate?.findUnique
     ? await webhookDelegate.findUnique({ where: { id: event.id }, select: { id: true } })
     : null;
+  if (event.type === "invoice.paid") await persistPaidSellerInvoice(db, event, event.data.object as StripeInvoice);
   if (previouslyProcessed && !sellerCheckout) {
     console.info(`[Stripe webhook ${event.id}] Event was already processed; no repair is required.`);
     return { duplicate: true };
@@ -310,6 +314,7 @@ export async function processStripeEvent(
         await prepareSupplierFulfillments(tx, { ...order, shippingCountry: address?.country?.toUpperCase() ?? order.shippingCountry });
         await tx.notification.create({ data: { userId: order.buyerId, type: "ORDER_PAID", title: "Order confirmed", body: `Payment for order ${order.id} was confirmed.`, href: `/account/orders/${order.id}` } });
         await enqueueSellerSaleNotifications(tx,{orderId:order.id,currency:order.currency});
+        await enqueueBuyerPaymentConfirmation(tx, order.id);
         return { paid: true };
       }
       if (event.type === "checkout.session.expired" || event.type === "payment_intent.payment_failed") {
@@ -336,14 +341,14 @@ async function syncSellerSubscription(
   if (!customerId) throw new Error(`[Stripe webhook ${eventId}] Subscription ${subscription.id} has no customer ID.`);
   const existing = await tx.sellerSubscription.findFirst({
     where: { OR: [{ stripeSubscriptionId: subscription.id }, { store: { stripeCustomerId: customerId } }, ...(hint.storeId ? [{ storeId: hint.storeId }] : [])] },
-    select: { storeId: true, plan: true, stripePriceId: true, stripeSubscriptionId: true, stripeCheckoutSessionId: true, status: true },
+    select: { storeId: true, plan: true, stripePriceId: true, stripeSubscriptionId: true, stripeCheckoutSessionId: true, status: true,trialEnd:true,cancelAtPeriodEnd:true },
   });
   const authorizedCheckoutReplacement = existing?.status === "INCOMPLETE" && hint.checkoutSessionId && existing.stripeCheckoutSessionId === hint.checkoutSessionId;
   if (existing?.stripeSubscriptionId && existing.stripeSubscriptionId !== subscription.id && !authorizedCheckoutReplacement) throw new Error(`[Stripe webhook ${eventId}] Superseded subscription cannot overwrite the current subscription.`);
   console.info(`[Stripe webhook ${eventId}] Local subscription lookup completed (found=${Boolean(existing)}).`);
   const storeId = subscription.metadata?.storeId ?? hint.storeId ?? existing?.storeId;
   if (!storeId) throw new Error(`[Stripe webhook ${eventId}] Cannot resolve a store for subscription ${subscription.id}.`);
-  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true, businessId:true } });
+  const store = await tx.store.findUnique({ where: { id: storeId }, select: { id: true, ownerId: true, stripeCustomerId: true, sellerType: true, businessId:true, business:{select:{sellerClosedAt:true}} } });
   if (!store) throw new Error(`[Stripe webhook ${eventId}] Store ${storeId} does not exist.`);
   if (hint.userId && store.ownerId !== hint.userId) throw new Error(`[Stripe webhook ${eventId}] Checkout user does not own store ${storeId}.`);
   if (store.stripeCustomerId && store.stripeCustomerId !== customerId) throw new Error(`[Stripe webhook ${eventId}] Stripe customer does not match store ${storeId}.`);
@@ -356,16 +361,38 @@ async function syncSellerSubscription(
   const item = subscription.items?.data?.[0];
   const currentPeriodStart = stripeDate(subscription.current_period_start ?? item?.current_period_start);
   const currentPeriodEnd = stripeDate(subscription.current_period_end ?? item?.current_period_end);
+  const trialEnd = stripeDate(subscription.trial_end ?? undefined);
   if (active && !currentPeriodEnd) throw new Error(`[Stripe webhook ${eventId}] Active subscription ${subscription.id} has no current period end.`);
   const commerciallyActive=active&&Boolean(currentPeriodEnd&&currentPeriodEnd>new Date());
+
+  let preserveScheduledCancellation = false;
+  if (existing?.cancelAtPeriodEnd && !subscription.cancel_at_period_end && !["CANCELED", "EXPIRED"].includes(status)) {
+    const latestRenewalDecision = store.businessId ? await tx.sellerBusinessAuditEvent.findFirst({
+      where: { businessId: store.businessId, action: { in: ["SELLER_RENEWAL_CANCELED", "SELLER_RENEWAL_CANCELLATION_SCHEDULED", "SELLER_RENEWAL_RESTORED"] } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { action: true },
+    }) : null;
+    preserveScheduledCancellation = latestRenewalDecision?.action !== "SELLER_RENEWAL_RESTORED";
+  }
+
+  if (store.businessId && (store.business?.sellerClosedAt || preserveScheduledCancellation)) {
+    await tx.sellerBusiness.updateMany({ where: { id: store.businessId, ...(store.business?.sellerClosedAt ? { sellerClosedAt: { not: null } } : {}) }, data: { stripeCancellationPending: !["CANCELED", "EXPIRED"].includes(status) } });
+  }
+
+  if ((status === "TRIALING" || Boolean(subscription.trial_end && existing?.trialEnd)) && store.businessId) {
+    await tx.sellerBusiness.updateMany({
+      where: { id: store.businessId, firstPaidTrialGrantedAt: null },
+      data: { firstPaidTrialGrantedAt: currentPeriodStart ?? new Date() },
+    });
+  }
 
   console.info(`[Stripe webhook ${eventId}] Updating local seller subscription state to ${status}.`);
   const storeUpdate = await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) }, select: { id: true, status: true, stripeCustomerId: true } });
   console.info(`[Stripe webhook ${eventId}] Store subscription state updated (status=${storeUpdate.status}).`);
   const subscriptionUpdate = await tx.sellerSubscription.upsert({
     where: { storeId },
-    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
-    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodStart, currentPeriodEnd },
+    create: { storeId, stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end) || preserveScheduledCancellation, currentPeriodStart, currentPeriodEnd,trialEnd },
+    update: { stripeSubscriptionId: subscription.id, stripePriceId: priceId, plan: configuredPlan.plan,billingInterval:configuredPlan.billingInterval,status, cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end) || preserveScheduledCancellation, currentPeriodStart, currentPeriodEnd,trialEnd },
   });
   console.info(`[Stripe webhook ${eventId}] Seller subscription record updated (status=${subscriptionUpdate.status}).`);
   const products = commerciallyActive && configuredPlan.plan === "pro" ? { count: 0 } : await enforceSellerPublicationCapacity(tx, storeId, store.businessId);

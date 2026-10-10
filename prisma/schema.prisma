@@ -312,6 +312,27 @@ enum SellerSaleEmailStatus {
   FAILED
 }
 
+enum ShipmentStatus {
+  SELLER_REPORTED
+  CARRIER_CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+enum BuyerOrderEmailKind {
+  PAYMENT_CONFIRMED
+  ORDER_SHIPPED
+  SHIPMENT_RECORDED
+}
+
+enum BuyerOrderEmailStatus {
+  QUEUED
+  PROCESSING
+  RETRYABLE
+  SENT
+  FAILED
+}
+
 enum SellerSubscriptionReminderKind {
   DAYS_30
   DAYS_7
@@ -462,6 +483,7 @@ model User {
   store               Store?   @relation("UserPrimaryStore", fields: [primaryStoreId], references: [id], onDelete: SetNull)
   stores              Store[]  @relation("StoreOwner")
   ownedBusiness       SellerBusiness?
+  sellerClosureTokens SellerClosureToken[]
   teamMemberships     SellerTeamMembership[]
   acceptedTeamInvitations SellerTeamInvitation[] @relation("AcceptedTeamInvitationUser")
   sellerBusinessAuditEvents SellerBusinessAuditEvent[] @relation("SellerBusinessAuditActor")
@@ -477,6 +499,7 @@ model User {
   notifications       Notification[]
   sellerSaleDeliveries SellerSaleDelivery[]
   sellerSaleRecipientDeliveries SellerSaleRecipientDelivery[]
+  shipmentsCreated Shipment[] @relation("ShipmentCreator")
   pushSubscriptions   PushSubscription[]
   mobileSessions      MobileSession[]
   mobileOAuthAttempts MobileOAuthAttempt[]
@@ -852,6 +875,24 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+model SellerClosureToken {
+  id         String    @id @default(cuid())
+  businessId String
+  userId     String
+  tokenHash  String    @unique @db.Char(64)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  emailSentAt DateTime?
+  emailAttemptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  business SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([userId, expiresAt])
+}
+
 model Store {
   id               String       @id @default(cuid())
   name             String       @unique
@@ -931,6 +972,8 @@ model Store {
   loyaltyAccounts LoyaltyAccount[]
   loyaltyChanges LoyaltyStoreChange[]
   sellerReviewEmails SellerReviewEmailDelivery[]
+  shipments Shipment[]
+  monthlyStatements SellerMonthlyStatement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -945,6 +988,13 @@ model SellerBusiness {
   ownerId        String   @unique
   billingStoreId String?  @unique
   maxStores      Int      @default(1)
+  firstPaidTrialGrantedAt DateTime?
+  sellerClosedAt DateTime?
+  reactivationStockReviewRequired Boolean @default(false)
+  reactivationStockReviewedAt DateTime?
+  stripeCancellationPending Boolean @default(false)
+  stripeCancellationClaimToken String? @unique
+  stripeCancellationClaimedAt DateTime?
   siren          String?  @unique @db.VarChar(9)
   legalBusinessName String? @db.VarChar(160)
   sellerLegalForm SellerLegalForm?
@@ -974,6 +1024,9 @@ model SellerBusiness {
   benefitRequests    SellerBenefitRequest[]
   benefitAuditEvents SellerBenefitAuditEvent[]
   productImports SellerProductImportJob[]
+  closureTokens SellerClosureToken[]
+  billingInvoices SellerBusinessInvoice[]
+  monthlyStatements SellerMonthlyStatement[]
 
   @@index([maxStores])
 }
@@ -1006,6 +1059,48 @@ model SellerBusinessEstablishment {
   @@unique([id, businessId])
   @@index([businessId, verificationState])
   @@index([siret])
+}
+
+model SellerBusinessInvoice {
+  id                   String   @id @default(cuid())
+  businessId           String
+  stripeInvoiceId      String   @unique
+  sourceEventId        String?  @unique
+  stripeCustomerId     String
+  stripeSubscriptionId String
+  invoiceNumber        String?
+  createdAt            DateTime
+  amountPaidMinor      BigInt
+  currency             String   @db.VarChar(3)
+  hostedInvoiceUrl     String?
+  invoicePdfUrl        String?
+  recordedAt           DateTime @default(now())
+  business             SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Restrict)
+
+  @@index([businessId, createdAt, stripeInvoiceId])
+  @@index([stripeCustomerId, createdAt])
+  @@index([stripeSubscriptionId])
+}
+
+model SellerMonthlyStatement {
+  id          String   @id @default(cuid())
+  businessId  String
+  storeId     String
+  year        Int
+  month       Int
+  currency    String   @db.VarChar(3)
+  revision    Int      @default(1)
+  contentHash String   @db.Char(64)
+  rowCount    Int
+  snapshot    Json
+  createdAt   DateTime @default(now())
+  business    SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  store       Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@unique([storeId, year, month, currency, revision], map: "SellerMonthlyStatement_store_period_currency_revision_key")
+  @@unique([storeId, year, month, currency, contentHash], map: "SellerMonthlyStatement_store_period_currency_hash_key")
+  @@index([businessId, year, month])
+  @@index([storeId, year, month])
 }
 
 model SellerTeamMembership {
@@ -1261,6 +1356,7 @@ enum FulfillmentStatus {
   PENDING
   PROCESSING
   PACKED
+  PARTIALLY_SHIPPED
   SHIPPED
   DELIVERED
 }
@@ -1731,6 +1827,7 @@ model SellerSubscription {
   status               SubscriptionStatus @default(INCOMPLETE)
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
+  trialEnd             DateTime?
   cancelAtPeriodEnd    Boolean            @default(false)
   stripeCheckoutSessionId         String?   @unique
   stripeCheckoutUrl               String?
@@ -1877,6 +1974,7 @@ model Order {
   sellerInvoiceReference   String?
   sellerInvoiceUrl         String?
   sellerInvoiceIssuedAt    DateTime?
+  buyerLocale              String?     @db.VarChar(10)
   buyerNameSnapshot        String?
   buyerEmailSnapshot       String?
   buyerPhoneSnapshot       String?
@@ -1920,11 +2018,14 @@ model Order {
   lifecycleEvents    OrderLifecycleEvent[]
   supplierFulfillments SupplierFulfillment[]
   groups OrderGroup[]
+  shipments Shipment[]
+  buyerOrderEmailDeliveries BuyerOrderEmailDelivery[]
   refundOperations RefundOperation[]
   loyaltyLedgerEntries LoyaltyLedgerEntry[]
   loyaltyFundingSnapshot LoyaltyOrderFundingSnapshot?
 
   @@unique([buyerId, checkoutRequestId])
+  @@unique([id, buyerId], map: "Order_id_buyerId_key")
   @@index([buyerId, status, createdAt])
   @@index([status, checkoutExpiresAt])
   @@index([checkoutExpiredAt, createdAt])
@@ -1992,6 +2093,7 @@ model OrderGroup {
   transferErrorCode String? @db.VarChar(120)
   transferErrorMessage String? @db.VarChar(500)
   shipmentVerifiedAt DateTime?
+  sellerDispatchReportedAt DateTime?
   transferEligibleAt DateTime?
   transferredAt DateTime?
   createdAt DateTime @default(now())
@@ -2007,8 +2109,12 @@ model OrderGroup {
   loyaltyReserveReversedMinor Int @default(0)
   sellerSaleDelivery SellerSaleDelivery?
   sellerSaleRecipientDeliveries SellerSaleRecipientDelivery[]
+  shipments Shipment[]
   @@unique([orderId,groupKey])
+  @@unique([id, orderId, storeId], map: "OrderGroup_id_orderId_storeId_key")
   @@index([storeId,transferStatus])
+  @@index([orderId, storeId])
+  @@index([storeId, orderId])
   @@index([transferStatus,nextTransferAttemptAt])
 }
 
@@ -2078,6 +2184,86 @@ model SellerSaleRecipientDelivery {
   @@unique([orderGroupId, recipientId])
   @@index([status, nextAttemptAt, createdAt])
   @@index([recipientId, createdAt])
+}
+
+model Shipment {
+  id                String         @id @default(cuid())
+  orderId           String
+  orderGroupId      String
+  storeId           String
+  createdById       String?
+  idempotencyKey    String         @db.VarChar(120)
+  status            ShipmentStatus @default(SELLER_REPORTED)
+  carrier           String?        @db.VarChar(120)
+  trackingNumber    String?        @db.VarChar(160)
+  trackingUrl       String?        @db.VarChar(500)
+  sellerReportedAt  DateTime       @default(now())
+  carrierAcceptedAt DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderGroup OrderGroup  @relation(fields: [orderGroupId, orderId, storeId], references: [id, orderId, storeId], onDelete: Cascade)
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  createdBy  User?       @relation("ShipmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items      ShipmentItem[]
+  emailDelivery BuyerOrderEmailDelivery?
+
+  @@unique([orderGroupId, idempotencyKey], map: "Shipment_orderGroupId_idempotencyKey_key")
+  @@unique([id, orderGroupId], map: "Shipment_id_orderGroupId_key")
+  @@unique([id, orderId], map: "Shipment_id_orderId_key")
+  @@index([orderId, createdAt])
+  @@index([storeId, sellerReportedAt])
+  @@index([orderGroupId, status])
+}
+
+model ShipmentItem {
+  id           String   @id @default(cuid())
+  shipmentId   String
+  orderGroupId String
+  orderItemId  String
+  quantity     Int
+  createdAt    DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId, orderGroupId], references: [id, orderGroupId], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId, orderGroupId], references: [id, orderGroupId], onDelete: Restrict)
+
+  @@unique([shipmentId, orderItemId], map: "ShipmentItem_shipmentId_orderItemId_key")
+  @@index([orderItemId, createdAt])
+}
+
+model BuyerOrderEmailDelivery {
+  id             String                @id @default(cuid())
+  eventKey       String                @unique @db.VarChar(240)
+  kind           BuyerOrderEmailKind
+  orderId        String
+  buyerId        String
+  shipmentId     String?               @unique
+  locale         String                @db.VarChar(10)
+  recipientEmail String                @db.VarChar(320)
+  recipientName  String                @db.VarChar(200)
+  orderReference String                @db.VarChar(200)
+  storeName      String?               @db.VarChar(200)
+  items          Json?
+  status         BuyerOrderEmailStatus @default(QUEUED)
+  attemptCount   Int                   @default(0)
+  nextAttemptAt  DateTime?
+  claimToken     String?               @unique
+  claimedAt      DateTime?
+  sentAt         DateTime?
+  errorCode      String?               @db.VarChar(120)
+  errorMessage   String?               @db.VarChar(500)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  order    Order     @relation(fields: [orderId, buyerId], references: [id, buyerId], onDelete: Cascade)
+  shipment Shipment? @relation(fields: [shipmentId, orderId], references: [id, orderId], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([buyerId, createdAt])
+  @@index([orderId, kind])
+  @@unique([shipmentId, orderId], map: "BuyerOrderEmailDelivery_shipmentId_orderId_key")
 }
 
 model ProductReport {
@@ -2164,11 +2350,13 @@ model OrderItem {
   restockEvents InventoryRestockEvent[]
   loyaltyGrant LoyaltyGrant?
   loyaltyRedemptionAllocations LoyaltyRedemptionAllocation[]
+  shipmentItems ShipmentItem[]
 
   @@unique([orderId, lineKey])
   @@index([productId])
   @@index([variantId])
   @@index([orderGroupId])
+  @@unique([id, orderGroupId], map: "OrderItem_id_orderGroupId_key")
 }
 
 model RefundOperation {

@@ -1,7 +1,10 @@
 import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100";
+const productionBuild = process.argv.includes("--production");
+const testArguments = process.argv.slice(2).filter((argument) => argument !== "--production");
 const databaseURL = process.env.PLAYWRIGHT_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public";
 const serverEnvironment = {
   ...process.env,
@@ -25,7 +28,17 @@ const serverEnvironment = {
 };
 const nextCli = join(process.cwd(), "node_modules", "next", "dist", "bin", "next");
 const playwrightCli = join(process.cwd(), "node_modules", "@playwright", "test", "cli.js");
-const server = spawn(process.execPath, [nextCli, "dev", "--hostname", "localhost", "--port", "3100"], {
+if (productionBuild && !existsSync(join(process.cwd(), ".next", "BUILD_ID"))) {
+  throw new Error("Production browser validation requires an existing Next.js build; run npm run build first.");
+}
+const server = spawn(process.execPath, [
+  nextCli,
+  productionBuild ? "start" : "dev",
+  "--hostname",
+  "localhost",
+  "--port",
+  "3100",
+], {
   env: serverEnvironment,
   stdio: "ignore",
 });
@@ -56,7 +69,7 @@ let exitCode = 1;
 try {
   await waitForServer();
   exitCode = await new Promise((resolve, reject) => {
-    const tests = spawn(process.execPath, [playwrightCli, "test", ...process.argv.slice(2)], {
+    const tests = spawn(process.execPath, [playwrightCli, "test", ...testArguments], {
       env: { ...serverEnvironment, PLAYWRIGHT_BASE_URL: baseURL },
       stdio: "inherit",
     });

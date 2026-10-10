@@ -36,8 +36,8 @@ test("canonical onboarding preserves identity, Phase 4 address reuse, and plan c
   assert.match(page, /defaultBuyerAddress\(prisma, session\.userId\)/);
   assert.match(page, /sellerIntent=\{intent\}/);
   assert.match(form, /sellerOnboardingPath\(locale, true, sellerIntent\)/);
-  assert.match(route, /where:\{id:user\.id\},data:\{role:"SELLER"\}/);
-  assert.match(route, /const store=user\.store\?await tx\.store\.update/);
+  assert.match(route, /where:\s*\{\s*id:\s*user\.id\s*\},\s*data:\s*\{\s*role:\s*"SELLER"\s*\}/);
+  assert.match(route, /const store = user\.store\s*\?\s*await tx\.store\.update/);
   assert.doesNotMatch(route, /buyerShippingAddress\.(create|update|delete)|tx\.user\.create/);
 });
 
@@ -57,7 +57,7 @@ test("redirect construction is localized, same-origin, and has no client redirec
 
 test("existing activity restrictions and subscription authority stay unchanged", () => {
   const onboarding = source("app/api/seller/onboarding/route.ts"), checkout = source("app/api/seller/subscription/checkout/route.ts");
-  assert.match(onboarding, /assertSellerActivity\(prisma,session\.userId\)/);
+  assert.match(onboarding, /assertSellerActivity\(prisma,\s*session\.userId\)/);
   assert.match(checkout, /assertSellerActivity/);
   assert.match(checkout, /createOrReuseSellerSubscriptionCheckout/);
 });

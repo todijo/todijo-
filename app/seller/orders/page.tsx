@@ -3,13 +3,13 @@ import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PackageSearch } from "lucide-react";
 import { EmptyState } from "@/components/FeedbackState";
-import { SellerFulfillmentControl } from "@/components/SellerFulfillmentControl";
+import { SellerShipmentForm } from "@/components/SellerShipmentForm";
 import { SellerRefundReviewControl } from "@/components/SellerRefundReviewControl";
 import SellerDashboardLayout from "@/components/SellerDashboardLayout";
 import { SellerPageHeader } from "@/components/SellerControlPanel";
 import { buyerPaymentState } from "@/lib/buyer-orders";
 import { listSellerOrderHistory } from "@/lib/order-history";
-import { fulfillmentStepFor, sellerFulfillmentActionFor } from "@/lib/order-status";
+import { fulfillmentStepFor } from "@/lib/order-status";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { canPublish } from "@/lib/seller-subscription";
@@ -38,8 +38,16 @@ export default async function SellerOrdersPage({ searchParams }: { searchParams:
     <div className="sellerOrdersWorkspace">
     <form className="sellerOrdersSearch" action={`/${locale}/seller/orders`}><input type="hidden" name="store" value={store.id}/><label htmlFor="order-reference">{t("history.searchLabel")}</label><div><input id="order-reference" name="q" defaultValue={result.search} maxLength={100} placeholder={t("history.searchPlaceholder")}/><button className="sellerControlButton primary" type="submit">{t("history.searchAction")}</button></div></form>
     {result.orders.length ? <section className="buyerOrderList">{result.orders.map((order) => {
-      const step = fulfillmentStepFor(order.status); const action = sellerFulfillmentActionFor(order.status); const buyer = order.recipientName ?? order.buyerNameSnapshot ?? `${order.buyer.firstName} ${order.buyer.lastName}`;
-      return <article className="buyerOrderCard" key={order.id}><header><div><span>{t("orderReference")}</span><strong>#{order.id}</strong></div><div className="buyerOrderBadges"><span className={`orderBadge payment-${buyerPaymentState(order)}`}>{t(`payment.${buyerPaymentState(order)}`)}</span><span className={`orderBadge status-${order.status.toLowerCase()}`}>{step ? t(`fulfillment.${step.toLowerCase()}`) : t(`status.${order.status}`)}</span></div></header><div className="buyerOrderMeta"><span>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(order.createdAt)}</span><span>{buyer}</span></div><div className="buyerOrderProducts">{order.items.map((item) => <div className="buyerOrderProduct" key={item.id}><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>)}</div>{order.refundRequest && <SellerRefundReviewControl request={order.refundRequest} totalLabel={t("total")} total={money(Number(order.total), order.currency)}/>}<footer><div><span>{t("total")}</span><strong>{money(Number(order.total), order.currency)}</strong></div>{action && <SellerFulfillmentControl orderId={order.id} action={action}/>}</footer></article>;
+      const step = fulfillmentStepFor(order.status); const buyer = order.recipientName ?? order.buyerNameSnapshot ?? `${order.buyer.firstName} ${order.buyer.lastName}`;
+      const shipmentItems = order.items.map((item) => {
+        const previouslyShipped = item.orderGroup?.shipments.flatMap((shipment) => shipment.items).filter((row) => row.orderItemId === item.id).reduce((sum, row) => sum + row.quantity, 0) ?? 0;
+        const refunded = item.refundAllocations.filter((allocation) => !["CANCELLED", "REJECTED"].includes(allocation.refundOperation.status)).reduce((sum, allocation) => sum + allocation.quantity, 0);
+        return { id: item.id, name: item.productNameSnapshot ?? item.product.name, variant: item.variantTitleSnapshot ?? [item.selectedColor, item.selectedSize].filter(Boolean).join(" / "), ordered: item.quantity, previouslyShipped, remaining: Math.max(0, item.quantity - previouslyShipped - refunded) };
+      });
+      const statusLabel = order.fulfillmentStatus === "PARTIALLY_SHIPPED" ? t("shipment.partialStatus") : step ? t(`fulfillment.${step.toLowerCase()}`) : t(`status.${order.status}`);
+      const sellerTotalMinor = order.items[0]?.orderGroup ? order.items[0].orderGroup.itemSubtotalMinor + order.items[0].orderGroup.shippingAmountMinor : order.items.reduce((sum, item) => sum + Math.round(Number(item.lineTotal ?? Number(item.unitPrice) * item.quantity) * 100), 0);
+      const canReportShipment = ["PAID", "PROCESSING", "SHIPPED"].includes(order.status) && shipmentItems.some((item) => item.remaining > 0);
+      return <article className="buyerOrderCard" key={order.id}><header><div><span>{t("orderReference")}</span><strong>#{order.id}</strong></div><div className="buyerOrderBadges"><span className={`orderBadge payment-${buyerPaymentState(order)}`}>{t(`payment.${buyerPaymentState(order)}`)}</span><span className={`orderBadge status-${order.status.toLowerCase()}`}>{statusLabel}</span></div></header><div className="buyerOrderMeta"><span>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(order.createdAt)}</span><span>{buyer}</span></div><div className="buyerOrderProducts">{order.items.map((item) => <div className="buyerOrderProduct" key={item.id}><strong>{item.productNameSnapshot ?? item.product.name}</strong><span>{t("quantity")}: {item.quantity}</span></div>)}</div>{order.refundRequest && <SellerRefundReviewControl request={order.refundRequest} totalLabel={t("total")} total={money(sellerTotalMinor / 100, order.currency)}/>}<footer><div><span>{t("total")}</span><strong>{money(sellerTotalMinor / 100, order.currency)}</strong></div>{canReportShipment && <SellerShipmentForm orderId={order.id} storeId={store.id} items={shipmentItems}/>}</footer></article>;
     })}</section> : <EmptyState
       icon={PackageSearch}
       title={t("history.noResults")}

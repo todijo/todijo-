@@ -85,7 +85,7 @@ export function elevatedStoreAccessWhere(now = new Date()): Prisma.StoreWhereInp
 export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
   void now; // Preserve the shared time-aware API; FREE lifecycle eligibility has no expiration.
   return { dataClass: "PRODUCTION", status: "ACTIVE", owner: { role: { in: ["SELLER", "ADMIN"] }, sellerSuspendedAt: null, deactivatedAt: null },
-    AND: [{ sellerType: { not: "UNKNOWN" } }, { OR: [{ sellerType: "PRIVATE" }, { vatStatus: { not: "UNKNOWN" } }] }, { OR: [
+    AND: [{ OR: [{business:{is:null}},{business:{is:{sellerClosedAt:null}}}] }, { sellerType: { not: "UNKNOWN" } }, { OR: [{ sellerType: "PRIVATE" }, { vatStatus: { not: "UNKNOWN" } }] }, { OR: [
       { sellerType: { not: "PROFESSIONAL" } },
       { country: { notIn: ["FR", "FRANCE", "France"] } },
       { business: { is: { inseeVerificationState: "VERIFIED" } }, establishment: { is: { verificationState: "VERIFIED" } } },

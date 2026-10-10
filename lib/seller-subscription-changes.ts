@@ -45,7 +45,8 @@ export async function requestSellerSubscriptionChange(input: { db: PrismaClient;
   if (target && !toFree && (targetAuthority?.plan !== target.id || targetAuthority.billingInterval !== target.interval)) throw new SellerSubscriptionChangeError("INVALID_PLAN", 400);
   const prepared = await input.db.$transaction(async tx => {
     await lockSellerSubscription(tx, input.storeId);
-    const store = await tx.store.findUnique({ where: { id: input.storeId }, select: { ownerId: true, stripeCustomerId: true } });
+    const store = await tx.store.findUnique({ where: { id: input.storeId }, select: { ownerId: true, stripeCustomerId: true, business:{select:{sellerClosedAt:true}} } });
+    if(store?.business?.sellerClosedAt)throw new SellerSubscriptionChangeError("SELLER_CLOSED",403);
     if (store?.ownerId !== input.userId || !store.stripeCustomerId) throw new SellerSubscriptionChangeError("OWNER_REQUIRED", 403);
     const local = await tx.sellerSubscription.findUnique({ where: { storeId: input.storeId } });
     if (!local?.stripeSubscriptionId || !hasCurrentSellerSubscriptionEntitlement(local, now)) throw new SellerSubscriptionChangeError("PAID_SUBSCRIPTION_REQUIRED");
@@ -89,7 +90,8 @@ export async function executeSellerSubscriptionChange(db: PrismaClient, changeId
       if (change.status !== "PREPARED" || change.stripeScheduleId) return;
       const current = await tx.sellerSubscription.findUnique({ where: { storeId: initial.sellerSubscription.storeId } });
       if (current?.stripeSubscriptionId !== change.stripeSubscriptionId) throw new SellerSubscriptionChangeError("SUBSCRIPTION_CHANGED_REFRESH_REQUIRED");
-      const owner = await tx.store.findUnique({ where: { id: current.storeId }, select: { stripeCustomerId: true } });
+      const owner = await tx.store.findUnique({ where: { id: current.storeId }, select: { stripeCustomerId: true, business:{select:{sellerClosedAt:true}} } });
+      if(owner?.business?.sellerClosedAt)throw new SellerSubscriptionChangeError("SELLER_CLOSED",403);
       const live = await providers.retrieve(change.stripeSubscriptionId);
       if (stripeId(live.customer) !== owner?.stripeCustomerId) throw new SellerSubscriptionChangeError("SUBSCRIPTION_OWNER_MISMATCH", 403);
       assertSource(live, change, now);
@@ -108,7 +110,8 @@ export async function executeSellerSubscriptionChange(db: PrismaClient, changeId
     if (change.status !== "PREPARED") return change;
     const current = await tx.sellerSubscription.findUnique({ where: { storeId: initial.sellerSubscription.storeId } });
     if (current?.id !== change.sellerSubscriptionId || current.stripeSubscriptionId !== change.stripeSubscriptionId) throw new SellerSubscriptionChangeError("SUBSCRIPTION_CHANGED_REFRESH_REQUIRED");
-    const owner = await tx.store.findUnique({ where: { id: current.storeId }, select: { ownerId: true, stripeCustomerId: true } });
+    const owner = await tx.store.findUnique({ where: { id: current.storeId }, select: { ownerId: true, stripeCustomerId: true, business:{select:{sellerClosedAt:true}} } });
+    if(owner?.business?.sellerClosedAt)throw new SellerSubscriptionChangeError("SELLER_CLOSED",403);
     const live = await providers.retrieve(change.stripeSubscriptionId);
     if (!owner || stripeId(live.customer) !== owner.stripeCustomerId || (live.metadata?.storeId && live.metadata.storeId !== current.storeId) || (live.metadata?.userId && live.metadata.userId !== owner.ownerId)) throw new SellerSubscriptionChangeError("SUBSCRIPTION_OWNER_MISMATCH", 403);
     const latestInvoice = typeof live.latest_invoice === "object" ? live.latest_invoice : live.latest_invoice ? await providers.invoice(live.latest_invoice) : null;

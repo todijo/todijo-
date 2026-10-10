@@ -6,8 +6,10 @@ import { accountProfileText } from "../i18n/account-profile";
 
 const source = (path: string) => readFileSync(path, "utf8");
 
-test("registration persists the initial buyer address as the default authoritative address", () => {
+test("registration can persist an optional saved buyer address without making it required", () => {
   const registration = source("app/api/auth/register/route.ts");
+  const form = source("app/register/RegisterForm.tsx");
+  assert.doesNotMatch(form, /addressLine1|recipientName|LocalizedCountrySelect/);
   assert.match(registration, /createBuyerAddress\(tx, created\.id, input\.shippingAddress, true\)/);
   assert.match(registration, /prisma\.\$transaction/);
 });
@@ -30,11 +32,12 @@ test("Account uses a safe empty state and the existing address manager for older
   assert.match(settings, /\$\{locale\}\/account\/addresses/);
 });
 
-test("buyer profile updates do not create or synchronize duplicate address storage", () => {
+test("personal profile editing is available to buyers and remains separate from shipping addresses", () => {
   const settings = source("app/account/AccountSettings.tsx");
   const profileRoute = source("app/api/account/profile/route.ts");
-  assert.match(settings, /!isBuyer&&/);
-  assert.match(profileRoute, /session\.role==="CUSTOMER"\?\{firstName:validation\.value\.firstName,lastName:validation\.value\.lastName\}:validation\.value/);
+  assert.match(settings, /name="profileAddress"/);
+  assert.match(settings, /name="profilePostalCode"/);
+  assert.match(profileRoute, /data:validation\.value/);
   assert.doesNotMatch(profileRoute, /buyerShippingAddress/);
 });
 

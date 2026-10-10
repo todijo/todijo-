@@ -1,4 +1,5 @@
 import type { UserRole } from "@prisma/client";
+import { resolveSellerLifecycleStatus, type SellerLifecycleInput } from "./seller-lifecycle-state";
 
 export function dashboardPaths(locale: string) {
   const root = `/${locale}`;
@@ -13,11 +14,10 @@ export function sellerDashboardGate(
   role: UserRole,
   emailVerified: boolean,
   store: { onboardingStep: number; onboardingStatus: string } | null,
+  lifecycleContext: Omit<SellerLifecycleInput, "role" | "store"> = {},
 ) {
-  if (role === "ADMIN" || dashboardAudience(role) !== "seller") return null;
+  const lifecycle = resolveSellerLifecycleStatus({ ...lifecycleContext, role, store });
+  if (role === "ADMIN" || dashboardAudience(role) !== "seller" || lifecycle !== "SELLER_SETUP") return null;
   if (!emailVerified) return "verify-email" as const;
-  if (!store || (store.onboardingStep < 4 && store.onboardingStatus !== "PENDING_REVIEW")) {
-    return "seller-onboarding" as const;
-  }
-  return null;
+  return "seller-onboarding" as const;
 }
