@@ -986,6 +986,7 @@ model Store {
 model SellerBusiness {
   id             String   @id @default(cuid())
   ownerId        String   @unique
+  adminContactPhone String? @db.VarChar(40)
   billingStoreId String?  @unique
   maxStores      Int      @default(1)
   firstPaidTrialGrantedAt DateTime?

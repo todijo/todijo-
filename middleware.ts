@@ -81,14 +81,15 @@ export function middleware(request: NextRequest) {
   const isLocalizedBuyerOrders = [3, 4].includes(segments.length) && segments[1] === "account" && segments[2] === "orders";
   const isLocalizedBuyerAddresses = segments.length === 3 && segments[1] === "account" && segments[2] === "addresses";
   const isLocalizedBuyerInvoices = segments.length === 3 && segments[1] === "account" && segments[2] === "invoices";
-  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices
+  const isLocalizedBuyerStatements = segments.length === 3 && segments[1] === "account" && segments[2] === "statements";
+  const response = isLocalizedDashboard || isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices || isLocalizedBuyerStatements
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   if (dashboardTracePath) console.info("[dashboard-trace]", JSON.stringify({
     phase: "middleware-out",
     pathname: request.nextUrl.pathname,
     locale: pathLocale,
-    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices) ? "next" : "rewrite",
+    action: isLocalizedDashboard ? "next-dashboard" : (isLocalizedConnectCallback || isLocalizedBuyerOrders || isLocalizedBuyerAddresses || isLocalizedBuyerInvoices || isLocalizedBuyerStatements) ? "next" : "rewrite",
     targetPath: url.pathname,
   }));
   if (request.cookies.get(localeCookie)?.value !== pathLocale) {

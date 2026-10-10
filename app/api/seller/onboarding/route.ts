@@ -12,6 +12,7 @@ import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-iden
 import { isTrustedMutationRequest } from "@/lib/request-security";
 import { sellerOnboardingCompletion } from "@/lib/seller-onboarding-completion";
 import { isSellerReviewSubmissionTransition, processSellerReviewEmailDelivery, queueSellerReviewEmail } from "@/lib/seller-review-alerts";
+import { normalizeSellerAdminContactPhone, persistSellerAdminContactPhone } from "@/lib/seller-admin-contact-phone";
 
 const text = (value: unknown, max: number) => {
   const result = String(value ?? "").trim();
@@ -60,8 +61,10 @@ export async function PUT(request: Request) {
   const frProfessional = !privateSeller && address.country === "FR";
   const vatStatus = privateSeller ? "NOT_REGISTERED_OR_NOT_APPLICABLE" : body.vatStatus === "REGISTERED" ? "REGISTERED" : body.vatStatus === "NOT_REGISTERED_OR_NOT_APPLICABLE" ? "NOT_REGISTERED_OR_NOT_APPLICABLE" : "UNKNOWN";
   const siren = frProfessional ? normalizeSiren(body.businessSiren) : { ok: false as const };
+  const adminContactPhone = text(body.adminContactPhone ?? body.phone, 40);
   const data = {
-    storeName: text(body.storeName, 120), ...address,
+    storeName: text(body.storeName, 120), country: address.country, city: address.city, address: address.address, postalCode: address.postalCode,
+    phone: adminContactPhone,
     sellerType: (sellerType ?? "UNKNOWN") as SellerType,
     legalForm: (legal.identity?.legalForm ?? null) as SellerLegalForm | null,
     companySubtype: (legal.identity?.companySubtype ?? null) as SellerCompanySubtype | null,
@@ -88,9 +91,11 @@ export async function POST(request: Request) {
   const body = await request.json();
   const sellerType = body.sellerType === "PRIVATE" ? "PRIVATE" : body.sellerType === "PROFESSIONAL" ? "PROFESSIONAL" : null;
   const storeName = text(body.storeName, 120);
+  const adminContactPhone = normalizeSellerAdminContactPhone(body.adminContactPhone ?? body.phone);
+  if (!adminContactPhone) return NextResponse.json({ error: "INVALID_ADMIN_CONTACT_PHONE" }, { status: 400 });
   const resolvedAddress = await addressInput(body, session.userId);
   if (!resolvedAddress) return NextResponse.json({ error: "PERSONAL_ADDRESS_NOT_FOUND" }, { status: 409 });
-  const { country, city, phone, address, postalCode } = resolvedAddress;
+  const { country, city, address, postalCode } = resolvedAddress;
   const legal = sellerLegalIdentity({ sellerType, country: country ?? null, legalForm: body.legalForm, companySubtype: body.companySubtype });
   if (legal.error) return NextResponse.json({ error: legal.error }, { status: 400 });
 
@@ -101,7 +106,7 @@ export async function POST(request: Request) {
   const vatStatus = privateSeller ? "NOT_REGISTERED_OR_NOT_APPLICABLE" : body.vatStatus === "REGISTERED" ? "REGISTERED" : body.vatStatus === "NOT_REGISTERED_OR_NOT_APPLICABLE" ? "NOT_REGISTERED_OR_NOT_APPLICABLE" : null;
   const vatNumber = privateSeller ? null : text(body.vatNumber, 80);
 
-  if (!sellerType || !country || !storeName || !city || !phone || !address || !postalCode || !legal.identity || !vatStatus) {
+  if (!sellerType || !country || !storeName || !city || !address || !postalCode || !legal.identity || !vatStatus) {
     return NextResponse.json({ error: "INVALID_ONBOARDING" }, { status: 400 });
   }
   if (frProfessional && !siren.ok) return NextResponse.json({ error: "INVALID_SIREN" }, { status: 400 });
@@ -131,7 +136,8 @@ export async function POST(request: Request) {
       await tx.user.update({ where: { id: user.id }, data: { role: "SELLER" } });
 
       const storeData = {
-        name: storeName, country, city, contactEmail: user.email, phone,
+        name: storeName, country, city, contactEmail: user.email,
+        ...(text(body.phone, 40) ? { phone: text(body.phone, 40) } : {}),
         sellerType: sellerType as SellerType, sellerLegalForm: identity.legalForm as SellerLegalForm,
         companySubtype: identity.companySubtype as SellerCompanySubtype | null,
         businessRegistrationId: registration, legalBusinessName: privateSeller ? null : text(body.legalBusinessName, 160),
@@ -146,6 +152,7 @@ export async function POST(request: Request) {
         : await tx.store.create({ data: { ...storeData, slug: slugBase, ownerId: user.id, status: "PENDING" }, select: { id: true } });
       const business = await ensureSellerBusiness(tx, user.id, store.id);
       await tx.store.updateMany({ where: { id: store.id, ownerId: user.id, businessId: null }, data: { businessId: business.id } });
+      await persistSellerAdminContactPhone(tx, { businessId: business.id, storeId: store.id, actorId: user.id, phone: adminContactPhone });
 
       let businessState: string | null = null;
       let establishmentState: string | null = null;

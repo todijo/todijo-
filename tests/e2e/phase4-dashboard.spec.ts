@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { SignJWT } from "jose";
 import { sellerActionCenterCopy } from "../../i18n/seller-action-center";
+import { sellerMonthlyStatementCopy } from "../../i18n/seller-monthly-statements";
 
 const db = new PrismaClient();
 const secret = "e2e-only-placeholder-secret-at-least-32-characters";
@@ -78,4 +79,12 @@ test("seller report downloads are localized and remain scoped to the authorized 
   const otherStore = await page.request.get("/api/seller/reports/export?type=stock&store=unowned-store&locale=en");
   expect(otherStore.status()).toBe(403);
   expect(await otherStore.text()).not.toContain("Low-stock fixture");
+});
+
+test("seller can open the localized monthly statements archive and sees its empty state", async ({ page }) => {
+  await addSession(page);
+  const response = await page.goto("/fr/account/statements");
+  expect(response?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: sellerMonthlyStatementCopy("fr").title })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText(sellerMonthlyStatementCopy("fr").empty);
 });
