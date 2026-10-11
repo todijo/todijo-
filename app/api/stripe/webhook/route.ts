@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
+import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { processStripeEvent } from "@/lib/payments";
 import { type StripeCheckoutSession, type StripeEvent } from "@/lib/stripe";
 import { handleStripeWebhookRequest } from "@/lib/stripe-webhook-request";
@@ -41,6 +43,7 @@ async function processAuthenticatedStripeEvent(event: StripeEvent) {
       console.info(`[Stripe webhook ${event.id}] Subscription lookup completed (found=${Boolean(initialRecord)}).`);
     }
     const result = await processStripeEvent(prisma, event);
+    if ("accountUpdated" in result && result.accountUpdated) revalidateTag(PUBLIC_STORES_CACHE_TAG);
     if ("storeId" in result && typeof result.storeId === "string") {
       const closedBusiness = await prisma.sellerBusiness.findFirst({ where: { stores: { some: { id: result.storeId } }, stripeCancellationPending: true }, select: { id: true } });
       if (closedBusiness) await processSellerClosureCancellation(prisma, closedBusiness.id);

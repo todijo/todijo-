@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
       }, variantInput, body.variantImages, async tx => {
         await lockSellerProductQuota(tx, store.id);
-        await requireStorePublishingAccess(tx, session.userId, store.id, "PRODUCT_CREATE");
+        await requireStorePublishingAccess(tx, session.userId, store.id, status === "PUBLISHED" ? "PRODUCT_PUBLISH" : "PRODUCT_CREATE");
         await requireProductCategoryScope(tx,session.userId,store.id,"PRODUCT_CREATE",category);
       });
     await prisma.$transaction((tx)=>replaceProductVideo(tx,product.id,body.video));

@@ -11,7 +11,8 @@ import { canPublish } from "@/lib/seller-subscription";
 import { requireStoreCapability, resolveSellerStoreContext } from "@/lib/seller-business-access";
 import SellerStoreSwitcher from "@/components/SellerStoreSwitcher";
 import { canSellerSelfCreateStore } from "@/lib/seller-commercial-access";
-import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
+import { sellerBusinessCommercialEntitlement } from "@/lib/seller-business";
+import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 import { sellerTeamCopy } from "@/i18n/seller-team";
 import SellerClosureControls from "./SellerClosureControls";
 
@@ -30,10 +31,12 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
 
   let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"STORE_VIEW_SETTINGS")}catch{redirect(`/${locale}/dashboard`)}
   const principal=await requireStoreCapability(prisma,session.userId,storeContext.selected.id,"STORE_VIEW_SETTINGS");
-  const [businessCapacity, commercialPlan] = principal.owner ? await Promise.all([
+  const [businessCapacity, commercialEntitlement] = principal.owner ? await Promise.all([
     prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { _count: { select: { stores: true } } } }),
-    sellerBusinessCommercialPlan(prisma, principal.businessId),
+    sellerBusinessCommercialEntitlement(prisma, principal.businessId),
   ]) : [null, null];
+  const commercialPlan=commercialEntitlement?.plan??null;
+  const entitlementCopy=sellerEntitlementSubscriptionMessages[locale as keyof typeof sellerEntitlementSubscriptionMessages]??sellerEntitlementSubscriptionMessages.en;
   const canCreateStore = Boolean(businessCapacity && canSellerSelfCreateStore(commercialPlan, businessCapacity._count.stores));
   const store = await prisma.store.findUnique({
     where: { id:storeContext.selected.id },
@@ -66,7 +69,7 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
       backHref={`/${locale}/dashboard`}
       backLabel={t("backDashboard")}
       actions={<><Link className="sellerControlButton light" href={`/${locale}/store/${store.slug}`}>{t("viewStore")}</Link>{canCreateStore&&<Link className="sellerControlButton" href={`/${locale}/seller/stores/new`}>{teamCopy.createStore}</Link>}</>}
-      badges={<><SellerStatusBadge tone="accent">{store.name}</SellerStatusBadge><SellerStatusBadge tone={["ACTIVE", "TRIALING"].includes(store.subscription?.status ?? "") ? "success" : "warning"}>{t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</SellerStatusBadge></>}
+      badges={<><SellerStatusBadge tone="accent">{store.name}</SellerStatusBadge><SellerStatusBadge tone={commercialEntitlement?.active ? "success" : "warning"}>{commercialEntitlement?.active ? commercialEntitlement.plan?.toUpperCase() ?? "—" : t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</SellerStatusBadge></>}
     />
 
     <nav className="sellerSettingsTabs" aria-label={t("settingsTitle")}>
@@ -85,7 +88,7 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
     {principal.owner&&<div className="sellerSettingsSupportGrid">
       <SellerSection id="notifications" icon={BellRing} title={t("notifications")} description={t("notificationsHelp")}><p className="sellerSettingsInfo"><BellRing size={18}/>{t("notificationsStatus")}</p></SellerSection>
       <SellerSection id="billing" icon={CreditCard} title={t("billing")} description={t("billingHelp")}>
-        <div className="sellerBillingCard"><div><span>{t("currentPlan")}</span><strong>{store.subscription?.plan?.toUpperCase() ?? "—"}</strong><small>{t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</small></div><Link href={`/${locale}/seller/subscription`}>{t("managePlan")}</Link></div>
+        <div className="sellerBillingCard"><div><span>{t("currentPlan")}</span><strong>{commercialEntitlement?.active ? commercialEntitlement.plan?.toUpperCase() ?? "—" : "—"}</strong><small>{commercialEntitlement?.active ? commercialEntitlement.source === "ADMIN_GRANTED" ? `${entitlementCopy.active} · ${entitlementCopy.adminAccess}` : entitlementCopy.active : t("subscriptionStatus", { status: store.subscription?.status ?? "NOT_STARTED" })}</small></div><Link href={`/${locale}/seller/subscription`}>{t("managePlan")}</Link></div>
         <SellerClosureControls locale={locale}/>
       </SellerSection>
       <SellerSection id="security" icon={ShieldCheck} title={t("security")} description={t("securityHelp")}><p className="sellerSettingsInfo"><ShieldCheck size={18}/>{t("securityStatus")}</p></SellerSection>

@@ -238,11 +238,15 @@ test("duplicate webhook event is acknowledged without processing", async () => {
 
 test("account.updated synchronizes connected seller capabilities", async () => {
   let update: any;
-  const tx: any = { stripeWebhookEvent: { create: async () => ({}) }, user: { updateMany: async (args: any) => { update = args; return { count: 1 }; } } };
+  const tx: any = {
+    stripeWebhookEvent: { create: async () => ({}) },
+    user: { updateMany: async (args: any) => { update = args; return { count: 1 }; }, findUnique: async () => ({ id: "seller_1" }) },
+    store: { findMany: async () => [] },
+  };
   const db: any = { $transaction: (callback: any) => callback(tx) };
-  const event: StripeEvent = { id: "evt_account", type: "account.updated", data: { object: { id: "acct_seller", object: "account", details_submitted: true, charges_enabled: true, payouts_enabled: false } } };
-  assert.deepEqual(await processStripeEvent(db, event), { accountUpdated: true });
-  assert.equal(update.where.stripeAccountId, "acct_seller"); assert.equal(update.data.stripeChargesEnabled, true);
+  const event: StripeEvent = { id: "evt_account", type: "account.updated", data: { object: { id: "acct_seller", object: "account", details_submitted: false, charges_enabled: false, payouts_enabled: false } } };
+  assert.deepEqual(await processStripeEvent(db, event, undefined, undefined, undefined, async () => ({ id: "acct_seller", object: "account", details_submitted: true, charges_enabled: true, payouts_enabled: true } as any)), { accountUpdated: true, storesActivated: false });
+  assert.equal(update.where.stripeAccountId, "acct_seller"); assert.equal(update.data.stripeChargesEnabled, true); assert.equal(update.data.stripePayoutsEnabled, true);
 });
 
 test("paid webhook rejects a mismatched destination account", async () => {
@@ -339,7 +343,7 @@ test("verified Checkout total mismatch blocks payment finalization", async () =>
   finally { if (previous == null) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previous; }
 });
 
-test("subscription Checkout retrieves Stripe subscription and activates the local seller", async () => {
+test("subscription Checkout records entitlement without bypassing seller readiness activation", async () => {
   let storeUpdate: any;
   let subscriptionUpsert: any;
   const tx: any = {
@@ -350,7 +354,7 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
       upsert: async (args: any) => { subscriptionUpsert = args; return {}; },
     },
     store: {
-      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1", sellerType: "PROFESSIONAL" }),
+      findUnique: async () => ({ id: "store_1", ownerId: "seller_1", stripeCustomerId: "cus_1", sellerType: "PROFESSIONAL", status: "PENDING" }),
       update: async (args: any) => { storeUpdate = args; return {}; },
     },
     product: { updateMany: async () => ({ count: 2 }) },
@@ -364,7 +368,7 @@ test("subscription Checkout retrieves Stripe subscription and activates the loca
   const retrieve = async () => ({ id: "sub_1", object: "subscription" as const, customer: "cus_1", status: "active", metadata: { storeId: "store_1", plan: "plus" }, items: { data: [{ price: { id: "price_plus" }, current_period_end: 1_800_000_000 }] } });
   assert.deepEqual(await processStripeEvent(db, event, retrieve), { subscriptionCheckoutCompleted: true, storeId: "store_1", status: "ACTIVE" });
   assert.equal(storeUpdate.data.stripeCustomerId, "cus_1");
-  assert.equal(storeUpdate.data.status, "ACTIVE");
+  assert.equal("status" in storeUpdate.data, false);
   assert.equal(subscriptionUpsert.update.stripeSubscriptionId, "sub_1");
   assert.equal(subscriptionUpsert.update.stripePriceId, "price_plus");
   assert.equal(subscriptionUpsert.update.status, "ACTIVE");

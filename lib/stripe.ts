@@ -318,7 +318,7 @@ export function retrieveStripeCheckoutSession(sessionId: string) {
 }
 
 export function connectedAccountStatus(account: StripeConnectedAccount) {
-  return { stripeOnboardingComplete: account.details_submitted, stripeChargesEnabled: account.charges_enabled, stripePayoutsEnabled: account.payouts_enabled };
+  return { stripeOnboardingComplete: account.details_submitted === true, stripeChargesEnabled: account.charges_enabled === true, stripePayoutsEnabled: account.payouts_enabled === true };
 }
 
 export function connectedAccountReady(account: StripeConnectedAccount, expectedAccountId?: string) {

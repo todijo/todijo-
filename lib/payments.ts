@@ -19,6 +19,7 @@ import {configuredSellerPlanForPriceId} from "./seller-plans";
 import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
 import { persistPaidSellerInvoice } from "./seller-invoice-persistence";
 import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
+import { reconcilePendingSellerStoreActivation } from "./seller-store-activation";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -218,6 +219,7 @@ export async function processStripeEvent(
   retrieveSubscription = retrieveStripeSubscription,
   retrieveCheckoutSession = retrieveStripeCheckoutSession,
   changeProviders = subscriptionChangeProviders,
+  retrieveConnectedAccountState = retrieveConnectedAccount,
 ) {
   let checkoutSession = event.data.object as StripeCheckoutSession;
   const sellerCheckout = event.type === "checkout.session.completed"
@@ -252,6 +254,17 @@ export async function processStripeEvent(
     const transition = await processSellerSubscriptionTransitionEvent(db, event, (tx, live) => syncSellerSubscription(tx, live, "authoritative.subscription", event.id), changeProviders);
     if (transition) return transition;
   }
+  let connectedAccountUpdate: StripeConnectedAccount | null = null;
+  if (event.type === "account.updated") {
+    const eventAccount = event.data.object as StripeConnectedAccount;
+    if (eventAccount.object !== "account" || !eventAccount.id) return { ignored: true };
+    // Webhook delivery can be delayed or out of order; reconcile against the
+    // current Stripe object rather than treating an old event snapshot as live.
+    connectedAccountUpdate = await retrieveConnectedAccountState(eventAccount.id);
+    if (connectedAccountUpdate.object !== "account" || connectedAccountUpdate.id !== eventAccount.id) {
+      throw new Error(`[Stripe webhook ${event.id}] Stripe returned a different connected account.`);
+    }
+  }
   if(event.type==="invoice.paid"){
     const invoice=event.data.object as StripeInvoice;
     const subscriptionId=invoice.subscription??invoice.parent?.subscription_details?.subscription;
@@ -265,10 +278,19 @@ export async function processStripeEvent(
       if (!previouslyProcessed) await tx.stripeWebhookEvent.create({ data: { id: event.id, type: event.type } });
       console.info(`[Stripe webhook ${event.id}] Processing ${event.type}.`);
       if (event.type === "account.updated") {
-        const account = event.data.object as StripeConnectedAccount;
-        if (account.object !== "account" || !account.id) return { ignored: true };
+        const account = connectedAccountUpdate;
+        if (!account) return { ignored: true };
         const changed = await tx.user.updateMany({ where: { stripeAccountId: account.id }, data: connectedAccountStatus(account) });
-        return changed.count ? { accountUpdated: true } : { ignored: true };
+        if (!changed.count) return { ignored: true };
+        const owner = await tx.user.findUnique({ where: { stripeAccountId: account.id }, select: { id: true } });
+        if (!owner) return { accountUpdated: true, storesActivated: false };
+        const pendingStores = await tx.store.findMany({ where: { ownerId: owner.id, status: "PENDING", onboardingStatus: "VERIFIED" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
+        let storesActivated = false;
+        for (const store of pendingStores) {
+          const result = await reconcilePendingSellerStoreActivation(tx, store.id);
+          storesActivated ||= result.activated;
+        }
+        return { accountUpdated: true, storesActivated };
       }
       if (event.type.startsWith("customer.subscription.")) {
         const subscription = event.data.object as StripeSubscription;
@@ -406,7 +428,10 @@ async function syncSellerSubscription(
   }
 
   console.info(`[Stripe webhook ${eventId}] Updating local seller subscription state to ${status}.`);
-  const storeUpdate = await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId, ...(active ? { status: "ACTIVE" } : {}) }, select: { id: true, status: true, stripeCustomerId: true } });
+  // Subscription webhooks establish commercial entitlement, not legal or
+  // Connect readiness. Only the guarded activation reconciler may promote a
+  // verified PENDING seller store to ACTIVE.
+  const storeUpdate = await tx.store.update({ where: { id: storeId }, data: { stripeCustomerId: customerId }, select: { id: true, status: true, stripeCustomerId: true } });
   console.info(`[Stripe webhook ${eventId}] Store subscription state updated (status=${storeUpdate.status}).`);
   const subscriptionUpdate = await tx.sellerSubscription.upsert({
     where: { storeId },

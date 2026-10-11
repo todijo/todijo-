@@ -84,7 +84,15 @@ export function elevatedStoreAccessWhere(now = new Date()): Prisma.StoreWhereInp
 
 export function publicStoreAccessWhere(now = new Date()): Prisma.StoreWhereInput {
   return { dataClass: "PRODUCTION", status: "ACTIVE", owner: { role: { in: ["SELLER", "ADMIN"] }, sellerSuspendedAt: null, deactivatedAt: null },
-    AND: [{ OR: [{business:{is:null}},{business:{is:{sellerClosedAt:null}}}] }, { OR: [
+    AND: [{ OR: [{ business: { is: null } }, { business: { is: { sellerClosedAt: null } } }] },
+      // Admin-owned/platform-managed catalogues (including CJ) do not require
+      // an independent seller Connect account. Independent sellers must have
+      // the same persisted readiness confirmed by the Connect status/webhook
+      // path before any public listing can include their stores.
+      { OR: [
+        { owner: { role: "ADMIN" } },
+        { owner: { role: "SELLER", stripeAccountId: { not: null }, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } },
+      ] }, { OR: [
       { business: { is: null } },
       { primaryForBusiness: { isNot: null } },
       { business: { is: { primaryStoreId: { not: null }, OR: [

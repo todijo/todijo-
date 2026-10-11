@@ -123,6 +123,18 @@ test("sixth FREE product is rejected by authoritative store creation gate",async
   assert.equal(sellerProductQuota({role:"SELLER",plan:"free",productCount:4}).blocked,false);
   assert.equal(sellerProductQuota({role:"SELLER",plan:"forged",productCount:0}).blocked,true);
 });
+test("seller can keep a draft before Connect readiness but cannot publish until Connect is fully ready",async()=>{
+  const baseStore={id:"store",businessId:"business",ownerId:"seller",archivedAt:null,business:{primaryStoreId:"store",siren:null,inseeVerificationState:null,sellerClosedAt:null,reactivationStockReviewRequired:false},owner:{role:"SELLER",stripeAccountId:null,stripeOnboardingComplete:false,stripeChargesEnabled:false,stripePayoutsEnabled:false},currency:"EUR",country:"FR",businessRegistrationId:null,status:"ACTIVE",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE",establishment:null,_count:{products:0}};
+  const db:any={user:{findUnique:async()=>({role:"SELLER",sellerSuspendedAt:null,deactivatedAt:null,blockedAt:null,blockExpiresAt:null})},store:{findUnique:async()=>baseStore},sellerBusiness:{findUnique:async()=>({primaryStoreId:"store",billingStoreId:"store",owner:{role:"SELLER"},billingStore:{id:"store",subscription:null,accessGrants:[]}})},product:{count:async()=>0}};
+  await requireStorePublishingAccess(db,"seller","store","PRODUCT_CREATE");
+  await assert.rejects(()=>requireStorePublishingAccess(db,"seller","store","PRODUCT_PUBLISH","product"),(error:any)=>error.code==="SELLER_STRIPE_NOT_READY");
+});
+test("verified onboarding remains pending until activation and permits drafts but never publication",async()=>{
+  const baseStore={id:"store",businessId:"business",ownerId:"seller",archivedAt:null,business:{primaryStoreId:"store",siren:null,inseeVerificationState:null,sellerClosedAt:null,reactivationStockReviewRequired:false},owner:{role:"SELLER",stripeAccountId:"acct_ready",stripeOnboardingComplete:true,stripeChargesEnabled:true,stripePayoutsEnabled:true},currency:"EUR",country:"FR",businessRegistrationId:null,status:"PENDING",onboardingStatus:"VERIFIED",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE",establishment:null,_count:{products:0}};
+  const db:any={user:{findUnique:async()=>({role:"SELLER",sellerSuspendedAt:null,deactivatedAt:null,blockedAt:null,blockExpiresAt:null})},store:{findUnique:async()=>baseStore},sellerBusiness:{findUnique:async()=>({primaryStoreId:"store",billingStoreId:"store",owner:{role:"SELLER"},billingStore:{id:"store",subscription:null,accessGrants:[]}})},product:{count:async()=>0}};
+  await requireStorePublishingAccess(db,"seller","store","PRODUCT_CREATE");
+  await assert.rejects(()=>requireStorePublishingAccess(db,"seller","store","PRODUCT_PUBLISH","new_product"),(error:any)=>error.code==="SUBORDINATE_STORE_REQUIRES_PRO");
+});
 for(const [count,expected] of [[0,"free"],[5,"free"],[6,"plus"],[50,"plus"],[51,"pro"]] as const){
   test(`transparent recommendation for ${count} products`,()=>assert.equal(recommendedSellerPlan(count),expected));
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import {connectPaymentCopy} from "@/i18n/connect-payment";
 
 type Status = { connected: boolean; onboardingComplete: boolean; chargesEnabled: boolean; payoutsEnabled: boolean };
@@ -27,6 +28,7 @@ async function responseBody(response: Response): Promise<unknown> {
 
 export default function StripeConnectSection({ initialStatus, commercialEntitlementActive=false }: { initialStatus: Status;commercialEntitlementActive?:boolean }) {
   const t = useTranslations("Connect");
+  const router = useRouter();
   const paymentCopy=connectPaymentCopy(useLocale());
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
@@ -48,6 +50,7 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
       if (!isStatusResponse(result)) throw new Error(t("error"));
       if (requestId === latestRefresh.current) {
         setStatus(result);
+        if ((result as Status & { storeActivated?: unknown }).storeActivated === true) router.refresh();
         if(isStripeConnectReady(result))setError("");
       }
     } catch (cause) {
@@ -56,7 +59,7 @@ export default function StripeConnectSection({ initialStatus, commercialEntitlem
     } finally {
       if (requestId === latestRefresh.current) setRefreshing(false);
     }
-  }, [t]);
+  }, [router, t]);
 
   useEffect(() => {
     const controller = new AbortController();
