@@ -1,5 +1,22 @@
 # Pre-launch FREE seller model
 
+## Authoritative pre-launch operating context
+
+Todijo has not publicly launched. There are no independent public buyers or
+sellers currently operating the marketplace; existing non-Admin accounts are
+owner-controlled test accounts. The protected Admin account and its associated
+business-critical CJ dropshipping store and catalog must be preserved. Do not
+delete, reset, reassign, or corrupt that identity, store, products, supplier
+references, variants, stock, media, provider references, or any related history.
+
+Pre-launch repairs should prioritize practical, evidence-based compatibility
+with this state. Existing real financial and provider references remain
+protected. Do not assume a test account may be deleted or mutated without
+explicit instruction. Coolify deployment is manual and owner-controlled; never
+infer deployment authorization from a Git push. Avoid repeated audits and
+speculative release blockers, while retaining meaningful regression tests and
+security safeguards.
+
 ## Isolation and scope
 
 Branch: `codex/prelaunch-free-seller-model`.
