@@ -114,6 +114,10 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   const racingPage = await racingContext.newPage();
   await authenticate(racingPage, ownerId, "SELLER");
   await racingPage.goto(`/fr/seller/store-settings?store=${encodeURIComponent(publicStoreId)}`);
+  // The earlier rename correctly starts the 14-day cooldown. Age only this
+  // disposable fixture past that window so the race exercises concurrent
+  // updates rather than having both requests rejected up front.
+  await db.store.update({ where: { id: publicStoreId }, data: { slugLastChangedAt: new Date(Date.now() - 15 * 86_400_000) } });
   const racingResults = await Promise.all([secondSlug, thirdSlug].map(slug => racingPage.evaluate(async ({ storeId, slug }) => {
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug }) });
     return { status: response.status, body: await response.json() };
