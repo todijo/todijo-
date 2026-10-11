@@ -22,6 +22,11 @@ export function canSellerSelfCreateStore(plan: string | null | undefined, curren
 export function hasLockedSellerMultiStoreTeaser(plan: string | null | undefined) {
   return plan === "free" || plan === "plus";
 }
+/** A business's canonical primary store uses the base plan; dependent stores require effective PRO. */
+export function canSellFromBusinessStore(input: { storeId: string; primaryStoreId: string | null | undefined; plan: string | null | undefined }) {
+  if (!input.plan || !input.primaryStoreId) return false;
+  return input.storeId === input.primaryStoreId || input.plan === "pro";
+}
 export type CommercialInput = {
   role: string;
   subscription: { status: string; plan: string; currentPeriodEnd?: Date | null } | null;

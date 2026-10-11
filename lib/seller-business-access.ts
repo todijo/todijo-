@@ -10,7 +10,7 @@ export function hasProTeamEntitlement(business:TeamBusinessEntitlement,now=new D
 }
 
 export class SellerCapabilityError extends Error {
-  constructor(public readonly code: "AUTH_REQUIRED"|"OWNER_REQUIRED"|"STORE_ACCESS_DENIED"|"PERMISSION_DENIED"|"TEAM_ACCESS_SUSPENDED"|"BUSINESS_NOT_FOUND"|"BUSINESS_CLOSED", public readonly status = 403) { super(code); }
+  constructor(public readonly code: "AUTH_REQUIRED"|"OWNER_REQUIRED"|"STORE_ACCESS_DENIED"|"PERMISSION_DENIED"|"TEAM_ACCESS_SUSPENDED"|"BUSINESS_NOT_FOUND"|"BUSINESS_CLOSED"|"STORE_ARCHIVED", public readonly status = 403) { super(code); }
 }
 
 export type SellerPrincipal = {
@@ -51,8 +51,9 @@ export async function requireBusinessOwner(db: Db, userId: string | null | undef
 
 export async function requireStoreCapability(db: Db, userId: string | null | undefined, storeId: string, permission: TeamPermission) {
   if (!userId) throw new SellerCapabilityError("AUTH_REQUIRED", 401);
-  const store = await db.store.findUnique({ where: { id: storeId }, select: { businessId: true, ownerId: true, business:{select:{sellerClosedAt:true}},owner:{select:{role:true}} } });
+  const store = await db.store.findUnique({ where: { id: storeId }, select: { businessId: true, ownerId: true, archivedAt:true, business:{select:{sellerClosedAt:true}},owner:{select:{role:true}} } });
   if (!store) throw new SellerCapabilityError("STORE_ACCESS_DENIED", 403);
+  if (store.archivedAt && permission !== "ORDER_VIEW" && permission !== "ORDER_FULFILL" && permission !== "REFUND_DECIDE" && permission !== "MESSAGE_VIEW" && permission !== "MESSAGE_REPLY") throw new SellerCapabilityError("STORE_ARCHIVED", 409);
   if(store.business?.sellerClosedAt)throw new SellerCapabilityError("BUSINESS_CLOSED",403);
   if (store.ownerId === userId) {
     if(!["SELLER","ADMIN"].includes(store.owner.role))throw new SellerCapabilityError("STORE_ACCESS_DENIED",403);
@@ -75,9 +76,9 @@ export async function requireAnyStoreCapability(db: Db, userId: string | null | 
 
 export async function sellerStoreChoices(db: Db, userId: string | null | undefined) {
   if (!userId) throw new SellerCapabilityError("AUTH_REQUIRED", 401);
-  const [owned,principals]=await Promise.all([db.store.findMany({ where: { ownerId: userId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, slug: true, businessId: true } }),sellerPrincipals(db,userId)]);
+  const [owned,principals]=await Promise.all([db.store.findMany({ where: { ownerId: userId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, name: true, slug: true, businessId: true, status:true, archivedAt:true } }),sellerPrincipals(db,userId)]);
   const assignedIds=principals.filter(principal=>!principal.owner).flatMap(principal=>principal.storeIds);
-  const assigned=assignedIds.length?await db.store.findMany({where:{id:{in:assignedIds}},orderBy:{createdAt:"asc"},select:{id:true,name:true,slug:true,businessId:true}}):[];
+  const assigned=assignedIds.length?await db.store.findMany({where:{id:{in:assignedIds}},orderBy:[{createdAt:"asc"},{id:"asc"}],select:{id:true,name:true,slug:true,businessId:true,status:true,archivedAt:true}}):[];
   return [...new Map([...owned, ...assigned].map(store => [store.id, store])).values()];
 }
 

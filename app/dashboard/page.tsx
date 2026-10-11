@@ -27,7 +27,7 @@ import { sellerTeamCopy } from "@/i18n/seller-team";
 import type { Prisma, TeamPermission } from "@prisma/client";
 import FreeSellerStartCard from "@/components/FreeSellerStartCard";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
-import { canSellerSelfCreateStore, hasLockedSellerMultiStoreTeaser, hasProSellerCapabilities } from "@/lib/seller-commercial-access";
+import { canSellFromBusinessStore, canSellerSelfCreateStore, hasLockedSellerMultiStoreTeaser, hasProSellerCapabilities } from "@/lib/seller-commercial-access";
 import { sellerMultiStoreTeaserCopy } from "@/i18n/seller-multi-store-teaser";
 import LockedMultiStoreTeaser from "@/components/LockedMultiStoreTeaser";
 import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
@@ -38,6 +38,8 @@ import { sellerStockAlerts } from "@/lib/seller-stock-alerts";
 import { sellerActionCenterCopy } from "@/i18n/seller-action-center";
 import { sellerReportCopy } from "@/i18n/seller-reports";
 import { loadSellerDispatchHealth } from "@/lib/seller-dispatch-health";
+import SellerStoreManagement from "@/components/SellerStoreManagement";
+import { getSellerStoreManagementCopy } from "@/i18n/seller-store-management";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -95,7 +97,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{siren:true,inseeVerificationState:true,inseeVerificationReason:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,businessId:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,archivedAt:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{primaryStoreId:true,siren:true,inseeVerificationState:true,inseeVerificationReason:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
 
 async function loadSellerDashboardMetrics(userId:string,storeId:string,permissions:{products:boolean;orders:boolean;analytics:boolean;sales:boolean}) {
   const sellerOrdersWhere = sellerOrderHistoryWhere(userId, storeId, "");
@@ -240,7 +242,10 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const selectedCommercialPlan=selectedPrincipal?await dashboardData(sellerBusinessCommercialPlan(prisma,selectedPrincipal.businessId)):null;
   const sellerBenefitCatalogEnabled=Boolean(selectedPrincipal?.owner&&user.role==="SELLER"&&hasProSellerCapabilities(selectedCommercialPlan)&&(await dashboardData(prisma.sellerBenefitAccess.findUnique({where:{businessId:selectedPrincipal.businessId},select:{enabled:true}})))?.enabled);
   const freeCopy = sellerFreeModelCopy(locale);
-  const sellerCanAddProduct = Boolean(activeStore && canCreateProducts && canPublish(activeStore,new Date(),selectedCommercialPlan));
+  const storeCanSellByEntitlement = Boolean(activeStore && (activeStore.businessId
+    ? canSellFromBusinessStore({ storeId: activeStore.id, primaryStoreId: activeStore.business?.primaryStoreId, plan: selectedCommercialPlan })
+    : true));
+  const sellerCanAddProduct = Boolean(activeStore && canCreateProducts && storeCanSellByEntitlement && !activeStore.archivedAt && canPublish(activeStore,new Date(),selectedCommercialPlan));
   const sellerNav = sellerDashboardNavItems({ locale, storeSlug: activeStore?.slug, publicStoreAvailable:sellerCanAddProduct, proImportAvailable:Boolean(selectedPrincipal?.owner&&hasProSellerCapabilities(selectedCommercialPlan)), ownerTools:Boolean(selectedPrincipal?.owner),permissions:selectedPrincipal?.owner?undefined:selectedPrincipal?.permissions??[],labels: { dashboard:p("nav.dashboard"), products:p("nav.products"), addProduct:p("nav.addProduct"), orders:p("nav.orders"), messages:p("nav.messages"), statistics:p("nav.statistics"), revenue:p("nav.revenue"), reviews:p("nav.reviews"), store:p("nav.store"), settings:p("nav.settings"), notifications:p("notifications"), eyebrow:p("seller.eyebrow"), logout:common("logout"), menu:s("menu"), collapse:s("collapse"), importProducts:freeCopy.importProducts }, accountLabel: common("account"), privacyLabel: privacy("privacyData"), active: "dashboard", unreadMessages });
   const sellerMobileNav = sellerNav;
 
@@ -282,16 +287,17 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   if(principal?.owner&&ownedStoreChoices.length>1&&!selectedStoreId){
     console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-render",audience:"seller-all-stores",storeCount:ownedStoreChoices.length}));
     const ids=ownedStoreChoices.map(store=>store.id);
+    const activeStoreCount=ownedStoreChoices.filter(store=>!store.archivedAt).length;
     const [productCount,groups,orderCount,business,commercialPlan]=await dashboardData(Promise.all([
       prisma.product.count({where:{storeId:{in:ids}}}),
       prisma.orderGroup.findMany({where:{storeId:{in:ids},kind:"MARKETPLACE"},select:{sellerNetAmountMinor:true,order:{select:{currency:true}}}}),
       prisma.order.count({where:{groups:{some:{storeId:{in:ids}}}}}),
-      prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{id:true}}),
+      prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{id:true,primaryStoreId:true}}),
       sellerBusinessCommercialPlan(prisma,principal.businessId),
     ]));
     const revenueByCurrency=groups.reduce<Record<string,number>>((totals,group)=>{totals[group.order.currency]=(totals[group.order.currency]??0)+group.sellerNetAmountMinor;return totals},{});
     const revenue=Object.entries(revenueByCurrency).map(([currency,minor])=>money(locale,minor/100,currency)).join(" · ")||money(locale,0,"EUR");
-    const canCreateStore=Boolean(business&&canSellerSelfCreateStore(commercialPlan,ownedStoreChoices.length));
+    const canCreateStore=Boolean(business&&canSellerSelfCreateStore(commercialPlan,activeStoreCount));
     const teaserCopy=user.role==="SELLER"&&hasLockedSellerMultiStoreTeaser(commercialPlan)?sellerMultiStoreTeaserCopy(locale):null;
     return <main className="premiumDashboard premiumSellerDashboard">
       <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
@@ -304,12 +310,14 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
             {canCreateStore&&<Link className="premiumPrimaryButton" href={`/${locale}/seller/stores/new`}>{teamCopy.createStore}</Link>}
           </section>
           <section className="premiumStatsGrid">
-            <DashboardStatCard label={p("nav.store")} value={ownedStoreChoices.length} icon={Store}/>
+            <DashboardStatCard label={p("nav.store")} value={activeStoreCount} icon={Store}/>
             <DashboardStatCard label={p("nav.products")} value={productCount} icon={Boxes}/>
             <DashboardStatCard label={p("stats.orders")} value={orderCount} icon={ReceiptText} tone="blue"/>
             <DashboardStatCard label={p("nav.revenue")} value={revenue} icon={TrendingUp} tone="mint"/>
           </section>
-          <DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><div className="premiumQuickGrid">{ownedStoreChoices.map(store=><DashboardQuickAction key={store.id} label={store.name} href={`/${locale}/dashboard?store=${store.id}`} icon={Store}/>)}</div></DashboardSection>
+          {user.role==="SELLER"&&business
+            ? <DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><SellerStoreManagement stores={ownedStoreChoices} primaryStoreId={business.primaryStoreId} locale={locale} copy={getSellerStoreManagementCopy(locale)}/></DashboardSection>
+            : <DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><div className="premiumQuickGrid">{ownedStoreChoices.map(store=><DashboardQuickAction key={store.id} label={store.name} href={`/${locale}/dashboard?store=${store.id}`} icon={Store}/>)}</div></DashboardSection>}
           {teaserCopy&&<LockedMultiStoreTeaser copy={teaserCopy}/>}
         </div>
       </div>
@@ -322,16 +330,18 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const dashboardMetrics = loadSellerDashboardMetrics(session.userId, activeStore.id, { products: canViewProducts, orders: canViewOrders, analytics: canViewAnalytics, sales: canViewSales });
   const profileFields = [activeStore.name, activeStore.description, activeStore.logo, activeStore.banner, activeStore.city, activeStore.country];
   const profileCompletion = Math.round(profileFields.filter(Boolean).length / profileFields.length * 100);
-  const subscriptionActive = canPublish(activeStore,new Date(),selectedCommercialPlan);
+  const subscriptionActive = !activeStore.archivedAt && storeCanSellByEntitlement && canPublish(activeStore,new Date(),selectedCommercialPlan);
   const sellerTypeRequired = activeStore.sellerType === "UNKNOWN";
   const vatStatusRequired = activeStore.sellerType === "PROFESSIONAL" && activeStore.vatStatus === "UNKNOWN";
   const businessVerificationRequired=!hasVerifiedFrenchBusiness(activeStore);
   const storeReadinessPending=activeStore.status!=="ACTIVE";
-  const readinessHref = businessVerificationRequired||sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings?store=${activeStore.id}#location` : `/${locale}/seller/subscription`;
-  const readinessTitle = businessVerificationRequired ? verification("sectionTitle") : sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : activeStore.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
-  const readinessHelp = businessVerificationRequired ? verification(sellerBusinessVerificationMessage({businessState:activeStore.business?.inseeVerificationState,businessReason:activeStore.business?.inseeVerificationReason,establishmentState:activeStore.establishment?.verificationState,establishmentReason:activeStore.establishment?.verificationReason})) : sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
+  const subordinateStoreNeedsPro = Boolean(activeStore.businessId && activeStore.id !== activeStore.business?.primaryStoreId && selectedCommercialPlan !== "pro");
+  const storeManagementCopy=getSellerStoreManagementCopy(locale);
+  const readinessHref = subordinateStoreNeedsPro||activeStore.archivedAt ? `/${locale}/seller/subscription` : businessVerificationRequired||sellerTypeRequired || vatStatusRequired || storeReadinessPending ? `/${locale}/seller/store-settings?store=${activeStore.id}#location` : `/${locale}/seller/subscription`;
+  const readinessTitle = subordinateStoreNeedsPro ? storeManagementCopy.requiresPro : activeStore.archivedAt ? storeManagementCopy.archived : businessVerificationRequired ? verification("sectionTitle") : sellerTypeRequired ? transparency("statusPending") : vatStatusRequired ? compliance("vatStatus") : activeStore.status==="PENDING" ? freeCopy.storeReviewTitle : storeReadinessPending ? freeCopy.storeUnavailableTitle : freeCopy.readinessTitle;
+  const readinessHelp = subordinateStoreNeedsPro ? storeManagementCopy.requiresPro : activeStore.archivedAt ? storeManagementCopy.archivedHelp : businessVerificationRequired ? verification(sellerBusinessVerificationMessage({businessState:activeStore.business?.inseeVerificationState,businessReason:activeStore.business?.inseeVerificationReason,establishmentState:activeStore.establishment?.verificationState,establishmentReason:activeStore.establishment?.verificationReason})) : sellerTypeRequired ? transparency("typeHelp") : vatStatusRequired ? compliance("vatNoExternalValidation") : activeStore.status==="PENDING" ? freeCopy.storeReviewHelp : storeReadinessPending ? freeCopy.storeUnavailableHelp : freeCopy.readinessHelp;
   const readinessAction = businessVerificationRequired ? verification("verify") : sellerTypeRequired ? transparency("typeTitle") : vatStatusRequired ? compliance("vatStatus") : selectedCommercialPlan==null ? freeCopy.compare : freeCopy.readinessAction;
-  const showReadinessWarning=Boolean(selectedPrincipal?.owner&&!subscriptionActive&&(storeReadinessPending||sellerTypeRequired||vatStatusRequired||businessVerificationRequired||selectedCommercialPlan==null));
+  const showReadinessWarning=Boolean(selectedPrincipal?.owner&&!subscriptionActive&&(subordinateStoreNeedsPro||activeStore.archivedAt||storeReadinessPending||sellerTypeRequired||vatStatusRequired||businessVerificationRequired||selectedCommercialPlan==null));
   return <main className="premiumDashboard premiumSellerDashboard">
     <DashboardSidebar items={sellerNav} mobileMenuItems={sellerMobileNav} homeHref={homeHref} logoutLabel={common("logout")} menuLabel={s("menu")} collapseLabel={s("collapse")} seller/>
     <div className="premiumDashboardMain"><DashboardHeader firstName={user.firstName} lastName={user.lastName} eyebrow={p("seller.eyebrow")} homeHref={homeHref} notificationHref={`/${locale}/notifications`} notificationLabel={p("notifications")} notificationCount={notificationCount}/><div className="premiumDashboardContent">{!user.emailVerified&&<EmailVerificationNotice email={user.email} locale={isLocale(locale)?locale:"en"}/>}
@@ -339,6 +349,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
       {lifecycleStatus==="REACTIVATION_PENDING"&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).stockReview}</strong><Link href={`/${locale}/seller/reactivate`}>{sellerLifecycleCopy(locale).reactivationTitle}</Link></section>}
       {showReadinessWarning && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span><Link href={readinessHref}>{readinessAction}</Link></section>}
       <SellerStoreSwitcher stores={storeChoices} selectedId={activeStore.id} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll={Boolean(principal?.owner&&ownedStoreChoices.length>1)}/>
+      {user.role==="SELLER"&&selectedPrincipal?.owner&&ownedStoreChoices.length>1&&<DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><SellerStoreManagement stores={ownedStoreChoices} primaryStoreId={activeStore.business?.primaryStoreId??null} locale={locale} copy={storeManagementCopy}/></DashboardSection>}
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<Suspense fallback={null}><SellerDashboardHeroMetrics metrics={dashboardMetrics} locale={locale} currency={activeStore.currency} canViewSales={canViewSales} canViewOrders={canViewOrders} canViewMessages={canViewMessages} unreadMessages={unreadMessages} labels={{todayRevenue:s("todayRevenue"),pendingOrders:s("pendingOrders"),newCustomers:s("newCustomers"),unreadMessages:s("unreadMessages")}}/></Suspense>}<Link href={subscriptionActive?`/${locale}/store/${activeStore.slug}`:`/${locale}/seller/store-settings?store=${activeStore.id}`}>{t("viewShop")} <Store size={18}/></Link></section>
       <Suspense fallback={null}><SellerStockActionAlerts storeId={activeStore.id} locale={locale} canViewProducts={canViewProducts}/></Suspense>
       <Suspense fallback={null}><SellerDashboardSecondarySections metrics={dashboardMetrics} locale={locale} activeStore={activeStore} storeChoices={ownedStoreChoices} sellerCanAddProduct={sellerCanAddProduct} readinessAction={readinessAction} readinessHref={readinessHref} subscriptionActive={subscriptionActive} commercialPlan={selectedCommercialPlan} owner={Boolean(selectedPrincipal?.owner)} role={user.role} canViewProducts={canViewProducts} canViewOrders={canViewOrders} canViewAnalytics={canViewAnalytics} canViewSales={canViewSales} canViewMessages={canViewMessages} canEditStore={canEditStore} readinessUsesSettings={sellerTypeRequired||vatStatusRequired}/></Suspense>

@@ -10,6 +10,7 @@ import SellerOnboardingForm from "./SellerAddressOnboardingForm";
 import { isLocale } from "@/i18n/config";
 import { sellerOnboardingJourneyCopy } from "@/i18n/seller-onboarding-journey";
 import { sellerPlanEntitlement } from "@/lib/seller-plans";
+import { sellerBusinessCommercialEntitlement } from "@/lib/seller-business";
 import { resolveSellerPersonalAddress } from "@/lib/seller-onboarding-address";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +24,15 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
   }
   if(session.role==="ADMIN"){console.info("[dashboard-trace]",JSON.stringify({phase:"seller-onboarding-redirect",reason:"admin",target:`/${locale}/dashboard`}));redirect(`/${locale}/dashboard`);}
   const [user, buyerAddress] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.userId }, select: { email:true,phone:true,profileAddress:true,profilePostalCode:true,profileCity:true,profileCountry:true,sellerOnboardingDraft:true, ownedBusiness:{select:{siren:true,inseeVerificationState:true,adminContactPhone:true}}, store: { select: { name: true, country: true, city: true, phone: true, businessAddress: true, businessPostalCode: true, displayBusinessAddress:true, samePersonalBusinessAddress:true, business:{select:{siren:true,inseeVerificationState:true,adminContactPhone:true}}, sellerType: true, sellerLegalForm: true, companySubtype: true, businessRegistrationId: true, legalBusinessName: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, plan: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } } } }),
+    prisma.user.findUnique({ where: { id: session.userId }, select: { email:true,phone:true,profileAddress:true,profilePostalCode:true,profileCity:true,profileCountry:true,sellerOnboardingDraft:true, ownedBusiness:{select:{id:true,siren:true,inseeVerificationState:true,adminContactPhone:true}}, store: { select: { businessId:true,name: true, country: true, city: true, phone: true, businessAddress: true, businessPostalCode: true, displayBusinessAddress:true, samePersonalBusinessAddress:true, business:{select:{siren:true,inseeVerificationState:true,adminContactPhone:true}}, sellerType: true, sellerLegalForm: true, companySubtype: true, businessRegistrationId: true, legalBusinessName: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, plan: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } } } }),
     defaultBuyerAddress(prisma, session.userId),
   ]);
   if (!user){console.info("[dashboard-trace]",JSON.stringify({phase:"seller-onboarding-redirect",reason:"no-user",target:`/${locale}/login`}));redirect(`/${locale}/login`);}
   const store = user.store, draft = user.sellerOnboardingDraft;
   const personalAddress = resolveSellerPersonalAddress(buyerAddress, user);
-  const entitlementSource = store ? activeAccessSource(store).source : "NONE";
+  const businessId = store?.businessId ?? user.ownedBusiness?.id ?? null;
+  const entitlement = businessId ? await sellerBusinessCommercialEntitlement(prisma, businessId) : null;
+  const entitlementSource = entitlement?.source ?? (store ? activeAccessSource(store).source : "NONE");
   const destination = sellerOnboardingDestination({ locale, intent, hasStore: Boolean(store), hasDraft: Boolean(draft), onboardingStatus: store?.onboardingStatus, onboardingStep: store?.onboardingStep, entitlementSource });
   console.info("[dashboard-trace]",JSON.stringify({phase:"seller-onboarding-state",role:session.role,hasStore:Boolean(store),hasDraft:Boolean(draft),onboardingStatus:store?.onboardingStatus??null,onboardingStep:store?.onboardingStep??null,entitlementSource,destination}));
   if (!destination.startsWith(`/${locale}/seller/onboarding`)){console.info("[dashboard-trace]",JSON.stringify({phase:"seller-onboarding-redirect",reason:"destination",target:destination}));redirect(destination);}
