@@ -51,7 +51,11 @@ export async function POST(request: Request) {
       if (updated.count !== 1) throw new Prisma.PrismaClientKnownRequestError("Store URL changed concurrently.", { code: "P2034", clientVersion: Prisma.prismaVersion.client });
       if (current.businessId) await appendSellerBusinessAudit(tx, { businessId: current.businessId, storeId: current.id, actorId: session.userId, category: "STORE", action: "STORE_SLUG_CHANGED", targetType: "STORE", targetId: current.id, metadata: { previousSlug: current.slug, newSlug: canonicalSlug, changedAt: now.toISOString() } });
       return { changed: true, slug: canonicalSlug, nextEligibleAt: nextStoreSlugChangeAt(now) };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    // Explicit owner/business/store row locks and the slug-namespace advisory
+    // lock serialize writers. ReadCommitted lets a waiter observe the winning
+    // rename and return the resulting cooldown instead of failing with a
+    // serialization error while trying to lock the already-updated Store row.
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, ...result, nextEligibleAt: result.nextEligibleAt?.toISOString() ?? null });
   } catch (error) {

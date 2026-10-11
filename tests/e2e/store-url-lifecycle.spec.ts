@@ -122,8 +122,8 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug }) });
     return { status: response.status, body: await response.json() };
   }, { storeId: publicStoreId, slug })));
-  expect(racingResults.filter(result => result.status === 200)).toHaveLength(1);
-  expect(racingResults.filter(result => result.status === 409 && result.body.error === "SLUG_CHANGE_COOLDOWN")).toHaveLength(1);
+  expect(racingResults.filter(result => result.status === 200), JSON.stringify(racingResults)).toHaveLength(1);
+  expect(racingResults.filter(result => result.status === 409 && result.body.error === "SLUG_CHANGE_COOLDOWN"), JSON.stringify(racingResults)).toHaveLength(1);
   await racingContext.close();
   const racingCanonical = (await db.store.findUniqueOrThrow({ where: { id: publicStoreId }, select: { slug: true } })).slug;
   expect([secondSlug, thirdSlug]).toContain(racingCanonical);
