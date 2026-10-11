@@ -189,7 +189,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   await expect(pendingPage).toHaveURL(new RegExp(`/fr/store/pending-url-${suffix}$`));
   await expect(pendingPage.locator(".storeOwnerPreviewCard")).toContainText("Cette boutique n’est pas encore visible publiquement");
   await expect(pendingPage.locator(".storeOwnerPreviewCard")).toContainText("En attente");
-  await expect(pendingPage.locator(".storeOwnerPreviewCard a")).toHaveAttribute("href", `/fr/seller/onboarding`);
+  await expect(pendingPage.locator(".storeOwnerPreviewCard a.sellerControlButton")).toHaveAttribute("href", `/fr/seller/onboarding`);
   await pendingContext.close();
 
   const platform = await db.store.findUniqueOrThrow({ where: { id: platformStoreId }, select: { ownerId: true, slug: true, name: true } });
