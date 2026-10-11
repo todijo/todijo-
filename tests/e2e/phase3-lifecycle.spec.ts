@@ -131,7 +131,7 @@ test("production-build closure confirmation, buyer access, reactivation and stoc
   expect(finalBusiness.firstPaidTrialGrantedAt).toEqual(trialGrantedAt);
   await page.goto("/en/seller/subscription");
   await expect(page.getByRole("button", { name: sellerLifecycleCopy("en").restoreRenewal })).toBeVisible();
-  await expect(page.getByText(/26\.99/)).toBeVisible();
+  await expect(page.locator(".subscriptionPlanGrid .subscriptionPrice strong").filter({ hasText: /26\.99/ })).toBeVisible();
   await expect(page.getByText(sellerLifecycleCopy("en").trialOffer)).toHaveCount(0);
   await page.getByRole("button", { name: sellerLifecycleCopy("en").restoreRenewal }).click();
   const renewalPrompt = page.locator(".sellerRenewalRestore [role=group]");
