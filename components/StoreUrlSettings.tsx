@@ -8,6 +8,7 @@ import { storeUrlLifecycleCopy } from "@/i18n/store-url-lifecycle";
 export default function StoreUrlSettings({ storeId, displayName, slug, slugLastChangedAt, locale }: { storeId: string; displayName: string; slug: string; slugLastChangedAt: string | null; locale: string }) {
   const router = useRouter();
   const copy = storeUrlLifecycleCopy(locale);
+  const [currentSlug, setCurrentSlug] = useState(slug);
   const [value, setValue] = useState(slug);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +39,9 @@ export default function StoreUrlSettings({ storeId, displayName, slug, slugLastC
         return;
       }
       setMessage(result.changed ? copy.changed : copy.unchanged);
-      setValue(result.slug ?? previewSlug);
+      const savedSlug = result.slug ?? previewSlug;
+      setCurrentSlug(savedSlug);
+      setValue(savedSlug);
       setConfirming(false);
       router.refresh();
     } catch { setMessage(copy.failed); }
@@ -48,13 +51,13 @@ export default function StoreUrlSettings({ storeId, displayName, slug, slugLastC
   return <section className="storeUrlSettings" aria-labelledby="store-url-title">
     <h2 id="store-url-title">{copy.urlTitle}</h2>
     <p><strong>{copy.displayName}:</strong> {displayName}</p>
-    <p><strong>{copy.canonical}:</strong> <a href={`/${locale}/store/${slug}`}>/{locale}/store/{slug}</a></p>
+    <p><strong>{copy.canonical}:</strong> <a href={`/${locale}/store/${currentSlug}`}>/{locale}/store/{currentSlug}</a></p>
     <label htmlFor={`store-url-slug-${storeId}`}>{copy.slug}</label>
     <div className="storeUrlInput"><span aria-hidden="true">/{locale}/store/</span><input id={`store-url-slug-${storeId}`} value={value} maxLength={100} autoComplete="off" onChange={event => { setValue(event.target.value); setConfirming(false); }} /></div>
     <p className="storeUrlPreview"><strong>{copy.proposed}:</strong> <code>{preview}</code></p>
     {nextChange && waiting && <p>{copy.nextChange.replace("{date}", new Intl.DateTimeFormat(locale).format(nextChange))}</p>}
     {message && <p role="status">{message}</p>}
-    {!confirming ? <button type="button" className="sellerControlButton" onClick={() => setConfirming(true)} disabled={busy || waiting || previewSlug === slug}>{copy.update}</button>
+    {!confirming ? <button type="button" className="sellerControlButton" onClick={() => setConfirming(true)} disabled={busy || waiting || previewSlug === currentSlug}>{copy.update}</button>
       : <button type="button" className="sellerControlButton" onClick={requestChange} disabled={busy || waiting}>{copy.confirm}</button>}
   </section>;
 }
