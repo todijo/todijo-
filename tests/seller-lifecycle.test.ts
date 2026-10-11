@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { cancelSellerRenewal, confirmSellerReactivationStock, processSellerClosureCancellation, restoreSellerRenewal, reactivateSellerActivity, sellerClosureProviders } from "../lib/seller-closure";
+import { readFileSync } from "node:fs";
+
+test("closure confirmation uses branded localized layout and announces missing or rejected links accessibly",()=>{
+  const page=readFileSync("app/seller/closure/confirm/page.tsx","utf8");
+  const button=readFileSync("app/seller/closure/SellerClosureConfirmButton.tsx","utf8");
+  assert.match(page,/TodijoLogo/);
+  assert.match(page,/copy\.closureBody/);
+  assert.match(page,/rtlLocales\.has\(locale\)/);
+  assert.match(page,/errorMessage=\{auth\("error"\)\}/);
+  assert.match(button,/loaded&&\(!token\|\|failed\)/);
+  assert.match(button,/role="alert"/);
+});
 import { sellerLifecycleCopy } from "../i18n/seller-lifecycle";
 
 const periodEnd=new Date("2027-01-08T00:00:00.000Z");

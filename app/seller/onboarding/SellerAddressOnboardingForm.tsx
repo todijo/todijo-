@@ -19,6 +19,7 @@ type Address = { address: string; postalCode: string; city: string; country: str
 type SellerType = "PRIVATE" | "PROFESSIONAL";
 type Initial = Address & {
   storeName: string;
+  adminContactPhone: string;
   contactEmail: string;
   sellerType: SellerType | "";
   legalForm: string;
@@ -64,6 +65,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
   const [currentStep, setCurrentStep] = useState(Math.max(1, Math.min(4, Math.trunc(initial.step) || 1)));
   const [sellerType, setSellerType] = useState<SellerType | null>(initial.sellerType || null);
   const [storeName, setStoreName] = useState(initial.storeName);
+  const [adminContactPhone, setAdminContactPhone] = useState(initial.adminContactPhone);
   const [legalForm, setLegalForm] = useState(initial.legalForm === "PRIVATE" ? "" : initial.legalForm);
   const [companySubtype, setCompanySubtype] = useState(initial.companySubtype);
   const [vatStatus, setVatStatus] = useState(initial.vatStatus);
@@ -108,7 +110,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
     contactEmail: initial.contactEmail,
     country: shownAddress.country,
     city: shownAddress.city,
-    phone: shownAddress.phone,
+    adminContactPhone,
     address: shownAddress.address,
     postalCode: shownAddress.postalCode,
     sellerType: sellerType ?? "UNKNOWN",
@@ -171,7 +173,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
   }, [currentStep, draftRevision, t]);
 
   const valueFor = (name: string) => ({
-    storeName: storeName.trim(), phone: shownAddress.phone.trim(), country: shownAddress.country.trim(), city: shownAddress.city.trim(), postalCode: shownAddress.postalCode.trim(), address: shownAddress.address.trim(),
+    storeName: storeName.trim(), phone: adminContactPhone.trim(), adminContactPhone: adminContactPhone.trim(), country: shownAddress.country.trim(), city: shownAddress.city.trim(), postalCode: shownAddress.postalCode.trim(), address: shownAddress.address.trim(),
     legalForm: legalForm.trim(), companySubtype: companySubtype.trim(), legalBusinessName: legalBusinessName.trim(), businessSiren: businessSiren.trim(), businessRegistrationNumber: businessRegistrationNumber.trim(), vatNumber: vatNumber.trim(),
   } as Record<string, string>)[name] ?? "";
 
@@ -247,6 +249,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
     setMessage("");
     const response = await fetch("/api/seller/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload(event.currentTarget)) });
     const data = await response.json().catch(() => ({}));
+    if (data.error === "INVALID_ADMIN_CONTACT_PHONE") { setCurrentStep(1); setMessage(t("error")); return; }
     if (response.ok) {
       location.assign(sellerIntent ? sellerOnboardingPath(locale, true, sellerIntent) : `/${locale}/seller/subscription`);
       return;
@@ -273,7 +276,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
         <h2 id="seller-onboarding-step-heading-1" tabIndex={-1}>{stepTitles[0]}</h2>
         <div className="formField"><FieldLabel htmlFor="storeName" required help={stepCopy.help.storeName}>{t("shopName")}</FieldLabel><input id="storeName" name="storeName" value={storeName} onChange={event => { setStoreName(event.target.value); clearFieldError("storeName"); }} {...errorProps("storeName")} />{error("storeName")}</div>
         <div className="formField"><FieldLabel htmlFor="contactEmail" help={stepCopy.help.contactEmail}>{t("email")}</FieldLabel><input id="contactEmail" name="contactEmail" type="email" autoComplete="email" value={initial.contactEmail} readOnly /></div>
-        <div className="formField"><FieldLabel htmlFor="phone" required help={stepCopy.help.phone}>{t("phone")}</FieldLabel><input id="phone" name="phone" type="tel" autoComplete="tel" value={shownAddress.phone} onChange={event => { setAddressField("phone", event.target.value); clearFieldError("phone"); }} {...errorProps("phone")} />{error("phone")}</div>
+        <div className="formField"><FieldLabel htmlFor="adminContactPhone" required help={stepCopy.adminPhoneHelp}>{stepCopy.adminPhoneLabel.slice(0, -2)}</FieldLabel><input id="adminContactPhone" name="adminContactPhone" type="tel" autoComplete="tel" value={adminContactPhone} onChange={event => { setAdminContactPhone(event.target.value); clearFieldError("phone"); }} {...errorProps("phone")} />{error("phone")}</div>
       </section>
 
       <section className="sellerOnboardingStep" hidden={currentStep !== 2} aria-labelledby="seller-onboarding-step-heading-2">
@@ -301,7 +304,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
       <section className="sellerOnboardingStep" hidden={currentStep !== 4} aria-labelledby="seller-onboarding-step-heading-4">
         <h2 id="seller-onboarding-step-heading-4" tabIndex={-1}>{stepTitles[3]}</h2>
         <dl className="sellerOnboardingReview">
-          <div><dt>{t("shopName")}</dt><dd>{storeName || "—"}</dd></div><div><dt>{t("email")}</dt><dd>{initial.contactEmail || "—"}</dd></div><div><dt>{t("phone")}</dt><dd>{shownAddress.phone || "—"}</dd></div>
+          <div><dt>{t("shopName")}</dt><dd>{storeName || "—"}</dd></div><div><dt>{t("email")}</dt><dd>{initial.contactEmail || "—"}</dd></div><div><dt>{stepCopy.adminPhoneLabel.slice(0, -2)}</dt><dd>{adminContactPhone || "—"}</dd></div>
           <div><dt>{t("country")}</dt><dd>{shownAddress.country || "—"}</dd></div><div><dt>{t("city")}</dt><dd>{shownAddress.city || "—"}</dd></div><div><dt>{t("address")}</dt><dd>{shownAddress.address || "—"}</dd></div>
           <div><dt>{t("sellerOnboarding")}</dt><dd>{sellerType === "PROFESSIONAL" ? v("professionalTitle") : sellerType === "PRIVATE" ? v("privateTitle") : "—"}</dd></div>
           {sellerType === "PROFESSIONAL" && <><div><dt>{t("legalBusinessName")}</dt><dd>{legalBusinessName || "—"}</dd></div><div><dt>{t("legalForm")}</dt><dd>{legalForm || "—"}</dd></div><div><dt>{shownAddress.country === "FR" ? v("siren") : t(requirements.registrationLabel)}</dt><dd>{shownAddress.country === "FR" ? businessSiren || "—" : businessRegistrationNumber || "—"}</dd></div>{shownAddress.country === "FR" && <div><dt>{v("siret")}</dt><dd>{businessRegistrationNumber || "—"}</dd></div>}<div><dt>{t("vatQuestion")}</dt><dd>{vatStatus === "REGISTERED" ? t("yes") : vatStatus === "NOT_REGISTERED_OR_NOT_APPLICABLE" ? t("no") : "—"}</dd></div></>}

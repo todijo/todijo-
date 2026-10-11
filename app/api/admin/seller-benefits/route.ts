@@ -22,9 +22,9 @@ export async function GET() {
   try {
     await requireAdmin(prisma, await readSession());
     const [businesses, items, requests] = await Promise.all([
-      prisma.sellerBusiness.findMany({ where: { owner: { role: "SELLER" } }, orderBy: [{ owner: { firstName: "asc" } }, { id: "asc" }], include: { owner: { select: { id: true, firstName: true, lastName: true, email: true } }, stores: { select: { id: true, name: true, slug: true }, orderBy: { createdAt: "asc" } }, benefitAccess: true } }),
+      prisma.sellerBusiness.findMany({ where: { owner: { role: "SELLER" } }, orderBy: [{ owner: { firstName: "asc" } }, { id: "asc" }], select: { id: true, owner: { select: { id: true, firstName: true, lastName: true, email: true } }, stores: { select: { id: true, name: true, slug: true }, orderBy: { createdAt: "asc" } }, benefitAccess: true } }),
       prisma.sellerBenefitCatalogItem.findMany({ orderBy: [{ active: "desc" }, { createdAt: "desc" }] }),
-      prisma.sellerBenefitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 300, include: { business: { include: { owner: { select: { firstName: true, lastName: true, email: true } } } }, store: { select: { name: true } }, item: { select: { name: true } } } }),
+      prisma.sellerBenefitRequest.findMany({ orderBy: { createdAt: "desc" }, take: 300, select: { id: true, status: true, quantity: true, priceTypeSnapshot: true, unitPriceMinorSnapshot: true, createdAt: true, business: { select: { owner: { select: { firstName: true, lastName: true, email: true } } } }, store: { select: { name: true } }, item: { select: { name: true } } } }),
     ]);
     const enriched = await Promise.all(businesses.map(async business => ({ ...business, isPro: hasProSellerCapabilities(await sellerBusinessCommercialPlan(prisma, business.id)) })));
     return NextResponse.json({ businesses: enriched.filter(business => business.isPro), items, requests }, { headers: { "Cache-Control": "private, no-store" } });

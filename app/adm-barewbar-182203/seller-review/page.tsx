@@ -10,6 +10,7 @@ import { readManagedCommercialSummary } from "@/lib/admin-managed-plan";
 import { adminAccessStatus, adminStatusDisplay } from "@/lib/admin-access-status";
 import { adminAccessLabels } from "@/components/AdminAccessStatus";
 import { pendingSellerReviewWhere } from "@/lib/seller-review-alerts";
+import { sellerOnboardingStepCopy } from "@/i18n/seller-onboarding-steps";
 import SellerReviewActions from "./SellerReviewActions";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,17 @@ export default async function SellerReviewPage() {
   const countryLabel = (code: string) => { try { return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code; } catch { return code; } };
   if (!session) redirect("/" + locale + "/login");
   try { await requireAdmin(prisma, session); } catch { redirect("/" + locale + "/dashboard"); }
-  const stores = await prisma.store.findMany({ where: { OR: [{ status: "PENDING" }, { onboardingStatus: { not: "NOT_STARTED" } }] }, take: 100, orderBy: [{ status: "asc" }, { updatedAt: "desc" }], select: { id: true, name: true, status: true, businessId: true, country: true, sellerType: true, sellerLegalForm: true, legalBusinessName: true, businessRegistrationId: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, business:{select:{siren:true,inseeVerificationState:true,inseeVerifiedAt:true,inseeVerificationSource:true,inseeVerificationReason:true,establishments:{orderBy:{updatedAt:"desc"},take:10,select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}}}, establishment:{select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}, subscription: { select: { plan: true, billingInterval: true, status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, owner: { select: { firstName: true, lastName: true, email: true, role: true, emailVerified: true, sellerSuspendedAt: true, stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } } } });
+  const stores = await prisma.store.findMany({ where: { OR: [{ status: "PENDING" }, { onboardingStatus: { not: "NOT_STARTED" } }] }, take: 100, orderBy: [{ status: "asc" }, { updatedAt: "desc" }], select: { id: true, name: true, status: true, businessId: true, country: true, sellerType: true, sellerLegalForm: true, legalBusinessName: true, businessRegistrationId: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, business:{select:{adminContactPhone:true,siren:true,inseeVerificationState:true,inseeVerifiedAt:true,inseeVerificationSource:true,inseeVerificationReason:true,establishments:{orderBy:{updatedAt:"desc"},take:10,select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}}}, establishment:{select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}, subscription: { select: { plan: true, billingInterval: true, status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, owner: { select: { firstName: true, lastName: true, email: true, role: true, emailVerified: true, sellerSuspendedAt: true, stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } } } });
+  const contactPhoneBusinessIds = [...new Set(stores.filter(store => store.businessId && store.business?.adminContactPhone).map(store => store.businessId!))];
+  let contactPhoneAccessAudited = contactPhoneBusinessIds.length === 0;
+  if (contactPhoneBusinessIds.length) {
+    try {
+      const recorded = await prisma.sellerBusinessAuditEvent.createMany({ data: contactPhoneBusinessIds.map(businessId => ({ businessId, actorId: session.userId, category: "SENSITIVE_DATA_ACCESS", action: "ADMIN_CONTACT_PHONE_VIEWED", targetType: "SELLER_BUSINESS", targetId: businessId, metadata: { field: "adminContactPhone", route: "seller-review" } })) });
+      contactPhoneAccessAudited = recorded.count === contactPhoneBusinessIds.length;
+    } catch {
+      contactPhoneAccessAudited = false;
+    }
+  }
   const [pendingCount, summaries] = await Promise.all([
     prisma.store.count({ where: pendingSellerReviewWhere() }),
     Promise.all(stores.map(async store => {
@@ -49,6 +60,7 @@ export default async function SellerReviewPage() {
           <div><dt>{copy.onboarding}</dt><dd>{store.owner.stripeOnboardingComplete?"✓":"—"} · {copy.charges}: {store.owner.stripeChargesEnabled?"✓":"—"} · {copy.payouts}: {store.owner.stripePayoutsEnabled?"✓":"—"}</dd></div>
           <div><dt>{t("country")}</dt><dd>{countryLabel(store.country)}</dd></div>
           <div><dt>{t("sellerOnboarding")}</dt><dd>{stateLabel("onboarding",store.onboardingStatus)} · {store.onboardingStep}/4</dd></div>
+          <div><dt>{sellerOnboardingStepCopy[locale].adminPhoneLabel.slice(0, -2)}</dt><dd>{contactPhoneAccessAudited ? store.business?.adminContactPhone ?? "—" : "—"}</dd></div>
           <div><dt>{t("legalForm")}</dt><dd>{stateLabel("legalForm",store.sellerLegalForm)} · {store.legalBusinessName??"—"}</dd></div>
           <div><dt>{t("companyNumber")}</dt><dd>{store.businessRegistrationId??"—"}{store.sellerType==="PROFESSIONAL"&&store.country==="FR"&&<small>{verification("adminState")}: {stateLabel("verification",store.business?.inseeVerificationState)} · {verification("adminSiren")}: {store.business?.siren??"—"} · {verification("adminSiret")}: {establishment?.siret??"—"}</small>}</dd></div>
           <div><dt>{t("vatNumber")}</dt><dd>{stateLabel("vat",store.vatStatus)} · {store.vatNumber??"—"}</dd></div>

@@ -6,6 +6,7 @@ import { locales } from "../i18n/config";
 import { buildLocalizedPath, canonicalizeNestedLocalePath } from "../lib/locale-routing";
 
 const switcherSource = fs.readFileSync(path.join(process.cwd(), "components/LanguageSwitcher.tsx"), "utf8");
+const middlewareSource = fs.readFileSync(path.join(process.cwd(), "middleware.ts"), "utf8");
 
 test("switching locale replaces the current locale instead of appending it", () => {
   assert.equal(buildLocalizedPath("/nl", "es"), "/es");
@@ -18,6 +19,12 @@ test("homepage, product, cart, and account routes preserve their remaining path"
   assert.equal(buildLocalizedPath("/nl/product/123", "es"), "/es/product/123");
   assert.equal(buildLocalizedPath("/es/cart", "de"), "/de/cart");
   assert.equal(buildLocalizedPath("/de/account/orders", "it"), "/it/account/orders");
+});
+
+test("localized monthly statements route bypasses locale-stripping middleware rewrite", () => {
+  assert.match(middlewareSource, /isLocalizedBuyerStatements = segments\.length === 3 && segments\[1\] === "account" && segments\[2\] === "statements"/);
+  assert.match(middlewareSource, /isLocalizedBuyerInvoices \|\| isLocalizedBuyerStatements/);
+  assert.match(fs.readFileSync(path.join(process.cwd(), "app/[locale]/account/statements/page.tsx"), "utf8"), /export default async function SellerMonthlyStatementsPage/);
 });
 
 test("every supported locale can switch to every other locale without nesting", () => {

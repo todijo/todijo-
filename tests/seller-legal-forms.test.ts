@@ -61,7 +61,9 @@ test("switching professional to private clears professional identity from the dr
   assert.ok(Object.values(requiredPrivateFields).every(Boolean));
   assert.ok(["REGISTERED", "NOT_REGISTERED_OR_NOT_APPLICABLE"].includes(requiredPrivateFields.vatStatus));
   const route = source("app/api/seller/onboarding/route.ts");
-  assert.match(route, /!sellerType \|\| !country \|\| !storeName \|\| !city \|\| !phone \|\| !address \|\| !postalCode \|\| !legal\.identity \|\| !vatStatus/);
+  assert.match(route, /const adminContactPhone = normalizeSellerAdminContactPhone\(body\.adminContactPhone \?\? body\.phone\)/);
+  assert.match(route, /if \(!adminContactPhone\) return NextResponse\.json\(\{ error: "INVALID_ADMIN_CONTACT_PHONE" \}/);
+  assert.match(route, /!sellerType \|\| !country \|\| !storeName \|\| !city \|\| !address \|\| !postalCode \|\| !legal\.identity \|\| !vatStatus/);
   assert.match(route, /!validBusinessRegistration\(registration \?\? "", requirements\)/);
 
   const switchedBack = selectSellerOnboardingType(privateSeller, "PROFESSIONAL");
