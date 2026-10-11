@@ -7,16 +7,13 @@ import { isSellerPlanId } from "@/lib/seller-plans";
 import { createAdditionalAdminManagedStore } from "@/lib/admin-managed-store";
 import { lockManagedOwner, requireManagedOwner } from "@/lib/admin-store-owner-eligibility";
 import { assertAdminMutationRequest, MutationOriginError } from "@/lib/request-security";
-
-function slugify(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-}
+import { StoreSlugError, validateStoreSlug } from "@/lib/store-slugs";
 
 function errorResponse(error: unknown) {
   if (error instanceof MutationOriginError) return NextResponse.json({ error: error.message }, { status: 403 });
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") return NextResponse.json({ error: "Owner state changed. Refresh the owner list and retry." }, { status: 409 });
   if (error instanceof AdminAccessError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+  if (error instanceof StoreSlugError) return NextResponse.json({ error: error.code }, { status: error.code === "INVALID_SLUG" || error.code === "RESERVED_SLUG" ? 400 : 409 });
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return NextResponse.json({ error: "A store already uses this name or address." }, { status: 409 });
   }
@@ -31,7 +28,7 @@ export async function POST(request: Request) {
     assertAdminMutationRequest(request);
     const body = await request.json();
     const name = String(body.name ?? "").trim();
-    const slug = slugify(String(body.slug || name));
+    const slug = validateStoreSlug(String(body.slug || name));
     const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
     const currency = String(body.currency ?? "EUR").trim().toUpperCase();
     const language = String(body.language ?? "en").trim().toLowerCase();

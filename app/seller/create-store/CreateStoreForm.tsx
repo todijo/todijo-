@@ -5,17 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import SellerTypeFields from "@/components/SellerTypeFields";
 import { sellerOnboardingPath, type SellerRegistrationIntent } from "@/lib/seller-registration-intent";
-
-function slugify(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
+import { normalizeStoreSlug } from "@/lib/store-slugs";
 
 export default function CreateStoreForm({ locale, sellerIntent, businessSiren="", primarySiret="" }: { locale: string; sellerIntent: SellerRegistrationIntent | null; businessSiren?:string; primarySiret?:string }) {
   const router = useRouter();
@@ -31,7 +21,7 @@ export default function CreateStoreForm({ locale, sellerIntent, businessSiren=""
   const [verifying,setVerifying]=useState(false);
 
   const displayedSlug = useMemo(
-    () => slugify(slugEdited ? slug : name),
+    () => normalizeStoreSlug(slugEdited ? slug : name).slice(0, 60).replace(/-+$/g, ""),
     [name, slug, slugEdited],
   );
 

@@ -16,17 +16,8 @@ import { ensureSellerBusiness, lockSellerBusiness, sellerBusinessCommercialPlan,
 import { requireStoreCapability, resolveSellerStoreContext, SellerCapabilityError } from "@/lib/seller-business-access";
 import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
 import { isFrenchProfessional } from "@/lib/seller-business-verification-policy";
-
-function makeSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
+import { assertStoreSlugAvailable, lockStoreSlugNamespace } from "@/lib/store-slug-service";
+import { StoreSlugError, validateStoreSlug } from "@/lib/store-slugs";
 
 export async function POST(request: Request) {
   try {
@@ -44,7 +35,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const requestedSlug = String(body.slug ?? "").trim();
-    const slug = makeSlug(requestedSlug || name);
+    const slug = validateStoreSlug(requestedSlug || name);
     const description = String(body.description ?? "").trim();
     const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
     const phone = String(body.phone ?? "").trim();
@@ -113,6 +104,8 @@ export async function POST(request: Request) {
       const commercialPlan = await sellerBusinessCommercialPlan(tx, business.id);
       if (storeCount > 0 && !canCreateAdditionalSellerStore(commercialPlan)) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
       if (storeCount >= sellerSelfServiceStoreLimit(commercialPlan)) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
+      await lockStoreSlugNamespace(tx);
+      const canonicalSlug = await assertStoreSlugAvailable(tx, slug);
       let establishmentId:string|null=null;
       if(isFrenchProfessional(sellerType,country)){
         const siren=normalizeSiren(body.businessSiren),siret=normalizeSiret(sellerIdentity.businessRegistrationId);
@@ -127,7 +120,7 @@ export async function POST(request: Request) {
       const created = await tx.store.create({
         data: {
           name,
-          slug,
+          slug: canonicalSlug,
           description: description || null,
           contactEmail,
           phone: phone || null,
@@ -165,6 +158,7 @@ export async function POST(request: Request) {
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
+    if (error instanceof StoreSlugError) return NextResponse.json({ error: error.code }, { status: error.code === "INVALID_SLUG" || error.code === "RESERVED_SLUG" ? 400 : 409 });
     if (error instanceof MutationOriginError) return NextResponse.json({ error: error.message }, { status: 403 });
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof SellerBusinessError) return NextResponse.json({ error: error.code }, { status: error.status });
