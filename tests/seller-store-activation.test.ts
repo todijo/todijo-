@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { reconcilePendingSellerStoreActivation } from "../lib/seller-store-activation";
+import { reconcilePendingSellerStoreActivation, reconcilePendingSellerStoreActivationsForOwner } from "../lib/seller-store-activation";
 
 const now = new Date("2026-10-11T12:00:00.000Z");
 
@@ -24,6 +24,7 @@ function activationFixture(overrides: Record<string, unknown> = {}) {
   const tx: any = {
     $queryRaw: async () => [],
     store: {
+      findMany: async () => [{ id: store.id }],
       findUnique: async () => store,
       updateMany: async (args: any) => { mutations.push(args); if (args.where.updatedAt === store.updatedAt && store.status === "PENDING") { store.status = "ACTIVE"; store.marketplaceActivatedAt = args.data.marketplaceActivatedAt; return { count: 1 }; } return { count: 0 }; },
     },
@@ -43,6 +44,19 @@ test("verified seller activates only after every independent gate passes and rec
   assert.equal(fixture.mutations.length, 1);
   assert.deepEqual(await reconcilePendingSellerStoreActivation(fixture.tx, "store_primary", now), { activated: false, reason: "NOT_ELIGIBLE_STATE" });
   assert.equal(fixture.mutations.length, 1);
+});
+
+test("owner reconciliation activates all verified pending stores and reports each genuine blocker", async () => {
+  const fixture = activationFixture();
+  const result = await reconcilePendingSellerStoreActivationsForOwner(fixture.tx, "seller_1", now);
+  assert.deepEqual(result, { activatedStoreIds: ["store_primary"], blocked: [] });
+  assert.equal(fixture.store.status, "ACTIVE");
+
+  const blocked = activationFixture({ owner: { ...activationFixture().store.owner, stripePayoutsEnabled: false } });
+  assert.deepEqual(await reconcilePendingSellerStoreActivationsForOwner(blocked.tx, "seller_1", now), {
+    activatedStoreIds: [], blocked: [{ storeId: "store_primary", reason: "STRIPE_CONNECT_NOT_READY" }],
+  });
+  assert.equal(blocked.store.status, "PENDING");
 });
 
 test("reconciliation never activates an exceptional-review, incomplete, suspended, or Connect-incomplete seller", async () => {
@@ -94,17 +108,29 @@ test("French professional activation requires matching verified INSEE legal-unit
   assert.equal(unverified.mutations.length, 0);
 });
 
-test("Connect status refresh and account.updated webhook use current provider state and invoke safe pending-store reconciliation", () => {
+test("every final readiness transition invokes the same safe pending-store reconciler", () => {
   const statusRoute = readFileSync(join(process.cwd(), "app/api/stripe/connect/status/route.ts"), "utf8");
   const paymentEvents = readFileSync(join(process.cwd(), "lib/payments.ts"), "utf8");
-  const onboardingReview = readFileSync(join(process.cwd(), "lib/seller-onboarding-review.ts"), "utf8");
+  const onboardingReview = readFileSync(join(process.cwd(), "app/api/admin/seller-onboarding/[storeId]/route.ts"), "utf8");
+  const reviewService = readFileSync(join(process.cwd(), "lib/seller-onboarding-review.ts"), "utf8");
+  const onboardingSubmit = readFileSync(join(process.cwd(), "app/api/seller/onboarding/route.ts"), "utf8");
+  const adminGrants = readFileSync(join(process.cwd(), "lib/admin-access.ts"), "utf8");
+  const adminPlan = readFileSync(join(process.cwd(), "lib/admin-managed-plan.ts"), "utf8");
   const productCreate = readFileSync(join(process.cwd(), "app/api/products/route.ts"), "utf8");
+  const productPage = readFileSync(join(process.cwd(), "app/seller/products/page.tsx"), "utf8");
   const connectUi = readFileSync(join(process.cwd(), "components/StripeConnectSection.tsx"), "utf8");
   assert.match(statusRoute, /retrieveConnectedAccount\(seller\.stripeAccountId\)/);
-  assert.match(statusRoute, /reconcilePendingSellerStoreActivation\(tx, store\.id\)/);
+  assert.match(statusRoute, /reconcilePendingSellerStoreActivationsForOwner\(tx, session\.userId\)/);
   assert.match(paymentEvents, /retrieveConnectedAccountState\(eventAccount\.id\)/);
-  assert.match(paymentEvents, /reconcilePendingSellerStoreActivation\(tx, store\.id\)/);
-  assert.match(onboardingReview, /decision==="VERIFIED"\?"PENDING"/);
+  assert.match(paymentEvents, /reconcilePendingSellerStoreActivationsForOwner\(tx, owner\.id\)/);
+  assert.match(paymentEvents, /reconcilePendingSellerStoreActivationsForOwner\(tx, store\.ownerId\)/);
+  assert.match(onboardingSubmit, /reconcilePendingSellerStoreActivation\(tx, store\.id\)/);
+  assert.match(onboardingReview, /reconcilePendingSellerStoreActivation\(tx,storeId\)/);
+  assert.match(adminGrants, /reconcilePendingSellerStoreActivationsForOwner\(db, target\.ownerId, now\)/);
+  assert.match(adminPlan, /reconcilePendingSellerStoreActivationsForOwner\(tx, state\.target\.owner\.id, now\)/);
+  assert.match(reviewService, /decision==="VERIFIED"\?"PENDING"/);
   assert.match(productCreate, /status === "PUBLISHED" \? "PRODUCT_PUBLISH" : "PRODUCT_CREATE"/);
   assert.match(connectUi, /storeActivated[\s\S]{0,100}router\.refresh\(\)/);
+  assert.match(productPage, /manualReviewPending=store\.onboardingStatus==="PENDING_REVIEW"/);
+  assert.doesNotMatch(productPage, /store\.status==="PENDING"\s*\?\s*freeCopy\.storeReviewTitle/);
 });

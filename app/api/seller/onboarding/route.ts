@@ -11,6 +11,7 @@ import { ensureSellerBusiness } from "@/lib/seller-business";
 import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
 import { isTrustedMutationRequest } from "@/lib/request-security";
 import { sellerOnboardingCompletion } from "@/lib/seller-onboarding-completion";
+import { reconcilePendingSellerStoreActivation } from "@/lib/seller-store-activation";
 import { isSellerReviewSubmissionTransition, processSellerReviewEmailDelivery, queueSellerReviewEmail } from "@/lib/seller-review-alerts";
 import { normalizeSellerAdminContactPhone, persistSellerAdminContactPhone } from "@/lib/seller-admin-contact-phone";
 
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
   if (conflict) return NextResponse.json({ error: "STORE_IDENTITY_UNAVAILABLE" }, { status: 409 });
 
   try {
-    const reviewEmailId = await prisma.$transaction(async tx => {
+    const submission = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
       const previousStore = user.store ? await tx.store.findUnique({ where: { id: user.store.id }, select: { id: true, onboardingStatus: true, sellerReviewSubmissionVersion: true } }) : null;
       await tx.user.update({ where: { id: user.id }, data: { role: "SELLER" } });
@@ -184,18 +185,25 @@ export async function POST(request: Request) {
       await tx.sellerOnboardingDraft.deleteMany({ where: { userId: user.id } });
       await tx.accountSecurityEvent.create({ data: { userId: user.id, type: "SELLER_ONBOARDING_SUBMITTED" } });
 
+      // Onboarding may be the last prerequisite (for example, a seller may
+      // already have a valid paid/Admin entitlement and a ready Connect account).
+      // The shared reconciler still fails closed on every independent gate.
+      const activation = completion.kind === "VERIFIED"
+        ? await reconcilePendingSellerStoreActivation(tx, store.id)
+        : { activated: false as const, reason: "NOT_ELIGIBLE_STATE" as const };
+
       const notify = completion.kind === "ADMIN_REVIEW" && isSellerReviewSubmissionTransition(previousStore?.onboardingStatus, completion.onboardingStatus);
-      if (!notify) return null;
+      if (!notify) return { reviewEmailId: null, activation };
       const version = (previousStore?.sellerReviewSubmissionVersion ?? 0) + 1;
       await tx.store.update({ where: { id: store.id }, data: { sellerReviewSubmissionVersion: version } });
-      return (await queueSellerReviewEmail(tx, store.id, version)).id;
+      return { reviewEmailId: (await queueSellerReviewEmail(tx, store.id, version)).id, activation };
     }, { isolationLevel: "Serializable" });
 
-    if (reviewEmailId) {
-      try { await processSellerReviewEmailDelivery(prisma, reviewEmailId); }
+    if (submission.reviewEmailId) {
+      try { await processSellerReviewEmailDelivery(prisma, submission.reviewEmailId); }
       catch (error) { console.warn("[seller-review-email] dispatch_failed", { errorName: error instanceof Error ? error.name : "UNKNOWN_ERROR" }); }
     }
-    return NextResponse.json({ ok: true, userId: user.id });
+    return NextResponse.json({ ok: true, userId: user.id, activation: submission.activation });
   } catch (error) {
     if (error instanceof SellerOnboardingSubmissionError) return NextResponse.json({ error: error.code }, { status: error.status });
     throw error;

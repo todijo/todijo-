@@ -5,6 +5,7 @@ import { AdminAccessError } from "./admin-access-error";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
 import { lockAdminGrant } from "./admin-grant-lock";
 import { ensureSellerBusiness } from "./seller-business";
+import { reconcilePendingSellerStoreActivationsForOwner } from "./seller-store-activation";
 export { AdminAccessError } from "./admin-access-error";
 
 export const adminGrantMonths = [1, 3, 6, 12] as const;
@@ -224,7 +225,7 @@ export async function extendManagedAccess(
   const stores = await db.store.findMany({
     where: { id: { in: ids }, owner: { role: "SELLER" } },
     select: {
-      id: true,
+      id: true, ownerId: true,
       accessGrants: { where: { source: "ADMIN_GRANTED" }, orderBy: { endsAt: "desc" }, take: 1, select: { endsAt: true } },
       subscription: { select: { status: true, currentPeriodEnd: true } },
       business: { select: { id:true,billingStoreId:true,billingStore:{select:{accessGrants:{where:{source:"ADMIN_GRANTED"},orderBy:{endsAt:"desc"},take:1,select:{endsAt:true}},subscription:{select:{status:true,currentPeriodEnd:true}}}} } },
@@ -232,7 +233,7 @@ export async function extendManagedAccess(
   });
   if (stores.length !== ids.length) throw new AdminAccessError("One or more selected stores are not eligible.", 400, "STORE_INELIGIBLE");
   const results = [];
-  const targets=new Map(stores.map(store=>[store.business?.billingStoreId??store.id,{storeId:store.business?.billingStoreId??store.id,businessId:store.business?.id??null,accessGrants:store.business?.billingStore?.accessGrants??store.accessGrants,subscription:store.business?.billingStore?.subscription??store.subscription}]));
+  const targets=new Map(stores.map(store=>[store.business?.billingStoreId??store.id,{storeId:store.business?.billingStoreId??store.id,businessId:store.business?.id??null,ownerId:store.ownerId,accessGrants:store.business?.billingStore?.accessGrants??store.accessGrants,subscription:store.business?.billingStore?.subscription??store.subscription}]));
   for (const target of [...targets.values()].sort((a,b)=>a.storeId.localeCompare(b.storeId))) {
     await lockAdminGrant(db, target.storeId);
     const live = await db.store.findUnique({ where: { id: target.storeId }, select: { accessGrants: { where: { source: "ADMIN_GRANTED" }, orderBy: { endsAt: "desc" }, take: 1, select: { endsAt: true } }, subscription: { select: { status: true, currentPeriodEnd: true } } } });
@@ -248,6 +249,10 @@ export async function extendManagedAccess(
     }));
     // Tier changes never republish previously demoted products automatically.
     if(target.businessId)await appendSellerBusinessAudit(db,{businessId:target.businessId,storeId:target.storeId,actorId:adminId,category:"ENTITLEMENT",action:"ADMIN_GRANT_CREATED",targetType:"STORE_ACCESS_GRANT",targetId:target.storeId,metadata:{plan,startsAt:period.startsAt.toISOString(),endsAt:period.endsAt.toISOString()}});
+    // Admin entitlement can be the final missing gate for an already verified
+    // seller. Never infer readiness from the grant: the activation reconciler
+    // independently checks legal identity, Connect, account state and anchor.
+    if (target.ownerId) await reconcilePendingSellerStoreActivationsForOwner(db, target.ownerId, now);
   }
   return results;
 }

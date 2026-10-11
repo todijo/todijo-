@@ -100,3 +100,28 @@ export async function reconcilePendingSellerStoreActivation(
     ? { activated: true as const, reason: "ACTIVATED" as const }
     : { activated: false as const, reason: "STATE_CHANGED" as const };
 }
+
+/**
+ * Every independent prerequisite can be satisfied last (onboarding, payment,
+ * Connect, or exceptional review). Run the same guarded reconciler for all of
+ * an owner's verified pending stores whenever one of those facts changes.
+ */
+export async function reconcilePendingSellerStoreActivationsForOwner(
+  tx: ActivationTransaction,
+  ownerId: string,
+  now = new Date(),
+) {
+  const pendingStores = await tx.store.findMany({
+    where: { ownerId, status: "PENDING", onboardingStatus: "VERIFIED" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  const results: Array<{ storeId: string; activated: boolean; reason: string }> = [];
+  for (const store of pendingStores) {
+    results.push({ storeId: store.id, ...(await reconcilePendingSellerStoreActivation(tx, store.id, now)) });
+  }
+  return {
+    activatedStoreIds: results.filter(result => result.activated).map(result => result.storeId),
+    blocked: results.filter(result => !result.activated).map(({ storeId, reason }) => ({ storeId, reason })),
+  };
+}

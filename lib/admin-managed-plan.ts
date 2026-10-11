@@ -9,6 +9,7 @@ import { resolveSellerCommercialAccess } from "./seller-commercial-access";
 import { ensureSellerBusiness } from "./seller-business";
 import { lockManagedOwner } from "./admin-store-owner-eligibility";
 import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
+import { reconcilePendingSellerStoreActivationsForOwner } from "./seller-store-activation";
 type Db = PrismaClient | Prisma.TransactionClient;
 const select = {
   id: true, businessId: true, owner: { select: { id: true, role: true } },
@@ -73,6 +74,7 @@ export async function changeManagedGrantPlan(db: PrismaClient, session: { userId
     }
     await appendSellerBusinessAudit(tx, { businessId, storeId: state.target.id, actorId: admin.id, category: "ENTITLEMENT", action: "ADMIN_GRANT_PLAN_CHANGED", targetType: "STORE_ACCESS_GRANT", targetId: active[0].id, metadata: { previousEffectiveTier: state.access.plan, previous, plan, reason: input.reason?.trim().slice(0,500) ?? "", expiryPreserved: true, futureTiersAligned: true } });
     if (plan !== "pro") await enforceSellerPublicationCapacity(tx, state.target.id, businessId, now);
+    await reconcilePendingSellerStoreActivationsForOwner(tx, state.target.owner.id, now);
     return { plan, expiresAt: active[0].endsAt!.toISOString() };
   }, { isolationLevel: "Serializable" });
 }
