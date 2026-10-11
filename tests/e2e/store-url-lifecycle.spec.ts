@@ -200,6 +200,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   const attackerContext = await page.context().browser()!.newContext();
   const attackerPage = await attackerContext.newPage();
   await authenticate(attackerPage, attackerId, "CUSTOMER");
+  await attackerPage.goto(`${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100"}/fr`);
   const unauthorized = await attackerPage.evaluate(async ({ storeId, slug }) => {
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug }) });
     return { status: response.status, body: await response.json() };
