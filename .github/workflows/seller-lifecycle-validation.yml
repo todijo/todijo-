@@ -91,7 +91,7 @@ jobs:
     env:
       CI: true
       DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
-      PLAYWRIGHT_DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
+      PLAYWRIGHT_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_browser?schema=public
       TODIJO_CI_DISPOSABLE_DATABASE: "1"
       APP_URL: http://localhost:3100
       SESSION_SECRET: ci-only-placeholder-secret-at-least-32-characters
@@ -115,7 +115,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Prepare disposable browser-test database
-        run: npx prisma migrate deploy
+        env:
+          PGPASSWORD: lifecycle
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U lifecycle -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_browser
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_browser?schema=public npx prisma migrate deploy
 
       - name: Prepare isolated PostgreSQL regression databases
         env:
