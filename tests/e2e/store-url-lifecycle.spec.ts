@@ -86,7 +86,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug: "admin" }) });
     return { status: response.status, body: await response.json() };
   }, { storeId: publicStoreId });
-  expect(reserved).toMatchObject({ status: 400, body: { error: "RESERVED_SLUG" } });
+  expect(reserved, `reserved slug response: ${JSON.stringify(reserved)}`).toMatchObject({ status: 400, body: { error: "RESERVED_SLUG" } });
   const duplicate = await page.evaluate(async ({ storeId, slug }) => {
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug }) });
     return { status: response.status, body: await response.json() };
