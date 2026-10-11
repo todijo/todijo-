@@ -62,7 +62,12 @@ function publicStoreLocation(store: { sellerType: string; country: string; city:
 
 function preserveQuery(query: Record<string, string | string[] | undefined>) {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) params.append(key, item);
+  for (const [key, value] of Object.entries(query)) {
+    // The locale middleware adds this marker only to its internal rewrite.
+    // It is not part of the visitor's URL and must not leak into redirects.
+    if (key === "__todijo_local_locale") continue;
+    for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) params.append(key, item);
+  }
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
