@@ -113,6 +113,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   const racingContext = await page.context().browser()!.newContext();
   const racingPage = await racingContext.newPage();
   await authenticate(racingPage, ownerId, "SELLER");
+  await racingPage.goto(`/fr/seller/store-settings?store=${encodeURIComponent(publicStoreId)}`);
   const racingResults = await Promise.all([secondSlug, thirdSlug].map(slug => racingPage.evaluate(async ({ storeId, slug }) => {
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug }) });
     return { status: response.status, body: await response.json() };
