@@ -68,8 +68,9 @@ async function authenticate(page: Page, userId: string, role: "SELLER" | "ADMIN"
 test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps unavailable status private", async ({ page }) => {
   await authenticate(page, ownerId, "SELLER");
   await page.goto(`/fr/seller/store-settings?store=${encodeURIComponent(publicStoreId)}`);
-  await expect(page.locator(".storeUrlSettings")).toContainText(`ALN URL ${suffix}`);
-  await expect(page.locator(".storeUrlSettings a")).toHaveAttribute("href", `/fr/store/${originalSlug}`);
+  const urlSettings = page.getByRole("region", { name: "URL de la boutique" });
+  await expect(urlSettings).toContainText(`ALN URL ${suffix}`);
+  await expect(urlSettings.locator("a")).toHaveAttribute("href", `/fr/store/${originalSlug}`);
   const displayNameChange = await page.evaluate(async ({ storeId, suffix }) => {
     const response = await fetch("/api/store", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       storeId, name: `ALN Display ${suffix}`, description: "", contactEmail: `url-owner-${suffix}@e2e.todijo.test`, phone: "", logo: "", banner: "", country: "FR", city: "Lille", currency: "EUR", language: "fr", sellerType: "PRIVATE",
@@ -81,7 +82,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   expect(displayNameChange).toMatchObject({ status: 200, body: { store: { slug: originalSlug } } });
   expect((await db.store.findUniqueOrThrow({ where: { id: publicStoreId }, select: { name: true, slug: true } })).slug).toBe(originalSlug);
   await page.reload();
-  await expect(page.locator(".storeUrlSettings")).toContainText(`ALN Display ${suffix}`);
+  await expect(urlSettings).toContainText(`ALN Display ${suffix}`);
   const reserved = await page.evaluate(async ({ storeId }) => {
     const response = await fetch("/api/store/slug", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storeId, slug: "admin" }) });
     return { status: response.status, body: await response.json() };
@@ -97,7 +98,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   await expect(page.getByText(`/fr/store/${firstSlug}`)).toBeVisible();
   await page.getByRole("button", { name: "Confirmer le changement d’URL" }).click();
   await expect(page.getByRole("status").filter({ hasText: "L’URL de la boutique a été mise à jour." })).toBeVisible();
-  await expect(page.locator(".storeUrlSettings a")).toHaveAttribute("href", `/fr/store/${firstSlug}`);
+  await expect(urlSettings.locator("a")).toHaveAttribute("href", `/fr/store/${firstSlug}`);
 
   const oldSlugState = await db.store.findUniqueOrThrow({ where: { id: publicStoreId }, select: { slug: true } });
   const originalAlias = await db.storeSlugHistory.findUnique({ where: { slug: originalSlug }, select: { storeId: true } });
