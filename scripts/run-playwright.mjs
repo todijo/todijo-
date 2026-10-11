@@ -40,7 +40,28 @@ const server = spawn(process.execPath, [
   "3100",
 ], {
   env: serverEnvironment,
-  stdio: "ignore",
+  stdio: ["ignore", "ignore", "pipe"],
+});
+
+// Keep ordinary server output quiet, but surface the existing safe exception
+// logs for the two store endpoints covered by the lifecycle regression tests.
+// These tests run only against disposable local/CI databases.
+let serverStderrRemainder = "";
+let remainingDiagnosticLines = 0;
+server.stderr?.setEncoding("utf8");
+server.stderr?.on("data", chunk => {
+  serverStderrRemainder += chunk;
+  const lines = serverStderrRemainder.split("\n");
+  serverStderrRemainder = lines.pop() ?? "";
+  for (const line of lines) {
+    if (line.includes("Create store error:") || line.includes("Store URL update failed:")) {
+      remainingDiagnosticLines = 40;
+    }
+    if (remainingDiagnosticLines > 0) {
+      process.stderr.write(`[e2e server] ${line}\n`);
+      remainingDiagnosticLines -= 1;
+    }
+  }
 });
 
 async function waitForServer() {

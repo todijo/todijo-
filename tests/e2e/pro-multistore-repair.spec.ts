@@ -78,7 +78,7 @@ test("Admin-granted PRO creates stores 2 and 3, blocks store 4, and archives wit
   await page.goto("/en/dashboard");
 
   const second = await createStore(page, 2);
-  expect(second.status).toBe(200);
+  expect(second.status, JSON.stringify(second.body)).toBe(200);
   store2Id = second.body.store.id;
   const third = await createStore(page, 3);
   expect(third.status).toBe(200);

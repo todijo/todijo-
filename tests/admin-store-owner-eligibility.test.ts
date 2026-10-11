@@ -57,10 +57,11 @@ test("concurrent first-store creation serializes and second stale request fails"
   let count = 0, tail = Promise.resolve(), business: any = null;
   const owner: any = { ...seller };
   const tx: any = {
-    $queryRaw: async () => [],
+    $queryRaw: async () => [{ id: "business-created", maxStores: 1, billingStoreId: null }],
     user: { findUnique: async () => ({ ...owner, _count: { stores: count } }), updateMany: async ({ data }: any) => { Object.assign(owner, data); return { count: 1 }; } },
     store: {
       create: async () => { count++; return { id: "created", slug: "created" }; },
+      findFirst: async () => null,
       findUnique: async ({ where }: any) => where.id === "created" ? { id: "created", ownerId: owner.id, businessId: owner.store?.businessId ?? null } : null,
       updateMany: async ({ where, data }: any) => {
         if (where.id !== "created" || where.ownerId !== owner.id || where.businessId !== null) return { count: 0 };
@@ -69,6 +70,7 @@ test("concurrent first-store creation serializes and second stale request fails"
       },
       findMany: async () => owner.store?.businessId ? [{ id: "created" }] : [],
     },
+    storeSlugHistory: { findUnique: async () => null },
     sellerBusiness: {
       upsert: async () => { business ??= { id: "business-created", primaryStoreId: null, billingStoreId: null, maxStores: 1, _count: { stores: 0 } }; business._count.stores = count; return business; },
       update: async ({ data }: any) => { if (data.billingStoreId) { business.billingStoreId = data.billingStoreId; owner.store = { id: data.billingStoreId, ownerId: owner.id, businessId: business.id }; } },

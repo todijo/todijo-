@@ -15,6 +15,7 @@ import { sellerBusinessCommercialEntitlement } from "@/lib/seller-business";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 import { sellerTeamCopy } from "@/i18n/seller-team";
 import SellerClosureControls from "./SellerClosureControls";
+import StoreUrlSettings from "@/components/StoreUrlSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
 
   let storeContext;try{storeContext=await resolveSellerStoreContext(prisma,session.userId,(await searchParams).store??null,"STORE_VIEW_SETTINGS")}catch{redirect(`/${locale}/dashboard`)}
   const principal=await requireStoreCapability(prisma,session.userId,storeContext.selected.id,"STORE_VIEW_SETTINGS");
+  const canChangeStoreUrl=principal.owner||principal.permissions.includes("STORE_EDIT_SETTINGS");
   const [businessCapacity, commercialEntitlement] = principal.owner ? await Promise.all([
     prisma.sellerBusiness.findUnique({ where: { id: principal.businessId }, select: { _count: { select: { stores: true } } } }),
     sellerBusinessCommercialEntitlement(prisma, principal.businessId),
@@ -41,7 +43,7 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
   const store = await prisma.store.findUnique({
     where: { id:storeContext.selected.id },
     select: {
-      name: true, slug: true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
+      name: true, slug: true, slugLastChangedAt:true, description: true, logo: true, banner: true, country: true, city: true, status: true, sellerType: true,
       legalBusinessName: true, businessRegistrationId: true, businessAddress: true, businessPostalCode: true, vatNumber: true, vatStatus: true, displayBusinessAddress:true, samePersonalBusinessAddress:true,
       business:{select:{siren:true,inseeVerificationState:true}}, establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},
       contactEmail: true, phone: true, currency: true, language: true,
@@ -75,6 +77,8 @@ export default async function StoreSettingsPage({searchParams}:{searchParams:Pro
     <nav className="sellerSettingsTabs" aria-label={t("settingsTitle")}>
       <a href="#profile">{t("storeProfile")}</a><a href="#shipping">{shippingText("settingsTitle")}</a><a href="#media">{t("media")}</a><a href="#location">{t("address")}</a>{principal.owner&&<><a href="#billing">{t("billing")}</a><a href="#security">{t("security")}</a></>}
     </nav>
+
+    {canChangeStoreUrl&&<StoreUrlSettings key={storeContext.selected.id} storeId={storeContext.selected.id} displayName={store.name} slug={store.slug} slugLastChangedAt={store.slugLastChangedAt?.toISOString()??null} locale={locale}/>}
 
     <StoreSettingsForm storeId={storeContext.selected.id} owner={principal.owner} initialValues={{
       name: store.name, description: store.description ?? "", contactEmail: store.contactEmail, phone: store.phone ?? "",

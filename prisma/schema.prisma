@@ -898,6 +898,7 @@ model Store {
   id               String       @id @default(cuid())
   name             String       @unique
   slug             String       @unique
+  slugLastChangedAt DateTime?
   description      String?
   logo             String?      @map("logoUrl")
   banner           String?
@@ -963,6 +964,7 @@ model Store {
   archivedBy User? @relation("StoreArchiveActor", fields: [archivedById], references: [id], onDelete: SetNull)
 
   products      Product[]
+  slugHistory   StoreSlugHistory[]
   productImports SellerProductImportJob[]
   conversations Conversation[]
   subscription  SellerSubscription?
@@ -987,6 +989,16 @@ model Store {
   @@index([ownerId])
   @@index([businessId, createdAt])
   @@index([archivedAt])
+}
+
+model StoreSlugHistory {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  storeId   String?
+  store     Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([storeId, createdAt])
 }
 
 model SellerBusiness {

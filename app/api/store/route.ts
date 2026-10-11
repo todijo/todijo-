@@ -16,17 +16,8 @@ import { ensureSellerBusiness, lockSellerBusiness, sellerBusinessCommercialPlan,
 import { requireStoreCapability, resolveSellerStoreContext, SellerCapabilityError } from "@/lib/seller-business-access";
 import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
 import { isFrenchProfessional } from "@/lib/seller-business-verification-policy";
-
-function makeSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
+import { assertStoreSlugAvailable, lockStoreSlugNamespace } from "@/lib/store-slug-service";
+import { StoreSlugError, validateStoreSlug } from "@/lib/store-slugs";
 
 export async function POST(request: Request) {
   try {
@@ -44,7 +35,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const requestedSlug = String(body.slug ?? "").trim();
-    const slug = makeSlug(requestedSlug || name);
+    const slug = validateStoreSlug(requestedSlug || name);
     const description = String(body.description ?? "").trim();
     const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
     const phone = String(body.phone ?? "").trim();
@@ -97,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Langue invalide." }, { status: 400 });
     }
 
-    const store = await prisma.$transaction(async (tx) => {
+    const createStoreTransaction = () => prisma.$transaction(async (tx) => {
       // Serialize first-store creation too; an unlinked legacy store still counts.
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${session.userId} FOR UPDATE`;
       const owner = await tx.user.findUnique({ where: { id: session.userId }, select: { role: true } });
@@ -113,6 +104,8 @@ export async function POST(request: Request) {
       const commercialPlan = await sellerBusinessCommercialPlan(tx, business.id);
       if (storeCount > 0 && !canCreateAdditionalSellerStore(commercialPlan)) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
       if (storeCount >= sellerSelfServiceStoreLimit(commercialPlan)) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
+      await lockStoreSlugNamespace(tx);
+      const canonicalSlug = await assertStoreSlugAvailable(tx, slug);
       let establishmentId:string|null=null;
       if(isFrenchProfessional(sellerType,country)){
         const siren=normalizeSiren(body.businessSiren),siret=normalizeSiret(sellerIdentity.businessRegistrationId);
@@ -127,7 +120,7 @@ export async function POST(request: Request) {
       const created = await tx.store.create({
         data: {
           name,
-          slug,
+          slug: canonicalSlug,
           description: description || null,
           contactEmail,
           phone: phone || null,
@@ -161,10 +154,26 @@ export async function POST(request: Request) {
 
       return created;
     },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
+    let store;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        store = await createStoreTransaction();
+        break;
+      } catch (error) {
+        // PostgreSQL may expose a serialization failure from the row-locking
+        // query as Prisma P2010/SQLSTATE 40001. The failed transaction rolled
+        // back, so retry the database-only operation with fresh state.
+        const serializationConflict = error instanceof Prisma.PrismaClientKnownRequestError
+          && error.code === "P2010"
+          && error.meta?.code === "40001";
+        if (!serializationConflict || attempt >= 2) throw error;
+      }
+    }
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });
   } catch (error) {
+    if (error instanceof StoreSlugError) return NextResponse.json({ error: error.code }, { status: error.code === "INVALID_SLUG" || error.code === "RESERVED_SLUG" ? 400 : 409 });
     if (error instanceof MutationOriginError) return NextResponse.json({ error: error.message }, { status: 403 });
     if (error instanceof AdminAccessError) return NextResponse.json({ error: error.code }, { status: error.status });
     if (error instanceof SellerBusinessError) return NextResponse.json({ error: error.code }, { status: error.status });
