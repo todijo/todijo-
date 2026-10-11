@@ -20,6 +20,14 @@ function fixture(plan = "free", linked = true) {
     sellerBusiness: {
       findUnique: async () => ({ owner: store.owner, billingStore: store }),
       upsert: async () => { if (!owner.ownedBusiness) { created++; owner.ownedBusiness = { id: "business", billingStoreId: store.id, maxStores: 1, _count: { stores: 1 } }; } return { ...owner.ownedBusiness, maxStores: 1 }; },
+      updateMany: async ({ where, data }: any) => {
+        if (where.id !== owner.ownedBusiness?.id) return { count: 0 };
+        if (where.primaryStoreId === null && owner.ownedBusiness.primaryStoreId) return { count: 0 };
+        if (where.billingStoreId === null && owner.ownedBusiness.billingStoreId) return { count: 0 };
+        Object.assign(owner.ownedBusiness, data);
+        return { count: 1 };
+      },
+      findUniqueOrThrow: async () => ({ ...owner.ownedBusiness, maxStores: 1 }),
       update: async ({ data }: any) => { owner.ownedBusiness.billingStoreId = data.billingStoreId; },
     },
     storeAccessGrant: { updateMany: async ({ where, data }: any) => {

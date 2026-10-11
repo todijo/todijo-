@@ -58,5 +58,9 @@ test("store section renders only at the authoritative five-store threshold", () 
   assert.equal(where.dataClass, "PRODUCTION"); assert.equal(where.status, "ACTIVE");
   assert.deepEqual(where.owner, {role:{in:["SELLER","ADMIN"]},sellerSuspendedAt:null,deactivatedAt:null});
   assert.ok(where.AND);
-  assert.doesNotMatch(JSON.stringify(where), /subscription/);
+  const serialized = JSON.stringify(where);
+  assert.match(serialized, /primaryForBusiness/);
+  assert.match(serialized, /billingStore/);
+  assert.match(serialized, /\"pro\"/);
+  assert.match(serialized, /\"role\":\"ADMIN\"/);
 });

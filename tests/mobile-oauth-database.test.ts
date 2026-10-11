@@ -8,7 +8,7 @@ const disposable = (() => {
   if (process.env.TODIJO_CI_DISPOSABLE_DATABASE !== "1" || !process.env.DATABASE_URL) return false;
   try {
     const url = new URL(process.env.DATABASE_URL);
-    return ["postgres:", "postgresql:"].includes(url.protocol) && url.hostname === "127.0.0.1" && url.port === "5432" && url.pathname === "/todijo_e2e";
+    return ["postgres:", "postgresql:"].includes(url.protocol) && url.hostname === "127.0.0.1" && url.port === (process.env.PGPORT || "5432") && url.pathname === "/todijo_e2e";
   } catch {
     return false;
   }

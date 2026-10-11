@@ -13,7 +13,7 @@ test("paid commercial entitlement expires at currentPeriodEnd while a live Admin
   const expired={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:{status:"ACTIVE",plan:"pro",currentPeriodEnd:now},accessGrants:[]}})}} as never;
   assert.equal((await sellerBusinessCommercialEntitlement(expired,"business",now)).plan,"free");
   const granted={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:{status:"ACTIVE",plan:"pro",currentPeriodEnd:now},accessGrants:[{source:"ADMIN_GRANTED",plan:"plus",startsAt:new Date("2026-10-01T00:00:00Z"),endsAt:after(7)}]}})}} as never;
-  assert.deepEqual(await sellerBusinessCommercialEntitlement(granted,"business",now),{businessId:"business",billingStoreId:"billing",active:true,plan:"plus",source:"ADMIN_GRANTED",expiresAt:after(7)});
+  assert.deepEqual(await sellerBusinessCommercialEntitlement(granted,"business",now),{businessId:"business",primaryStoreId:null,billingStoreId:"billing",billingAnchorMismatch:false,active:true,plan:"plus",source:"ADMIN_GRANTED",expiresAt:after(7)});
 });
 
 test("annual and monthly reminder cadence chooses only the most relevant due reminder",()=>{
