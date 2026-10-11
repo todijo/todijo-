@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 type SellerType = "UNKNOWN" | "PROFESSIONAL" | "PRIVATE";
 type Initial = { sellerType: SellerType; legalBusinessName?: string; businessRegistrationId?: string; businessAddress?: string; businessPostalCode?: string; vatNumber?: string; vatStatus?: "UNKNOWN" | "REGISTERED" | "NOT_REGISTERED_OR_NOT_APPLICABLE" };
 
-export default function SellerTypeFields({ initial = { sellerType: "UNKNOWN" } }: { initial?: Initial }) {
+export default function SellerTypeFields({ initial = { sellerType: "UNKNOWN" }, showRegistrationId = true }: { initial?: Initial; showRegistrationId?: boolean }) {
   const t = useTranslations("SellerTransparency");
   const compliance = useTranslations("Compliance");
   const [sellerType, setSellerType] = useState(initial.sellerType);
@@ -18,7 +18,7 @@ export default function SellerTypeFields({ initial = { sellerType: "UNKNOWN" } }
     </div>
     {sellerType === "PROFESSIONAL" && <div className="sellerBusinessFields">
       <label><span>{t("legalBusinessName")}</span><input name="legalBusinessName" required maxLength={160} defaultValue={initial.legalBusinessName}/></label>
-      <label><span>{t("registrationId")}</span><input name="businessRegistrationId" maxLength={120} defaultValue={initial.businessRegistrationId}/><small>{t("ifApplicable")}</small></label>
+      {showRegistrationId&&<label><span>{t("registrationId")}</span><input name="businessRegistrationId" maxLength={120} defaultValue={initial.businessRegistrationId}/><small>{t("ifApplicable")}</small></label>}
       <label className="wide"><span>{t("businessAddress")}</span><input name="businessAddress" maxLength={240} defaultValue={initial.businessAddress}/><small>{t("ifApplicable")}</small></label>
       <label><span>{t("postalCode")}</span><input name="businessPostalCode" maxLength={40} defaultValue={initial.businessPostalCode}/></label>
       <fieldset className="wide sellerVatChoice"><legend>{compliance("vatStatus")}</legend><div>{(["REGISTERED", "NOT_REGISTERED_OR_NOT_APPLICABLE"] as const).map((status) => <label className={vatStatus === status ? "isSelected" : ""} key={status}><input type="radio" name="vatStatus" value={status} checked={vatStatus === status} onChange={() => setVatStatus(status)} required/><span><strong>{compliance(status === "REGISTERED" ? "vatRegistered" : "vatNotRegistered")}</strong><small>{compliance("vatNoExternalValidation")}</small></span></label>)}</div></fieldset>

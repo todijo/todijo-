@@ -112,11 +112,36 @@ test("verification writes are origin-protected, server-owned, and public French 
 test("existing professional sellers can submit editable SIREN/SIRET values from store settings and retain verified establishment linkage", () => {
   const form = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
   const route = readFileSync("app/api/store/route.ts", "utf8");
+  const typeFields = readFileSync("components/SellerTypeFields.tsx", "utf8");
   assert.match(form, /name="businessSiren"[^>]*defaultValue=\{initialValues\.businessSiren\}/);
-  assert.match(form, /name="businessRegistrationId"[^>]*defaultValue=\{initialValues\.businessRegistrationId\}/);
-  assert.match(form, /businessSiren:values\.get\("businessSiren"\),businessRegistrationNumber:values\.get\("businessRegistrationId"\)/);
+  assert.match(form, /SellerTypeFields initial=\{initialValues\} showRegistrationId=\{false\}/);
+  assert.match(form, /id="businessRegistrationId" name="businessRegistrationId"[^>]*defaultValue=\{initialValues\.businessRegistrationId\}/);
+  assert.match(typeFields, /showRegistrationId&&<label><span>\{t\("registrationId"\)\}<\/span><input name="businessRegistrationId"/);
+  assert.match(form, /businessRegistrationNumber:values\.get\("businessRegistrationId"\)/);
   assert.match(route, /verifiedEstablishment\?\.verificationState==="VERIFIED"&&verifiedEstablishment\.legalUnitSiren===siren\.value/);
   assert.match(route, /\?\{establishmentId\}:\{\}/);
+});
+
+test("store-settings SIRET verification submits the edited 14-digit field rather than the duplicate profile value", () => {
+  const form = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
+  assert.match(form, /SellerTypeFields initial=\{initialValues\} showRegistrationId=\{false\}/);
+  assert.match(form, /businessRegistrationNumber:values\.get\("businessRegistrationId"\)/);
+  assert.equal([...form.matchAll(/name="businessRegistrationId"/g)].length, 1);
+  assert.doesNotMatch(form, /name="verificationSiret"/);
+  assert.deepEqual(normalizeSiret("73282932000074"), { ok: true, value: "73282932000074" });
+});
+
+test("professional address preference is a keyboard-operable selectable card group with the saved value selected", () => {
+  const form = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
+  const css = readFileSync("app/globals.css", "utf8");
+  assert.match(form, /className="sellerBusinessAddressChoices"/);
+  assert.match(form, /name="displayBusinessAddress" value="full" checked=\{displayBusinessAddress\}/);
+  assert.match(form, /name="displayBusinessAddress" value="country" checked=\{!displayBusinessAddress\}/);
+  assert.match(form, /sellerBusinessAddressOption\$\{displayBusinessAddress\?" isSelected":""\}/);
+  assert.match(form, /sellerBusinessAddressOption\$\{!displayBusinessAddress\?" isSelected":""\}/);
+  assert.match(form, /\[displayBusinessAddress,setDisplayBusinessAddress\]=useState\(initialValues\.displayBusinessAddress\)/);
+  assert.match(css, /\.sellerBusinessAddressOption:focus-within/);
+  assert.match(css, /@media\(max-width:640px\)\{\.sellerBusinessVerification \.sellerBusinessAddressChoices\{grid-template-columns:1fr\}/);
 });
 
 test("corrected identifiers clear stale errors and preserve separate length, checksum, not-found, and outage messages", () => {
