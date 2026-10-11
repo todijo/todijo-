@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { connectReadinessCounts, connectReadinessState, maskedStripeAccountId } from "../lib/connect-readiness";
 import { processEligibleSellerTransfer } from "../lib/seller-transfers";
-import { connectedAccountReady } from "../lib/stripe";
+import { connectedAccountReady, connectedAccountStatus } from "../lib/stripe";
 import { startStripeConnectOnboarding } from "../lib/stripe-connect-onboarding";
 
 const account = (overrides: Partial<{ id: string; details_submitted: boolean; charges_enabled: boolean; payouts_enabled: boolean }> = {}) => ({
@@ -17,6 +17,15 @@ test("Connect readiness requires the expected account plus onboarding, charges, 
   assert.equal(connectedAccountReady(account({ details_submitted: false }), "acct_ready"), false);
   assert.equal(connectedAccountReady(account({ charges_enabled: false }), "acct_ready"), false);
   assert.equal(connectedAccountReady(account({ payouts_enabled: false }), "acct_ready"), false);
+});
+
+test("missing provider capability data is stored as not-ready, never truthy readiness", () => {
+  assert.deepEqual(connectedAccountStatus({ ...account(), details_submitted: undefined } as any), {
+    stripeOnboardingComplete: false, stripeChargesEnabled: true, stripePayoutsEnabled: true,
+  });
+  assert.deepEqual(connectedAccountStatus({ ...account(), charges_enabled: undefined } as any), {
+    stripeOnboardingComplete: true, stripeChargesEnabled: false, stripePayoutsEnabled: true,
+  });
 });
 
 test("read-only admin counts expose every migration readiness category", () => {

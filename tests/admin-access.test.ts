@@ -178,6 +178,16 @@ test("public FREE listings retain lifecycle, data isolation, supplier safety and
   assert.match(serialized, /currentPeriodEnd/); assert.doesNotMatch(serialized, /basic/);
 });
 
+test("public independent-seller stores require all Connect readiness flags while Admin/CJ stays exempt", () => {
+  const serialized = JSON.stringify(publicStoreAccessWhere());
+  assert.match(serialized, /"role":"ADMIN"/);
+  assert.match(serialized, /"role":"SELLER"/);
+  assert.match(serialized, /stripeAccountId/);
+  assert.match(serialized, /stripeOnboardingComplete/);
+  assert.match(serialized, /stripeChargesEnabled/);
+  assert.match(serialized, /stripePayoutsEnabled/);
+});
+
 test("existing admin store exemption is permanent, idempotent, and does not touch Stripe", async () => {
   const created: Array<Record<string, unknown>> = [];
   const events: Array<Record<string, unknown>> = [];

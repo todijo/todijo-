@@ -1,5 +1,5 @@
 export type SellerOnboardingCompletion =
-  | { kind: "ACTIVATE"; storeStatus: "ACTIVE"; onboardingStatus: "VERIFIED" }
+  | { kind: "VERIFIED"; storeStatus: "PENDING"; onboardingStatus: "VERIFIED" }
   | { kind: "ADMIN_REVIEW"; storeStatus: "PENDING"; onboardingStatus: "PENDING_REVIEW" }
   | { kind: "VERIFICATION_REQUIRED" };
 
@@ -14,11 +14,11 @@ export function sellerOnboardingCompletion(input: {
   establishmentState?: string | null;
 }): SellerOnboardingCompletion {
   if (!input.professional || input.country.toUpperCase() !== "FR") {
-    return { kind: "ACTIVATE", storeStatus: "ACTIVE", onboardingStatus: "VERIFIED" };
+    return { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" };
   }
 
   if (input.businessState === "VERIFIED" && input.establishmentState === "VERIFIED") {
-    return { kind: "ACTIVATE", storeStatus: "ACTIVE", onboardingStatus: "VERIFIED" };
+    return { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" };
   }
 
   const businessCanRequireReview = input.businessState === "MANUAL_REVIEW" || input.businessState === "VERIFIED";

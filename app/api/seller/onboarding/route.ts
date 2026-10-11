@@ -132,7 +132,7 @@ export async function POST(request: Request) {
   try {
     const reviewEmailId = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
-      const previousStore = user.store ? await tx.store.findUnique({ where: { id: user.store.id }, select: { id: true, status: true, onboardingStatus: true, sellerReviewSubmissionVersion: true, marketplaceActivatedAt: true } }) : null;
+      const previousStore = user.store ? await tx.store.findUnique({ where: { id: user.store.id }, select: { id: true, onboardingStatus: true, sellerReviewSubmissionVersion: true } }) : null;
       await tx.user.update({ where: { id: user.id }, data: { role: "SELLER" } });
 
       const storeData = {
@@ -180,7 +180,6 @@ export async function POST(request: Request) {
         status: completion.storeStatus,
         onboardingStatus: completion.onboardingStatus,
         establishmentId,
-        ...(completion.kind === "ACTIVATE" && previousStore?.status !== "ACTIVE" ? { marketplaceActivatedAt: new Date() } : {}),
       } });
       await tx.sellerOnboardingDraft.deleteMany({ where: { userId: user.id } });
       await tx.accountSecurityEvent.create({ data: { userId: user.id, type: "SELLER_ONBOARDING_SUBMITTED" } });
