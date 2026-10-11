@@ -99,8 +99,12 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
   await expect(page.getByRole("status").filter({ hasText: "L’URL de la boutique a été mise à jour." })).toBeVisible();
   await expect(page.locator(".storeUrlSettings a")).toHaveAttribute("href", `/fr/store/${firstSlug}`);
 
+  const oldSlugState = await db.store.findUniqueOrThrow({ where: { id: publicStoreId }, select: { slug: true } });
+  const originalAlias = await db.storeSlugHistory.findUnique({ where: { slug: originalSlug }, select: { storeId: true } });
+  expect(oldSlugState.slug).toBe(firstSlug);
+  expect(originalAlias?.storeId).toBe(publicStoreId);
   const oldResponse = await request.get(`${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100"}/fr/store/${originalSlug}?page=1&sort=newest`, { maxRedirects: 0 });
-  expect(oldResponse.status()).toBe(308);
+  expect(oldResponse.status(), JSON.stringify({ url: oldResponse.url(), location: oldResponse.headers().location })).toBe(308);
   expect(oldResponse.headers().location).toBe(`/fr/store/${firstSlug}?page=1&sort=newest`);
 
   const racingContext = await page.context().browser()!.newContext();
