@@ -139,7 +139,7 @@ test("professional address preference is a keyboard-operable selectable card gro
   assert.match(form, /name="displayBusinessAddress" value="country" checked=\{!displayBusinessAddress\}/);
   assert.match(form, /sellerBusinessAddressOption\$\{displayBusinessAddress\?" isSelected":""\}/);
   assert.match(form, /sellerBusinessAddressOption\$\{!displayBusinessAddress\?" isSelected":""\}/);
-  assert.match(form, /setDisplayBusinessAddress\(initialValues\.displayBusinessAddress\)/);
+  assert.match(form, /\[displayBusinessAddress,setDisplayBusinessAddress\]=useState\(initialValues\.displayBusinessAddress\)/);
   assert.match(css, /\.sellerBusinessAddressOption:focus-within/);
   assert.match(css, /@media\(max-width:640px\)\{\.sellerBusinessVerification \.sellerBusinessAddressChoices\{grid-template-columns:1fr\}/);
 });
