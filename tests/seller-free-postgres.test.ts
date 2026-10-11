@@ -8,12 +8,12 @@ import { proHomepageDiscovery } from "../lib/pro-homepage-discovery";
 const databaseUrl=process.env.FREE_SELLER_TEST_DATABASE_URL;
 test("PostgreSQL FREE visibility, quota concurrency and expiry retain data without auto-republishing",{skip:!databaseUrl},async()=>{
   const url=new URL(databaseUrl!);
-  assert.equal(process.env.TODIJO_FREE_EPHEMERAL,"1");assert.equal(url.hostname,"127.0.0.1");assert.equal(url.port,"5432");assert.equal(url.pathname,"/todijo_free_test");assert.equal(url.username,"validation");
+  assert.equal(process.env.TODIJO_FREE_EPHEMERAL,"1");assert.equal(url.hostname,"127.0.0.1");assert.equal(url.port,process.env.PGPORT||"5432");assert.equal(url.pathname,"/todijo_free_test");assert.equal(url.username,"validation");
   const db=new PrismaClient({datasources:{db:{url:databaseUrl}}});
   try{
     const owner=await db.user.create({data:{firstName:"Free",lastName:"Seller",email:"free@example.invalid",role:"SELLER",emailVerified:true,stripeAccountId:"acct_mock",stripeOnboardingComplete:true,stripeChargesEnabled:true,stripePayoutsEnabled:true}});
     const store=await db.store.create({data:{name:"FREE fixture",slug:"free-fixture",country:"FR",city:"Paris",contactEmail:owner.email,ownerId:owner.id,status:"ACTIVE",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE"}});
-    const business=await db.sellerBusiness.create({data:{ownerId:owner.id,billingStoreId:store.id}});
+    const business=await db.sellerBusiness.create({data:{ownerId:owner.id,primaryStoreId:store.id,billingStoreId:store.id}});
     await db.store.update({where:{id:store.id},data:{businessId:business.id}});
     const create=(index:number)=>db.product.create({data:{storeId:store.id,name:"Fixture "+index,slug:"fixture-"+index,description:"Disposable fixture",price:10,category:"test",condition:"NEUF",images:["/fixture.png"],complianceDeclaredAt:new Date(),createdAt:new Date(Date.UTC(2026,0,index))}});
     for(let i=1;i<=7;i++)await create(i);

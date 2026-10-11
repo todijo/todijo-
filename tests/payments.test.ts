@@ -8,13 +8,13 @@ import { CheckoutError, createCheckout, isBuyerCheckoutComplete, persistCheckout
 import { assertStripeCheckoutSessionMode, assertStripeWebhookMode, configuredStripeMode, stripeCheckoutSessionMode, validateStripeSecretKey, verifyStripeWebhook, type StripeEvent } from "../lib/stripe";
 
 const readyConnectedAccount = async (id = "acct_seller") => ({ id, object: "account" as const, details_submitted: true, charges_enabled: true, payouts_enabled: true });
-const activeCommercialEntitlement:any=async()=>({active:true,plan:"plus",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")});
+const activeCommercialEntitlement:any=async()=>({businessId:"business_1",primaryStoreId:"store_1",billingStoreId:"store_1",billingAnchorMismatch:false,active:true,plan:"plus",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")});
 const connectDeps = { retrieveConnectedAccount: readyConnectedAccount,commercialEntitlement:activeCommercialEntitlement };
 
 function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROFESSIONAL" | "PRIVATE" = "PROFESSIONAL") {
   let order: any = null;
   let creates = 0;
-  const product = { id: "prod_1", name: "Produit", price: new Prisma.Decimal("12.50"), currency: "EUR", stock, storeId: "store_1", store: { id: "store_1", name: "Store", slug: "store", city: "Paris", country: "France", contactEmail: "seller@example.com", phone: null, currency: "EUR", sellerType, legalBusinessName: sellerType === "PROFESSIONAL" ? "Example SARL" : null, businessRegistrationId: null, businessAddress: null, businessPostalCode: null, vatNumber: null, shippingEnabled: true, shippingMethodName: "Standard", shippingPrice: new Prisma.Decimal("4.50"), shippingFree: false, shippingMinDays: 2, shippingMaxDays: 5, shippingCountries: ["FR", "BE"], shippingCarrier: "La Poste", shippingProvider: "MANUAL", shippingExternalServiceId: null, owner: { stripeAccountId: sellerReady ? "acct_seller" : null, stripeOnboardingComplete: sellerReady, stripeChargesEnabled: sellerReady } } };
+  const product = { id: "prod_1", name: "Produit", price: new Prisma.Decimal("12.50"), currency: "EUR", stock, storeId: "store_1", variants: [] as any[], store: { id: "store_1", name: "Store", slug: "store", city: "Paris", country: "France", contactEmail: "seller@example.com", phone: null, currency: "EUR", sellerType, legalBusinessName: sellerType === "PROFESSIONAL" ? "Example SARL" : null, businessRegistrationId: null, businessAddress: null, businessPostalCode: null, vatNumber: null, shippingEnabled: true, shippingMethodName: "Standard", shippingPrice: new Prisma.Decimal("4.50"), shippingFree: false, shippingMinDays: 2, shippingMaxDays: 5, shippingCountries: ["FR", "BE"], shippingCarrier: "La Poste", shippingProvider: "MANUAL", shippingExternalServiceId: null, owner: { stripeAccountId: sellerReady ? "acct_seller" : null, stripeOnboardingComplete: sellerReady, stripeChargesEnabled: sellerReady } } };
   const db: any = {
     order: {
       findUnique: async () => order,
@@ -23,7 +23,7 @@ function checkoutDb(stock = 5, sellerReady = true, sellerType: "UNKNOWN" | "PROF
       update: async ({ data }: any) => { Object.assign(order, data); return order; },
     },
     product: { findMany: async () => [product] },
-    store: { findUniqueOrThrow: async () => ({ status:"ACTIVE",businessId:"business_1",vatStatus: "REGISTERED" }) },
+    store: { findUniqueOrThrow: async () => ({ id:"store_1",status:"ACTIVE",archivedAt:null,businessId:"business_1",vatStatus: "REGISTERED",business:{primaryStoreId:"store_1",sellerClosedAt:null} }) },
     sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store_1",subscription:{status:"ACTIVE",plan:"plus",currentPeriodEnd:new Date("2099-01-01T00:00:00Z")},accessGrants:[]}})},
     user: { findUniqueOrThrow: async () => ({ email: "buyer@example.com", firstName: "Buyer", lastName: "Example" }), update: async () => ({}) },
   };
@@ -72,6 +72,23 @@ test("no-plan seller cannot checkout a stale published product and no order or S
   const fixture=checkoutDb();let stripeCalls=0;
   await assert.rejects(()=>createCheckout(fixture.db,"buyer_1","request_no_plan",[{productId:"prod_1",quantity:1}],async()=>{stripeCalls++;return{id:"cs_forbidden",url:"https://stripe.test/forbidden"}},"FR",undefined,{...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",billingStoreId:"store_1",active:false,plan:null,source:"NONE",expiresAt:null})}),(error:unknown)=>error instanceof CheckoutError&&error.message==="SELLER_SUBSCRIPTION_INACTIVE"&&error.status===409);
   assert.equal(fixture.getCreates(),0);assert.equal(stripeCalls,0);
+});
+
+test("PLUS subordinate product cannot be checked out even when a stale published marketplace listing remains",async()=>{
+  const fixture=checkoutDb();fixture.product.storeId="store_2";let stripeCalls=0;
+  fixture.db.store.findUniqueOrThrow=async()=>({id:"store_2",status:"ACTIVE",archivedAt:null,businessId:"business_1",vatStatus:"REGISTERED",business:{primaryStoreId:"store_1",sellerClosedAt:null}});
+  await assert.rejects(()=>createCheckout(fixture.db,"buyer_1","request_subordinate_plus",[{productId:"prod_1",quantity:1}],async()=>{stripeCalls++;return{id:"cs_forbidden",url:"https://stripe.test/no"}} ,"FR",undefined,{...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",primaryStoreId:"store_1",billingStoreId:"store_1",billingAnchorMismatch:false,active:true,plan:"plus",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")})}),(error:unknown)=>error instanceof CheckoutError&&error.message==="SELLER_SUBSCRIPTION_INACTIVE"&&error.status===409);
+  assert.equal(fixture.getCreates(),0);assert.equal(stripeCalls,0);
+});
+
+test("PLUS subordinate CJ product cannot bypass the business PRO requirement",async()=>{
+  const fixture=checkoutDb();fixture.product.id="cj_product";fixture.product.storeId="store_2";fixture.product.variants=[{id:"cj_variant",stock:5,active:true,sku:"CJ-1",priceOverride:null,values:[]}];
+  fixture.db.product.findMany=async()=>[fixture.product];
+  fixture.db.store.findUniqueOrThrow=async()=>({id:"store_2",status:"ACTIVE",archivedAt:null,businessId:"business_1",vatStatus:"REGISTERED",business:{primaryStoreId:"store_1",sellerClosedAt:null}});
+  fixture.db.supplierProductLink={findMany:async()=>[{productId:"cj_product",provider:"CJ",ownerType:"PLATFORM",sourceMetadata:{pricing:{mode:"AUTOMATIC"}},connection:{status:"CONNECTED",store:null},supplierAvailable:true,syncStatus:"HEALTHY"}]};
+  let pricingCalled=false,stripeCalls=0;
+  await assert.rejects(()=>createCheckout(fixture.db,"buyer_1","request_subordinate_cj",[{productId:"cj_product",variantId:"cj_variant",quantity:1}],async()=>{stripeCalls++;return{id:"cs_forbidden",url:"https://stripe.test/no"}} ,"FR",undefined,{...connectDeps,resolveDropshipping:async()=>{pricingCalled=true;throw new Error("must not resolve")},commercialEntitlement:async()=>({businessId:"business_1",primaryStoreId:"store_1",billingStoreId:"store_1",billingAnchorMismatch:false,active:true,plan:"plus",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")})}),(error:unknown)=>error instanceof CheckoutError&&error.message==="SELLER_SUBSCRIPTION_INACTIVE"&&error.status===409);
+  assert.equal(pricingCalled,false);assert.equal(fixture.getCreates(),0);assert.equal(stripeCalls,0);
 });
 
 for (const allowed of [true, false]) test(`FREE checkout ${allowed ? "allows its five visible products" : "rejects excess products before order or Stripe creation"}`, async()=>{
@@ -178,13 +195,14 @@ test("checkout reprices an eligible supplier line once, preserves mixed shipping
   const shippingFields={shippingOverrideEnabled:false,shippingEnabled:true,shippingMethodName:"Standard",shippingPrice:new Prisma.Decimal("4.50"),shippingFree:false,shippingFreeThreshold:null,shippingMinDays:2,shippingMaxDays:5,shippingCountries:["FR"],shippingWorldwide:false,shippingPostalCodes:[],shippingCarrier:"Carrier",shippingProvider:"MANUAL",shippingExternalServiceId:null};
   const variant={id:"variant_cj",stock:10,active:true,sku:"CJ-V",priceOverride:null,values:[]};
   const products=[{id:"cj",name:"CJ",description:null,images:[],colors:[],sizes:[],price:new Prisma.Decimal("9"),currency:"USD",stock:10,storeId:"store_1",...shippingFields,variants:[variant],store},{id:"normal",name:"Normal",description:null,images:[],colors:[],sizes:[],price:new Prisma.Decimal("12.50"),currency:"EUR",stock:10,storeId:"store_1",...shippingFields,variants:[],store}];
-  const db:any={order:{findUnique:async()=>order,findUniqueOrThrow:async()=>order,create:async({data}:any)=>{order={id:"order_mix",status:"PENDING",stripeCheckoutSessionId:null,stripeCheckoutUrl:null,...data,items:data.items.create};return order;},update:async({data}:any)=>{Object.assign(order,data);return order;}},product:{findMany:async()=>products},supplierProductLink:{findMany:async()=>[{productId:"cj",provider:"CJ",sourceMetadata:{pricing:{mode:"AUTOMATIC"}},supplierAvailable:true,syncStatus:"HEALTHY",ownerType:"PLATFORM",connection:{status:"CONNECTED",store:null}}]},store:{findUniqueOrThrow:async()=>({status:"ACTIVE",businessId:"business_1",vatStatus:"REGISTERED"})},user:{findUniqueOrThrow:async()=>({email:"buyer@example.com",firstName:"Buyer",lastName:"Example"})}};
+  const db:any={order:{findUnique:async()=>order,findUniqueOrThrow:async()=>order,create:async({data}:any)=>{order={id:"order_mix",status:"PENDING",stripeCheckoutSessionId:null,stripeCheckoutUrl:null,...data,items:data.items.create};return order;},update:async({data}:any)=>{Object.assign(order,data);return order;}},product:{findMany:async()=>products},supplierProductLink:{findMany:async()=>[{productId:"cj",provider:"CJ",sourceMetadata:{pricing:{mode:"AUTOMATIC"}},supplierAvailable:true,syncStatus:"HEALTHY",ownerType:"PLATFORM",connection:{status:"CONNECTED",store:null}}]},store:{findUniqueOrThrow:async()=>({id:"store_1",status:"ACTIVE",archivedAt:null,businessId:"business_1",vatStatus:"REGISTERED",business:{primaryStoreId:"store_1",sellerClosedAt:null}})},user:{findUniqueOrThrow:async()=>({email:"buyer@example.com",firstName:"Buyer",lastName:"Example"})}};
   const snapshot:any={pricingMode:"AUTOMATIC",provider:"CJ",productId:"cj",variantId:"variant_cj",supplierProductId:"supplier",supplierVariantId:"supplier-v",quantity:1,supplierCurrency:"USD",supplierUnitCost:"8.24",freightCurrency:"USD",freightTotal:"4.75",supportedFees:[],includedCost:"12.99",targetMargin:"0.2",calculatedSellingPrice:"16.24",buyerCurrency:"EUR",fx:{base:"USD",quote:"EUR",rate:"0.866341",source:"OPEN_EXCHANGE_RATES",effectiveAt:"2026-08-11T00:00:00.000Z",fetchedAt:"2026-08-11T00:00:00.000Z"},buyerUnitPrice:"14.07",buyerLineTotal:"14.07",shippingIncluded:true,freeShipping:true,shippingMethod:"CJ Standard",deliveryMinDays:8,deliveryMaxDays:15,pricedAt:"2026-08-11T00:00:00.000Z",pricingSource:"CJ_LIVE_FREIGHT_VERIFIED_FX"};
   const resolver:any=async()=>{pricingCalls++;return{eligibility:{eligible:true},buyer:{buyerUnitPrice:"14.07"},snapshot};};
+  const proPricingDeps={resolveDropshipping:resolver,...connectDeps,commercialEntitlement:async()=>({businessId:"business_1",primaryStoreId:"store_1",billingStoreId:"store_1",billingAnchorMismatch:false,active:true,plan:"pro",source:"STRIPE",expiresAt:new Date("2099-01-01T00:00:00Z")})};
   const items=[{productId:"cj",variantId:"variant_cj",quantity:1,displayedUnitPrice:"9",displayedCurrency:"USD"},{productId:"normal",quantity:1,displayedUnitPrice:"12.50",displayedCurrency:"EUR"}];
-  await assert.rejects(()=>createCheckout(db,"buyer_1","request_mix",items,undefined,"FR",undefined,{resolveDropshipping:resolver,...connectDeps}),(error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_PRICE_CHANGED"&&error.status===409);
+  await assert.rejects(()=>createCheckout(db,"buyer_1","request_mix",items,undefined,"FR",undefined,proPricingDeps),(error:unknown)=>error instanceof CheckoutError&&error.message==="CHECKOUT_PRICE_CHANGED"&&error.status===409);
   items[0].displayedUnitPrice="14.07";items[0].displayedCurrency="EUR";
-  await createCheckout(db,"buyer_1","request_mix",items,async(input:any)=>{stripeInput=input;return{id:"cs_mix",url:"https://stripe.test/mix"};},"FR",undefined,{resolveDropshipping:resolver,...connectDeps});
+  await createCheckout(db,"buyer_1","request_mix",items,async(input:any)=>{stripeInput=input;return{id:"cs_mix",url:"https://stripe.test/mix"};},"FR",undefined,proPricingDeps);
   assert.equal(pricingCalls,2);assert.equal(order.subtotal.toString(),"26.57");assert.equal(order.shippingCost.toString(),"4.5");assert.equal(order.total.toString(),"31.07");
   assert.equal(stripeInput.items[0].unitAmount,1407);assert.equal(stripeInput.shipping.amount,450);assert.equal(stripeInput.items[0].currency,"EUR");
   assert.deepEqual(order.items[0].supplierPricingSnapshot.create.snapshot,snapshot);assert.equal(order.items[1].supplierPricingSnapshot,undefined);

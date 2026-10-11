@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       if (owner?.role === "ADMIN" && firstStore) throw new SellerBusinessError("ADMIN_ONE_STORE_REQUIRED", 409);
       const business = await ensureSellerBusiness(tx, session.userId, firstStore?.id);
       await lockSellerBusiness(tx, business.id);
-      const storeCount = await tx.store.count({ where: { businessId: business.id } });
+      const storeCount = await tx.store.count({ where: { businessId: business.id, archivedAt: null } });
       const commercialPlan = await sellerBusinessCommercialPlan(tx, business.id);
       if (storeCount > 0 && !canCreateAdditionalSellerStore(commercialPlan)) throw new SellerBusinessError("MULTI_STORE_PRO_REQUIRED", 403);
       if (storeCount >= sellerSelfServiceStoreLimit(commercialPlan)) throw new SellerBusinessError("STORE_LIMIT_REACHED", 409);
@@ -151,7 +151,12 @@ export async function POST(request: Request) {
         where: { id: session.userId },
         data: { role: "SELLER", storeName: storeCount === 0 ? name : undefined, primaryStoreId: storeCount === 0 ? created.id : undefined },
       });
-      if (storeCount === 0) await tx.sellerBusiness.update({ where: { id: business.id }, data: { billingStoreId: created.id } });
+      if (storeCount === 0) {
+        const primaryLinked = await tx.sellerBusiness.updateMany({ where: { id: business.id, primaryStoreId: null }, data: { primaryStoreId: created.id } });
+        const identity = await tx.sellerBusiness.findUniqueOrThrow({ where: { id: business.id }, select: { primaryStoreId: true, billingStoreId: true } });
+        if (primaryLinked.count !== 1 && identity.primaryStoreId !== created.id) throw new SellerBusinessError("BUSINESS_PRIMARY_STORE_IDENTITY_CONFLICT", 409);
+        if (!identity.billingStoreId) await tx.sellerBusiness.updateMany({ where: { id: business.id, billingStoreId: null }, data: { billingStoreId: created.id } });
+      }
       await appendSellerBusinessAudit(tx,{businessId:business.id,storeId:created.id,actorId:session.userId,category:"STORE",action:"STORE_CREATED",targetType:"STORE",targetId:created.id,metadata:{name,slug}});
 
       return created;

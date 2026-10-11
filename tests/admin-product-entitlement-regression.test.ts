@@ -39,7 +39,8 @@ test("ordinary seller product limits remain enforced", () => {
 function entitlementDb(role: "ADMIN" | "SELLER", productCount: number) {
   return {
     user: { findUnique: async () => ({ sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null }) },
-    store: { findFirst: async () => ({ id: "store-1", currency: "EUR", status: "ACTIVE", sellerType: "INDIVIDUAL", vatStatus: "NOT_APPLICABLE", owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2099-01-01T00:00:00Z"), plan: "free" }, accessGrants: [], _count: { products: productCount } }) },
+    store: { findFirst: async () => ({ id: "store-1", businessId: "business-1", currency: "EUR", status: "ACTIVE", sellerType: "PRIVATE", vatStatus: "NOT_APPLICABLE", business: { primaryStoreId: "store-1" }, owner: { role }, subscription: { status: "ACTIVE", currentPeriodEnd: new Date("2099-01-01T00:00:00Z"), plan: "free" }, accessGrants: [], _count: { products: productCount } }) },
+    sellerBusiness: { findUnique: async () => ({ primaryStoreId: "store-1", billingStoreId: "store-1", owner: { role }, billingStore: { id: "store-1", subscription: role === "ADMIN" ? null : { status: "ACTIVE", plan: "free", currentPeriodEnd: new Date("2099-01-01T00:00:00Z") }, accessGrants: [] } }) },
   };
 }
 

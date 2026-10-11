@@ -40,10 +40,10 @@ test("authoritative active Stripe plan wins and plan-level Admin grants work wit
 
 test("every Store resolves the one billing Store commercial entitlement", async () => {
   const stripeEnd=new Date("2026-02-01T00:00:00Z"),stripeNow=new Date("2026-01-01T00:00:00Z"),stripeDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:{status:"ACTIVE",plan:"pro",currentPeriodEnd:stripeEnd},accessGrants:[]}})}} as never;
-  assert.deepEqual(await sellerBusinessCommercialEntitlement(stripeDb,"business",stripeNow),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"STRIPE",expiresAt:stripeEnd});
+  assert.deepEqual(await sellerBusinessCommercialEntitlement(stripeDb,"business",stripeNow),{businessId:"business",primaryStoreId:null,billingStoreId:"billing",billingAnchorMismatch:false,active:true,plan:"pro",source:"STRIPE",expiresAt:stripeEnd});
   assert.equal((await sellerBusinessCommercialEntitlement(stripeDb,"business",stripeEnd)).plan,"free");
   const expires=new Date("2026-02-01T00:00:00Z"),now=new Date("2026-01-01T00:00:00Z");
   const grantDb={sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"billing",subscription:null,accessGrants:[{source:"ADMIN_GRANTED",plan:"pro",startsAt:now,endsAt:expires}]}})}} as never;
-  assert.deepEqual(await sellerBusinessCommercialEntitlement(grantDb,"business",now),{businessId:"business",billingStoreId:"billing",active:true,plan:"pro",source:"ADMIN_GRANTED",expiresAt:expires});
+  assert.deepEqual(await sellerBusinessCommercialEntitlement(grantDb,"business",now),{businessId:"business",primaryStoreId:null,billingStoreId:"billing",billingAnchorMismatch:false,active:true,plan:"pro",source:"ADMIN_GRANTED",expiresAt:expires});
   assert.equal((await sellerBusinessCommercialEntitlement(grantDb,"business",expires)).plan,"free");
 });

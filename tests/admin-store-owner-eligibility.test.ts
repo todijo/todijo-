@@ -59,8 +59,28 @@ test("concurrent first-store creation serializes and second stale request fails"
   const tx: any = {
     $queryRaw: async () => [],
     user: { findUnique: async () => ({ ...owner, _count: { stores: count } }), updateMany: async ({ data }: any) => { Object.assign(owner, data); return { count: 1 }; } },
-    store: { create: async () => { count++; return { id: "created", slug: "created" }; }, updateMany: async () => ({ count: 1 }) },
-    sellerBusiness: { upsert: async () => { business ??= { id: "business-created", billingStoreId: null, maxStores: 1, _count: { stores: 0 } }; business._count.stores = count; return business; }, update: async ({ data }: any) => { if (data.billingStoreId) { business.billingStoreId = data.billingStoreId; owner.store = { id: data.billingStoreId, ownerId: owner.id, businessId: business.id }; } } },
+    store: {
+      create: async () => { count++; return { id: "created", slug: "created" }; },
+      findUnique: async ({ where }: any) => where.id === "created" ? { id: "created", ownerId: owner.id, businessId: owner.store?.businessId ?? null } : null,
+      updateMany: async ({ where, data }: any) => {
+        if (where.id !== "created" || where.ownerId !== owner.id || where.businessId !== null) return { count: 0 };
+        owner.store = { id: "created", ownerId: owner.id, businessId: data.businessId };
+        return { count: 1 };
+      },
+      findMany: async () => owner.store?.businessId ? [{ id: "created" }] : [],
+    },
+    sellerBusiness: {
+      upsert: async () => { business ??= { id: "business-created", primaryStoreId: null, billingStoreId: null, maxStores: 1, _count: { stores: 0 } }; business._count.stores = count; return business; },
+      update: async ({ data }: any) => { if (data.billingStoreId) { business.billingStoreId = data.billingStoreId; owner.store = { id: data.billingStoreId, ownerId: owner.id, businessId: business.id }; } },
+      updateMany: async ({ where, data }: any) => {
+        if (where.id !== business?.id) return { count: 0 };
+        if (where.primaryStoreId === null && business.primaryStoreId) return { count: 0 };
+        if (where.billingStoreId === null && business.billingStoreId) return { count: 0 };
+        Object.assign(business, data);
+        return { count: 1 };
+      },
+      findUniqueOrThrow: async () => business,
+    },
     sellerBusinessAuditEvent: { create: async ({ data }: any) => data },
   };
   const db = { $transaction: (run: (value: typeof tx) => Promise<unknown>) => {

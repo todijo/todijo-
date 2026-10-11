@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { sellerPlans, configuredSellerPlan, configuredSellerPlanForPriceId } from "../lib/seller-plans";
-import { resolveSellerCommercialAccess, hasProSellerCapabilities, canCreateAdditionalSellerStore, canSellerSelfCreateStore, hasLockedSellerMultiStoreTeaser, sellerSelfServiceStoreLimit } from "../lib/seller-commercial-access";
+import { resolveSellerCommercialAccess, hasProSellerCapabilities, canCreateAdditionalSellerStore, canSellerSelfCreateStore, canSellFromBusinessStore, hasLockedSellerMultiStoreTeaser, sellerSelfServiceStoreLimit } from "../lib/seller-commercial-access";
 import { canPublish, sellerProductQuota, requireStorePublishingAccess } from "../lib/seller-subscription";
 import { createOrReuseSellerSubscriptionCheckout } from "../lib/seller-subscription-checkout";
 import { dailyDiscoveryOffset, interleaveDiscoveryStores, proHomepageDiscovery } from "../lib/pro-homepage-discovery";
@@ -58,6 +58,16 @@ test("FREE and PLUS retain one store while PRO self-service is capped at three r
   assert.equal(canSellerSelfCreateStore("admin-exempt",1),false);
   assert.equal(canSellerSelfCreateStore("pro",-1),false);
 });
+test("business commercial entitlement allows primary selling for the base plan and subordinates only for effective PRO",()=>{
+  for(const plan of ["free","plus"]){
+    assert.equal(canSellFromBusinessStore({storeId:"primary",primaryStoreId:"primary",plan}),true);
+    assert.equal(canSellFromBusinessStore({storeId:"subordinate",primaryStoreId:"primary",plan}),false);
+  }
+  assert.equal(canSellFromBusinessStore({storeId:"subordinate",primaryStoreId:"primary",plan:"pro"}),true);
+  assert.equal(canSellFromBusinessStore({storeId:"subordinate",primaryStoreId:"primary",plan:"admin-exempt"}),false);
+  assert.equal(canSellFromBusinessStore({storeId:"primary",primaryStoreId:null,plan:"pro"}),false);
+  assert.equal(canSellFromBusinessStore({storeId:"primary",primaryStoreId:"primary",plan:null}),false);
+});
 test("seller store creation surfaces and API enforce the same plan entitlement instead of Admin maxStores",()=>{
   for(const file of ["app/dashboard/page.tsx","app/seller/stores/new/page.tsx","app/seller/store-settings/page.tsx"]){
     assert.match(source(file),/canSellerSelfCreateStore\(/);
@@ -107,7 +117,7 @@ test("FREE does not bypass pending, suspended or missing legal status",()=>{
 });
 test("sixth FREE product is rejected by authoritative store creation gate",async()=>{
   const db:any={user:{findUnique:async()=>({role:"SELLER",sellerSuspendedAt:null,deactivatedAt:null,blockedAt:null,blockExpiresAt:null})},
-    store:{findUnique:async()=>({id:"store",businessId:"business",ownerId:"seller",business:null,owner:{role:"SELLER"},currency:"EUR",status:"ACTIVE",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE",_count:{products:5}})},
+    store:{findUnique:async()=>({id:"store",businessId:"business",ownerId:"seller",archivedAt:null,business:{primaryStoreId:"store"},owner:{role:"SELLER"},currency:"EUR",status:"ACTIVE",sellerType:"PRIVATE",vatStatus:"NOT_REGISTERED_OR_NOT_APPLICABLE",_count:{products:5}})},
     sellerBusiness:{findUnique:async()=>({owner:{role:"SELLER"},billingStore:{id:"store",subscription:null,accessGrants:[]}})}};
   await assert.rejects(()=>requireStorePublishingAccess(db,"seller","store","PRODUCT_CREATE"),(e:any)=>e.code==="SELLER_PRODUCT_LIMIT_REACHED");
   assert.equal(sellerProductQuota({role:"SELLER",plan:"free",productCount:4}).blocked,false);

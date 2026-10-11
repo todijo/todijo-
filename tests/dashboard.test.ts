@@ -20,7 +20,7 @@ test("seller product actions keep the subscription and team capability gates", (
   const dashboardPage = readFileSync("app/dashboard/page.tsx", "utf8");
   const productsPage = readFileSync("app/seller/products/page.tsx", "utf8");
 
-  assert.match(dashboardPage, /sellerCanAddProduct\s*=\s*Boolean\(activeStore\s*&&\s*canCreateProducts\s*&&\s*canPublish\(activeStore,new Date\(\),selectedCommercialPlan\)\)/);
+  assert.match(dashboardPage, /sellerCanAddProduct\s*=\s*Boolean\(activeStore\s*&&\s*canCreateProducts\s*&&\s*storeCanSellByEntitlement\s*&&\s*!activeStore\.archivedAt\s*&&\s*canPublish\(activeStore,new Date\(\),selectedCommercialPlan\)\)/);
   assert.match(dashboardPage, /sellerCanAddProduct&&<DashboardQuickAction[^>]+seller\/products\/new/);
   assert.match(dashboardPage, /owner&&!subscriptionActive&&<DashboardQuickAction label=\{readinessAction\} href=\{readinessHref\}/);
   assert.match(dashboardPage, /readinessUsesSettings\?Settings:CreditCard/);

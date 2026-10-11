@@ -3,7 +3,7 @@ import { assertSellerActivity } from "./account-status";
 import { sellerPlanEntitlement, type SellerPlanId } from "./seller-plans";
 import { requireStoreCapability } from "./seller-business-access";
 import { sellerBusinessCommercialPlan } from "./seller-business";
-import { resolveSellerCommercialAccess } from "./seller-commercial-access";
+import { canSellFromBusinessStore, resolveSellerCommercialAccess } from "./seller-commercial-access";
 import { hasVerifiedFrenchBusiness } from "./seller-business-verification-policy";
 
 export const publishableSubscriptionStatuses: SubscriptionStatus[] = ["ACTIVE", "TRIALING"];
@@ -47,9 +47,10 @@ export async function requirePublishingAccess(db: PrismaClient, userId: string) 
   await assertSellerActivity(db,userId);
   const store = await db.store.findFirst({
     where: { ownerId: userId },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
-  id: true, currency: true, country: true, businessRegistrationId:true, status: true, sellerType: true, vatStatus: true,
-      business: { select: { siren: true, inseeVerificationState: true, sellerClosedAt:true,reactivationStockReviewRequired:true } },
+  id: true, businessId:true, currency: true, country: true, businessRegistrationId:true, status: true, archivedAt:true, sellerType: true, vatStatus: true,
+      business: { select: { primaryStoreId:true,siren: true, inseeVerificationState: true, sellerClosedAt:true,reactivationStockReviewRequired:true } },
       establishment: { select: { siret: true, legalUnitSiren: true, verificationState: true } },
       owner: { select: { role: true } },
       subscription: { select: { status: true, currentPeriodEnd: true, plan: true } },
@@ -58,18 +59,21 @@ export async function requirePublishingAccess(db: PrismaClient, userId: string) 
     },
   });
   if (!store) throw Object.assign(new SellerSubscriptionError("Create your store first."), { code: "STORE_REQUIRED" });
+  if (store.archivedAt) throw Object.assign(new SellerSubscriptionError("This store is archived."), { code: "STORE_ARCHIVED" });
   if(store.business?.sellerClosedAt)throw Object.assign(new SellerSubscriptionError("Seller activity is closed."),{code:"SELLER_CLOSED"});
   if(store.business?.reactivationStockReviewRequired)throw Object.assign(new SellerSubscriptionError("Stock review is required before republishing products."),{code:"REACTIVATION_STOCK_REVIEW_REQUIRED"});
   if (store.sellerType === "UNKNOWN") throw Object.assign(new SellerSubscriptionError("Confirm your seller status in store settings before publishing products."), { code: "SELLER_TYPE_REQUIRED" });
   if (store.sellerType === "PROFESSIONAL" && store.vatStatus === "UNKNOWN") throw Object.assign(new SellerSubscriptionError("Confirm your VAT status in store settings before publishing products."), { code: "VAT_STATUS_REQUIRED" });
   if (!hasVerifiedFrenchBusiness(store)) throw Object.assign(new SellerSubscriptionError("French business verification is required before publishing products."), { code: "BUSINESS_VERIFICATION_REQUIRED" });
-  if (!canPublish(store)) throw new SellerSubscriptionError("Your seller subscription is inactive. Renew your monthly plan to publish or reactivate products.");
+  const adminExempt = store.owner.role === "ADMIN";
+  const plan = store.businessId ? await sellerBusinessCommercialPlan(db, store.businessId) : adminExempt ? "admin-exempt" : null;
+  if (!canPublish(store, new Date(), plan) || (!adminExempt && !canSellFromBusinessStore({ storeId: store.id, primaryStoreId: store.business?.primaryStoreId, plan }))) throw new SellerSubscriptionError("Your seller subscription is inactive. Renew your plan to publish or reactivate products.");
   return store;
 }
 
 export async function requireProductCreationAccess(db: PrismaClient, userId: string) {
   const store = await requirePublishingAccess(db, userId);
-  const plan = effectiveSellerPlan({ role: store.owner.role, subscription: store.subscription, accessGrants: store.accessGrants });
+  const plan = store.businessId ? await sellerBusinessCommercialPlan(db, store.businessId) : null;
   const quota = sellerProductQuota({ role: store.owner.role, plan, productCount: store._count.products });
   if (quota.blocked) {
     throw Object.assign(new SellerSubscriptionError(`Your plan allows ${quota.productLimit} products and your store has reached that limit.`), { code: "SELLER_PRODUCT_LIMIT_REACHED" });
@@ -80,15 +84,16 @@ export async function requireProductCreationAccess(db: PrismaClient, userId: str
 export async function requireStorePublishingAccess(db: PrismaClient | Prisma.TransactionClient, userId: string, storeId: string, permission: "PRODUCT_CREATE"|"PRODUCT_PUBLISH" = "PRODUCT_CREATE", productId?: string) {
   await assertSellerActivity(db,userId);
   const principal=await requireStoreCapability(db,userId,storeId,permission);
-  const store=await db.store.findUnique({where:{id:storeId},select:{id:true,currency:true,country:true,businessRegistrationId:true,status:true,sellerType:true,vatStatus:true,business:{select:{siren:true,inseeVerificationState:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},_count:{select:{products:true}}}});
+  const store=await db.store.findUnique({where:{id:storeId},select:{id:true,businessId:true,currency:true,country:true,businessRegistrationId:true,status:true,archivedAt:true,sellerType:true,vatStatus:true,business:{select:{primaryStoreId:true,siren:true,inseeVerificationState:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true}},_count:{select:{products:true}}}});
   if(!store)throw Object.assign(new SellerSubscriptionError("Create your store first."),{code:"STORE_REQUIRED"});
+  if(store.archivedAt)throw Object.assign(new SellerSubscriptionError("This store is archived."),{code:"STORE_ARCHIVED"});
   if(store.business?.sellerClosedAt)throw Object.assign(new SellerSubscriptionError("Seller activity is closed."),{code:"SELLER_CLOSED"});
   if(store.business?.reactivationStockReviewRequired)throw Object.assign(new SellerSubscriptionError("Stock review is required before republishing products."),{code:"REACTIVATION_STOCK_REVIEW_REQUIRED"});
   if(store.sellerType==="UNKNOWN")throw Object.assign(new SellerSubscriptionError("Confirm your seller status in store settings before publishing products."),{code:"SELLER_TYPE_REQUIRED"});
   if(store.sellerType==="PROFESSIONAL"&&store.vatStatus==="UNKNOWN")throw Object.assign(new SellerSubscriptionError("Confirm your VAT status in store settings before publishing products."),{code:"VAT_STATUS_REQUIRED"});
   if(!hasVerifiedFrenchBusiness(store))throw Object.assign(new SellerSubscriptionError("French business verification is required before publishing products."),{code:"BUSINESS_VERIFICATION_REQUIRED"});
   const plan=await sellerBusinessCommercialPlan(db,principal.businessId);
-  if(store.status!=="ACTIVE"||!plan)throw new SellerSubscriptionError("Your seller subscription is inactive. Renew your plan to publish or reactivate products.");
+  if(store.status!=="ACTIVE"||!plan||!canSellFromBusinessStore({storeId:store.id,primaryStoreId:store.business?.primaryStoreId,plan}))throw Object.assign(new SellerSubscriptionError("This store requires an active PRO entitlement to sell."),{code:"SUBORDINATE_STORE_REQUIRES_PRO"});
   const productCount = permission === "PRODUCT_PUBLISH" ? await db.product.count({ where: { storeId, status: "PUBLISHED", removedAt: null, ...(productId ? { id: { not: productId } } : {}) } }) : store._count.products;
   const quota=sellerProductQuota({role:plan==="admin-exempt"?"ADMIN":"SELLER",plan,productCount});
   if(quota.blocked)throw Object.assign(new SellerSubscriptionError(`Your plan allows ${quota.productLimit} products and this store has reached that limit.`),{code:"SELLER_PRODUCT_LIMIT_REACHED"});

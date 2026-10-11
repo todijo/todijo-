@@ -58,11 +58,24 @@ test("Admin can create additional own stores without seller plan or self-service
 test("admin creates an eligible seller store with timed access and no Stripe data", async () => {
   let data: Record<string, unknown> | undefined;
   const links: Array<Record<string, unknown>> = [], audits: Array<Record<string, unknown>> = [];
+  let primaryStoreId: string | null = null, businessPrimaryStoreId: string | null = null, billingStoreId: string | null = null, storeBusinessId: string | null = null;
   const db = {
     $queryRaw: async () => [],
-    user: { findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId: null, store: null, _count: { stores: 0 }, ownedBusiness: null }), updateMany: async (input: { where: Record<string, unknown>; data: Record<string, unknown> }) => { links.push(input); return { count: 1 }; } },
-    store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; }, updateMany: async (input: { data: Record<string, unknown> }) => { links.push(input); return { count: 1 }; } },
-    sellerBusiness: { upsert: async () => ({ id: "business-seller", billingStoreId: null, maxStores: 1 }), update: async (input: { data: Record<string, unknown> }) => { links.push(input); } },
+    user: {
+      findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId, store: null, _count: { stores: 0 }, ownedBusiness: null }),
+      updateMany: async (input: { where: Record<string, unknown>; data: Record<string, unknown> }) => { links.push(input); primaryStoreId = String(input.data.primaryStoreId); return { count: 1 }; },
+    },
+    store: {
+      create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; },
+      findUnique: async () => ({ id: "store-seller", ownerId: "seller", businessId: storeBusinessId }),
+      findMany: async () => [],
+      updateMany: async (input: { data: Record<string, unknown> }) => { links.push(input); storeBusinessId = String(input.data.businessId); return { count: 1 }; },
+    },
+    sellerBusiness: {
+      upsert: async () => ({ id: "business-seller", primaryStoreId: businessPrimaryStoreId, billingStoreId, maxStores: 1 }),
+      updateMany: async (input: { data: Record<string, unknown> }) => { links.push(input); if (input.data.primaryStoreId) businessPrimaryStoreId = String(input.data.primaryStoreId); if (input.data.billingStoreId) billingStoreId = String(input.data.billingStoreId); return { count: 1 }; },
+      findUniqueOrThrow: async () => ({ id: "business-seller", primaryStoreId: businessPrimaryStoreId, billingStoreId, maxStores: 1 }),
+    },
     sellerBusinessAuditEvent: { create: async (input: { data: Record<string, unknown> }) => { audits.push(input.data); return input.data; } },
   } as unknown as Db;
   const now = new Date("2026-01-15T12:00:00Z");
@@ -73,6 +86,10 @@ test("admin creates an eligible seller store with timed access and no Stripe dat
   assert.equal(nested.endsAt.toISOString(), "2026-04-15T12:00:00.000Z");
   assert.equal("subscription" in (data ?? {}), false);
   assert.equal(links.some(item => JSON.stringify(item).includes("business-seller")), true);
+  assert.equal(storeBusinessId, "business-seller");
+  assert.equal(businessPrimaryStoreId, "store-seller");
+  assert.equal(billingStoreId, "store-seller");
+  assert.equal(primaryStoreId, "store-seller");
   assert.equal(audits[0].action, "ADMIN_MANAGED_STORE_CREATED");
 });
 

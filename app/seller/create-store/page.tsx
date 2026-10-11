@@ -5,6 +5,7 @@ import { getLocale } from "next-intl/server";
 import { explicitSellerRegistrationIntent, sellerOnboardingPath } from "@/lib/seller-registration-intent";
 import { sellerOnboardingDestination } from "@/lib/seller-onboarding-flow";
 import { activeAccessSource } from "@/lib/admin-access";
+import { sellerBusinessCommercialEntitlement } from "@/lib/seller-business";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,11 @@ export default async function CreateStorePage({ searchParams }: { searchParams: 
   if (session.role === "ADMIN") redirect(`/${locale}/dashboard`);
 
   const [store, draft] = await Promise.all([
-    prisma.store.findFirst({ where: { ownerId: session.userId }, orderBy:{createdAt:"asc"}, select: { onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, plan: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }),
-    prisma.sellerOnboardingDraft.findUnique({ where: { userId: session.userId }, select: { userId: true } }),
+    prisma.store.findFirst({ where: { ownerId: session.userId }, orderBy:{createdAt:"asc"}, select: { businessId:true,onboardingStatus: true, onboardingStep: true, subscription: { select: { status: true, plan: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } } } }),
+    prisma.sellerOnboardingDraft.findUnique({ where: { userId: session.userId }, select: { userId: true, user:{select:{ownedBusiness:{select:{id:true}}}} } }),
   ]);
-  const entitlementSource = store ? activeAccessSource(store).source : "NONE";
+  const businessId = store?.businessId ?? draft?.user.ownedBusiness?.id ?? null;
+  const entitlement = businessId ? await sellerBusinessCommercialEntitlement(prisma, businessId) : null;
+  const entitlementSource = entitlement?.source ?? (store ? activeAccessSource(store).source : "NONE");
   redirect(sellerOnboardingDestination({ locale, intent, hasStore: Boolean(store), hasDraft: Boolean(draft), onboardingStatus: store?.onboardingStatus, onboardingStep: store?.onboardingStep, entitlementSource }));
 }

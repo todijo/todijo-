@@ -14,6 +14,7 @@ import { enqueueSellerSaleNotifications } from "./seller-sale-notifications";
 import { enqueueBuyerPaymentConfirmation } from "./buyer-order-email-deliveries";
 import { isLocale } from "../i18n/config";
 import { sellerBusinessCommercialEntitlement } from "./seller-business";
+import { canSellFromBusinessStore, hasProSellerCapabilities } from "./seller-commercial-access";
 import {configuredSellerPlanForPriceId} from "./seller-plans";
 import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
 import { persistPaidSellerInvoice } from "./seller-invoice-persistence";
@@ -24,7 +25,8 @@ export class CheckoutError extends Error {
 }
 
 type CheckoutItem = { productId: string; quantity: number; selectedColor?: string | null; selectedSize?: string | null; variantId?: string | null; displayedUnitPrice?: string | number | null; displayedCurrency?: string | null };
-type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount;commercialEntitlement?:typeof sellerBusinessCommercialEntitlement;stripeMode?:StripeMode;returnLocale?:string };
+type CheckoutCommercialEntitlement = { businessId?:string; primaryStoreId?:string|null; billingStoreId?:string|null; billingAnchorMismatch?:boolean; active:boolean; plan:string|null; source:string; expiresAt:Date|null };
+type CheckoutPricingDependencies = { resolveDropshipping?: typeof resolveDropshippingPricing;buyerCurrency?:unknown;marketplaceFx?:Parameters<typeof convertMarketplacePrice>[3];retrieveConnectedAccount?:typeof retrieveConnectedAccount;commercialEntitlement?:(db:PrismaClient,businessId:string)=>Promise<CheckoutCommercialEntitlement>;stripeMode?:StripeMode;returnLocale?:string };
 const paidOrderStatuses = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED"]);
 
 export function embeddedShippingQuote(lines:Array<{pricingSnapshot:DropshippingPriceSnapshot|null}>,currency:SupportedBuyerCurrency,destinationCountry:unknown){
@@ -88,11 +90,28 @@ export async function createCheckout(
     const link = supplierByProduct.get(line.productId);
     return {...line,eligibility:resolveDropshippingEligibility({hasSupplierLink:Boolean(link),provider:link?.provider,ownerType:link?.ownerType,connectionStatus:link?.connection?.status,sellerDropshippingEnabled:link?.connection?.store?.dropshippingEnabled,sourceMetadata:link?.sourceMetadata})};
   });
+  // Resolve commercial authority for each product store before marketplace/CJ
+  // splitting. A CJ line must not bypass the PRO requirement of a subordinate
+  // store merely because it does not create a marketplace transfer group.
+  const businessEntitlements = new Map<string, CheckoutCommercialEntitlement>();
+  const checkedStores = new Set<string>();
+  for (const product of products) {
+    if (checkedStores.has(product.storeId)) continue;
+    checkedStores.add(product.storeId);
+    const authority = await db.store.findUniqueOrThrow({ where: { id: product.storeId }, select: { id: true, status: true, archivedAt: true, businessId: true, sellerType: true, vatStatus: true, business: { select: { primaryStoreId: true, sellerClosedAt: true } } } });
+    if (authority.status !== "ACTIVE" || authority.archivedAt || authority.business?.sellerClosedAt) throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE", 409);
+    if (!authority.businessId) continue; // Keep the established legacy path; marketplace checkout below still requires a business entitlement.
+    const entitlement = await (pricingDependencies.commercialEntitlement ?? sellerBusinessCommercialEntitlement)(db, authority.businessId);
+    businessEntitlements.set(authority.businessId, entitlement);
+    if (!entitlement.active || !canSellFromBusinessStore({ storeId: authority.id, primaryStoreId: authority.business?.primaryStoreId, plan: entitlement.plan })) throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE", 409);
+    const hasEligibleDropshippingLine = classifiedLines.some((line) => line.productId === product.id && line.eligibility.eligible);
+    if (hasEligibleDropshippingLine && !hasProSellerCapabilities(entitlement.plan)) throw new CheckoutError("DROPSHIPPING_REQUIRES_PRO", 409);
+  }
   const marketplaceStores=[...new Map(classifiedLines.filter(line=>!line.eligibility.eligible).map(line=>{const product=products.find(candidate=>candidate.id===line.productId)!;return[product.storeId,product.store] as const})).values()];
   for(const store of marketplaceStores){
     const authority=await db.store.findUniqueOrThrow({where:{id:store.id},select:{status:true,businessId:true,vatStatus:true}});
     if(authority.status!=="ACTIVE"||!authority.businessId)throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE",409);
-    const entitlement=await (pricingDependencies.commercialEntitlement??sellerBusinessCommercialEntitlement)(db,authority.businessId);
+    const entitlement=businessEntitlements.get(authority.businessId)??await (pricingDependencies.commercialEntitlement??sellerBusinessCommercialEntitlement)(db,authority.businessId);
     if(!entitlement.active||!entitlement.plan)throw new CheckoutError("SELLER_SUBSCRIPTION_INACTIVE",409);
     if (entitlement.plan === "free") {
       const visible = await db.product.count({ where: { id: { in: products.filter(product => product.storeId === store.id).map(product => product.id) }, status: "PUBLISHED", removedAt: null, freeVisibilityPosition: { lte: 5 } } });

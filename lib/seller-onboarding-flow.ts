@@ -1,7 +1,7 @@
 import { sellerRegistrationIntentQuery, type SellerRegistrationIntent } from "./seller-registration-intent";
 
 type OnboardingStatus = "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "VERIFIED" | "REJECTED" | "NEEDS_INFORMATION";
-type EntitlementSource = "STRIPE" | "ADMIN_GRANTED" | "ADMIN_EXEMPT" | "NONE";
+type EntitlementSource = "STRIPE" | "ADMIN_GRANTED" | "ADMIN_EXEMPT" | "FREE" | "NONE";
 
 export type SellerOnboardingState = {
   locale: string;

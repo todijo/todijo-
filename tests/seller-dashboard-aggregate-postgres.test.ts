@@ -7,8 +7,9 @@ const databaseUrl = process.env.SELLER_DASHBOARD_TEST_DATABASE_URL;
 
 test("PostgreSQL dashboard aggregates are currency-safe, date-bounded, and isolated to the selected store", { skip: !databaseUrl }, async () => {
   const target = new URL(databaseUrl!);
+  assert.equal(process.env.TODIJO_CI_DISPOSABLE_DATABASE, "1");
   assert.equal(target.hostname, "127.0.0.1");
-  assert.equal(target.port, "5432");
+  assert.equal(target.port, process.env.PGPORT || "5432");
   assert.equal(target.pathname, "/todijo_dashboard_test");
   assert.equal(target.username, "validation");
   const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
