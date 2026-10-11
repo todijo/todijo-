@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Langue invalide." }, { status: 400 });
     }
 
-    const store = await prisma.$transaction(async (tx) => {
+    const createStoreTransaction = () => prisma.$transaction(async (tx) => {
       // Serialize first-store creation too; an unlinked legacy store still counts.
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${session.userId} FOR UPDATE`;
       const owner = await tx.user.findUnique({ where: { id: session.userId }, select: { role: true } });
@@ -154,6 +154,21 @@ export async function POST(request: Request) {
 
       return created;
     },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
+    let store;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        store = await createStoreTransaction();
+        break;
+      } catch (error) {
+        // PostgreSQL may expose a serialization failure from the row-locking
+        // query as Prisma P2010/SQLSTATE 40001. The failed transaction rolled
+        // back, so retry the database-only operation with fresh state.
+        const serializationConflict = error instanceof Prisma.PrismaClientKnownRequestError
+          && error.code === "P2010"
+          && error.meta?.code === "40001";
+        if (!serializationConflict || attempt >= 2) throw error;
+      }
+    }
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, store, next: "/seller/subscription" });

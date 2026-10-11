@@ -5,7 +5,7 @@ type SlugDatabase = Pick<Prisma.TransactionClient, "$queryRaw" | "store" | "stor
 
 export async function lockStoreSlugNamespace(tx: SlugDatabase) {
   // One lock protects the namespace shared by current slugs and historical aliases.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(1936749421, 1397511767)`;
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(1936749421, 1397511767)::text`;
 }
 
 export async function assertStoreSlugAvailable(tx: SlugDatabase, slugInput: string, exceptStoreId?: string) {

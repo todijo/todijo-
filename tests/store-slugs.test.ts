@@ -30,8 +30,12 @@ test("store creation uses shared reservation checks and display-name edits do no
   const settingsPage = source("app", "seller", "store-settings", "page.tsx");
   const productPage = source("app", "product", "[id]", "page.tsx");
   const mobileProfile = source("app", "api", "mobile", "account", "profile", "route.ts");
+  const slugService = source("lib", "store-slug-service.ts");
   assert.match(storeApi, /lockStoreSlugNamespace\(tx\)/);
   assert.match(storeApi, /assertStoreSlugAvailable\(tx, slug\)/);
+  assert.match(storeApi, /error\.meta\?\.code === "40001"/);
+  assert.match(storeApi, /attempt >= 2/);
+  assert.match(slugService, /pg_advisory_xact_lock\(1936749421, 1397511767\)::text/);
   assert.match(onboarding, /allocateInitialStoreSlug\(tx, storeName, user\.id\)/);
   assert.match(onboarding, /lockStoreSlugNamespace\(tx\)/);
   assert.match(adminStores, /validateStoreSlug\(String\(body\.slug \|\| name\)\)/);
