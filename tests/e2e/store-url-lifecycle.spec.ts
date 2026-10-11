@@ -65,7 +65,7 @@ async function authenticate(page: Page, userId: string, role: "SELLER" | "ADMIN"
   await page.context().addCookies([{ name: "todijo_session", value: token, url: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100", httpOnly: true, sameSite: "Lax" }]);
 }
 
-test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps unavailable status private", async ({ page, request }) => {
+test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps unavailable status private", async ({ page }) => {
   await authenticate(page, ownerId, "SELLER");
   await page.goto(`/fr/seller/store-settings?store=${encodeURIComponent(publicStoreId)}`);
   await expect(page.locator(".storeUrlSettings")).toContainText(`ALN URL ${suffix}`);
@@ -171,10 +171,17 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
     { id: subordinateStoreId, ownerId, businessId, slug: renamedSubordinateSlug },
   ].sort((a, b) => a.id.localeCompare(b.id)));
 
-  const pendingPublic = await request.get(`${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100"}/fr/store/pending-url-${suffix}`, { maxRedirects: 0 });
-  expect(pendingPublic.status()).toBe(404);
-  const pendingLegacyPublic = await request.get(`${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100"}/fr/store/${pendingOldSlug}`, { maxRedirects: 0 });
-  expect(pendingLegacyPublic.status()).toBe(404);
+  const anonymousContext = await page.context().browser()!.newContext();
+  const anonymousPage = await anonymousContext.newPage();
+  await anonymousPage.goto(`/fr/store/pending-url-${suffix}`);
+  await expect(anonymousPage.locator(".premiumNotFoundPage")).toBeVisible();
+  await expect(anonymousPage.locator(".premiumNotFoundPage")).toContainText("404");
+  await expect(anonymousPage.locator("body")).not.toContainText(`Pending URL ${suffix}`);
+  await anonymousPage.goto(`/fr/store/${pendingOldSlug}`);
+  await expect(anonymousPage.locator(".premiumNotFoundPage")).toBeVisible();
+  await expect(anonymousPage.locator(".premiumNotFoundPage")).toContainText("404");
+  await expect(anonymousPage.locator("body")).not.toContainText(`Pending URL ${suffix}`);
+  await anonymousContext.close();
   const pendingContext = await page.context().browser()!.newContext();
   const pendingPage = await pendingContext.newPage();
   await authenticate(pendingPage, pendingOwnerId, "SELLER");
