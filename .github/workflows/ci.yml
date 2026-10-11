@@ -124,7 +124,9 @@ jobs:
     timeout-minutes: 15
     env:
       CI: true
-      DATABASE_URL: postgresql://e2e:e2e@127.0.0.1:5432/todijo_e2e?schema=public
+      DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_browser?schema=public
+      PLAYWRIGHT_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_browser?schema=public
+      TODIJO_CI_DISPOSABLE_DATABASE: "1"
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -155,6 +157,13 @@ jobs:
 
       - name: Install Chromium browser only
         run: npx playwright install chromium
+
+      - name: Prepare dedicated disposable Playwright database
+        env:
+          PGPASSWORD: e2e
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U e2e -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
+          createdb -h 127.0.0.1 -p 5432 -U e2e --maintenance-db=postgres -O validation todijo_browser
 
       - name: Prepare ephemeral browser-test database
         run: npx prisma migrate deploy
