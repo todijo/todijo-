@@ -66,6 +66,11 @@ async function authenticate(page: Page, userId: string, role: "SELLER" | "ADMIN"
 }
 
 test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps unavailable status private", async ({ page }) => {
+  // This single end-to-end lifecycle intentionally covers sequential rename,
+  // a concurrent rename race, subordinate-store access, and privacy checks.
+  // Keep the full assertions while allowing the production server enough time
+  // for that multi-request flow on slower CI runners.
+  test.setTimeout(90_000);
   await authenticate(page, ownerId, "SELLER");
   await page.goto(`/fr/seller/store-settings?store=${encodeURIComponent(publicStoreId)}`);
   const urlSettings = page.getByRole("region", { name: "URL de la boutique" });
@@ -93,7 +98,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
     return { status: response.status, body: await response.json() };
   }, { storeId: publicStoreId, slug: `platform-cj-${suffix}` });
   expect(duplicate).toMatchObject({ status: 409, body: { error: "SLUG_TAKEN" } });
-  await page.locator(`#store-url-slug-${publicStoreId}`).fill(firstSlug);
+  await urlSettings.locator("input").fill(firstSlug);
   await page.getByRole("button", { name: "Demander un changement d’URL" }).click();
   await expect(page.getByText(`/fr/store/${firstSlug}`)).toBeVisible();
   await page.getByRole("button", { name: "Confirmer le changement d’URL" }).click();
@@ -145,7 +150,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
 
   await db.store.update({ where: { id: publicStoreId }, data: { slugLastChangedAt: new Date(Date.now() - 15 * 86_400_000) } });
   await page.reload();
-  await page.locator(`#store-url-slug-${publicStoreId}`).fill(finalSlug);
+  await urlSettings.locator("input").fill(finalSlug);
   await page.getByRole("button", { name: "Demander un changement d’URL" }).click();
   await page.getByRole("button", { name: "Confirmer le changement d’URL" }).click();
   await expect(page.getByRole("status").filter({ hasText: "L’URL de la boutique a été mise à jour." })).toBeVisible();

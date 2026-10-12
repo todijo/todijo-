@@ -6,7 +6,7 @@ import { readSession } from "@/lib/session";
 import { connectedAccountStatus, retrieveConnectedAccount, stripeErrorDiagnostic } from "@/lib/stripe";
 import { PUBLIC_STORES_CACHE_TAG } from "@/lib/cache-tags";
 import { requireBusinessOwner, SellerCapabilityError } from "@/lib/seller-business-access";
-import { reconcilePendingSellerStoreActivation } from "@/lib/seller-store-activation";
+import { reconcilePendingSellerStoreActivationsForOwner } from "@/lib/seller-store-activation";
 
 export const runtime = "nodejs";
 
@@ -31,17 +31,12 @@ export async function GET() {
     const reconciled = await prisma.$transaction(async tx => {
       const updated = await tx.user.updateMany({ where: { id: session.userId, stripeAccountId: seller.stripeAccountId }, data: status });
       if (updated.count !== 1) return { updated: false, storeActivated: false };
-      const pendingStores = await tx.store.findMany({ where: { ownerId: session.userId, status: "PENDING", onboardingStatus: "VERIFIED" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
-      let activated = false;
-      for (const store of pendingStores) {
-        const result = await reconcilePendingSellerStoreActivation(tx, store.id);
-        activated ||= result.activated;
-      }
-      return { updated: true, storeActivated: activated };
+      const activation = await reconcilePendingSellerStoreActivationsForOwner(tx, session.userId);
+      return { updated: true, storeActivated: activation.activatedStoreIds.length > 0, activation };
     }, { isolationLevel: "Serializable" });
     if (!reconciled.updated) return NextResponse.json({ error: "STRIPE_ACCOUNT_CHANGED" }, { status: 409 });
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
-    return NextResponse.json({ connected: true, accountId: account.id, onboardingComplete: status.stripeOnboardingComplete, chargesEnabled: status.stripeChargesEnabled, payoutsEnabled: status.stripePayoutsEnabled, storeActivated: reconciled.storeActivated });
+    return NextResponse.json({ connected: true, accountId: account.id, onboardingComplete: status.stripeOnboardingComplete, chargesEnabled: status.stripeChargesEnabled, payoutsEnabled: status.stripePayoutsEnabled, storeActivated: reconciled.storeActivated, activation: reconciled.activation });
   } catch (error) {
     if(error instanceof SellerCapabilityError)return NextResponse.json({error:error.code},{status:error.status});
     console.error("Stripe Connect status failed", stripeErrorDiagnostic(error, { correlationId, route: "GET /api/stripe/connect/status", sellerId: session.userId, hasStoredAccount }));

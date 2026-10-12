@@ -91,7 +91,14 @@ try {
   await waitForServer();
   exitCode = await new Promise((resolve, reject) => {
     const tests = spawn(process.execPath, [playwrightCli, "test", ...testArguments], {
-      env: { ...serverEnvironment, PLAYWRIGHT_BASE_URL: baseURL },
+      // Browser fixtures may exercise server-only webhook services directly
+      // with injected providers. Reuse the repository's existing Node-test
+      // marker shim in Playwright workers only; never load it into Next.js.
+      env: {
+        ...serverEnvironment,
+        PLAYWRIGHT_BASE_URL: baseURL,
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${join(process.cwd(), "tests", "setup.cjs")}`].filter(Boolean).join(" "),
+      },
       stdio: "inherit",
     });
     tests.once("error", reject);

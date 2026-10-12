@@ -19,7 +19,7 @@ import {configuredSellerPlanForPriceId} from "./seller-plans";
 import { processSellerSubscriptionTransitionEvent, subscriptionChangeProviders } from "./seller-subscription-changes";
 import { persistPaidSellerInvoice } from "./seller-invoice-persistence";
 import { enforceSellerPublicationCapacity } from "./seller-publication-capacity";
-import { reconcilePendingSellerStoreActivation } from "./seller-store-activation";
+import { reconcilePendingSellerStoreActivationsForOwner } from "./seller-store-activation";
 
 export class CheckoutError extends Error {
   constructor(message: string, public status = 400, public details?: unknown) { super(message); }
@@ -284,13 +284,9 @@ export async function processStripeEvent(
         if (!changed.count) return { ignored: true };
         const owner = await tx.user.findUnique({ where: { stripeAccountId: account.id }, select: { id: true } });
         if (!owner) return { accountUpdated: true, storesActivated: false };
-        const pendingStores = await tx.store.findMany({ where: { ownerId: owner.id, status: "PENDING", onboardingStatus: "VERIFIED" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
-        let storesActivated = false;
-        for (const store of pendingStores) {
-          const result = await reconcilePendingSellerStoreActivation(tx, store.id);
-          storesActivated ||= result.activated;
-        }
-        return { accountUpdated: true, storesActivated };
+        const activation = await reconcilePendingSellerStoreActivationsForOwner(tx, owner.id);
+        console.info(`[Stripe webhook ${event.id}] Seller activation reconciled (activated=${activation.activatedStoreIds.length}, blocked=${activation.blocked.length}).`);
+        return { accountUpdated: true, storesActivated: activation.activatedStoreIds.length > 0 };
       }
       if (event.type.startsWith("customer.subscription.")) {
         const subscription = event.data.object as StripeSubscription;
@@ -441,6 +437,8 @@ async function syncSellerSubscription(
   console.info(`[Stripe webhook ${eventId}] Seller subscription record updated (status=${subscriptionUpdate.status}).`);
   const products = commerciallyActive && configuredPlan.plan === "pro" ? { count: 0 } : await enforceSellerPublicationCapacity(tx, storeId, store.businessId);
   console.info(`[Stripe webhook ${eventId}] Saved ${status} subscription state; updated ${products.count} product(s).`);
+  const activation = await reconcilePendingSellerStoreActivationsForOwner(tx, store.ownerId);
+  console.info(`[Stripe webhook ${eventId}] Seller activation reconciled (activated=${activation.activatedStoreIds.length}, blocked=${activation.blocked.length}).`);
   return { storeId, status };
 }
 

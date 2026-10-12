@@ -50,12 +50,13 @@ function FieldError({ id, text }: { id: string; text?: string }) {
   return text ? <small className="sellerOnboardingFieldError" id={id} role="alert">{text}</small> : null;
 }
 
-export default function SellerOnboardingForm({ initial, buyerAddress, sellerIntent, selectedPlan, journeyCopy }: {
+export default function SellerOnboardingForm({ initial, buyerAddress, sellerIntent, selectedPlan, journeyCopy, adminReview }: {
   initial: Initial;
   buyerAddress: Address | null;
   sellerIntent: SellerRegistrationIntent | null;
   selectedPlan: SelectedPlan | null;
   journeyCopy: SellerJourneyCopy;
+  adminReview: { label: string; reason: string } | null;
 }) {
   const t = useTranslations("Auth");
   const v = useTranslations("SellerBusinessVerification");
@@ -268,6 +269,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
     <div className="sellerJourneyBrand"><TodijoLogo href={`/${locale}`} /><div><strong>{journeyCopy.welcome}</strong><p>{journeyCopy.intro}</p></div></div>
     <ol className="sellerJourneyProgress" aria-label={journeyCopy.welcome}><li className="isComplete">✓ <span>{journeyCopy.account}</span></li><li className="isCurrent">2 <span>{journeyCopy.information}</span></li><li>3 <span>{sellerIntent ? journeyCopy.subscription : journeyCopy.verification}</span></li><li>4 <span>{journeyCopy.paymentSetup}</span></li><li>5 <span>{journeyCopy.ready}</span></li></ol>
     <form ref={formRef} className="sellerOnboardingCard authForm" noValidate onChange={() => { markDirty(); setMessage(""); }} onSubmit={submit}>
+      {adminReview&&<p className="authMessage" role="status"><strong>{adminReview.label}</strong><span>{adminReview.reason}</span></p>}
       <header><span>{journeyCopy.accountComplete}</span><h1>{t("sellerOnboarding")}</h1><p>{t("sellerOnboardingIntro")}</p>{selectedPlan && <aside className="sellerSelectedPlan"><span>{journeyCopy.selectedPlan}</span><strong>{selectedPlan.name}</strong><small>{selectedPlan.interval === "monthly" ? journeyCopy.monthly : journeyCopy.annual} · {(selectedPlan.amountMinor / 100).toFixed(2)} {selectedPlan.currency}</small></aside>}<p className="sellerPaymentReassurance">{sellerIntent ? <>{journeyCopy.noPaymentYet}<br />{journeyCopy.nextStripe}</> : journeyCopy.nextFree}</p></header>
       <ol className="sellerOnboardingStepProgress" aria-label={stepTitles[currentStep - 1]}>{stepTitles.map((title, index) => <li key={title} className={index + 1 === currentStep ? "isCurrent" : index + 1 < currentStep ? "isComplete" : ""} aria-current={index + 1 === currentStep ? "step" : undefined}><span>{index + 1}</span>{title}</li>)}</ol>
       <p className="sellerOnboardingRequiredNote">{stepCopy.requiredNote}</p>
