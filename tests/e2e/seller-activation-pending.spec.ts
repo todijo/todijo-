@@ -214,7 +214,8 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
   await authenticate(page, store.ownerId, "SELLER");
   await page.goto("/en/seller/onboarding");
   await expect(page.getByRole("status").getByText(adminReason)).toBeVisible();
-  await page.locator(".sellerOnboardingActions button.socialLoginButton").first().click();
+  await expect(page.locator("#seller-onboarding-step-heading-3")).toBeVisible();
+  await expect(page.locator(".sellerBusinessVerification")).toBeVisible();
   await expect(page.locator("#businessSiren")).toHaveValue(identifiers.siren);
   await expect(page.getByRole("status").getByText("No result matches this SIREN or SIRET.")).toBeVisible();
   await page.locator("#businessRegistrationNumber").fill("");
@@ -227,7 +228,10 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
     });
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "VERIFIED", code: "VERIFIED", retryAfter: null }) });
   });
-  await page.locator(".sellerBusinessVerification button").click();
+  const verifyButton = page.locator(".sellerBusinessVerification button");
+  await expect(verifyButton).toBeVisible();
+  await expect(verifyButton).toBeEnabled();
+  await verifyButton.click();
   await expect(page.getByRole("status").getByText("SIREN and SIRET verified with INSEE.")).toBeVisible();
   await page.locator(".sellerOnboardingActions button.authSubmit").click();
   await expect(page.locator("#seller-onboarding-step-heading-4")).toBeVisible();
