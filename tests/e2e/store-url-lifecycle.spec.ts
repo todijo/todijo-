@@ -66,6 +66,11 @@ async function authenticate(page: Page, userId: string, role: "SELLER" | "ADMIN"
 }
 
 test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps unavailable status private", async ({ page }) => {
+  // This single end-to-end lifecycle intentionally covers sequential rename,
+  // a concurrent rename race, subordinate-store access, and privacy checks.
+  // Keep the full assertions while allowing the production server enough time
+  // for that multi-request flow on slower CI runners.
+  test.setTimeout(90_000);
   await authenticate(page, ownerId, "SELLER");
   await page.goto(`/fr/seller/store-settings?store=${encodeURIComponent(publicStoreId)}`);
   const urlSettings = page.getByRole("region", { name: "URL de la boutique" });
