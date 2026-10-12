@@ -217,10 +217,10 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
   await expect(page.locator("#seller-onboarding-step-heading-3:visible").first()).toBeVisible();
   const verification = page.locator(".sellerBusinessVerification:visible").first();
   await expect(verification).toBeVisible();
-  await expect(page.locator("#businessSiren")).toHaveValue(identifiers.siren);
+  await expect(verification.locator("#businessSiren").first()).toHaveValue(identifiers.siren);
   await expect(page.getByRole("status").getByText("No result matches this SIREN or SIRET.")).toBeVisible();
-  await page.locator("#businessRegistrationNumber").fill("");
-  await page.locator("#businessRegistrationNumber").fill(identifiers.siret);
+  await verification.locator("#businessRegistrationNumber").first().fill("");
+  await verification.locator("#businessRegistrationNumber").first().fill(identifiers.siret);
   await page.route("**/api/seller/business/verification", async route => {
     await db.$transaction(async tx => {
       await tx.sellerBusiness.update({ where: { id: store.businessId }, data: { inseeVerificationState: "VERIFIED", inseeVerificationReason: null, inseeVerifiedAt: new Date() } });
