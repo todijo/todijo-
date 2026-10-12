@@ -121,7 +121,7 @@ test("Admin review decision persists its audit reason and rejected approval retu
 
   await authenticate(page, store.ownerId, "SELLER");
   await page.goto("/en/seller/onboarding");
-  await expect(page.getByText(reason)).toBeVisible();
+  await expect(page.getByRole("status").getByText(reason)).toBeVisible();
 });
 
 test("Admin-granted PRO activates only after a fresh ready Connect state, then seller dashboard and listing render", async ({ page }) => {
