@@ -186,7 +186,7 @@ test("paid PRO subscription state is the final activation gate and makes the sto
     } as unknown as StripeSubscription;
     const event: StripeEvent = { id: `evt_paid_activation_browser_${suffix}`, type: "customer.subscription.updated", data: { object: subscription } };
     expect(await processStripeEvent(db as never, event, async () => subscription))
-      .toEqual({ subscriptionUpdated: true, storeId: store.storeId, status: "ACTIVE" });
+      .toEqual({ subscriptionUpdated: true, storeId: store.primaryStoreId, status: "ACTIVE" });
   } finally {
     if (previousPrice === undefined) delete process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID;
     else process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID = previousPrice;
