@@ -98,7 +98,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
     return { status: response.status, body: await response.json() };
   }, { storeId: publicStoreId, slug: `platform-cj-${suffix}` });
   expect(duplicate).toMatchObject({ status: 409, body: { error: "SLUG_TAKEN" } });
-  await page.locator(`#store-url-slug-${publicStoreId}`).fill(firstSlug);
+  await urlSettings.getByRole("textbox", { name: "Identifiant URL Identifiant" }).fill(firstSlug);
   await page.getByRole("button", { name: "Demander un changement d’URL" }).click();
   await expect(page.getByText(`/fr/store/${firstSlug}`)).toBeVisible();
   await page.getByRole("button", { name: "Confirmer le changement d’URL" }).click();
@@ -150,7 +150,7 @@ test("store URL is explicit, cooldown-protected, redirects old slugs, and keeps 
 
   await db.store.update({ where: { id: publicStoreId }, data: { slugLastChangedAt: new Date(Date.now() - 15 * 86_400_000) } });
   await page.reload();
-  await page.locator(`#store-url-slug-${publicStoreId}`).fill(finalSlug);
+  await urlSettings.getByRole("textbox", { name: "Identifiant URL Identifiant" }).fill(finalSlug);
   await page.getByRole("button", { name: "Demander un changement d’URL" }).click();
   await page.getByRole("button", { name: "Confirmer le changement d’URL" }).click();
   await expect(page.getByRole("status").filter({ hasText: "L’URL de la boutique a été mise à jour." })).toBeVisible();
