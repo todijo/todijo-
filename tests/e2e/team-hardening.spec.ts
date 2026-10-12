@@ -31,6 +31,14 @@ async function setSession(page: import("@playwright/test").Page, userId: string,
 
 async function cleanupFixtures() {
   await db.sellerTeamMembership.deleteMany({ where: { id: membershipId } });
+  await db.sellerBusinessAuditEvent.deleteMany({
+    where: {
+      OR: [
+        { businessId: { in: [businessId, reviewBusinessId] } },
+        { actorId: { in: [ownerId, memberId, adminId, buyerId, applicantId] } },
+      ],
+    },
+  });
   await db.store.deleteMany({ where: { id: { in: [store2Id, store3Id, reviewStoreId] } } });
   await db.sellerBusiness.deleteMany({ where: { id: { in: [businessId, reviewBusinessId] } } });
   await db.user.deleteMany({ where: { id: { in: [ownerId, memberId, adminId, buyerId, applicantId] } } });
