@@ -188,6 +188,8 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
   await db.sellerBusinessEstablishment.update({ where: { id: identifiers.establishmentId }, data: { verificationState: "REJECTED", verificationReason: "NOT_FOUND" } });
   await authenticate(page, adminId, "ADMIN");
   await page.goto("/en/dashboard");
+  await expect(page.locator(".cookieReject")).toBeVisible();
+  await page.locator(".cookieReject").click();
   const grant = await page.evaluate(async storeId => {
     const response = await fetch("/api/admin/stores", {
       method: "PATCH", headers: { "content-type": "application/json", "x-todijo-admin-action": "1" },
