@@ -228,7 +228,7 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
     });
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "VERIFIED", code: "VERIFIED", retryAfter: null }) });
   });
-  const verifyButton = page.locator(".sellerBusinessVerification button");
+  const verifyButton = page.locator(".sellerBusinessVerification button.socialLoginButton");
   await expect(verifyButton).toBeVisible();
   await expect(verifyButton).toBeEnabled();
   await verifyButton.click();
