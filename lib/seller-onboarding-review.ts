@@ -26,17 +26,21 @@ export async function reviewSellerOnboarding(tx:Prisma.TransactionClient,input:{
       if(!store.legalBusinessName||!validBusinessRegistration(store.businessRegistrationId??"",requirements)||store.vatStatus==="UNKNOWN"||store.vatStatus==="REGISTERED"&&!store.vatNumber)throw new SellerReviewError("SELLER_PREREQUISITES_INCOMPLETE",409);
       if(store.country.toUpperCase()==="FR"){
         const siren=normalizeSiren(store.business?.siren),siret=normalizeSiret(store.businessRegistrationId);
-        if(!siren.ok||!siret.ok||sirenForSiret(siret.value)!==siren.value)throw new SellerReviewError("SELLER_BUSINESS_VERIFICATION_REQUIRED",409);
+        if(!siret.ok)throw new SellerReviewError("SELLER_ESTABLISHMENT_REQUIRED",409);
+        if(!siren.ok||sirenForSiret(siret.value)!==siren.value)throw new SellerReviewError("SELLER_BUSINESS_VERIFICATION_REQUIRED",409);
+        const registrationDocument=await tx.sellerVerificationDocument.findFirst({where:{businessId:store.businessId,businessSiren:siren.value,type:"BUSINESS_REGISTRATION",status:{not:"SUPERSEDED"}},orderBy:[{submittedAt:"desc"},{id:"desc"}],select:{id:true,status:true}});
+        if(registrationDocument?.status!=="ACCEPTED")throw new SellerReviewError("REGISTRATION_DOCUMENT_NOT_ACCEPTED",409);
         const establishment=await tx.sellerBusinessEstablishment.findUnique({where:{businessId_siret:{businessId:store.businessId,siret:siret.value}}});
         if(!establishment||establishment.legalUnitSiren!==siren.value)throw new SellerReviewError("SELLER_BUSINESS_VERIFICATION_REQUIRED",409);
         const inseeVerified=store.business?.inseeVerificationState==="VERIFIED"&&establishment.verificationState==="VERIFIED";
-        const manualReview=(store.business?.inseeVerificationState==="MANUAL_REVIEW"||store.business?.inseeVerificationState==="VERIFIED")&&establishment.verificationState==="MANUAL_REVIEW";
-        if(!inseeVerified&&!manualReview)throw new SellerReviewError("SELLER_BUSINESS_VERIFICATION_REQUIRED",409);
+        const manualReview=!inseeVerified;
         if(manualReview){
           const verifiedAt=new Date();
-          if(store.business?.inseeVerificationState!="VERIFIED")await tx.sellerBusiness.update({where:{id:store.businessId},data:{inseeVerificationState:"VERIFIED",inseeVerifiedAt:verifiedAt,inseeVerificationSource:"ADMIN_REVIEW",inseeVerificationReason:null}});
-          await tx.sellerBusinessEstablishment.update({where:{id:establishment.id},data:{verificationState:"VERIFIED",verifiedAt,verificationSource:"ADMIN_REVIEW",verificationReason:null}});
-          await appendSellerBusinessAudit(tx,{businessId:store.businessId,storeId:store.id,actorId:input.adminId,category:"BUSINESS_VERIFICATION",action:"INSEE_ADMIN_MANUAL_VERIFIED",targetType:"SELLER_BUSINESS_ESTABLISHMENT",targetId:establishment.id,metadata:{reason:input.reason,siren:siren.value,siret:siret.value}});
+          const previousBusinessState=store.business?.inseeVerificationState??null;
+          const previousEstablishmentState=establishment.verificationState;
+          if(store.business?.inseeVerificationState!=="VERIFIED")await tx.sellerBusiness.update({where:{id:store.businessId},data:{inseeVerificationState:"VERIFIED",inseeVerifiedAt:verifiedAt,inseeVerificationSource:"ADMIN_REVIEW"}});
+          await tx.sellerBusinessEstablishment.update({where:{id:establishment.id},data:{verificationState:"VERIFIED",verifiedAt,verificationSource:"ADMIN_REVIEW"}});
+          await appendSellerBusinessAudit(tx,{businessId:store.businessId,storeId:store.id,actorId:input.adminId,category:"BUSINESS_VERIFICATION",action:"INSEE_ADMIN_MANUAL_VERIFIED",targetType:"SELLER_BUSINESS_ESTABLISHMENT",targetId:establishment.id,metadata:{reason:input.reason,siren:siren.value,siret:siret.value,documentId:registrationDocument.id,previousBusinessState,previousEstablishmentState}});
         }
         // Keep the Store write in the same optimistic-concurrency update below.
         // Updating it here changes updatedAt and makes our own CAS fail, which

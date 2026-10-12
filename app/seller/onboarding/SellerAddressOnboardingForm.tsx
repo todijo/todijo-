@@ -7,13 +7,15 @@ import LocalizedCountrySelect from "@/components/LocalizedCountrySelect";
 import { sellerRegistrationRequirements, validBusinessRegistration } from "@/lib/seller-registration-requirements";
 import { sellerOnboardingPath, type SellerRegistrationIntent } from "@/lib/seller-registration-intent";
 import { franceCompanySubtypes } from "@/lib/seller-legal-forms";
-import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
+import { hasVerifiedSiretForSiren, normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
 import { isLocale } from "@/i18n/config";
 import { sellerLegalFormMessages } from "@/i18n/seller-legal-forms";
 import { sellerOnboardingStepCopy } from "@/i18n/seller-onboarding-steps";
 import { selectSellerOnboardingType } from "@/lib/seller-onboarding-seller-type";
 import TodijoLogo from "@/components/TodijoLogo";
 import type { SellerJourneyCopy } from "@/i18n/seller-onboarding-journey";
+import SellerVerificationDocumentUpload from "./SellerVerificationDocumentUpload";
+import { sellerVerificationDocumentCopy } from "@/i18n/seller-verification-documents";
 
 type Address = { address: string; postalCode: string; city: string; country: string; phone: string };
 type SellerType = "PRIVATE" | "PROFESSIONAL";
@@ -32,6 +34,7 @@ type Initial = Address & {
   displayBusinessAddress: boolean;
   samePersonalBusinessAddress: boolean;
   businessVerificationState: string;
+  businessEstablishmentVerificationState: string;
   businessVerificationReason: string;
   step: number;
 };
@@ -80,6 +83,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
   const [businessSiren, setBusinessSiren] = useState(initial.businessSiren);
   const [businessRegistrationNumber, setBusinessRegistrationNumber] = useState(initial.businessRegistrationNumber);
   const [businessVerificationState, setBusinessVerificationState] = useState(initial.businessVerificationState);
+  const [establishmentVerified, setEstablishmentVerified] = useState(Boolean(initial.businessRegistrationNumber) && initial.businessEstablishmentVerificationState === "VERIFIED");
   const [businessVerificationReason, setBusinessVerificationReason] = useState(initial.businessVerificationReason);
   const [displayBusinessAddress, setDisplayBusinessAddress] = useState(initial.displayBusinessAddress);
   const [samePersonalBusinessAddress, setSamePersonalBusinessAddress] = useState(initial.samePersonalBusinessAddress);
@@ -95,6 +99,9 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
   const shownAddress = usePersonalAddress && buyerAddress ? { ...buyerAddress, phone: buyerAddress.phone || storeAddress.phone } : storeAddress;
   const requirements = useMemo(() => sellerRegistrationRequirements(shownAddress.country, sellerType ?? "PRIVATE"), [shownAddress.country, sellerType]);
   const professionalIdentityReady = sellerType === "PROFESSIONAL" && Boolean(shownAddress.country) && Boolean(legalForm) && !(shownAddress.country === "FR" && legalForm === "COMPANY" && !companySubtype);
+  const showInseeSuccess = shownAddress.country === "FR"
+    ? hasVerifiedSiretForSiren({ businessState: businessVerificationState, establishmentState: establishmentVerified ? "VERIFIED" : "NOT_VERIFIED", siren: businessSiren, siret: businessRegistrationNumber })
+    : businessVerificationState === "VERIFIED";
 
   const markDirty = () => {
     revisionRef.current += 1;
@@ -136,6 +143,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
       const response = await fetch("/api/seller/business/verification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sellerType, country: shownAddress.country, businessSiren, businessRegistrationNumber }) });
       const data = await response.json().catch(() => ({}));
       if (typeof data.state === "string") setBusinessVerificationState(data.state);
+      setEstablishmentVerified(data.state === "VERIFIED" && normalizeSiret(businessRegistrationNumber).ok);
       const code = typeof data.code === "string" ? data.code : data.error;
       setBusinessVerificationReason(typeof code === "string" ? code : "");
       const copyKey = code === "VERIFIED" ? "success" : code === "SIRET_SIREN_MISMATCH" || code === "SIREN_MISMATCH" ? "mismatch" : code === "SIREN_INVALID_FORMAT" ? "invalidSiren" : code === "SIRET_INVALID_FORMAT" ? "invalidSiret" : code === "SIREN_INVALID_CHECKSUM" ? "invalidSirenChecksum" : code === "SIRET_INVALID_CHECKSUM" ? "invalidSiretChecksum" : ["NOT_FOUND", "BUSINESS_NOT_FOUND"].includes(code) ? "notFound" : code === "PUBLIC_DATA_INCOMPLETE" ? "partialData" : ["PENDING", "TIMEOUT", "RATE_LIMITED", "UPSTREAM_ERROR", "NOT_CONFIGURED", "RETRY_LATER", "BUSINESS_VERIFICATION_UNAVAILABLE"].includes(code) ? "unavailable" : "manualReview";
@@ -196,13 +204,14 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
         required("legalForm");
         if (shownAddress.country === "FR" && legalForm === "COMPANY") required("companySubtype");
         required("legalBusinessName");
-        required("businessRegistrationNumber");
         if (shownAddress.country === "FR") {
           const siren = normalizeSiren(businessSiren);
           if (!siren.ok) errors.businessSiren = v(siren.code === "SIREN_INVALID_CHECKSUM" ? "invalidSirenChecksum" : "invalidSiren");
-          const siret = normalizeSiret(businessRegistrationNumber);
-          if (!siret.ok) errors.businessRegistrationNumber = v(siret.code === "SIRET_INVALID_CHECKSUM" ? "invalidSiretChecksum" : "invalidSiret");
-          if (siren.ok && siret.ok && sirenForSiret(siret.value) !== siren.value) errors.businessRegistrationNumber = v("mismatch");
+          if (businessRegistrationNumber.trim()) {
+            const siret = normalizeSiret(businessRegistrationNumber);
+            if (!siret.ok) errors.businessRegistrationNumber = v(siret.code === "SIRET_INVALID_CHECKSUM" ? "invalidSiretChecksum" : "invalidSiret");
+            if (siren.ok && siret.ok && sirenForSiret(siret.value) !== siren.value) errors.businessRegistrationNumber = v("mismatch");
+          }
         } else if (!validBusinessRegistration(businessRegistrationNumber, requirements)) {
           errors.businessRegistrationNumber = legalCopy.invalid;
         }
@@ -262,7 +271,8 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
       location.assign(sellerIntent ? sellerOnboardingPath(locale, true, sellerIntent) : `/${locale}/seller/subscription`);
       return;
     }
-    if (data.error === "INVALID_SIREN") { setCurrentStep(3); setFieldErrors({ businessSiren: v("invalidSiren") }); }
+    if (data.error === "REGISTRATION_DOCUMENT_REQUIRED") { setCurrentStep(3); setMessage(sellerVerificationDocumentCopy[isLocale(locale) ? locale : "en"].registrationDocument); }
+    else if (data.error === "INVALID_SIREN") { setCurrentStep(3); setFieldErrors({ businessSiren: v("invalidSiren") }); }
     else if (data.error === "INVALID_SIRET") { setCurrentStep(3); setFieldErrors({ businessRegistrationNumber: v("invalidSiret") }); }
     else if (data.error === "SIRET_SIREN_MISMATCH") { setCurrentStep(3); setFieldErrors({ businessRegistrationNumber: v("mismatch") }); }
     else if (data.error === "SELLER_BUSINESS_VERIFICATION_REQUIRED") { setCurrentStep(3); setBusinessVerificationState("REJECTED"); setMessage(v("verificationRequired")); }
@@ -313,10 +323,11 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
           <div className="formField"><FieldLabel htmlFor="legalForm" required>{t("legalForm")}</FieldLabel><select id="legalForm" name="legalForm" value={legalForm} onChange={event => { setLegalForm(event.target.value); if (event.target.value !== "COMPANY") setCompanySubtype(""); clearFieldError("legalForm"); }} {...errorProps("legalForm")}><option value="">{t("legalForm")}</option><option value="SOLE_TRADER">{shownAddress.country === "FR" ? legalCopy.individual : t("soleTrader")}</option><option value="COMPANY">{shownAddress.country === "FR" ? legalCopy.company : t("company")}</option><option value="ASSOCIATION">{shownAddress.country === "FR" ? legalCopy.association : t("association")}</option><option value="OTHER">{shownAddress.country === "FR" ? legalCopy.other : t("otherLegalForm")}</option></select>{error("legalForm")}</div>
           {shownAddress.country === "FR" && legalForm === "COMPANY" && <div className="formField"><FieldLabel htmlFor="companySubtype" required>{legalCopy.subtype}</FieldLabel><select id="companySubtype" name="companySubtype" value={companySubtype} onChange={event => { setCompanySubtype(event.target.value); clearFieldError("companySubtype"); }} {...errorProps("companySubtype")}><option value="">{legalCopy.subtype}</option>{franceCompanySubtypes.map(subtype => <option value={subtype} key={subtype}>{subtype === "SOCIETE_CIVILE" ? legalCopy.civil : subtype === "SOCIETE_EXERCICE_LIBERAL" ? legalCopy.liberal : subtype === "SOCIETE_COOPERATIVE" ? legalCopy.cooperative : subtype === "SOCIETE_EUROPEENNE" ? legalCopy.european : subtype === "OTHER_COMPANY" ? legalCopy.otherCompany : subtype}</option>)}</select>{error("companySubtype")}</div>}
           {professionalIdentityReady && <><div className="formField"><FieldLabel htmlFor="legalBusinessName" required>{t("legalBusinessName")}</FieldLabel><input id="legalBusinessName" name="legalBusinessName" value={legalBusinessName} onChange={event => { setLegalBusinessName(event.target.value); clearFieldError("legalBusinessName"); }} {...errorProps("legalBusinessName")} />{error("legalBusinessName")}</div>
-          {shownAddress.country === "FR" ? <section className="sellerBusinessVerification" aria-labelledby="seller-business-verification-title"><h3 id="seller-business-verification-title">{v("sectionTitle")}</h3><p>{v("sectionIntro")}</p><div className="formField"><FieldLabel htmlFor="businessSiren" required help={stepCopy.help.siren}>{v("siren")}</FieldLabel><input id="businessSiren" name="businessSiren" inputMode="numeric" autoComplete="off" value={businessSiren} onChange={event => { setBusinessSiren(event.target.value); setBusinessVerificationState("NOT_STARTED"); setBusinessVerificationReason(""); setVerificationMessage(""); clearFieldError("businessSiren"); clearFieldError("businessRegistrationNumber"); }} {...errorProps("businessSiren")} />{error("businessSiren")}</div><div className="formField"><FieldLabel htmlFor="businessRegistrationNumber" required help={stepCopy.help.siret}>{v("siret")}</FieldLabel><input id="businessRegistrationNumber" name="businessRegistrationNumber" inputMode="numeric" autoComplete="off" value={businessRegistrationNumber} onChange={event => { setBusinessRegistrationNumber(event.target.value); setBusinessVerificationState("NOT_STARTED"); setBusinessVerificationReason(""); setVerificationMessage(""); clearFieldError("businessRegistrationNumber"); }} {...errorProps("businessRegistrationNumber")} /><small>{stepCopy.inseeVerificationNote}</small>{error("businessRegistrationNumber")}</div><button type="button" className="socialLoginButton" disabled={verifying || !businessSiren || !businessRegistrationNumber} onClick={verifyBusiness}>{verifying ? v("unavailable") : v("verify")}</button><p role="status">{businessVerificationState === "VERIFIED" ? v("success") : verificationReasonMessage(businessVerificationReason) || (businessVerificationState === "MANUAL_REVIEW" ? v("manualReview") : businessVerificationState === "PENDING" ? v("unavailable") : "")}</p>{verificationMessage && <p role="status">{verificationMessage}</p>}</section> : <div className="formField"><FieldLabel htmlFor="businessRegistrationNumber" required>{t(requirements.registrationLabel)}</FieldLabel><input id="businessRegistrationNumber" name="businessRegistrationNumber" value={businessRegistrationNumber} onChange={event => { setBusinessRegistrationNumber(event.target.value); clearFieldError("businessRegistrationNumber"); }} {...errorProps("businessRegistrationNumber")} /><small>{t("formatNotVerification")}</small>{error("businessRegistrationNumber")}</div>}
+          {shownAddress.country === "FR" ? <section className="sellerBusinessVerification" aria-labelledby="seller-business-verification-title"><h3 id="seller-business-verification-title">{v("sectionTitle")}</h3><p>{v("sectionIntro")}</p><div className="formField"><FieldLabel htmlFor="businessSiren" required help={stepCopy.help.siren}>{v("siren")}</FieldLabel><input id="businessSiren" name="businessSiren" inputMode="numeric" autoComplete="off" value={businessSiren} onChange={event => { setBusinessSiren(event.target.value); setBusinessVerificationState("NOT_STARTED"); setEstablishmentVerified(false); setBusinessVerificationReason(""); setVerificationMessage(""); clearFieldError("businessSiren"); clearFieldError("businessRegistrationNumber"); }} {...errorProps("businessSiren")} />{error("businessSiren")}</div><div className="formField"><FieldLabel htmlFor="businessRegistrationNumber" help={stepCopy.help.siret}>{v("siret")}</FieldLabel><input id="businessRegistrationNumber" name="businessRegistrationNumber" inputMode="numeric" autoComplete="off" value={businessRegistrationNumber} onChange={event => { setBusinessRegistrationNumber(event.target.value); setBusinessVerificationState("NOT_STARTED"); setEstablishmentVerified(false); setBusinessVerificationReason(""); setVerificationMessage(""); clearFieldError("businessRegistrationNumber"); }} {...errorProps("businessRegistrationNumber")} /><small>{stepCopy.inseeVerificationNote}</small>{error("businessRegistrationNumber")}</div><button type="button" className="socialLoginButton" disabled={verifying || !businessSiren} onClick={verifyBusiness}>{verifying ? v("unavailable") : v("verify")}</button><p role="status">{showInseeSuccess ? v("success") : verificationReasonMessage(businessVerificationReason) || (businessVerificationState === "MANUAL_REVIEW" ? v("manualReview") : businessVerificationState === "PENDING" ? v("unavailable") : "")}</p>{verificationMessage && <p role="status">{verificationMessage}</p>}</section> : <div className="formField"><FieldLabel htmlFor="businessRegistrationNumber" required>{t(requirements.registrationLabel)}</FieldLabel><input id="businessRegistrationNumber" name="businessRegistrationNumber" value={businessRegistrationNumber} onChange={event => { setBusinessRegistrationNumber(event.target.value); clearFieldError("businessRegistrationNumber"); }} {...errorProps("businessRegistrationNumber")} /><small>{t("formatNotVerification")}</small>{error("businessRegistrationNumber")}</div>}
           <fieldset aria-invalid={Boolean(fieldErrors.vatStatus)} aria-describedby={fieldErrors.vatStatus ? "vatStatus-error" : undefined}><legend><FieldLabel required help={stepCopy.help.vat}>{t("vatQuestion")}</FieldLabel></legend><label><input id="vat-registered" type="radio" name="vatStatus" value="REGISTERED" checked={vatStatus === "REGISTERED"} onChange={() => { setVatStatus("REGISTERED"); clearFieldError("vatStatus"); }} />{t("yes")}</label><label><input id="vat-not-registered" type="radio" name="vatStatus" value="NOT_REGISTERED_OR_NOT_APPLICABLE" checked={vatStatus === "NOT_REGISTERED_OR_NOT_APPLICABLE"} onChange={() => { setVatStatus("NOT_REGISTERED_OR_NOT_APPLICABLE"); clearFieldError("vatStatus"); }} />{t("no")}</label>{fieldErrors.vatStatus && <FieldError id="vatStatus-error" text={fieldErrors.vatStatus} />}</fieldset>
           {vatStatus === "REGISTERED" && <div className="formField"><FieldLabel htmlFor="vatNumber" required>{t("vatNumber")}</FieldLabel><input id="vatNumber" name="vatNumber" value={vatNumber} onChange={event => { setVatNumber(event.target.value); clearFieldError("vatNumber"); }} {...errorProps("vatNumber")} />{error("vatNumber")}</div>}
           <fieldset><legend>{v("addressTitle")}</legend><p>{v("addressQuestion")}</p><label><input type="radio" name="displayBusinessAddress" value="true" checked={displayBusinessAddress} onChange={() => setDisplayBusinessAddress(true)} />{v("showAddress")}</label><label><input type="radio" name="displayBusinessAddress" value="false" checked={!displayBusinessAddress} onChange={() => setDisplayBusinessAddress(false)} />{v("countryOnly")}</label><small>{v("addressHelper")}</small></fieldset></>}
+          {shownAddress.country === "FR" && <SellerVerificationDocumentUpload locale={isLocale(locale) ? locale : "en"} errorMessage={t("error")} businessSiren={businessSiren} />}
         </>}
       </section>
 
@@ -328,7 +339,7 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
           <div><dt>{t("sellerOnboarding")}</dt><dd>{sellerType === "PROFESSIONAL" ? v("professionalTitle") : sellerType === "PRIVATE" ? v("privateTitle") : "—"}</dd></div>
           {sellerType === "PROFESSIONAL" && <><div><dt>{t("legalBusinessName")}</dt><dd>{legalBusinessName || "—"}</dd></div><div><dt>{t("legalForm")}</dt><dd>{legalForm || "—"}</dd></div><div><dt>{shownAddress.country === "FR" ? v("siren") : t(requirements.registrationLabel)}</dt><dd>{shownAddress.country === "FR" ? businessSiren || "—" : businessRegistrationNumber || "—"}</dd></div>{shownAddress.country === "FR" && <div><dt>{v("siret")}</dt><dd>{businessRegistrationNumber || "—"}</dd></div>}<div><dt>{t("vatQuestion")}</dt><dd>{vatStatus === "REGISTERED" ? t("yes") : vatStatus === "NOT_REGISTERED_OR_NOT_APPLICABLE" ? t("no") : "—"}</dd></div></>}
         </dl>
-        {businessVerificationState === "VERIFIED" && <p role="status">{v("success")}</p>}
+        {showInseeSuccess && <p role="status">{v("success")}</p>}
         {verificationMessage && <p role="status">{verificationMessage}</p>}
       </section>
 

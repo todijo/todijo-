@@ -21,3 +21,10 @@ function normalize(value: unknown, length: 9 | 14, formatCode: "SIREN_INVALID_FO
 export function normalizeSiren(value: unknown) { return normalize(value, 9, "SIREN_INVALID_FORMAT", "SIREN_INVALID_CHECKSUM"); }
 export function normalizeSiret(value: unknown) { return normalize(value, 14, "SIRET_INVALID_FORMAT", "SIRET_INVALID_CHECKSUM"); }
 export function sirenForSiret(siret: string) { return siret.slice(0, 9); }
+
+export function hasVerifiedSiretForSiren(input: { businessState: string; establishmentState: string; siren: unknown; siret: unknown }) {
+  if (input.businessState !== "VERIFIED" || input.establishmentState !== "VERIFIED") return false;
+  const siren = normalizeSiren(input.siren);
+  const siret = normalizeSiret(input.siret);
+  return siren.ok && siret.ok && sirenForSiret(siret.value) === siren.value;
+}

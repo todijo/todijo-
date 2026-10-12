@@ -9,17 +9,19 @@ test("ordinary completed private and non-French professional sellers are verifie
   assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "DE" }), { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" });
 });
 
-test("French professional sellers complete onboarding only after matching INSEE verification", () => {
-  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "VERIFIED", establishmentState: "VERIFIED" }), { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" });
-  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "PENDING", establishmentState: "PENDING" }), { kind: "VERIFICATION_REQUIRED" });
-  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "REJECTED", establishmentState: "REJECTED" }), { kind: "VERIFICATION_REQUIRED" });
+test("French professional onboarding requires a registration document, but does not require initial SIRET", () => {
+  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "VERIFIED", establishmentState: "VERIFIED", siretProvided: true, registrationDocumentSubmitted: true, registrationDocumentAccepted: true }), { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" });
+  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "VERIFIED", establishmentState: "VERIFIED", siretProvided: true, registrationDocumentSubmitted: true }), { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" });
+  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "VERIFIED", registrationDocumentSubmitted: true, siretProvided: false }), { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" });
+  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "VERIFIED", establishmentState: "VERIFIED", siretProvided: true }), { kind: "VERIFICATION_REQUIRED" });
+  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "REJECTED", establishmentState: "REJECTED", siretProvided: true, registrationDocumentSubmitted: true }), { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" });
 });
 
-test("Admin review is limited to the existing exceptional INSEE manual-review outcome", () => {
-  for (const businessState of ["MANUAL_REVIEW", "VERIFIED"]) {
-    assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState, establishmentState: "MANUAL_REVIEW" }), { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" });
+test("document-backed INSEE inconclusive and rejected outcomes enter an auditable manual-review path", () => {
+  for (const businessState of ["MANUAL_REVIEW", "VERIFIED", "REJECTED", "PENDING"]) {
+    assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState, establishmentState: "MANUAL_REVIEW", siretProvided: true, registrationDocumentSubmitted: true }), { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" });
   }
-  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "MANUAL_REVIEW", establishmentState: "VERIFIED" }), { kind: "VERIFICATION_REQUIRED" });
+  assert.deepEqual(sellerOnboardingCompletion({ professional: true, country: "FR", businessState: "MANUAL_REVIEW", establishmentState: "VERIFIED", siretProvided: true, registrationDocumentSubmitted: true }), { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" });
 });
 
 test("onboarding submission records verified setup as pending Connect activation and only queues exceptional review", () => {

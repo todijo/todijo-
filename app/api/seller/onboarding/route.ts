@@ -115,10 +115,11 @@ export async function POST(request: Request) {
   if (frProfessional && !siren.ok) return NextResponse.json({ error: "INVALID_SIREN" }, { status: 400 });
   const identity = legal.identity;
   const requirements = sellerRegistrationRequirements(country, sellerType);
-  if (!validBusinessRegistration(registration ?? "", requirements) || vatStatus === "REGISTERED" && !vatNumber) {
+  const missingInitialFrenchSiret = frProfessional && !registration;
+  if ((!missingInitialFrenchSiret && !validBusinessRegistration(registration ?? "", requirements)) || vatStatus === "REGISTERED" && !vatNumber) {
     return NextResponse.json({ error: "INVALID_BUSINESS_DETAILS" }, { status: 400 });
   }
-  if (frProfessional) {
+  if (frProfessional && registration) {
     const siret = normalizeSiret(registration);
     if (!siret.ok) return NextResponse.json({ error: "INVALID_SIRET" }, { status: 400 });
     if (!siren.ok || sirenForSiret(siret.value) !== siren.value) return NextResponse.json({ error: "SIRET_SIREN_MISMATCH" }, { status: 400 });
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
         : await tx.store.create({ data: { ...storeData, slug: await allocateInitialStoreSlug(tx, storeName, user.id), ownerId: user.id, status: "PENDING" }, select: { id: true } });
       const business = await ensureSellerBusiness(tx, user.id, store.id);
       await tx.store.updateMany({ where: { id: store.id, ownerId: user.id, businessId: null }, data: { businessId: business.id } });
+      await tx.sellerVerificationDocument.updateMany({ where: { businessId: business.id, storeId: null }, data: { storeId: store.id } });
       await persistSellerAdminContactPhone(tx, { businessId: business.id, storeId: store.id, actorId: user.id, phone: adminContactPhone });
 
       let businessState: string | null = null;
@@ -178,7 +180,9 @@ export async function POST(request: Request) {
         }
       }
 
-      const completion = sellerOnboardingCompletion({ professional: sellerType === "PROFESSIONAL", country, businessState, establishmentState });
+      const registrationDocument = frProfessional ? await tx.sellerVerificationDocument.findFirst({ where: { businessId: business.id, type: "BUSINESS_REGISTRATION", businessSiren: siren.ok ? siren.value : null, status: { not: "SUPERSEDED" } }, orderBy: [{ submittedAt: "desc" }, { id: "desc" }], select: { id: true, status: true } }) : null;
+      if (frProfessional && (!registrationDocument || registrationDocument.status === "REJECTED")) throw new SellerOnboardingSubmissionError("REGISTRATION_DOCUMENT_REQUIRED", 409);
+      const completion = sellerOnboardingCompletion({ professional: sellerType === "PROFESSIONAL", country, businessState, establishmentState, siretProvided: Boolean(registration), registrationDocumentSubmitted: Boolean(registrationDocument), registrationDocumentAccepted: registrationDocument?.status === "ACCEPTED" });
       if (completion.kind === "VERIFICATION_REQUIRED") throw new SellerOnboardingSubmissionError("SELLER_BUSINESS_VERIFICATION_REQUIRED", 409);
 
       await tx.store.update({ where: { id: store.id }, data: {

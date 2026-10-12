@@ -32,6 +32,7 @@ import { sellerMultiStoreTeaserCopy } from "@/i18n/seller-multi-store-teaser";
 import LockedMultiStoreTeaser from "@/components/LockedMultiStoreTeaser";
 import { hasVerifiedFrenchBusiness } from "@/lib/seller-business-verification-policy";
 import { sellerBusinessVerificationMessage } from "@/lib/seller-dashboard-readiness";
+import { sellerVerificationDocumentCopy } from "@/i18n/seller-verification-documents";
 import { connectPaymentCopy } from "@/i18n/connect-payment";
 import { sellerLifecycleCopy } from "@/i18n/seller-lifecycle";
 import { resolveSellerLifecycleStatus } from "@/lib/seller-lifecycle-state";
@@ -98,7 +99,7 @@ function RecentOrder({ order, locale, detailsLabel, unknownStore, statusLabel }:
   </article>;
 }
 
-const sellerStoreSelect={id:true,businessId:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,archivedAt:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{primaryStoreId:true,siren:true,inseeVerificationState:true,inseeVerificationReason:true,sellerClosedAt:true,reactivationStockReviewRequired:true}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} as const;
+const sellerStoreSelect={id:true,businessId:true,name:true,slug:true,description:true,logo:true,banner:true,country:true,city:true,businessRegistrationId:true,currency:true,status:true,archivedAt:true,sellerType:true,vatStatus:true,onboardingStatus:true,onboardingStep:true,business:{select:{primaryStoreId:true,siren:true,inseeVerificationState:true,inseeVerificationReason:true,sellerClosedAt:true,reactivationStockReviewRequired:true,verificationDocuments:{where:{type:"BUSINESS_REGISTRATION",status:{not:"SUPERSEDED"}},orderBy:{submittedAt:"desc"},take:10,select:{id:true,businessSiren:true,status:true}}}},establishment:{select:{siret:true,legalUnitSiren:true,verificationState:true,verificationReason:true}},subscription:{select:{status:true,currentPeriodEnd:true,cancelAtPeriodEnd:true}},accessGrants:{select:{source:true,startsAt:true,endsAt:true}},_count:{select:{products:true}}} satisfies Prisma.StoreSelect;
 
 async function loadSellerDashboardMetrics(userId:string,storeId:string,permissions:{products:boolean;orders:boolean;analytics:boolean;sales:boolean}) {
   const sellerOrdersWhere = sellerOrderHistoryWhere(userId, storeId, "");
@@ -338,6 +339,8 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const businessVerificationRequired=!hasVerifiedFrenchBusiness(activeStore);
   const storeReadinessPending=activeStore.status!=="ACTIVE";
   const manualReviewPending=activeStore.onboardingStatus==="PENDING_REVIEW";
+  const registrationDocument=activeStore.business?.verificationDocuments.find(document=>document.businessSiren===activeStore.business?.siren);
+  const registrationDocumentUploadNeeded=activeStore.sellerType==="PROFESSIONAL"&&activeStore.country.toUpperCase()==="FR"&&(!registrationDocument||registrationDocument.status==="NEEDS_INFORMATION"||registrationDocument.status==="REJECTED");
   const subordinateStoreNeedsPro = Boolean(activeStore.businessId && activeStore.id !== activeStore.business?.primaryStoreId && selectedCommercialPlan !== "pro");
   const storeManagementCopy=getSellerStoreManagementCopy(locale);
   const connectCopy=connectPaymentCopy(locale);
@@ -352,6 +355,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
       {lifecycleStatus==="RENEWAL_CANCELLED"&&activeStore.subscription?.currentPeriodEnd&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).cancelConfirmation.replace("{date}",new Intl.DateTimeFormat(locale,{dateStyle:"long"}).format(activeStore.subscription.currentPeriodEnd))}</strong><Link href={`/${locale}/seller/subscription`}>{sellerLifecycleCopy(locale).restoreRenewal}</Link></section>}
       {lifecycleStatus==="REACTIVATION_PENDING"&&<section className="subscriptionWarning" role="status"><strong>{sellerLifecycleCopy(locale).stockReview}</strong><Link href={`/${locale}/seller/reactivate`}>{sellerLifecycleCopy(locale).reactivationTitle}</Link></section>}
       {showReadinessWarning && <section className="subscriptionWarning" role="status"><strong>{readinessTitle}</strong><span>{readinessHelp}</span>{!manualReviewPending&&<Link href={readinessHref}>{readinessAction}</Link>}</section>}
+      {registrationDocumentUploadNeeded&&activeStore.status==="PENDING"&&<section className="subscriptionWarning" role="status"><strong>{sellerVerificationDocumentCopy[isLocale(locale)?locale:"en"].registrationDocument}</strong><Link href={`/${locale}/seller/onboarding`}>{sellerVerificationDocumentCopy[isLocale(locale)?locale:"en"].upload}</Link></section>}
       <SellerStoreSwitcher stores={storeChoices} selectedId={activeStore.id} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll={Boolean(principal?.owner&&ownedStoreChoices.length>1)}/>
       {user.role==="SELLER"&&selectedPrincipal?.owner&&ownedStoreChoices.length>1&&<DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><SellerStoreManagement stores={ownedStoreChoices} primaryStoreId={activeStore.business?.primaryStoreId??null} locale={locale} copy={storeManagementCopy}/></DashboardSection>}
       <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<Suspense fallback={null}><SellerDashboardHeroMetrics metrics={dashboardMetrics} locale={locale} currency={activeStore.currency} canViewSales={canViewSales} canViewOrders={canViewOrders} canViewMessages={canViewMessages} unreadMessages={unreadMessages} labels={{todayRevenue:s("todayRevenue"),pendingOrders:s("pendingOrders"),newCustomers:s("newCustomers"),unreadMessages:s("unreadMessages")}}/></Suspense>}<Link href={`/${locale}/store/${activeStore.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>

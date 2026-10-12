@@ -51,6 +51,20 @@ enum SellerBusinessVerificationState {
   REVERIFY_REQUIRED
 }
 
+enum SellerVerificationDocumentType {
+  BUSINESS_REGISTRATION
+  REPRESENTATION_AUTHORITY
+  OTHER
+}
+
+enum SellerVerificationDocumentStatus {
+  SUBMITTED
+  ACCEPTED
+  NEEDS_INFORMATION
+  REJECTED
+  SUPERSEDED
+}
+
 enum ProductReportReason {
   ILLEGAL
   UNSAFE
@@ -488,6 +502,8 @@ model User {
   teamMemberships     SellerTeamMembership[]
   acceptedTeamInvitations SellerTeamInvitation[] @relation("AcceptedTeamInvitationUser")
   sellerBusinessAuditEvents SellerBusinessAuditEvent[] @relation("SellerBusinessAuditActor")
+  sellerVerificationDocumentsUploaded SellerVerificationDocument[] @relation("SellerVerificationDocumentUploader")
+  sellerVerificationDocumentsReviewed SellerVerificationDocument[] @relation("SellerVerificationDocumentReviewer")
   sellerBenefitRequests              SellerBenefitRequest[]              @relation("SellerBenefitRequester")
   sellerBenefitRequestsReviewed      SellerBenefitRequest[]              @relation("SellerBenefitReviewer")
   sellerBenefitAccessUpdated         SellerBenefitAccess[]               @relation("SellerBenefitAccessUpdater")
@@ -979,6 +995,7 @@ model Store {
   loyaltyAccounts LoyaltyAccount[]
   loyaltyChanges LoyaltyStoreChange[]
   sellerReviewEmails SellerReviewEmailDelivery[]
+  verificationDocuments SellerVerificationDocument[]
   shipments Shipment[]
   monthlyStatements SellerMonthlyStatement[]
 
@@ -1048,6 +1065,7 @@ model SellerBusiness {
   closureTokens SellerClosureToken[]
   billingInvoices SellerBusinessInvoice[]
   monthlyStatements SellerMonthlyStatement[]
+  verificationDocuments SellerVerificationDocument[]
 
   @@index([maxStores])
 }
@@ -1080,6 +1098,37 @@ model SellerBusinessEstablishment {
   @@unique([id, businessId])
   @@index([businessId, verificationState])
   @@index([siret])
+}
+
+model SellerVerificationDocument {
+  id               String @id @default(cuid())
+  businessId       String
+  storeId          String?
+  uploadedById     String?
+  reviewedById     String?
+  type             SellerVerificationDocumentType
+  status           SellerVerificationDocumentStatus @default(SUBMITTED)
+  businessSiren    String? @db.VarChar(9)
+  storageKey       String @unique
+  originalFilename String @db.VarChar(255)
+  mimeType         String @db.VarChar(64)
+  sizeBytes        Int
+  contentHash      String @db.Char(64)
+  reviewReason     String? @db.VarChar(1000)
+  submittedAt      DateTime @default(now())
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  business SellerBusiness @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  store    Store? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  uploadedBy User? @relation("SellerVerificationDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  reviewedBy User? @relation("SellerVerificationDocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([businessId, storeId, status, submittedAt])
+  @@index([storeId, type, submittedAt])
+  @@index([uploadedById, submittedAt])
+  @@unique([businessId, type, businessSiren, contentHash])
 }
 
 model SellerBusinessInvoice {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { normalizeSiren, normalizeSiret, sirenForSiret } from "../lib/sirene-identifiers";
+import { hasVerifiedSiretForSiren, normalizeSiren, normalizeSiret, sirenForSiret } from "../lib/sirene-identifiers";
 import { hasVerifiedFrenchBusiness, isFrenchProfessional, publicStoreCity } from "../lib/seller-business-verification-policy";
 import { evaluateSireneSnapshot, isTransientSireneFailure } from "../lib/seller-business-verification";
 import { InseeSireneV311 } from "../lib/insee-sirene-v311";
@@ -19,6 +19,16 @@ test("French identifiers normalize whitespace, validate checksums, and preserve 
   assert.deepEqual(normalizeSiret("73282932000075"), { ok: false, code: "SIRET_INVALID_CHECKSUM" });
   assert.deepEqual(normalizeSiret("73282932000074"), { ok: true, value: "73282932000074" });
   assert.equal(sirenForSiret("73282932000074"), "732829320");
+});
+
+test("French verification success is shown only when the matching SIRET establishment is also verified", () => {
+  assert.equal(hasVerifiedSiretForSiren({ businessState: "VERIFIED", establishmentState: "NOT_VERIFIED", siren: "732829320", siret: "" }), false);
+  assert.equal(hasVerifiedSiretForSiren({ businessState: "VERIFIED", establishmentState: "VERIFIED", siren: "732829320", siret: "73282932000074" }), true);
+  assert.equal(hasVerifiedSiretForSiren({ businessState: "VERIFIED", establishmentState: "VERIFIED", siren: "732829320", siret: "12345678900012" }), false);
+  const onboarding = readFileSync("app/seller/onboarding/SellerAddressOnboardingForm.tsx", "utf8");
+  const onboardingPage = readFileSync("app/seller/onboarding/page.tsx", "utf8");
+  assert.match(onboarding, /hasVerifiedSiretForSiren\(/);
+  assert.match(onboardingPage, /businessEstablishmentVerificationState:currentEstablishment\?\.verificationState/);
 });
 
 test("INSEE V3.11 adapter sends the API key only as a server header and maps public identifiers", async () => {
@@ -149,8 +159,8 @@ test("corrected identifiers clear stale errors and preserve separate length, che
   const settings = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
   const french = JSON.parse(readFileSync("messages/seller-business-verification/fr.json", "utf8")) as Record<string, string>;
   const english = JSON.parse(readFileSync("messages/seller-business-verification/en.json", "utf8")) as Record<string, string>;
-  assert.match(onboarding, /setBusinessSiren\(event\.target\.value\); setBusinessVerificationState\("NOT_STARTED"\); setBusinessVerificationReason\(""\); setVerificationMessage\(""\)/);
-  assert.match(onboarding, /setBusinessRegistrationNumber\(event\.target\.value\); setBusinessVerificationState\("NOT_STARTED"\); setBusinessVerificationReason\(""\); setVerificationMessage\(""\)/);
+  assert.match(onboarding, /setBusinessSiren\(event\.target\.value\); setBusinessVerificationState\("NOT_STARTED"\); setEstablishmentVerified\(false\); setBusinessVerificationReason\(""\); setVerificationMessage\(""\)/);
+  assert.match(onboarding, /setBusinessRegistrationNumber\(event\.target\.value\); setBusinessVerificationState\("NOT_STARTED"\); setEstablishmentVerified\(false\); setBusinessVerificationReason\(""\); setVerificationMessage\(""\)/);
   assert.match(settings, /onChange=\{\(\)=>setVerificationMessage\(""\)\}/);
   assert.match(onboarding, /SIREN_INVALID_FORMAT[^;]*invalidSiren/);
   assert.match(onboarding, /SIRET_INVALID_FORMAT[^;]*invalidSiret/);
@@ -165,11 +175,12 @@ test("corrected identifiers clear stale errors and preserve separate length, che
   assert.match(onboarding, /"RATE_LIMITED", "UPSTREAM_ERROR"/);
 });
 
-test("Admin approval accepts only a matching verified/manual-review pair and keeps an audit trail", () => {
+test("Admin approval requires an accepted registration document before manual INSEE review and keeps an audit trail", () => {
   const review = readFileSync("lib/seller-onboarding-review.ts", "utf8");
   assert.match(review, /SELLER_BUSINESS_VERIFICATION_REQUIRED/);
+  assert.match(review, /registrationDocument\?\.status!=="ACCEPTED"/);
   assert.match(review, /store\.business\?\.inseeVerificationState==="VERIFIED"&&establishment\.verificationState==="VERIFIED"/);
-  assert.match(review, /store\.business\?\.inseeVerificationState==="MANUAL_REVIEW"\|\|store\.business\?\.inseeVerificationState==="VERIFIED"\)\&\&establishment\.verificationState==="MANUAL_REVIEW"/);
+  assert.match(review, /const manualReview=!inseeVerified/);
   assert.match(review, /INSEE_ADMIN_MANUAL_VERIFIED/);
   assert.match(review, /appendSellerBusinessAudit/);
   assert.match(review, /updatedAt:store\.updatedAt/);

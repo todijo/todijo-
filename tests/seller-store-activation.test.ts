@@ -21,6 +21,7 @@ function activationFixture(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   const mutations: any[] = [];
+  let registrationDocumentAccepted = true;
   const tx: any = {
     $queryRaw: async () => [],
     store: {
@@ -32,8 +33,9 @@ function activationFixture(overrides: Record<string, unknown> = {}) {
       primaryStoreId: store.business.primaryStoreId, billingStoreId: store.business.billingStoreId,
       owner: { role: "SELLER" }, billingStore: { id: store.business.billingStoreId, subscription: null, accessGrants: [] },
     }) },
+    sellerVerificationDocument: { findFirst: async () => registrationDocumentAccepted ? { id: "registration-document", status: "ACCEPTED" } : null },
   };
-  return { tx, store, mutations };
+  return { tx, store, mutations, setRegistrationDocumentAccepted(value: boolean) { registrationDocumentAccepted = value; } };
 }
 
 test("verified seller activates only after every independent gate passes and reconciliation is idempotent", async () => {
@@ -106,6 +108,18 @@ test("French professional activation requires matching verified INSEE legal-unit
   });
   assert.equal((await reconcilePendingSellerStoreActivation(unverified.tx, "store_primary", now)).reason, "BUSINESS_VERIFICATION_INCOMPLETE");
   assert.equal(unverified.mutations.length, 0);
+});
+
+test("French professional activation also requires an Admin-accepted registration document", async () => {
+  const fixture = activationFixture({
+    sellerType: "PROFESSIONAL", sellerLegalForm: "SOLE_TRADER", businessRegistrationId: "73282932000074",
+    legalBusinessName: "Verified business", vatStatus: "NOT_REGISTERED_OR_NOT_APPLICABLE", establishmentId: "establishment_1",
+    business: { ...activationFixture().store.business, siren: "732829320", inseeVerificationState: "VERIFIED" },
+    establishment: { id: "establishment_1", siret: "73282932000074", legalUnitSiren: "732829320", verificationState: "VERIFIED" },
+  });
+  fixture.setRegistrationDocumentAccepted(false);
+  assert.deepEqual(await reconcilePendingSellerStoreActivation(fixture.tx, "store_primary", now), { activated: false, reason: "REGISTRATION_DOCUMENT_NOT_ACCEPTED" });
+  assert.equal(fixture.store.status, "PENDING");
 });
 
 test("every final readiness transition invokes the same safe pending-store reconciler", () => {
