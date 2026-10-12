@@ -26,7 +26,7 @@ async function createPendingSeller(plan: "admin-pro" | "paid-pro", suffix: strin
   await db.$transaction(async tx => {
     await tx.user.create({ data: { id: ownerId, firstName: "Activation", lastName: plan, email: `${ownerId}@e2e.todijo.test`, role: "SELLER", emailVerified: true, stripeAccountId, stripeOnboardingComplete: plan === "paid-pro", stripeChargesEnabled: plan === "paid-pro", stripePayoutsEnabled: plan === "paid-pro" } });
     await tx.user.create({ data: { id: adminId, firstName: "Activation", lastName: "Admin", email: `${adminId}@e2e.todijo.test`, role: "ADMIN", emailVerified: true } });
-    await tx.sellerBusiness.create({ data: { id: businessId, ownerId, primaryStoreId: storeId, billingStoreId: storeId, maxStores: 3 } });
+    await tx.sellerBusiness.create({ data: { id: businessId, ownerId, maxStores: 3 } });
     await tx.store.create({ data: {
       id: storeId, name: `Activation ${plan} ${suffix}`, slug: `activation-${plan}-${suffix}`, ownerId, businessId,
       country: "FR", city: "Paris", businessAddress: "10 rue de test", businessPostalCode: "75001", contactEmail: `${ownerId}@e2e.todijo.test`,
@@ -34,6 +34,7 @@ async function createPendingSeller(plan: "admin-pro" | "paid-pro", suffix: strin
       onboardingStatus: "VERIFIED", onboardingStep: 4,
       ...(plan === "paid-pro" ? { stripeCustomerId: `cus_activation_${suffix}` } : {}),
     } });
+    await tx.sellerBusiness.update({ where: { id: businessId }, data: { primaryStoreId: storeId, billingStoreId: storeId } });
     await tx.user.update({ where: { id: ownerId }, data: { primaryStoreId: storeId } });
     await tx.product.create({ data: { id: `activation-product-${plan}-${suffix}`, storeId, name: `Activation product ${suffix}`, slug: `activation-product-${plan}-${suffix}`, description: "Disposable seller activation fixture", price: 12, currency: "EUR", category: "test", condition: "NEUF", images: [], stock: 3, status: "PUBLISHED", dataClass: "PRODUCTION" } });
   });
