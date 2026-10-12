@@ -27,6 +27,7 @@ async function createSeller(plan: "admin" | "paid" | "review") {
   const ownerId = `activation-browser-${plan}-${fixtureSuffix}`;
   const businessId = `activation-business-${plan}-${fixtureSuffix}`;
   const storeId = `activation-store-${plan}-${fixtureSuffix}`;
+  const primaryStoreId = plan === "paid" ? `activation-primary-${fixtureSuffix}` : storeId;
   const slug = `activation-${plan}-${fixtureSuffix}`;
   const productId = `activation-product-${plan}-${fixtureSuffix}`;
   const productName = `Activation product ${plan} ${fixtureSuffix}`;
@@ -38,22 +39,29 @@ async function createSeller(plan: "admin" | "paid" | "review") {
       ...(plan === "paid" ? { stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } : {}),
     } });
     await tx.sellerBusiness.create({ data: { id: businessId, ownerId, maxStores: 3 } });
+    if (plan === "paid") {
+      await tx.store.create({ data: {
+        id: primaryStoreId, name: `Activation primary ${fixtureSuffix}`, slug: `activation-primary-${fixtureSuffix}`, ownerId, businessId,
+        country: "FR", city: "Paris", businessAddress: "10 rue de test", businessPostalCode: "75001", contactEmail: `${ownerId}@e2e.todijo.test`,
+        status: "ACTIVE", marketplaceActivatedAt: new Date(), sellerType: "PRIVATE", sellerLegalForm: "PRIVATE", vatStatus: "NOT_REGISTERED_OR_NOT_APPLICABLE",
+        onboardingStatus: "VERIFIED", onboardingStep: 4, stripeCustomerId: `cus_activation_${fixtureSuffix}`,
+      } });
+    }
     await tx.store.create({ data: {
       id: storeId, name: `Activation ${plan} ${fixtureSuffix}`, slug, ownerId, businessId,
       country: "FR", city: "Paris", businessAddress: "10 rue de test", businessPostalCode: "75001", contactEmail: `${ownerId}@e2e.todijo.test`,
       status: "PENDING", sellerType: "PRIVATE", sellerLegalForm: "PRIVATE", vatStatus: "NOT_REGISTERED_OR_NOT_APPLICABLE",
       onboardingStatus: plan === "review" ? "PENDING_REVIEW" : "PENDING_REVIEW", onboardingStep: 4,
-      ...(plan === "paid" ? { stripeCustomerId: `cus_activation_${fixtureSuffix}` } : {}),
     } });
-    await tx.sellerBusiness.update({ where: { id: businessId }, data: { primaryStoreId: storeId, billingStoreId: storeId } });
-    await tx.user.update({ where: { id: ownerId }, data: { primaryStoreId: storeId } });
+    await tx.sellerBusiness.update({ where: { id: businessId }, data: { primaryStoreId, billingStoreId: primaryStoreId } });
+    await tx.user.update({ where: { id: ownerId }, data: { primaryStoreId } });
     await tx.product.create({ data: {
       id: productId, storeId, name: productName, slug: `activation-product-${plan}-${fixtureSuffix}`,
       description: "Synthetic seller activation fixture", price: 12, currency: "EUR", category: "test", condition: "NEUF", images: [], stock: 3,
       status: "PUBLISHED", dataClass: "PRODUCTION",
     } });
   });
-  return { ownerId, businessId, storeId, slug, productId, productName, stripeAccountId, customerId: `cus_activation_${fixtureSuffix}` };
+  return { ownerId, businessId, storeId, primaryStoreId, slug, productId, productName, stripeAccountId, customerId: `cus_activation_${fixtureSuffix}` };
 }
 
 test.beforeAll(async () => {
@@ -132,7 +140,7 @@ test("Admin-granted PRO activates only after a fresh ready Connect state, then s
 
   const grant = await page.evaluate(async storeId => {
     const response = await fetch("/api/admin/stores", {
-      method: "PATCH", headers: { "content-type": "application/json" },
+      method: "PATCH", headers: { "content-type": "application/json", "x-todijo-admin-action": "1" },
       body: JSON.stringify({ storeIds: [storeId], months: 3, plan: "pro" }),
     });
     return { status: response.status, body: await response.json() };
@@ -163,7 +171,7 @@ test("paid PRO subscription state is the final activation gate and makes the sto
   }, store.storeId);
   expect(approval).toMatchObject({ status: 200, body: { ok: true, changed: true, status: "VERIFIED", activation: { activated: false, reason: "COMMERCIAL_ENTITLEMENT_INACTIVE" } } });
   const previousPrice = process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID;
-  const priceId = `price_activation_browser_${randomUUID().replaceAll("-", "")}`;
+  const priceId = `price_activationbrowser${randomUUID().replaceAll("-", "")}`;
   process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID = priceId;
   try {
     const start = Math.floor(Date.now() / 1000) - 60;
@@ -172,7 +180,9 @@ test("paid PRO subscription state is the final activation gate and makes the sto
       id: `sub_activation_browser_${suffix}`, object: "subscription", customer: store.customerId, status: "active", cancel_at_period_end: false,
       current_period_start: start, current_period_end: end,
       items: { data: [{ price: { id: priceId }, current_period_start: start, current_period_end: end }] },
-      metadata: { storeId: store.storeId },
+      // The paid plan is business-level and belongs to the canonical billing
+      // store. Its webhook must reconcile the verified secondary store too.
+      metadata: { storeId: store.primaryStoreId },
     } as unknown as StripeSubscription;
     const event: StripeEvent = { id: `evt_paid_activation_browser_${suffix}`, type: "customer.subscription.updated", data: { object: subscription } };
     expect(await processStripeEvent(db as never, event, async () => subscription))
@@ -187,12 +197,16 @@ test("paid PRO subscription state is the final activation gate and makes the sto
   await sellerCanSell(page, store);
 });
 
-test("an otherwise eligible seller remains pending when its commercial or Connect gate is missing", async () => {
+test("an otherwise eligible FREE primary store remains pending until all Connect capabilities are ready", async () => {
   const store = await createSeller("admin");
   await db.store.update({ where: { id: store.storeId }, data: { onboardingStatus: "VERIFIED" } });
+  const missingConnect = await db.$transaction(tx => reconcilePendingSellerStoreActivation(tx, store.storeId));
+  expect(missingConnect).toMatchObject({ activated: false, reason: "STRIPE_CONNECT_NOT_READY" });
+  expect((await db.store.findUniqueOrThrow({ where: { id: store.storeId }, select: { status: true } })).status).toBe("PENDING");
   await db.user.update({ where: { id: store.ownerId }, data: { stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } });
-  const noEntitlement = await db.$transaction(tx => reconcilePendingSellerStoreActivation(tx, store.storeId));
-  expect(noEntitlement).toMatchObject({ activated: false, reason: "COMMERCIAL_ENTITLEMENT_INACTIVE" });
+  expect(await db.$transaction(tx => reconcilePendingSellerStoreActivation(tx, store.storeId)))
+    .toMatchObject({ activated: true, reason: "ACTIVATED" });
+  expect((await db.store.findUniqueOrThrow({ where: { id: store.storeId }, select: { status: true } })).status).toBe("ACTIVE");
 });
 
 test.afterAll(async () => { await db.$disconnect(); });
