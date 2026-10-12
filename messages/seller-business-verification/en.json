@@ -8,6 +8,7 @@
   "sectionTitle": "Business verification",
   "sectionIntro": "We verify your SIREN and SIRET with INSEE. Setting up payments with Stripe remains a separate step.",
   "verify": "Verify my business",
+  "verificationRequired": "Verify your SIREN and SIRET with INSEE before completing seller setup.",
   "invalidSiren": "The SIREN must contain 9 digits.",
   "invalidSiret": "The SIRET must contain 14 digits.",
   "invalidSirenChecksum": "The SIREN has 9 digits, but its checksum is invalid.",
@@ -29,6 +30,8 @@
   "anotherEstablishment": "Declare another establishment of this business.",
   "dashboardPending": "Your business verification is pending. You can sell once the required checks are complete.",
   "adminState": "INSEE verification state",
+  "adminReason": "Business INSEE reason",
+  "adminEstablishmentReason": "Establishment INSEE reason",
   "adminSiren": "Verified SIREN",
   "adminSiret": "Verified SIRET",
   "adminManualReview": "Manual review required"

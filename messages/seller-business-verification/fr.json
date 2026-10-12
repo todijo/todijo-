@@ -8,6 +8,7 @@
   "sectionTitle": "Vérification de l’entreprise",
   "sectionIntro": "Nous vérifions votre SIREN et votre SIRET auprès de l’INSEE. La configuration des paiements avec Stripe reste une étape distincte.",
   "verify": "Vérifier mon entreprise",
+  "verificationRequired": "Vérifiez vos informations SIREN et SIRET auprès de l’INSEE avant de terminer la configuration vendeur.",
   "invalidSiren": "Le SIREN doit comporter 9 chiffres.",
   "invalidSiret": "Le SIRET doit comporter 14 chiffres.",
   "invalidSirenChecksum": "Le SIREN comporte 9 chiffres, mais sa clé de contrôle est invalide.",
@@ -29,6 +30,8 @@
   "anotherEstablishment": "Déclarer un autre établissement de cette entreprise.",
   "dashboardPending": "La vérification de votre entreprise est en attente. Vous pourrez vendre une fois les vérifications requises terminées.",
   "adminState": "État de vérification INSEE",
+  "adminReason": "Motif INSEE entreprise",
+  "adminEstablishmentReason": "Motif INSEE établissement",
   "adminSiren": "SIREN vérifié",
   "adminSiret": "SIRET vérifié",
   "adminManualReview": "Vérification manuelle nécessaire"

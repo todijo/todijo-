@@ -148,8 +148,9 @@ test("corrected identifiers clear stale errors and preserve separate length, che
   const onboarding = readFileSync("app/seller/onboarding/SellerAddressOnboardingForm.tsx", "utf8");
   const settings = readFileSync("app/seller/store-settings/StoreSettingsForm.tsx", "utf8");
   const french = JSON.parse(readFileSync("messages/seller-business-verification/fr.json", "utf8")) as Record<string, string>;
-  assert.match(onboarding, /setBusinessSiren\(event\.target\.value\); setVerificationMessage\(""\)/);
-  assert.match(onboarding, /setBusinessRegistrationNumber\(event\.target\.value\); setVerificationMessage\(""\)/);
+  const english = JSON.parse(readFileSync("messages/seller-business-verification/en.json", "utf8")) as Record<string, string>;
+  assert.match(onboarding, /setBusinessSiren\(event\.target\.value\); setBusinessVerificationState\("NOT_STARTED"\); setBusinessVerificationReason\(""\); setVerificationMessage\(""\)/);
+  assert.match(onboarding, /setBusinessRegistrationNumber\(event\.target\.value\); setBusinessVerificationState\("NOT_STARTED"\); setBusinessVerificationReason\(""\); setVerificationMessage\(""\)/);
   assert.match(settings, /onChange=\{\(\)=>setVerificationMessage\(""\)\}/);
   assert.match(onboarding, /SIREN_INVALID_FORMAT[^;]*invalidSiren/);
   assert.match(onboarding, /SIRET_INVALID_FORMAT[^;]*invalidSiret/);
@@ -159,7 +160,8 @@ test("corrected identifiers clear stale errors and preserve separate length, che
   assert.equal(french.invalidSiret, "Le SIRET doit comporter 14 chiffres.");
   assert.equal(french.invalidSirenChecksum, "Le SIREN comporte 9 chiffres, mais sa clé de contrôle est invalide.");
   assert.equal(french.invalidSiretChecksum, "Le SIRET comporte 14 chiffres, mais sa clé de contrôle est invalide.");
-  assert.match(onboarding, /code === "NOT_FOUND" \? "notFound"/);
+  assert.deepEqual(Object.keys(french).sort(), Object.keys(english).sort());
+  assert.match(onboarding, /\["NOT_FOUND", "BUSINESS_NOT_FOUND"\]\.includes\(code\) \? "notFound"/);
   assert.match(onboarding, /"RATE_LIMITED", "UPSTREAM_ERROR"/);
 });
 

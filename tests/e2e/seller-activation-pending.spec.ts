@@ -87,6 +87,27 @@ async function sellerCanSell(page: Page, store: Awaited<ReturnType<typeof create
   await expect(page.getByText(store.productName)).toBeVisible();
 }
 
+async function makeFrenchProfessionalReviewFixture(storeId: string, businessId: string, ownerId: string) {
+  const siren = "732829320", siret = "73282932000074";
+  const establishment = await db.sellerBusinessEstablishment.create({ data: {
+    businessId, siret, legalUnitSiren: siren, country: "FR", verificationState: "MANUAL_REVIEW",
+    verificationReason: "PUBLIC_DATA_INCOMPLETE", verificationSource: "INSEE_SIRENE",
+  } });
+  await db.$transaction(async tx => {
+    await tx.user.update({ where: { id: ownerId }, data: { phone: "+33612345678" } });
+    await tx.sellerBusiness.update({ where: { id: businessId }, data: {
+      siren, inseeVerificationState: "MANUAL_REVIEW", inseeVerificationReason: "PUBLIC_DATA_INCOMPLETE",
+      inseeVerificationSource: "INSEE_SIRENE",
+    } });
+    await tx.store.update({ where: { id: storeId }, data: {
+      phone: "+33612345678", establishmentId: establishment.id, sellerType: "PROFESSIONAL", sellerLegalForm: "SOLE_TRADER",
+      businessRegistrationId: siret, legalBusinessName: "Example business", vatStatus: "NOT_REGISTERED_OR_NOT_APPLICABLE",
+      status: "PENDING", onboardingStatus: "PENDING_REVIEW", onboardingStep: 4,
+    } });
+  });
+  return { siren, siret, establishmentId: establishment.id };
+}
+
 test("Admin review decision persists its audit reason and rejected approval returns the exact prerequisite code", async ({ page }) => {
   const store = await createSeller("review");
   await db.store.update({ where: { id: store.storeId }, data: { businessPostalCode: null } });
@@ -122,6 +143,84 @@ test("Admin review decision persists its audit reason and rejected approval retu
   await authenticate(page, store.ownerId, "SELLER");
   await page.goto("/en/seller/onboarding");
   await expect(page.getByRole("status").getByText(reason)).toBeVisible();
+});
+
+test("manual INSEE review approval persists despite Store timestamp changes and remains gated by Connect", async ({ page }) => {
+  const store = await createSeller("review");
+  const identifiers = await makeFrenchProfessionalReviewFixture(store.storeId, store.businessId, store.ownerId);
+  await authenticate(page, adminId, "ADMIN");
+  await page.goto("/en/dashboard");
+  const reason = `Manual INSEE evidence checked ${suffix}`;
+  const decision = await page.evaluate(async ({ storeId, reason }) => {
+    const response = await fetch(`/api/admin/seller-onboarding/${storeId}`, {
+      method: "PATCH", headers: { "content-type": "application/json", "x-todijo-admin-action": "1" },
+      body: JSON.stringify({ status: "VERIFIED", reason }),
+    });
+    return { status: response.status, body: await response.json() };
+  }, { storeId: store.storeId, reason });
+  expect(decision).toMatchObject({ status: 200, body: { ok: true, changed: true, status: "VERIFIED", activation: { activated: false, reason: "STRIPE_CONNECT_NOT_READY" } } });
+  expect(await db.store.findUniqueOrThrow({ where: { id: store.storeId }, select: { status: true, onboardingStatus: true, establishmentId: true } }))
+    .toEqual({ status: "PENDING", onboardingStatus: "VERIFIED", establishmentId: identifiers.establishmentId });
+  expect(await db.sellerBusiness.findUniqueOrThrow({ where: { id: store.businessId }, select: { inseeVerificationState: true, inseeVerificationReason: true } }))
+    .toEqual({ inseeVerificationState: "VERIFIED", inseeVerificationReason: null });
+  expect(await db.sellerBusinessAuditEvent.findFirstOrThrow({ where: { storeId: store.storeId, action: "INSEE_ADMIN_MANUAL_VERIFIED" }, select: { actorId: true, metadata: true } }))
+    .toMatchObject({ actorId: adminId, metadata: { reason } });
+});
+
+test("seller sees INSEE rejection reason, corrects and resubmits, then activates from verified PRO readiness", async ({ page }) => {
+  const store = await createSeller("admin");
+  const identifiers = await makeFrenchProfessionalReviewFixture(store.storeId, store.businessId, store.ownerId);
+  await db.sellerBusiness.update({ where: { id: store.businessId }, data: { inseeVerificationState: "REJECTED", inseeVerificationReason: "NOT_FOUND" } });
+  await db.sellerBusinessEstablishment.update({ where: { id: identifiers.establishmentId }, data: { verificationState: "REJECTED", verificationReason: "NOT_FOUND" } });
+  await authenticate(page, adminId, "ADMIN");
+  await page.goto("/en/dashboard");
+  const grant = await page.evaluate(async storeId => {
+    const response = await fetch("/api/admin/stores", {
+      method: "PATCH", headers: { "content-type": "application/json", "x-todijo-admin-action": "1" },
+      body: JSON.stringify({ storeIds: [storeId], months: 3, plan: "pro" }),
+    });
+    return { status: response.status, body: await response.json() };
+  }, store.storeId);
+  expect(grant.status, JSON.stringify(grant.body)).toBe(200);
+  const readyAccount = { id: store.stripeAccountId, object: "account", details_submitted: true, charges_enabled: true, payouts_enabled: true };
+  const connectEvent: StripeEvent = { id: `evt_corrected_insee_${suffix}`, type: "account.updated", data: { object: readyAccount as never } };
+  expect(await processStripeEvent(db as never, connectEvent, undefined, undefined, undefined, async () => readyAccount as never)).toMatchObject({ accountUpdated: true });
+  const adminReason = `Please correct the rejected INSEE identifiers ${suffix}`;
+  const requestedInfo = await page.evaluate(async ({ storeId, reason }) => {
+    const response = await fetch(`/api/admin/seller-onboarding/${storeId}`, {
+      method: "PATCH", headers: { "content-type": "application/json", "x-todijo-admin-action": "1" },
+      body: JSON.stringify({ status: "NEEDS_INFORMATION", reason }),
+    });
+    return { status: response.status, body: await response.json() };
+  }, { storeId: store.storeId, reason: adminReason });
+  expect(requestedInfo).toMatchObject({ status: 200, body: { ok: true, status: "NEEDS_INFORMATION" } });
+
+  await authenticate(page, store.ownerId, "SELLER");
+  await page.goto("/en/seller/onboarding");
+  await expect(page.getByRole("status").getByText(adminReason)).toBeVisible();
+  await page.locator(".sellerOnboardingActions button.socialLoginButton").first().click();
+  await expect(page.locator("#businessSiren")).toHaveValue(identifiers.siren);
+  await expect(page.getByRole("status").getByText("No result matches this SIREN or SIRET.")).toBeVisible();
+  await page.locator("#businessRegistrationNumber").fill("");
+  await page.locator("#businessRegistrationNumber").fill(identifiers.siret);
+  await page.route("**/api/seller/business/verification", async route => {
+    await db.$transaction(async tx => {
+      await tx.sellerBusiness.update({ where: { id: store.businessId }, data: { inseeVerificationState: "VERIFIED", inseeVerificationReason: null, inseeVerifiedAt: new Date() } });
+      await tx.sellerBusinessEstablishment.update({ where: { id: identifiers.establishmentId }, data: { verificationState: "VERIFIED", verificationReason: null, verifiedAt: new Date(), verificationSource: "INSEE_SIRENE" } });
+      await tx.store.update({ where: { id: store.storeId }, data: { establishmentId: identifiers.establishmentId } });
+    });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "VERIFIED", code: "VERIFIED", retryAfter: null }) });
+  });
+  await page.locator(".sellerBusinessVerification button").click();
+  await expect(page.getByRole("status").getByText("SIREN and SIRET verified with INSEE.")).toBeVisible();
+  await page.locator(".sellerOnboardingActions button.authSubmit").click();
+  await expect(page.locator("#seller-onboarding-step-heading-4")).toBeVisible();
+  await page.locator(".sellerOnboardingActions button.authSubmit").click();
+  await expect.poll(async () => (await db.store.findUniqueOrThrow({ where: { id: store.storeId }, select: { status: true, onboardingStatus: true } })))
+    .toEqual({ status: "ACTIVE", onboardingStatus: "VERIFIED" });
+  expect(await db.product.count({ where: { ...publicProductAccessWhere(new Date()), id: store.productId } })).toBe(1);
+  await page.goto(`/en/store/${store.slug}`);
+  await expect(page.getByText(store.productName)).toBeVisible();
 });
 
 test("Admin-granted PRO activates only after a fresh ready Connect state, then seller dashboard and listing render", async ({ page }) => {

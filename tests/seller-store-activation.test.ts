@@ -125,7 +125,7 @@ test("every final readiness transition invokes the same safe pending-store recon
   assert.match(paymentEvents, /reconcilePendingSellerStoreActivationsForOwner\(tx, owner\.id\)/);
   assert.match(paymentEvents, /reconcilePendingSellerStoreActivationsForOwner\(tx, store\.ownerId\)/);
   assert.match(onboardingSubmit, /reconcilePendingSellerStoreActivation\(tx, store\.id\)/);
-  assert.match(onboardingReview, /reconcilePendingSellerStoreActivation\(tx,storeId\)/);
+  assert.match(onboardingReview, /reconcilePendingSellerStoreActivation\(tx,\s*storeId\)/);
   assert.match(adminGrants, /reconcilePendingSellerStoreActivationsForOwner\(db, target\.ownerId, now\)/);
   assert.match(adminPlan, /reconcilePendingSellerStoreActivationsForOwner\(tx, state\.target\.owner\.id, now\)/);
   assert.match(reviewService, /decision==="VERIFIED"\?"PENDING"/);

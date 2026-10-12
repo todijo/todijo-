@@ -14,7 +14,13 @@ export default function SellerReviewActions({ storeId, locale, reviewable = true
     setBusy(true); setFeedback("");
     try {
       const response = await fetch(`/api/admin/seller-onboarding/${storeId}`, { method: "PATCH", headers: { "Content-Type": "application/json", "x-todijo-admin-action": "1" }, body: JSON.stringify({ status, reason }) });
-      if (!response.ok) throw new Error("SELLER_REVIEW_FAILED");
+      const result = await response.json().catch(() => ({})) as { error?: unknown };
+      if (!response.ok) {
+        const safeCode = typeof result.error === "string" && /^[A-Z0-9_]{1,80}$/.test(result.error) ? result.error : "REVIEW_SAVE_FAILED";
+        setFeedback(`${copy.failed} (${safeCode})`);
+        setBusy(false);
+        return;
+      }
       setFeedback(copy.saved); location.reload();
     } catch { setFeedback(copy.failed); setBusy(false); }
   }
