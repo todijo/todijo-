@@ -31,23 +31,6 @@ async function setSession(page: import("@playwright/test").Page, userId: string,
   await page.context().addCookies([{ name: "todijo_session", value: token, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax" }]);
 }
 
-async function cleanupFixtures() {
-  await db.sellerTeamMembership.deleteMany({ where: { id: membershipId } });
-  await db.sellerBusinessAuditEvent.deleteMany({
-    where: {
-      OR: [
-        { businessId: { in: [businessId, reviewBusinessId] } },
-        { actorId: { in: [ownerId, memberId, adminId, buyerId, applicantId] } },
-      ],
-    },
-  });
-  await db.sellerSubscriptionChange.deleteMany({ where: { sellerSubscriptionId: subscriptionId } });
-  await db.sellerSubscription.deleteMany({ where: { id: subscriptionId } });
-  await db.store.deleteMany({ where: { id: { in: [store2Id, store3Id, reviewStoreId] } } });
-  await db.sellerBusiness.deleteMany({ where: { id: { in: [businessId, reviewBusinessId] } } });
-  await db.user.deleteMany({ where: { id: { in: [ownerId, memberId, adminId, buyerId, applicantId] } } });
-}
-
 test.beforeAll(async () => {
   await db.$transaction(async (tx) => {
     await tx.user.createMany({ data: [
@@ -72,8 +55,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  try { await cleanupFixtures(); }
-  finally { await db.$disconnect(); }
+  await db.$disconnect();
 });
 
 test("PRO owner and assigned member stay store-scoped with owner-managed password controls", async ({ browser }) => {
