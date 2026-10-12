@@ -98,7 +98,7 @@ async function sellerCanSell(page: Page, store: Awaited<ReturnType<typeof create
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   const storefront = await page.goto(`/en/store/${store.slug}`);
   expect(storefront?.status()).toBe(200);
-  await expect(page.getByText(store.productName)).toBeVisible();
+  await expect(page.getByRole("link", { name: store.productName, exact: true }).first()).toBeVisible();
 }
 
 async function makeFrenchProfessionalReviewFixture(storeId: string, businessId: string, ownerId: string) {
@@ -215,7 +215,8 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
   await page.goto("/en/seller/onboarding");
   await expect(page.getByRole("status").getByText(adminReason)).toBeVisible();
   await expect(page.locator("#seller-onboarding-step-heading-3:visible").first()).toBeVisible();
-  await expect(page.locator(".sellerBusinessVerification")).toBeVisible();
+  const verification = page.locator(".sellerBusinessVerification:visible").first();
+  await expect(verification).toBeVisible();
   await expect(page.locator("#businessSiren")).toHaveValue(identifiers.siren);
   await expect(page.getByRole("status").getByText("No result matches this SIREN or SIRET.")).toBeVisible();
   await page.locator("#businessRegistrationNumber").fill("");
@@ -228,7 +229,7 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
     });
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "VERIFIED", code: "VERIFIED", retryAfter: null }) });
   });
-  const verifyButton = page.locator(".sellerBusinessVerification button.socialLoginButton");
+  const verifyButton = verification.locator("button.socialLoginButton");
   await expect(verifyButton).toBeVisible();
   await expect(verifyButton).toBeEnabled();
   await verifyButton.click();
@@ -240,7 +241,7 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
     .toEqual({ status: "ACTIVE", onboardingStatus: "VERIFIED" });
   expect(await db.product.count({ where: { ...publicProductAccessWhere(new Date()), id: store.productId } })).toBe(1);
   await page.goto(`/en/store/${store.slug}`);
-  await expect(page.getByText(store.productName)).toBeVisible();
+  await expect(page.getByRole("link", { name: store.productName, exact: true }).first()).toBeVisible();
 });
 
 test("Admin-granted PRO activates only after a fresh ready Connect state, then seller dashboard and listing render", async ({ page }) => {
