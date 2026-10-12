@@ -46,7 +46,8 @@ export default async function SellerReviewPage() {
     {pendingCount === 0 && locale === "fr" && <p className="adminSellerReviewEmpty">Aucun vendeur en attente de vérification</p>}
     <section className="adminSellerReviewGrid">{summaries.map(({ store, state }) => {
       const establishment=store.establishment??store.business?.establishments.find(item=>item.siret===store.businessRegistrationId)??null;
-      const reviewable=Boolean(store.businessId)&&store.status==="PENDING"&&["PENDING_REVIEW","IN_PROGRESS","NEEDS_INFORMATION"].includes(store.onboardingStatus);
+      const rejectedForReconsideration=store.status==="REJECTED"&&store.onboardingStatus==="REJECTED";
+      const reviewable=Boolean(store.businessId)&&((store.status==="PENDING"&&["PENDING_REVIEW","IN_PROGRESS","NEEDS_INFORMATION"].includes(store.onboardingStatus))||rejectedForReconsideration);
       return <article className="adminSellerReviewCard" key={store.id}>
         <header><div><span className="adminSellerReviewEyebrow">{locale === "fr" && isPending(store) ? "Demande de vérification vendeur" : t("sellerReview")}</span><h2>{store.name}</h2><p>{store.owner.firstName} {store.owner.lastName} · {store.owner.email}</p></div><span className="adminSellerReviewState">{stateLabel("onboarding",store.onboardingStatus)} · {stateLabel("store",store.status)}</span></header>
         <dl className="adminSellerReviewFacts">
@@ -62,10 +63,10 @@ export default async function SellerReviewPage() {
           <div><dt>{t("sellerOnboarding")}</dt><dd>{stateLabel("onboarding",store.onboardingStatus)} · {store.onboardingStep}/4</dd></div>
           <div><dt>{sellerOnboardingStepCopy[locale].adminPhoneLabel.slice(0, -2)}</dt><dd>{contactPhoneAccessAudited ? store.business?.adminContactPhone ?? "—" : "—"}</dd></div>
           <div><dt>{t("legalForm")}</dt><dd>{stateLabel("legalForm",store.sellerLegalForm)} · {store.legalBusinessName??"—"}</dd></div>
-          <div><dt>{t("companyNumber")}</dt><dd>{store.businessRegistrationId??"—"}{store.sellerType==="PROFESSIONAL"&&store.country==="FR"&&<small>{verification("adminState")}: {stateLabel("verification",store.business?.inseeVerificationState)} · {verification("adminSiren")}: {store.business?.siren??"—"} · {verification("adminSiret")}: {establishment?.siret??"—"}</small>}</dd></div>
+          <div><dt>{t("companyNumber")}</dt><dd>{store.businessRegistrationId??"—"}{store.sellerType==="PROFESSIONAL"&&store.country==="FR"&&<small>{verification("adminState")}: {stateLabel("verification",store.business?.inseeVerificationState)} · {verification("adminSiren")}: {store.business?.siren??"—"} · {verification("adminSiret")}: {establishment?.siret??"—"}<br />{verification("adminReason")}: {store.business?.inseeVerificationReason??"—"} · {verification("adminEstablishmentReason")}: {establishment?.verificationReason??"—"}</small>}</dd></div>
           <div><dt>{t("vatNumber")}</dt><dd>{stateLabel("vat",store.vatStatus)} · {store.vatNumber??"—"}</dd></div>
         </dl>
-        <SellerReviewActions storeId={store.id} locale={locale} reviewable={reviewable} approvable={store.onboardingStatus==="PENDING_REVIEW"}/>
+        <SellerReviewActions storeId={store.id} locale={locale} reviewable={reviewable} approvable={store.onboardingStatus==="PENDING_REVIEW"||rejectedForReconsideration}/>
       </article>;
     })}</section></section></main>;
 }

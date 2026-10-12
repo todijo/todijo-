@@ -5,6 +5,7 @@ import { isTrustedMutationRequest } from "@/lib/request-security";
 import { assertSellerActivity } from "@/lib/account-status";
 import { ensureSellerBusiness } from "@/lib/seller-business";
 import { verifySellerBusinessIdentifiers } from "@/lib/seller-business-verification";
+import { reconcilePendingSellerStoreActivationsForOwner } from "@/lib/seller-store-activation";
 
 export async function GET() {
   const session = await readSession();
@@ -27,7 +28,18 @@ export async function POST(request: Request) {
     if (body.sellerType !== "PROFESSIONAL" || !["FR", "FRANCE"].includes(String(body.country ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase())) return NextResponse.json({ error: "FRENCH_PROFESSIONAL_REQUIRED" }, { status: 400 });
     const business = await prisma.$transaction(async (tx) => ensureSellerBusiness(tx, session.userId));
     const result = await verifySellerBusinessIdentifiers(prisma, { businessId: business.id, actorId: session.userId, siren: body.businessSiren, siret: body.businessRegistrationNumber });
-    return NextResponse.json({ state: result.state, code: result.code, retryAfter: result.retryAfter?.toISOString() ?? null }, { status: result.state === "REJECTED" ? 422 : 200, headers: { "Cache-Control": "private, no-store" } });
+    let activation: Awaited<ReturnType<typeof reconcilePendingSellerStoreActivationsForOwner>> | null = null;
+    let activationError: string | undefined;
+    if (result.state === "VERIFIED") {
+      try {
+        activation = await prisma.$transaction(tx => reconcilePendingSellerStoreActivationsForOwner(tx, session.userId));
+      } catch {
+        // Verification itself is already durable. Keep its authoritative result
+        // visible if an independent activation write needs to be retried.
+        activationError = "RECONCILIATION_UNAVAILABLE";
+      }
+    }
+    return NextResponse.json({ state: result.state, code: result.code, retryAfter: result.retryAfter?.toISOString() ?? null, ...(activation ? { activation } : {}), ...(activationError ? { activationError } : {}) }, { status: result.state === "REJECTED" ? 422 : 200, headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "BUSINESS_VERIFICATION_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
   }

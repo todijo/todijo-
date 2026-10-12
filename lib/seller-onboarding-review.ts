@@ -13,9 +13,11 @@ export async function reviewSellerOnboarding(tx:Prisma.TransactionClient,input:{
   if(!store)throw new SellerReviewError("NOT_FOUND",404);
   if(!store.businessId)throw new SellerReviewError("SELLER_BUSINESS_REQUIRED",409);
   if(store.onboardingStatus===input.decision&&(input.decision==="VERIFIED"?["PENDING","ACTIVE"].includes(store.status):store.status===(input.decision==="REJECTED"?"REJECTED":"PENDING")))return{changed:false,status:input.decision};
-  if(store.status!=="PENDING"||!["PENDING_REVIEW","IN_PROGRESS","NEEDS_INFORMATION"].includes(store.onboardingStatus))throw new SellerReviewError("REVIEW_STATE_INVALID",409);
+  const pendingReview = store.status === "PENDING" && ["PENDING_REVIEW", "IN_PROGRESS", "NEEDS_INFORMATION"].includes(store.onboardingStatus);
+  const rejectedForReconsideration = store.status === "REJECTED" && store.onboardingStatus === "REJECTED";
+  if(!pendingReview&&!rejectedForReconsideration)throw new SellerReviewError("REVIEW_STATE_INVALID",409);
   if(input.decision==="VERIFIED"){
-    if(store.onboardingStatus!=="PENDING_REVIEW")throw new SellerReviewError("REVIEW_STATE_INVALID",409);
+    if(store.onboardingStatus!=="PENDING_REVIEW"&&!rejectedForReconsideration)throw new SellerReviewError("REVIEW_STATE_INVALID",409);
     if(store.onboardingStep<4||store.owner.role!=="SELLER"||!store.owner.emailVerified||store.sellerType==="UNKNOWN"||!store.businessAddress||!store.businessPostalCode)throw new SellerReviewError("SELLER_PREREQUISITES_INCOMPLETE",409);
     const legal=sellerLegalIdentity({sellerType:store.sellerType,country:store.country,legalForm:store.sellerLegalForm,companySubtype:store.companySubtype});
     if(legal.error)throw new SellerReviewError(legal.error,409);
@@ -36,7 +38,10 @@ export async function reviewSellerOnboarding(tx:Prisma.TransactionClient,input:{
           await tx.sellerBusinessEstablishment.update({where:{id:establishment.id},data:{verificationState:"VERIFIED",verifiedAt,verificationSource:"ADMIN_REVIEW",verificationReason:null}});
           await appendSellerBusinessAudit(tx,{businessId:store.businessId,storeId:store.id,actorId:input.adminId,category:"BUSINESS_VERIFICATION",action:"INSEE_ADMIN_MANUAL_VERIFIED",targetType:"SELLER_BUSINESS_ESTABLISHMENT",targetId:establishment.id,metadata:{reason:input.reason,siren:siren.value,siret:siret.value}});
         }
-        await tx.store.update({where:{id:store.id},data:{establishmentId:establishment.id,...(store.business?.inseeLegalUnitName?{legalBusinessName:store.business.inseeLegalUnitName}:{})}});
+        // Keep the Store write in the same optimistic-concurrency update below.
+        // Updating it here changes updatedAt and makes our own CAS fail, which
+        // previously rolled back legitimate manual-review approvals.
+        store.establishmentId = establishment.id;
       }
     }
   }else if(store.onboardingStatus==="NOT_STARTED")throw new SellerReviewError("REVIEW_STATE_INVALID",409);
@@ -44,7 +49,7 @@ export async function reviewSellerOnboarding(tx:Prisma.TransactionClient,input:{
   // current commercial entitlement are separate activation requirements.
   const status=input.decision==="VERIFIED"?"PENDING":input.decision==="REJECTED"?"REJECTED":"PENDING";
   if(store.onboardingStatus===input.decision&&store.status===status)return{changed:false,status:input.decision};
-  const changed=await tx.store.updateMany({where:{id:store.id,status:store.status,onboardingStatus:store.onboardingStatus,updatedAt:store.updatedAt},data:{onboardingStatus:input.decision,status}});
+  const changed=await tx.store.updateMany({where:{id:store.id,status:store.status,onboardingStatus:store.onboardingStatus,updatedAt:store.updatedAt},data:{onboardingStatus:input.decision,status,...(input.decision==="VERIFIED"&&store.establishmentId?{establishmentId:store.establishmentId}:{}),...(input.decision==="VERIFIED"&&store.business?.inseeLegalUnitName?{legalBusinessName:store.business.inseeLegalUnitName}:{})}});
   if(changed.count!==1)throw new SellerReviewError("REVIEW_STATE_CHANGED",409);
   await appendSellerBusinessAudit(tx,{businessId:store.businessId,storeId:store.id,actorId:input.adminId,category:"SELLER_REVIEW",action:`SELLER_${input.decision}`,targetType:"STORE",targetId:store.id,metadata:{reason:input.reason,previousStatus:store.status,newStatus:status,previousOnboardingStatus:store.onboardingStatus,newOnboardingStatus:input.decision}});
   await tx.accountSecurityEvent.create({data:{userId:store.owner.id,type:`SELLER_REVIEW_${input.decision}`}});
