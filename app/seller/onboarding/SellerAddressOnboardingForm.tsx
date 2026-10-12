@@ -139,7 +139,9 @@ export default function SellerOnboardingForm({ initial, buyerAddress, sellerInte
       const code = typeof data.code === "string" ? data.code : data.error;
       setBusinessVerificationReason(typeof code === "string" ? code : "");
       const copyKey = code === "VERIFIED" ? "success" : code === "SIRET_SIREN_MISMATCH" || code === "SIREN_MISMATCH" ? "mismatch" : code === "SIREN_INVALID_FORMAT" ? "invalidSiren" : code === "SIRET_INVALID_FORMAT" ? "invalidSiret" : code === "SIREN_INVALID_CHECKSUM" ? "invalidSirenChecksum" : code === "SIRET_INVALID_CHECKSUM" ? "invalidSiretChecksum" : ["NOT_FOUND", "BUSINESS_NOT_FOUND"].includes(code) ? "notFound" : code === "PUBLIC_DATA_INCOMPLETE" ? "partialData" : ["PENDING", "TIMEOUT", "RATE_LIMITED", "UPSTREAM_ERROR", "NOT_CONFIGURED", "RETRY_LATER", "BUSINESS_VERIFICATION_UNAVAILABLE"].includes(code) ? "unavailable" : "manualReview";
-      setVerificationMessage(v(copyKey));
+      // The primary status region already renders the VERIFIED success copy.
+      // Do not announce the same success a second time in a second live region.
+      setVerificationMessage(code === "VERIFIED" ? "" : v(copyKey));
     } catch {
       setBusinessVerificationState("PENDING");
       setBusinessVerificationReason("BUSINESS_VERIFICATION_UNAVAILABLE");
