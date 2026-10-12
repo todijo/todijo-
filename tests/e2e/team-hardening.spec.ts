@@ -18,6 +18,8 @@ const store3Id = `pro-team-browser-store-3-${suffix}`;
 const reviewBusinessId = `pro-team-browser-review-business-${suffix}`;
 const reviewStoreId = `pro-team-browser-review-store-${suffix}`;
 const membershipId = `pro-team-browser-membership-${suffix}`;
+const subscriptionId = `pro-team-browser-subscription-${suffix}`;
+const stripeSubscriptionId = `sub_test_pro_team_browser_${suffix}`;
 
 async function setSession(page: import("@playwright/test").Page, userId: string, role: "SELLER" | "CUSTOMER" | "ADMIN") {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { authVersion: true } });
@@ -39,6 +41,8 @@ async function cleanupFixtures() {
       ],
     },
   });
+  await db.sellerSubscriptionChange.deleteMany({ where: { sellerSubscriptionId: subscriptionId } });
+  await db.sellerSubscription.deleteMany({ where: { id: subscriptionId } });
   await db.store.deleteMany({ where: { id: { in: [store2Id, store3Id, reviewStoreId] } } });
   await db.sellerBusiness.deleteMany({ where: { id: { in: [businessId, reviewBusinessId] } } });
   await db.user.deleteMany({ where: { id: { in: [ownerId, memberId, adminId, buyerId, applicantId] } } });
@@ -60,7 +64,7 @@ test.beforeAll(async () => {
     ] });
     await tx.sellerBusiness.update({ where: { id: businessId }, data: { billingStoreId: store2Id } });
     await tx.user.update({ where: { id: ownerId }, data: { primaryStoreId: store2Id } });
-    await tx.sellerSubscription.create({ data: { id: "pro-team-browser-subscription", storeId: store2Id, stripeSubscriptionId: "sub_test_pro_team_browser", stripePriceId: "price_test_pro_monthly", plan: "pro", billingInterval: "monthly", status: "ACTIVE", currentPeriodStart: new Date(Date.now() - 60_000), currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000) } });
+    await tx.sellerSubscription.create({ data: { id: subscriptionId, storeId: store2Id, stripeSubscriptionId, stripePriceId: "price_test_pro_monthly", plan: "pro", billingInterval: "monthly", status: "ACTIVE", currentPeriodStart: new Date(Date.now() - 60_000), currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000) } });
     await tx.sellerTeamMembership.create({ data: { id: membershipId, businessId, userId: memberId, status: "ACTIVE", roleTemplate: "CUSTOM", permissions: ["PRODUCT_VIEW"], assignments: { create: { storeId: store2Id, productScope: "SELECTED_CATEGORIES", categoryKeys: [CANONICAL_LEAF_CATEGORIES[0].id] } } } });
     await tx.sellerBusiness.create({ data: { id: reviewBusinessId, ownerId: applicantId } });
     await tx.store.create({ data: { id: reviewStoreId, name: `Pending Review Store ${suffix}`, slug: reviewStoreId, country: "FR", city: "Paris", contactEmail: `pro-team-browser-applicant-${suffix}@e2e.todijo.test`, ownerId: applicantId, businessId: reviewBusinessId, status: "PENDING", sellerType: "PROFESSIONAL", onboardingStatus: "PENDING_REVIEW", onboardingStep: 4 } });
