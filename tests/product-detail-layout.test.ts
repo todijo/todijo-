@@ -16,7 +16,7 @@ test("product detail renders one full description below the bounded gallery grid
 test("shop wording and Ask Seller order match their actions", async () => {
   const source = await readFile("app/product/[id]/page.tsx", "utf8");
   assert.match(source, /detailText\("viewShop"\)/);
-  assert.match(source, /href=\{`\/store\/\$\{product\.store\.slug\}`\}/);
+  assert.match(source, /href=\{`\/\$\{locale\}\/store\/\$\{product\.store\.slug\}`\}/);
   assert.ok(source.indexOf("productDetailDescription") < source.indexOf("<AskSellerButton"));
   assert.equal(source.match(/<AskSellerButton/g)?.length, 1);
 });

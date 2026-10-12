@@ -1,10 +1,11 @@
 import type { Prisma, PrismaClient, StoreAccessSource, UserRole } from "@prisma/client";
 import { isPaidSellerPlanId, isSellerPlanId, type SellerPlanId } from "./seller-plans";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
+import { assertStoreSlugAvailable, lockStoreSlugNamespace } from "./store-slug-service";
 import { AdminAccessError } from "./admin-access-error";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
 import { lockAdminGrant } from "./admin-grant-lock";
-import { ensureSellerBusiness } from "./seller-business";
+import { ensureSellerBusiness, lockSellerBusiness } from "./seller-business";
 import { reconcilePendingSellerStoreActivationsForOwner } from "./seller-store-activation";
 export { AdminAccessError } from "./admin-access-error";
 
@@ -149,11 +150,17 @@ export async function createManagedStore(db: Database, adminId: string, input: M
   if (!ownStore && owner.role !== "SELLER") throw new AdminAccessError("Only an existing seller can receive a managed store.", 400, "OWNER_INELIGIBLE");
   if (!ownStore && !validGrantMonths(input.months)) throw new AdminAccessError("Select an initial access duration.", 400, "INVALID_DURATION");
   if (!ownStore && !isSellerPlanId(input.plan)) throw new AdminAccessError("Select a valid seller plan.", 400, "INVALID_SELLER_PLAN");
+  if (!ownStore) {
+    const business = await ensureSellerBusiness(db, owner.id);
+    await lockSellerBusiness(db as Prisma.TransactionClient, business.id);
+  }
+  await lockStoreSlugNamespace(db as Prisma.TransactionClient);
+  const canonicalSlug = await assertStoreSlugAvailable(db as Prisma.TransactionClient, input.slug);
   const period = ownStore ? null : calculateGrantPeriod(now, input.months!);
   const store = await db.store.create({
     data: {
       name: input.name,
-      slug: input.slug,
+      slug: canonicalSlug,
       description: input.description || null,
       contactEmail: input.contactEmail,
       phone: input.phone || null,

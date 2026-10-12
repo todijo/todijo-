@@ -4,6 +4,7 @@ import { isSellerPlanId } from "./seller-plans";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
 import { lockSellerBusiness } from "./seller-business";
 import { lockManagedOwner, requireManagedOwner } from "./admin-store-owner-eligibility";
+import { assertStoreSlugAvailable, lockStoreSlugNamespace } from "./store-slug-service";
 
 export async function createAdditionalAdminManagedStore(
   tx: Prisma.TransactionClient,
@@ -15,9 +16,11 @@ export async function createAdditionalAdminManagedStore(
   await lockManagedOwner(tx, input.ownerId);
   const { owner, mode, businessId: eligibleBusinessId } = await requireManagedOwner(tx, input.ownerId, adminId, now);
   if (owner.id === adminId && owner.role === "ADMIN" && mode === "ADDITIONAL" && !businessId && !eligibleBusinessId) {
+    await lockStoreSlugNamespace(tx);
+    const canonicalSlug = await assertStoreSlugAvailable(tx, input.slug);
     return tx.store.create({
       data: {
-        name: input.name, slug: input.slug, description: input.description || null,
+        name: input.name, slug: canonicalSlug, description: input.description || null,
         contactEmail: input.contactEmail, phone: input.phone || null, country: input.country,
         city: input.city, currency: input.currency, language: input.language,
         status: "ACTIVE", marketplaceActivatedAt: now, ownerId: owner.id,
@@ -30,9 +33,11 @@ export async function createAdditionalAdminManagedStore(
   const locked = await lockSellerBusiness(tx, businessId);
   if (!locked.billingStoreId) throw new AdminAccessError("Seller business billing identity is incomplete.", 409, "OWNER_BUSINESS_INCONSISTENT");
   if (!validGrantMonths(input.months) || !isSellerPlanId(input.plan)) throw new AdminAccessError("Select a valid initial access grant.", 400, "INVALID_INITIAL_ACCESS");
+  await lockStoreSlugNamespace(tx);
+  const canonicalSlug = await assertStoreSlugAvailable(tx, input.slug);
   const store = await tx.store.create({
     data: {
-      name: input.name, slug: input.slug, description: input.description || null,
+      name: input.name, slug: canonicalSlug, description: input.description || null,
       contactEmail: input.contactEmail, phone: input.phone || null, country: input.country,
       city: input.city, currency: input.currency, language: input.language,
       status: "ACTIVE", marketplaceActivatedAt: now, ownerId: owner.id, businessId,

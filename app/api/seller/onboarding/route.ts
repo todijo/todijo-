@@ -7,13 +7,15 @@ import { assertSellerActivity } from "@/lib/account-status";
 import { defaultBuyerAddress } from "@/lib/buyer-addresses";
 import { resolveSellerPersonalAddress } from "@/lib/seller-onboarding-address";
 import { sellerLegalIdentity } from "@/lib/seller-legal-forms";
-import { ensureSellerBusiness } from "@/lib/seller-business";
+import { ensureSellerBusiness, lockSellerBusiness } from "@/lib/seller-business";
 import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
 import { isTrustedMutationRequest } from "@/lib/request-security";
 import { sellerOnboardingCompletion } from "@/lib/seller-onboarding-completion";
 import { reconcilePendingSellerStoreActivation } from "@/lib/seller-store-activation";
 import { isSellerReviewSubmissionTransition, processSellerReviewEmailDelivery, queueSellerReviewEmail } from "@/lib/seller-review-alerts";
 import { normalizeSellerAdminContactPhone, persistSellerAdminContactPhone } from "@/lib/seller-admin-contact-phone";
+import { allocateInitialStoreSlug, lockStoreSlugNamespace } from "@/lib/store-slug-service";
+import { StoreSlugError } from "@/lib/store-slugs";
 
 const text = (value: unknown, max: number) => {
   const result = String(value ?? "").trim();
@@ -126,13 +128,15 @@ export async function POST(request: Request) {
   const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, email: true, role: true, store: { select: { id: true, name: true, slug: true } } } });
   if (!user) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
 
-  const slugBase = storeName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || `store-${user.id.slice(-8)}`;
-  const conflict = await prisma.store.findFirst({ where: { OR: [{ name: storeName }, { slug: slugBase }], NOT: user.store ? { id: user.store.id } : undefined }, select: { id: true } });
+  const conflict = await prisma.store.findFirst({ where: { name: storeName, NOT: user.store ? { id: user.store.id } : undefined }, select: { id: true } });
   if (conflict) return NextResponse.json({ error: "STORE_IDENTITY_UNAVAILABLE" }, { status: 409 });
 
   try {
     const submission = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
+      const slugBusiness = await ensureSellerBusiness(tx, user.id, user.store?.id ?? null);
+      await lockSellerBusiness(tx, slugBusiness.id);
+      await lockStoreSlugNamespace(tx);
       const previousStore = user.store ? await tx.store.findUnique({ where: { id: user.store.id }, select: { id: true, onboardingStatus: true, sellerReviewSubmissionVersion: true } }) : null;
       await tx.user.update({ where: { id: user.id }, data: { role: "SELLER" } });
 
@@ -150,7 +154,7 @@ export async function POST(request: Request) {
       };
       const store = user.store
         ? await tx.store.update({ where: { id: user.store.id }, data: storeData, select: { id: true } })
-        : await tx.store.create({ data: { ...storeData, slug: slugBase, ownerId: user.id, status: "PENDING" }, select: { id: true } });
+        : await tx.store.create({ data: { ...storeData, slug: await allocateInitialStoreSlug(tx, storeName, user.id), ownerId: user.id, status: "PENDING" }, select: { id: true } });
       const business = await ensureSellerBusiness(tx, user.id, store.id);
       await tx.store.updateMany({ where: { id: store.id, ownerId: user.id, businessId: null }, data: { businessId: business.id } });
       await persistSellerAdminContactPhone(tx, { businessId: business.id, storeId: store.id, actorId: user.id, phone: adminContactPhone });
@@ -206,6 +210,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, userId: user.id, activation: submission.activation });
   } catch (error) {
     if (error instanceof SellerOnboardingSubmissionError) return NextResponse.json({ error: error.code }, { status: error.status });
+    if (error instanceof StoreSlugError) return NextResponse.json({ error: error.code }, { status: 409 });
     throw error;
   }
 }

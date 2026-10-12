@@ -32,7 +32,8 @@ test("admin creates an own permanent store without payment", async () => {
   const db = {
     $queryRaw: async () => [],
     user: { findUnique: async () => ({ id: "admin", role: "ADMIN", primaryStoreId: null, _count: { stores: 0 } }) },
-    store: { create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-admin", slug: "admin-shop" }; } },
+    store: { findFirst: async () => null, create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-admin", slug: "admin-shop" }; } },
+    storeSlugHistory: { findUnique: async () => null },
   } as unknown as Db;
   await createManagedStore(db, "admin", { ownerId: "admin", name: "Admin Shop", slug: "admin-shop", contactEmail: "admin@example.com", country: "FR", city: "Paris", currency: "EUR", language: "fr" });
   const nested = (data?.accessGrants as { create: { source: string; endsAt: Date | null } }).create;
@@ -46,7 +47,8 @@ test("Admin can create additional own stores without seller plan or self-service
   const db = {
     $queryRaw: async () => [],
     user: { findUnique: async () => ({ id: "admin", role: "ADMIN", primaryStoreId: "existing-admin-store", _count: { stores: 4 }, sellerSuspendedAt: null, deactivatedAt: null, blockedAt: null, blockExpiresAt: null }) },
-    store: { create: async ({ data: input }: { data: Record<string, unknown> }) => { data = input; return { id: "admin-store-5", slug: "admin-shop-5" }; } },
+    store: { findFirst: async () => null, create: async ({ data: input }: { data: Record<string, unknown> }) => { data = input; return { id: "admin-store-5", slug: "admin-shop-5" }; } },
+    storeSlugHistory: { findUnique: async () => null },
   } as never;
   const created = await createAdditionalAdminManagedStore(db, "admin", { ownerId: "admin", name: "Admin Shop 5", slug: "admin-shop-5", contactEmail: "admin@example.com", country: "FR", city: "Paris", currency: "EUR", language: "fr" }, null);
   assert.deepEqual(created, { id: "admin-store-5", slug: "admin-shop-5" });
@@ -60,17 +62,19 @@ test("admin creates an eligible seller store with timed access and no Stripe dat
   const links: Array<Record<string, unknown>> = [], audits: Array<Record<string, unknown>> = [];
   let primaryStoreId: string | null = null, businessPrimaryStoreId: string | null = null, billingStoreId: string | null = null, storeBusinessId: string | null = null;
   const db = {
-    $queryRaw: async () => [],
+    $queryRaw: async () => [{ id: "business-seller", maxStores: 1, billingStoreId: null }],
     user: {
       findUnique: async () => ({ id: "seller", role: "SELLER", primaryStoreId, store: null, _count: { stores: 0 }, ownedBusiness: null }),
       updateMany: async (input: { where: Record<string, unknown>; data: Record<string, unknown> }) => { links.push(input); primaryStoreId = String(input.data.primaryStoreId); return { count: 1 }; },
     },
     store: {
       create: async (input: { data: Record<string, unknown> }) => { data = input.data; return { id: "store-seller", slug: "seller-shop" }; },
+      findFirst: async () => null,
       findUnique: async () => ({ id: "store-seller", ownerId: "seller", businessId: storeBusinessId }),
       findMany: async () => [],
       updateMany: async (input: { data: Record<string, unknown> }) => { links.push(input); storeBusinessId = String(input.data.businessId); return { count: 1 }; },
     },
+    storeSlugHistory: { findUnique: async () => null },
     sellerBusiness: {
       upsert: async () => ({ id: "business-seller", primaryStoreId: businessPrimaryStoreId, billingStoreId, maxStores: 1 }),
       updateMany: async (input: { data: Record<string, unknown> }) => { links.push(input); if (input.data.primaryStoreId) businessPrimaryStoreId = String(input.data.primaryStoreId); if (input.data.billingStoreId) billingStoreId = String(input.data.billingStoreId); return { count: 1 }; },
@@ -102,9 +106,11 @@ test("Admin creates an additional seller Store and business-level managed grant 
     $queryRaw: async () => [{ id: "business-1", maxStores: 1, billingStoreId: "billing" }],
     store: {
       create: async ({ data }: { data: Record<string, unknown> }) => { created = data; return { id: "store-2", slug: "second-shop" }; },
+      findFirst: async () => null,
       findMany: async () => [{ id: "store-2", accessGrants: [], subscription: null, business: { id: "business-1", billingStoreId: "billing", billingStore: billing } }],
       findUnique: async () => billing,
     },
+    storeSlugHistory: { findUnique: async () => null },
     storeAccessGrant: { create: async ({ data }: { data: Record<string, unknown> }) => { grants.push(data); return { storeId: data.storeId, endsAt: data.endsAt }; } },
     sellerBusinessAuditEvent: { create: async ({ data }: { data: Record<string, unknown> }) => { audits.push(data); return data; } },
   } as never;

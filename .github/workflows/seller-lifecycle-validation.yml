@@ -5,6 +5,7 @@ on:
     branches:
       - codex/buyer-seller-journey
       - codex/seller-journey-repair
+      - codex/global-store-url-lifecycle-repair
   pull_request:
     branches:
       - main
@@ -72,7 +73,7 @@ jobs:
     name: PostgreSQL 16 application and browser validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey' || github.event.pull_request.head.ref == 'codex/seller-journey-repair'
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey' || github.event.pull_request.head.ref == 'codex/seller-journey-repair' || github.event.pull_request.head.ref == 'codex/global-store-url-lifecycle-repair'
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -90,7 +91,8 @@ jobs:
     env:
       CI: true
       DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
-      PLAYWRIGHT_DATABASE_URL: postgresql://lifecycle:lifecycle@127.0.0.1:5432/todijo_lifecycle_validation?schema=public
+      PLAYWRIGHT_DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/todijo_browser?schema=public
+      TODIJO_CI_DISPOSABLE_DATABASE: "1"
       APP_URL: http://localhost:3100
       SESSION_SECRET: ci-only-placeholder-secret-at-least-32-characters
     steps:
@@ -112,9 +114,6 @@ jobs:
       - name: Install Chromium browser only
         run: npx playwright install --with-deps chromium
 
-      - name: Prepare disposable browser-test database
-        run: npx prisma migrate deploy
-
       - name: Prepare isolated PostgreSQL regression databases
         env:
           PGPASSWORD: lifecycle
@@ -132,6 +131,8 @@ jobs:
           DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_dashboard_test?schema=public npx prisma migrate deploy
           DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_statement_test?schema=public npx prisma migrate deploy
           DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_archive_test?schema=public npx prisma migrate deploy
+          createdb -h 127.0.0.1 -p 5432 -U lifecycle --maintenance-db=postgres -O validation todijo_browser
+          DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_browser?schema=public npx prisma migrate deploy
 
       - name: Type-check
         run: npm run typecheck
@@ -163,6 +164,7 @@ jobs:
           tests/e2e/phase3-lifecycle.spec.ts
           tests/e2e/phase6-shipments.spec.ts
           tests/e2e/phase4-dashboard.spec.ts
+          tests/e2e/store-url-lifecycle.spec.ts
 
       - name: Upload Playwright failure report
         if: failure()
