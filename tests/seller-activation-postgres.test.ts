@@ -43,6 +43,10 @@ async function createPendingSeller(plan: "admin-pro" | "paid-pro", suffix: strin
 
 async function removeFixture(fixture: Awaited<ReturnType<typeof createPendingSeller>>) {
   if (!db) return;
+  // Admin grant decisions are append-only business audit history. Keep the
+  // associated fixture intact rather than disabling or deleting that history;
+  // this suite only runs against the disposable CI database.
+  if (await db.sellerBusinessAuditEvent.count({ where: { businessId: fixture.businessId } })) return;
   await db.$transaction(async tx => {
     await tx.product.deleteMany({ where: { storeId: fixture.storeId } });
     await tx.sellerSubscription.deleteMany({ where: { storeId: fixture.storeId } });
@@ -78,7 +82,9 @@ test("paid PRO subscription webhook activates a legally verified store when it i
   assert.ok(db);
   const fixture = await createPendingSeller("paid-pro", randomUUID().slice(0, 8));
   const previousPrice = process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID;
-  const priceId = `price_activation_${randomUUID().replaceAll("-", "")}`;
+  // Stripe Price IDs accepted by the application mapping are alphanumeric
+  // after "price_"; underscores make an otherwise synthetic ID invalid.
+  const priceId = `price_activation${randomUUID().replaceAll("-", "")}`;
   process.env.STRIPE_SELLER_PRO_MONTHLY_PRICE_ID = priceId;
   try {
     const start = Math.floor(Date.now() / 1000) - 60;
