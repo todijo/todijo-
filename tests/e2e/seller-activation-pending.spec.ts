@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { SignJWT } from "jose";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { processStripeEvent } from "../../lib/payments";
 import { publicProductAccessWhere } from "../../lib/admin-access";
 import type { StripeEvent, StripeSubscription } from "../../lib/stripe";
 import { reconcilePendingSellerStoreActivation } from "../../lib/seller-store-activation";
+import { normalizeSiren, normalizeSiret } from "../../lib/sirene-identifiers";
 
 const databaseUrl = process.env.PLAYWRIGHT_DATABASE_URL;
 const allowedDatabase = (() => {
@@ -64,6 +65,19 @@ async function createSeller(plan: "admin" | "paid" | "review") {
   return { ownerId, businessId, storeId, primaryStoreId, slug, productId, productName, stripeAccountId, customerId: `cus_activation_${fixtureSuffix}` };
 }
 
+function createUniqueFrenchIdentifiers() {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const siren = String(randomInt(100_000_000, 1_000_000_000));
+    if (!normalizeSiren(siren).ok) continue;
+    const prefix = `${siren}${String(randomInt(0, 10_000)).padStart(4, "0")}`;
+    for (let checkDigit = 0; checkDigit < 10; checkDigit += 1) {
+      const siret = `${prefix}${checkDigit}`;
+      if (normalizeSiret(siret).ok) return { siren, siret };
+    }
+  }
+  throw new Error("Unable to create unique synthetically valid French business identifiers for the browser fixture.");
+}
+
 test.beforeAll(async () => {
   await db.user.create({ data: { id: adminId, firstName: "Activation", lastName: "Admin", email: `activation-admin-${suffix}@e2e.todijo.test`, role: "ADMIN", emailVerified: true } });
 });
@@ -88,7 +102,7 @@ async function sellerCanSell(page: Page, store: Awaited<ReturnType<typeof create
 }
 
 async function makeFrenchProfessionalReviewFixture(storeId: string, businessId: string, ownerId: string) {
-  const siren = "732829320", siret = "73282932000074";
+  const { siren, siret } = createUniqueFrenchIdentifiers();
   const establishment = await db.sellerBusinessEstablishment.create({ data: {
     businessId, siret, legalUnitSiren: siren, country: "FR", verificationState: "MANUAL_REVIEW",
     verificationReason: "PUBLIC_DATA_INCOMPLETE", verificationSource: "INSEE_SIRENE",
