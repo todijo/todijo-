@@ -214,7 +214,7 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
   await authenticate(page, store.ownerId, "SELLER");
   await page.goto("/en/seller/onboarding");
   await expect(page.getByRole("status").getByText(adminReason)).toBeVisible();
-  await expect(page.locator("#seller-onboarding-step-heading-3")).toBeVisible();
+  await expect(page.locator("#seller-onboarding-step-heading-3:visible").first()).toBeVisible();
   await expect(page.locator(".sellerBusinessVerification")).toBeVisible();
   await expect(page.locator("#businessSiren")).toHaveValue(identifiers.siren);
   await expect(page.getByRole("status").getByText("No result matches this SIREN or SIRET.")).toBeVisible();
@@ -234,7 +234,7 @@ test("seller sees INSEE rejection reason, corrects and resubmits, then activates
   await verifyButton.click();
   await expect(page.getByRole("status").getByText("SIREN and SIRET verified with INSEE.")).toBeVisible();
   await page.locator(".sellerOnboardingActions button.authSubmit").click();
-  await expect(page.locator("#seller-onboarding-step-heading-4")).toBeVisible();
+  await expect(page.locator("#seller-onboarding-step-heading-4:visible").first()).toBeVisible();
   await page.locator(".sellerOnboardingActions button.authSubmit").click();
   await expect.poll(async () => (await db.store.findUniqueOrThrow({ where: { id: store.storeId }, select: { status: true, onboardingStatus: true } })))
     .toEqual({ status: "ACTIVE", onboardingStatus: "VERIFIED" });
