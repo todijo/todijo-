@@ -5,10 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { isTrustedMutationRequest } from "@/lib/request-security";
 import { ProProductImportError, requireProProductImport } from "@/lib/pro-product-import";
-import { SellerCapabilityError } from "@/lib/seller-business-access";
+import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
 import { parseSellerProductImport, parseSellerProductImportMultipart, readBoundedSellerImportBody, SellerImportParseError } from "@/lib/seller-product-import-parser";
-import { createSellerProductImportJob, processSellerProductImport, type SellerImportMapping } from "@/lib/seller-product-import";
+import { createSellerProductImportJob, getConfirmedSellerImportCategoryMappings, processSellerProductImport, type SellerImportMapping } from "@/lib/seller-product-import";
 import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
+import { suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
 
 export const runtime = "nodejs";
 const sourceFormats = new Set(["csv", "xlsx", "xml", "json"]);
@@ -31,10 +32,14 @@ export async function POST(request: Request) {
     const rawBody = await readBoundedSellerImportBody(request);
     if (contentType.includes("multipart/form-data")) {
       const { filename, storeId, bytes } = await parseSellerProductImportMultipart(rawBody, contentType);
-      const store = await prisma.store.findFirst({ where: { id: storeId, businessId: principal.businessId, ownerId: session.userId }, select: { id: true } });
+      const store = await prisma.store.findFirst({ where: { id: storeId, businessId: principal.businessId }, select: { id: true } });
       if (!store) return NextResponse.json({ error: "STORE_ACCESS_DENIED" }, { status: 403 });
+      await requireStoreCapability(prisma, session.userId, store.id, "PRODUCT_CREATE");
       const parsed = parseSellerProductImport(filename, bytes);
-      return NextResponse.json({ sourceFormat: filename.split(".").pop()?.toLowerCase(), headers: parsed.headers, rows: parsed.rows }, { headers: { "Cache-Control": "private, no-store" } });
+      const suggestedMapping = suggestSellerImportMapping(parsed.headers);
+      const confirmedMappings = await getConfirmedSellerImportCategoryMappings(prisma, principal.businessId, store.id);
+      const categorySuggestions = parsed.rows.map((row, index) => ({ rowNumber: index + 2, ...suggestSellerImportCategory(row, suggestedMapping, confirmedMappings) }));
+      return NextResponse.json({ sourceFormat: filename.split(".").pop()?.toLowerCase(), headers: parsed.headers, rows: parsed.rows, suggestedMapping, categorySuggestions }, { headers: { "Cache-Control": "private, no-store" } });
     }
     let body: { action?: unknown; storeId?: unknown; sourceFormat?: unknown; idempotencyKey?: unknown; mapping?: unknown; headers?: unknown; rows?: unknown };
     try { body = JSON.parse(rawBody.toString("utf8")) as typeof body; } catch { return NextResponse.json({ error: "IMPORT_REQUEST_INVALID" }, { status: 400 }); }
@@ -43,14 +48,18 @@ export async function POST(request: Request) {
     if (!body.rows.every(row => row && typeof row === "object" && !Array.isArray(row) && Object.keys(row).length <= headers.length && Object.entries(row).every(([key, value]) => headers.includes(key) && typeof value === "string" && value.length <= 12_000))) return NextResponse.json({ error: "IMPORT_REQUEST_INVALID" }, { status: 400 });
     if (!body.mapping || typeof body.mapping !== "object" || Array.isArray(body.mapping)) return NextResponse.json({ error: "IMPORT_REQUEST_INVALID" }, { status: 400 });
     const mapping = body.mapping as SellerImportMapping;
-    const allowedFields = new Set(["title", "description", "price", "category", "stock", "sku", "images", "variants", "video", "weightGrams", "lengthMm", "widthMm", "heightMm", "rowCategories"]);
+    const allowedFields = new Set(["title", "parentTitle", "description", "price", "variantPrice", "category", "stock", "variantStock", "sku", "variantSku", "supplierProductId", "parentProductId", "images", "variantImages", "variants", "video", "brand", "condition", "currency", "color", "size", "material", "style", "attributes", "weightGrams", "lengthMm", "widthMm", "heightMm", "rowCategories", "groupCategories", "confirmedRowGroups", "duplicatePolicy"]);
     if (Object.keys(mapping).some(key => !allowedFields.has(key))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
-    for (const key of ["title", "description", "price", "category", "stock"] as const) if (!mapping[key] || !headers.includes(mapping[key]!)) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
-    for (const [key, value] of Object.entries(mapping)) if (key !== "rowCategories" && value !== undefined && (typeof value !== "string" || !headers.includes(value))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (!(mapping.title || mapping.parentTitle) || !mapping.description || !headers.includes(mapping.title ?? mapping.parentTitle!) || !headers.includes(mapping.description)) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (!(mapping.price || mapping.variantPrice) || !(mapping.stock || mapping.variantStock)) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    for (const [key, value] of Object.entries(mapping)) if (!new Set(["rowCategories", "groupCategories", "confirmedRowGroups", "duplicatePolicy"]).has(key) && value !== undefined && (typeof value !== "string" || !headers.includes(value))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (mapping.duplicatePolicy !== undefined && !["SKIP_EXISTING", "UPDATE_EXISTING", "NEW_ONLY"].includes(mapping.duplicatePolicy)) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
     if (mapping.rowCategories !== undefined && (!mapping.rowCategories || typeof mapping.rowCategories !== "object" || Array.isArray(mapping.rowCategories) || Object.entries(mapping.rowCategories).some(([rowNumber, category]) => !/^([2-9]|[1-9]\d|100|101)$/.test(rowNumber) || Number(rowNumber) > (body.rows as unknown[]).length + 1 || typeof category !== "string" || !isCanonicalLeafCategoryId(category)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (mapping.groupCategories !== undefined && (!mapping.groupCategories || typeof mapping.groupCategories !== "object" || Array.isArray(mapping.groupCategories) || Object.entries(mapping.groupCategories).some(([key, category]) => !key || key.length > 180 || typeof category !== "string" || !isCanonicalLeafCategoryId(category)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (mapping.confirmedRowGroups !== undefined && (!mapping.confirmedRowGroups || typeof mapping.confirmedRowGroups !== "object" || Array.isArray(mapping.confirmedRowGroups) || Object.entries(mapping.confirmedRowGroups).some(([rowNumber, groupKey]) => !/^([2-9]|[1-9]\d|100|101)$/.test(rowNumber) || Number(rowNumber) > (body.rows as unknown[]).length + 1 || typeof groupKey !== "string" || !/^[a-z0-9-]{1,80}$/.test(groupKey)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
     const job = await createSellerProductImportJob(prisma, { businessId: principal.businessId, storeId: body.storeId, userId: session.userId, key: body.idempotencyKey, sourceFormat: body.sourceFormat, mapping, headers, rows: body.rows as Array<Record<string, string>> });
     const result = await processSellerProductImport(prisma, { job, businessId: principal.businessId, userId: session.userId });
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
-    return NextResponse.json({ jobId: result.id, status: result.status, requestedCount: result.requestedCount, importedCount: result.importedCount, failedCount: result.failedCount, items: result.items }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ jobId: result.id, status: result.status, requestedCount: result.requestedCount, importedCount: result.importedCount, failedCount: result.failedCount, skippedCount: result.skippedCount, items: result.items }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return failure(error); }
 }

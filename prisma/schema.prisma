@@ -1332,7 +1332,7 @@ model SellerProductImportItem {
   sourceRow Json
   status    String   @default("PENDING") @db.VarChar(24)
   errorCode String?  @db.VarChar(80)
-  productId String?  @unique
+  productId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1340,6 +1340,7 @@ model SellerProductImportItem {
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@unique([importId, rowNumber])
+  @@index([productId])
   @@index([importId, status])
 }
 
@@ -1485,6 +1486,7 @@ model Product {
   name               String
   slug               String
   description        String
+  attributes         Json                      @default("{}") @db.JsonB
   sourceLocale       String                    @default("en") @db.VarChar(8)
   price              Decimal                   @db.Decimal(12, 2)
   compareAtPrice     Decimal?                  @db.Decimal(12, 2)
@@ -1548,7 +1550,7 @@ model Product {
   media         ProductMedia[]
   catalogTranslationItems CatalogTranslationItem[]
   translations ProductTranslation[]
-  sellerImportItem SellerProductImportItem?
+  sellerImportItems SellerProductImportItem[]
 
   @@unique([storeId, slug])
   @@index([storeId, status])
