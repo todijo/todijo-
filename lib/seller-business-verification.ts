@@ -21,6 +21,43 @@ export function evaluateSireneSnapshot(input: { legalUnit: LegalUnit; establishm
   return { state: "VERIFIED" as const, code: "VERIFIED" };
 }
 
+async function verifySellerBusinessSirenOnly(db: PrismaClient, input: { businessId: string; actorId: string; siren: string; now: Date; client: InseeSireneV311 }): Promise<BusinessVerificationResult> {
+  return db.$transaction(async tx => {
+    await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`insee-business:${input.businessId}`}, 0))::text`);
+    const business = await tx.sellerBusiness.findUnique({ where: { id: input.businessId }, select: { id: true, ownerId: true, siren: true, inseeVerificationState: true, inseeVerifiedAt: true, inseeLegalUnitStatus: true, inseeLegalUnitName: true, inseeRetryAfter: true } });
+    if (!business) return { state: "REJECTED", code: "BUSINESS_NOT_FOUND" };
+    if (business.ownerId !== input.actorId) return { state: "REJECTED", code: "BUSINESS_OWNER_REQUIRED" };
+    if (business.siren === input.siren && business.inseeVerificationState === "VERIFIED" && business.inseeVerifiedAt && input.now.getTime() - business.inseeVerifiedAt.getTime() < VERIFIED_CACHE_MS) return { state: "VERIFIED", code: "VERIFIED" };
+    if (business.siren === input.siren && business.inseeRetryAfter && business.inseeRetryAfter > input.now) return { state: "PENDING", code: "RETRY_LATER", retryAfter: business.inseeRetryAfter };
+    const conflict = await tx.sellerBusiness.findUnique({ where: { siren: input.siren }, select: { id: true } });
+    if (conflict && conflict.id !== business.id) {
+      await appendSellerBusinessAudit(tx, { businessId: business.id, actorId: input.actorId, category: "BUSINESS_VERIFICATION", action: "INSEE_MANUAL_REVIEW", targetType: "SELLER_BUSINESS", targetId: business.id, metadata: { source: SOURCE, reason: "BUSINESS_IDENTIFIER_IN_USE", siren: input.siren } });
+      return { state: "MANUAL_REVIEW", code: "BUSINESS_IDENTIFIER_IN_USE" };
+    }
+    const changedSiren = business.siren !== input.siren;
+    if (changedSiren) {
+      await tx.store.updateMany({ where: { businessId: business.id }, data: { establishmentId: null } });
+      await tx.sellerBusinessEstablishment.updateMany({ where: { businessId: business.id }, data: { verificationState: "REVERIFY_REQUIRED" } });
+      await tx.sellerVerificationDocument.updateMany({ where: { businessId: business.id, type: "BUSINESS_REGISTRATION", status: { not: "SUPERSEDED" }, OR: [{ businessSiren: null }, { businessSiren: { not: input.siren } }] }, data: { status: "SUPERSEDED" } });
+    }
+    const lookup = await input.client.lookupLegalUnit(input.siren);
+    if (!lookup.ok) {
+      const state = lookup.reason === "NOT_FOUND" ? "REJECTED" : "PENDING";
+      const until = state === "PENDING" ? retryDate(lookup, input.now) : null;
+      await tx.sellerBusiness.update({ where: { id: business.id }, data: { siren: input.siren, inseeVerificationState: state, inseeVerifiedAt: null, inseeVerificationSource: SOURCE, inseeVerificationReason: lookup.reason, inseeRetryAfter: until, inseeLastAttemptAt: input.now, ...(changedSiren ? { inseeLegalUnitStatus: null, inseeLegalUnitName: null, inseeVerificationSnapshot: Prisma.DbNull } : {}) } });
+      await appendSellerBusinessAudit(tx, { businessId: business.id, actorId: input.actorId, category: "BUSINESS_VERIFICATION", action: `INSEE_${state}`, targetType: "SELLER_BUSINESS", targetId: business.id, metadata: { source: SOURCE, reason: lookup.reason, siren: input.siren } });
+      return { state, code: lookup.reason, ...(until ? { retryAfter: until } : {}) };
+    }
+    const legalUnit = lookup.value;
+    const state = legalUnit.status === "C" ? "REJECTED" : legalUnit.status !== "A" || legalUnit.diffusionRestricted || !legalUnit.name ? "MANUAL_REVIEW" : "VERIFIED";
+    const reason = state === "REJECTED" ? "INACTIVE_OR_CLOSED" : state === "MANUAL_REVIEW" ? legalUnit.status !== "A" ? "OFFICIAL_STATUS_INCONCLUSIVE" : "PUBLIC_DATA_INCOMPLETE" : null;
+    const snapshot = { source: SOURCE, legalUnitStatus: legalUnit.status, publicDataRestricted: legalUnit.diffusionRestricted, legalNameAvailable: Boolean(legalUnit.name), establishmentRequested: false } satisfies Prisma.InputJsonObject;
+    await tx.sellerBusiness.update({ where: { id: business.id }, data: { siren: input.siren, inseeVerificationState: state, inseeVerifiedAt: state === "VERIFIED" ? input.now : null, inseeVerificationSource: SOURCE, inseeLegalUnitStatus: legalUnit.status, inseeLegalUnitName: legalUnit.diffusionRestricted ? null : legalUnit.name, legalBusinessName: legalUnit.diffusionRestricted ? business.inseeLegalUnitName : legalUnit.name, inseeVerificationReason: reason, inseeVerificationSnapshot: snapshot, inseeRetryAfter: null, inseeLastAttemptAt: input.now } });
+    await appendSellerBusinessAudit(tx, { businessId: business.id, actorId: input.actorId, category: "BUSINESS_VERIFICATION", action: `INSEE_${state}`, targetType: "SELLER_BUSINESS", targetId: business.id, metadata: { source: SOURCE, reason, siren: input.siren, legalUnitStatus: legalUnit.status, publicDataRestricted: legalUnit.diffusionRestricted } });
+    return { state, code: reason ?? "VERIFIED" };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });
+}
+
 function retryDate(result: SireneResult<unknown>, now: Date) {
   const wait = !result.ok && result.retryAfterMs ? result.retryAfterMs : FAILURE_BACKOFF_MS;
   return new Date(now.getTime() + Math.max(1000, Math.min(wait, 24 * 60 * 60_000)));
@@ -29,13 +66,13 @@ function retryDate(result: SireneResult<unknown>, now: Date) {
 export async function verifySellerBusinessIdentifiers(db: PrismaClient, input: { businessId: string; actorId: string; siren: unknown; siret: unknown; now?: Date; client?: InseeSireneV311 }): Promise<BusinessVerificationResult> {
   const sirenResult = normalizeSiren(input.siren);
   if (!sirenResult.ok) return { state: "REJECTED", code: sirenResult.code };
+  const now = input.now ?? new Date();
+  const client = input.client ?? new InseeSireneV311();
+  if (input.siret == null || typeof input.siret === "string" && !input.siret.trim()) return verifySellerBusinessSirenOnly(db, { businessId: input.businessId, actorId: input.actorId, siren: sirenResult.value, now, client });
   const siretResult = normalizeSiret(input.siret);
   if (!siretResult.ok) return { state: "REJECTED", code: siretResult.code };
   const siren = sirenResult.value, siret = siretResult.value;
   if (sirenForSiret(siret) !== siren) return { state: "REJECTED", code: "SIRET_SIREN_MISMATCH" };
-  const now = input.now ?? new Date();
-  const client = input.client ?? new InseeSireneV311();
-
   try {
     return await db.$transaction(async (tx) => {
       await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`insee-business:${input.businessId}`}, 0))::text`);
@@ -63,6 +100,7 @@ export async function verifySellerBusinessIdentifiers(db: PrismaClient, input: {
       if (business.siren && business.siren !== siren) {
         await tx.store.updateMany({ where: { businessId: business.id }, data: { establishmentId: null } });
         await tx.sellerBusinessEstablishment.updateMany({ where: { businessId: business.id }, data: { verificationState: "REVERIFY_REQUIRED" } });
+        await tx.sellerVerificationDocument.updateMany({ where: { businessId: business.id, type: "BUSINESS_REGISTRATION", status: { not: "SUPERSEDED" }, OR: [{ businessSiren: null }, { businessSiren: { not: siren } }] }, data: { status: "SUPERSEDED" } });
       }
       const updatedBusiness = await tx.sellerBusiness.update({ where: { id: business.id }, data: {
         siren, inseeVerificationState: business.siren === siren && business.inseeVerificationState === "VERIFIED" ? "VERIFIED" : "PENDING", inseeVerificationReason: null, inseeLastAttemptAt: now, inseeRetryAfter: null,

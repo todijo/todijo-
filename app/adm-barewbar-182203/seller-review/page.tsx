@@ -12,18 +12,21 @@ import { adminAccessLabels } from "@/components/AdminAccessStatus";
 import { pendingSellerReviewWhere } from "@/lib/seller-review-alerts";
 import { sellerOnboardingStepCopy } from "@/i18n/seller-onboarding-steps";
 import SellerReviewActions from "./SellerReviewActions";
+import SellerVerificationDocumentActions from "./SellerVerificationDocumentActions";
+import { sellerVerificationDocumentCopy } from "@/i18n/seller-verification-documents";
 
 export const dynamic = "force-dynamic";
 export default async function SellerReviewPage() {
   const [requestedLocale, t, verification, session] = await Promise.all([getLocale(), getTranslations("Auth"), getTranslations("SellerBusinessVerification"), readSession()]);
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const copy = sellerReviewMessages[locale];
+  const documentCopy = sellerVerificationDocumentCopy[locale];
   const accessCopy = adminAccessLabels(locale);
   const stateLabel = (group: Parameters<typeof sellerReviewStateLabel>[1], value: string | null | undefined) => sellerReviewStateLabel(locale, group, value);
   const countryLabel = (code: string) => { try { return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code; } catch { return code; } };
   if (!session) redirect("/" + locale + "/login");
   try { await requireAdmin(prisma, session); } catch { redirect("/" + locale + "/dashboard"); }
-  const stores = await prisma.store.findMany({ where: { OR: [{ status: "PENDING" }, { onboardingStatus: { not: "NOT_STARTED" } }] }, take: 100, orderBy: [{ status: "asc" }, { updatedAt: "desc" }], select: { id: true, name: true, status: true, businessId: true, country: true, sellerType: true, sellerLegalForm: true, legalBusinessName: true, businessRegistrationId: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, business:{select:{adminContactPhone:true,siren:true,inseeVerificationState:true,inseeVerifiedAt:true,inseeVerificationSource:true,inseeVerificationReason:true,establishments:{orderBy:{updatedAt:"desc"},take:10,select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}}}, establishment:{select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}, subscription: { select: { plan: true, billingInterval: true, status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, owner: { select: { firstName: true, lastName: true, email: true, role: true, emailVerified: true, sellerSuspendedAt: true, stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } } } });
+  const stores = await prisma.store.findMany({ where: { OR: [{ status: "PENDING" }, { onboardingStatus: { not: "NOT_STARTED" } }] }, take: 100, orderBy: [{ status: "asc" }, { updatedAt: "desc" }], select: { id: true, name: true, status: true, businessId: true, country: true, sellerType: true, sellerLegalForm: true, legalBusinessName: true, businessRegistrationId: true, vatStatus: true, vatNumber: true, onboardingStatus: true, onboardingStep: true, business:{select:{adminContactPhone:true,siren:true,inseeVerificationState:true,inseeVerifiedAt:true,inseeVerificationSource:true,inseeVerificationReason:true,verificationDocuments:{where:{type:"BUSINESS_REGISTRATION"},orderBy:[{submittedAt:"desc"},{id:"desc"}],select:{id:true,type:true,status:true,originalFilename:true,submittedAt:true,reviewedAt:true,reviewReason:true}},establishments:{orderBy:{updatedAt:"desc"},take:10,select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}}}, establishment:{select:{siret:true,verificationState:true,verifiedAt:true,verificationSource:true,verificationReason:true}}, subscription: { select: { plan: true, billingInterval: true, status: true, currentPeriodEnd: true } }, accessGrants: { select: { source: true, startsAt: true, endsAt: true } }, owner: { select: { firstName: true, lastName: true, email: true, role: true, emailVerified: true, sellerSuspendedAt: true, stripeAccountId: true, stripeOnboardingComplete: true, stripeChargesEnabled: true, stripePayoutsEnabled: true } } } });
   const contactPhoneBusinessIds = [...new Set(stores.filter(store => store.businessId && store.business?.adminContactPhone).map(store => store.businessId!))];
   let contactPhoneAccessAudited = contactPhoneBusinessIds.length === 0;
   if (contactPhoneBusinessIds.length) {
@@ -66,6 +69,7 @@ export default async function SellerReviewPage() {
           <div><dt>{t("companyNumber")}</dt><dd>{store.businessRegistrationId??"—"}{store.sellerType==="PROFESSIONAL"&&store.country==="FR"&&<small>{verification("adminState")}: {stateLabel("verification",store.business?.inseeVerificationState)} · {verification("adminSiren")}: {store.business?.siren??"—"} · {verification("adminSiret")}: {establishment?.siret??"—"}<br />{verification("adminReason")}: {store.business?.inseeVerificationReason??"—"} · {verification("adminEstablishmentReason")}: {establishment?.verificationReason??"—"}</small>}</dd></div>
           <div><dt>{t("vatNumber")}</dt><dd>{stateLabel("vat",store.vatStatus)} · {store.vatNumber??"—"}</dd></div>
         </dl>
+        {store.business?.verificationDocuments.map(document=><section className="sellerBusinessVerification" key={document.id}><h3>{documentCopy.registrationDocument}</h3><p>{document.originalFilename}</p><a href={`/api/admin/seller-verification-documents/${document.id}`}>{documentCopy.view}</a>{document.status==="ACCEPTED"&&<p>{documentCopy.accepted}</p>}{document.status==="NEEDS_INFORMATION"&&<p>{documentCopy.needsInformation}</p>}{document.status==="REJECTED"&&<p>{documentCopy.rejected}</p>}{document.reviewReason&&<p>{document.reviewReason}</p>}<SellerVerificationDocumentActions documentId={document.id} locale={locale}/></section>)}
         <SellerReviewActions storeId={store.id} locale={locale} reviewable={reviewable} approvable={store.onboardingStatus==="PENDING_REVIEW"||rejectedForReconsideration}/>
       </article>;
     })}</section></section></main>;

@@ -60,6 +60,7 @@ test("manual INSEE approval does not invalidate its own optimistic Store update"
       updateMany: async (input: any) => { calls.push("store.updateMany"); storeUpdates.push(input); return { count: 1 }; },
     },
     sellerBusiness: { update: async () => { calls.push("business.update"); return {}; } },
+    sellerVerificationDocument: { findFirst: async () => ({ id: "accepted-registration-document", status: "ACCEPTED" }) },
     sellerBusinessEstablishment: {
       findUnique: async () => ({ id: "establishment", legalUnitSiren: "732829320", verificationState: "MANUAL_REVIEW" }),
       update: async () => { calls.push("establishment.update"); return {}; },

@@ -12,17 +12,27 @@ export function sellerOnboardingCompletion(input: {
   country: string;
   businessState?: string | null;
   establishmentState?: string | null;
+  siretProvided?: boolean;
+  registrationDocumentSubmitted?: boolean;
+  registrationDocumentAccepted?: boolean;
 }): SellerOnboardingCompletion {
   if (!input.professional || input.country.toUpperCase() !== "FR") {
     return { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" };
   }
 
-  if (input.businessState === "VERIFIED" && input.establishmentState === "VERIFIED") {
+  if (!input.registrationDocumentSubmitted) return { kind: "VERIFICATION_REQUIRED" };
+
+  // A French professional may submit a SIREN and the required registration
+  // document before selecting an establishment. That is a legitimate review
+  // state, not a malformed onboarding request.
+  if (!input.siretProvided) return { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" };
+
+  if (input.businessState === "VERIFIED" && input.establishmentState === "VERIFIED" && input.registrationDocumentAccepted) {
     return { kind: "VERIFIED", storeStatus: "PENDING", onboardingStatus: "VERIFIED" };
   }
 
-  const businessCanRequireReview = input.businessState === "MANUAL_REVIEW" || input.businessState === "VERIFIED";
-  if (businessCanRequireReview && input.establishmentState === "MANUAL_REVIEW") {
+  const documentCanRequireReview = input.registrationDocumentSubmitted;
+  if (documentCanRequireReview) {
     return { kind: "ADMIN_REVIEW", storeStatus: "PENDING", onboardingStatus: "PENDING_REVIEW" };
   }
 

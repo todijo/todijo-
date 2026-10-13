@@ -119,6 +119,12 @@ async function makeFrenchProfessionalReviewFixture(storeId: string, businessId: 
       status: "PENDING", onboardingStatus: "PENDING_REVIEW", onboardingStep: 4,
     } });
   });
+  await db.sellerVerificationDocument.create({ data: {
+    id: `registration-document-${ownerId}`, businessId, storeId, uploadedById: ownerId, reviewedById: adminId,
+    type: "BUSINESS_REGISTRATION", status: "ACCEPTED", businessSiren: siren, storageKey: `e2e/${ownerId}/registration.pdf`,
+    originalFilename: "registration.pdf", mimeType: "application/pdf", sizeBytes: 5,
+    contentHash: ownerId.padEnd(64, "0").slice(0, 64), reviewReason: "Synthetic isolated test document", reviewedAt: new Date(),
+  } });
   return { siren, siret, establishmentId: establishment.id };
 }
 
@@ -176,7 +182,7 @@ test("manual INSEE review approval persists despite Store timestamp changes and 
   expect(await db.store.findUniqueOrThrow({ where: { id: store.storeId }, select: { status: true, onboardingStatus: true, establishmentId: true } }))
     .toEqual({ status: "PENDING", onboardingStatus: "VERIFIED", establishmentId: identifiers.establishmentId });
   expect(await db.sellerBusiness.findUniqueOrThrow({ where: { id: store.businessId }, select: { inseeVerificationState: true, inseeVerificationReason: true } }))
-    .toEqual({ inseeVerificationState: "VERIFIED", inseeVerificationReason: null });
+    .toEqual({ inseeVerificationState: "VERIFIED", inseeVerificationReason: "PUBLIC_DATA_INCOMPLETE" });
   expect(await db.sellerBusinessAuditEvent.findFirstOrThrow({ where: { storeId: store.storeId, action: "INSEE_ADMIN_MANUAL_VERIFIED" }, select: { actorId: true, metadata: true } }))
     .toMatchObject({ actorId: adminId, metadata: { reason } });
 });

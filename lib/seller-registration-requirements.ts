@@ -5,6 +5,12 @@ export function sellerRegistrationRequirements(countryCode:string,sellerType:Sel
  const country=countryCode.trim().toUpperCase();if(sellerType==="PRIVATE")return{registrationRequired:false,registrationLabel:country==="FR"?"siret":"companyNumber",vatSupported:EEA.has(country)||country==="GB",format:country==="FR"?"FR_SIRET":"GENERIC"};
  return{registrationRequired:true,registrationLabel:country==="FR"?"siret":"companyNumber",vatSupported:EEA.has(country)||country==="GB",format:country==="FR"?"FR_SIRET":"GENERIC"};
 }
+/** French professional sellers may submit initial onboarding with a SIREN and
+ * official registration document before supplying the establishment SIRET.
+ * Later legal review and activation still require the applicable SIRET. */
+export function mayOmitInitialFrenchSiret(countryCode:string,sellerType:SellerRegistrationType,value:string){
+ return sellerType==="PROFESSIONAL"&&countryCode.trim().toUpperCase()==="FR"&&!value.trim();
+}
 export function validBusinessRegistration(value:string,requirements:SellerRegistrationRequirements){
  const normalized=value.replace(/[\s.-]/g,"");if(!requirements.registrationRequired)return true;
  if(requirements.format==="FR_SIRET")return /^\d{14}$/.test(normalized);

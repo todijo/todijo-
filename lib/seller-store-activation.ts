@@ -77,6 +77,11 @@ export async function reconcilePendingSellerStoreActivation(
       || !hasVerifiedFrenchBusiness(store)
       || store.establishment?.legalUnitSiren !== siren.value
     ) return { activated: false as const, reason: "BUSINESS_VERIFICATION_INCOMPLETE" as const };
+    const registrationDocument = await tx.sellerVerificationDocument.findFirst({
+      where: { businessId: store.businessId, businessSiren: siren.value, type: "BUSINESS_REGISTRATION", status: { not: "SUPERSEDED" } },
+      orderBy: [{ submittedAt: "desc" }, { id: "desc" }], select: { id: true, status: true },
+    });
+    if (registrationDocument?.status !== "ACCEPTED") return { activated: false as const, reason: "REGISTRATION_DOCUMENT_NOT_ACCEPTED" as const };
   }
 
   // A signed event or UI-supplied flag is not enough by itself: these stored
