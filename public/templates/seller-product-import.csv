@@ -1,11 +1,11 @@
 parent_product_id,parent_title,title,description,price,currency,stock,sku,color,size,supplier_category,brand,condition,images,video,weight_g,length_mm,width_mm,height_mm,attributes
-TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,8.99,EUR,8,TSHIRT-BLUE-S,Blue,S,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,"{""fabric"":""cotton""}"
-TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,8.99,EUR,12,TSHIRT-BLUE-M,Blue,M,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,"{""fabric"":""cotton""}"
-TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,9.49,EUR,5,TSHIRT-BLACK-S,Black,S,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,"{""fabric"":""cotton""}"
-TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,9.49,EUR,9,TSHIRT-BLACK-M,Black,M,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,"{""fabric"":""cotton""}"
-BACKPACK-001,School backpack,School backpack,Lightweight school backpack with a front pocket.,18.00,EUR,4,BAG-BLUE,Blue,Small,Jouets Enfants et Bébé > Chaussures et Sacs > Sacs d'école,Example brand,Neuf,,,,,,
-BACKPACK-001,School backpack,School backpack,Lightweight school backpack with a front pocket.,19.00,EUR,7,BAG-BLACK,Black,Large,Jouets Enfants et Bébé > Chaussures et Sacs > Sacs d'école,Example brand,Neuf,,,,,,
-CUSHION-001,Decorative cushion,Decorative cushion,Decorative cushion for a living room.,12.00,EUR,6,CUSHION-GREEN,Green,Small,Maison et Jardin > Textiles de maison > Oreillers,Example brand,Neuf,,,,,,
-CUSHION-001,Decorative cushion,Decorative cushion,Decorative cushion for a living room.,13.00,EUR,3,CUSHION-GOLD,Gold,Large,Maison et Jardin > Textiles de maison > Oreillers,Example brand,Neuf,,,,,,
-MUG-001,Ceramic mug,Ceramic mug,Reusable ceramic mug for everyday drinks.,7.50,EUR,10,MUG-WHITE,White,One size,Maison et Jardin > Cuisine Salle à manger et Bar > Vaisselle,Example brand,Neuf,,,,,,
-MUG-001,Ceramic mug,Ceramic mug,Reusable ceramic mug for everyday drinks.,7.50,EUR,8,MUG-BLUE,Blue,One size,Maison et Jardin > Cuisine Salle à manger et Bar > Vaisselle,Example brand,Neuf,,,,,,
+TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,8.99,EUR,8,TSHIRT-BLUE-S,Blue,S,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,,"{""fabric"":""cotton""}"
+TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,8.99,EUR,12,TSHIRT-BLUE-M,Blue,M,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,,"{""fabric"":""cotton""}"
+TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,9.49,EUR,5,TSHIRT-BLACK-S,Black,S,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,,"{""fabric"":""cotton""}"
+TSHIRT-001,Men cotton T-shirt,Men cotton T-shirt,Soft cotton short sleeve shirt.,9.49,EUR,9,TSHIRT-BLACK-M,Black,M,Vêtements pour hommes > T-shirts > Solide,Example brand,Neuf,,,,,,,"{""fabric"":""cotton""}"
+BACKPACK-001,School backpack,School backpack,Lightweight school backpack with a front pocket.,18.00,EUR,4,BAG-BLUE,Blue,Small,Jouets Enfants et Bébé > Chaussures et Sacs > Sacs d'école,Example brand,Neuf,,,,,,,
+BACKPACK-001,School backpack,School backpack,Lightweight school backpack with a front pocket.,19.00,EUR,7,BAG-BLACK,Black,Large,Jouets Enfants et Bébé > Chaussures et Sacs > Sacs d'école,Example brand,Neuf,,,,,,,
+CUSHION-001,Decorative cushion,Decorative cushion,Decorative cushion for a living room.,12.00,EUR,6,CUSHION-GREEN,Green,Small,Maison et Jardin > Textiles de maison > Oreillers,Example brand,Neuf,,,,,,,
+CUSHION-001,Decorative cushion,Decorative cushion,Decorative cushion for a living room.,13.00,EUR,3,CUSHION-GOLD,Gold,Large,Maison et Jardin > Textiles de maison > Oreillers,Example brand,Neuf,,,,,,,
+MUG-001,Ceramic mug,Ceramic mug,Reusable ceramic mug for everyday drinks.,7.50,EUR,10,MUG-WHITE,White,One size,Maison et Jardin > Cuisine Salle à manger et Bar > Vaisselle,Example brand,Neuf,,,,,,,
+MUG-001,Ceramic mug,Ceramic mug,Reusable ceramic mug for everyday drinks.,7.50,EUR,8,MUG-BLUE,Blue,One size,Maison et Jardin > Cuisine Salle à manger et Bar > Vaisselle,Example brand,Neuf,,,,,,,

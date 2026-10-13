@@ -120,6 +120,36 @@ test("downloadable CSV example parses as ten supplier rows grouped into four con
   assert.ok(suggestions.every(suggestion => suggestion.canonicalCategoryId && suggestion.confidence >= .85));
 });
 
+test("ten-row example prepares four categorized parent products with exact variant SKU, price, and stock", () => {
+  const sample = parseSellerProductImport("seller-product-import.csv", readFileSync("public/templates/seller-product-import.csv"));
+  const mapping = suggestSellerImportMapping(sample.headers);
+  const groups = groupSellerImportRows(sample.rows, mapping);
+  const expected = new Map<string, { category: string; variants: readonly (readonly [string, string, number])[] }>([
+    ["TSHIRT-001", { category: "men--tshirts--solide", variants: [["TSHIRT-BLUE-S", "8.99", 8], ["TSHIRT-BLUE-M", "8.99", 12], ["TSHIRT-BLACK-S", "9.49", 5], ["TSHIRT-BLACK-M", "9.49", 9]] }],
+    ["BACKPACK-001", { category: "kids--shoes--sacs-d-ecole", variants: [["BAG-BLUE", "18.00", 4], ["BAG-BLACK", "19.00", 7]] }],
+    ["CUSHION-001", { category: "home--textiles--oreillers", variants: [["CUSHION-GREEN", "12.00", 6], ["CUSHION-GOLD", "13.00", 3]] }],
+    ["MUG-001", { category: "home--kitchen--vaisselle", variants: [["MUG-WHITE", "7.50", 10], ["MUG-BLUE", "7.50", 8]] }],
+  ] as const);
+
+  assert.equal(groups.length, 4);
+  for (const group of groups) {
+    const items = group.rows.map((sourceRow, index) => ({ rowNumber: group.rowNumbers[index], sourceRow }));
+    let prepared: ReturnType<typeof prepareSellerImportGroup>;
+    try {
+      prepared = prepareSellerImportGroup(items as never, mapping, "EUR", group.key);
+    } catch (error) {
+      assert.fail(`${group.parentIdentifier}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const assertion = expected.get(group.parentIdentifier ?? "");
+    assert.ok(assertion, `unexpected parent ${group.parentIdentifier}`);
+    assert.equal(prepared.productIdentifier, group.parentIdentifier);
+    assert.equal(prepared.category, assertion.category);
+    assert.ok(group.rows.every(row => suggestSellerImportCategory(row, mapping).canonicalCategoryId === prepared.category));
+    assert.equal(prepared.variants?.variants?.length, assertion.variants.length);
+    assert.deepEqual(prepared.variants?.variants?.map(variant => [variant.sku, variant.priceOverride ?? prepared.price, variant.stock]), assertion.variants);
+  }
+});
+
 test("import preparation preserves exact supplied variants, their price/stock/SKU and category attributes", () => {
   const headers = ["parent_product_id", "parent_title", "supplier_product_id", "title", "description", "price", "currency", "stock", "sku", "color", "size", "supplier_category", "attributes"];
   const parsed = parseSellerProductImport("variants.csv", Buffer.from([
