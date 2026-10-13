@@ -1,10 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient, type SellerVerificationDocumentType } from "@prisma/client";
-import type { R2ObjectStore } from "@/lib/r2";
-import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
-import { reconcilePendingSellerStoreActivation } from "@/lib/seller-store-activation";
-import { normalizeSiren, normalizeSiret, sirenForSiret } from "@/lib/sirene-identifiers";
+import type { R2ObjectStore } from "./r2";
+import { appendSellerBusinessAudit } from "./seller-business-audit";
+import { reconcilePendingSellerStoreActivation } from "./seller-store-activation";
+import { normalizeSiren, normalizeSiret, sirenForSiret } from "./sirene-identifiers";
 import { SellerVerificationDocumentError, validateSellerVerificationFile, type SellerVerificationFile, MAX_SELLER_VERIFICATION_DOCUMENT_BYTES } from "./seller-verification-file";
 
 export { SellerVerificationDocumentError, validateSellerVerificationFile, MAX_SELLER_VERIFICATION_DOCUMENT_BYTES };
@@ -18,11 +18,20 @@ export async function uploadSellerVerificationDocument(
   if (!["BUSINESS_REGISTRATION", "REPRESENTATION_AUTHORITY", "OTHER"].includes(input.type)) throw new SellerVerificationDocumentError("DOCUMENT_TYPE_INVALID");
   const siren = input.type === "BUSINESS_REGISTRATION" ? normalizeSiren(input.businessSiren) : null;
   if (input.type === "BUSINESS_REGISTRATION" && !siren?.ok) throw new SellerVerificationDocumentError("INVALID_SIREN");
-  const business = await db.sellerBusiness.findUnique({ where: { ownerId: input.ownerId }, select: { id: true, ownerId: true } });
+  const business = await db.sellerBusiness.findUnique({ where: { ownerId: input.ownerId }, select: { id: true, ownerId: true, primaryStoreId: true } });
   if (!business) throw new SellerVerificationDocumentError("SELLER_BUSINESS_REQUIRED", 409);
   const checked = await validateSellerVerificationFile(input.file);
   const duplicate = await db.sellerVerificationDocument.findFirst({ where: { businessId: business.id, contentHash: checked.contentHash, type: input.type, businessSiren: siren?.ok ? siren.value : null }, select: { id: true, type: true, status: true, originalFilename: true, mimeType: true, sizeBytes: true, submittedAt: true, reviewReason: true } });
-  if (duplicate) return duplicate;
+  if (duplicate) {
+    if (!["NEEDS_INFORMATION", "REJECTED", "SUPERSEDED"].includes(duplicate.status)) return duplicate;
+    return db.$transaction(async tx => {
+      await tx.sellerVerificationDocument.updateMany({ where: { businessId: business.id, type: input.type, id: { not: duplicate.id }, status: { in: ["SUBMITTED", "NEEDS_INFORMATION", "REJECTED"] } }, data: { status: "SUPERSEDED" } });
+      const changed = await tx.sellerVerificationDocument.updateMany({ where: { id: duplicate.id, status: duplicate.status }, data: { status: "SUBMITTED", storeId: business.primaryStoreId, submittedAt: new Date(), reviewedAt: null, reviewedById: null, reviewReason: null } });
+      if (changed.count !== 1) throw new SellerVerificationDocumentError("DOCUMENT_REVIEW_STATE_CHANGED", 409);
+      await appendSellerBusinessAudit(tx, { businessId: business.id, storeId: business.primaryStoreId, actorId: input.ownerId, category: "BUSINESS_VERIFICATION", action: "SELLER_VERIFICATION_DOCUMENT_RESUBMITTED", targetType: "SELLER_VERIFICATION_DOCUMENT", targetId: duplicate.id, metadata: { previousStatus: duplicate.status } });
+      return { ...duplicate, status: "SUBMITTED", reviewReason: null };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
 
   const storageKey = `seller-verification/${business.id}/${randomUUID()}.${checked.extension}`;
   await storage.put(storageKey, checked.bytes, checked.mimeType);
@@ -30,7 +39,7 @@ export async function uploadSellerVerificationDocument(
     return await db.$transaction(async tx => {
       await tx.sellerVerificationDocument.updateMany({ where: { businessId: business.id, type: input.type, status: { in: ["SUBMITTED", "NEEDS_INFORMATION", "REJECTED"] } }, data: { status: "SUPERSEDED" } });
       const document = await tx.sellerVerificationDocument.create({ data: {
-        businessId: business.id, uploadedById: input.ownerId, type: input.type, status: "SUBMITTED", businessSiren: siren?.ok ? siren.value : null, storageKey,
+        businessId: business.id, storeId: business.primaryStoreId, uploadedById: input.ownerId, type: input.type, status: "SUBMITTED", businessSiren: siren?.ok ? siren.value : null, storageKey,
         originalFilename: checked.originalFilename, mimeType: checked.mimeType, sizeBytes: checked.bytes.length, contentHash: checked.contentHash,
       }, select: { id: true, type: true, status: true, originalFilename: true, mimeType: true, sizeBytes: true, submittedAt: true, reviewReason: true } });
       await appendSellerBusinessAudit(tx, { businessId: business.id, actorId: input.ownerId, category: "BUSINESS_VERIFICATION", action: "SELLER_VERIFICATION_DOCUMENT_UPLOADED", targetType: "SELLER_VERIFICATION_DOCUMENT", targetId: document.id, metadata: { type: document.type, mimeType: checked.mimeType, sizeBytes: checked.bytes.length, contentHash: checked.contentHash } });
@@ -81,6 +90,9 @@ export async function decideSellerVerificationDocument(
       const verified = await db.store.updateMany({ where: { id: store.id, status: "PENDING", onboardingStatus: "PENDING_REVIEW", updatedAt: store.updatedAt }, data: { onboardingStatus: "VERIFIED" } });
       if (verified.count === 1) activation = await reconcilePendingSellerStoreActivation(db, store.id, now);
     }
+  }
+  if (input.status === "ACCEPTED" && document.type === "BUSINESS_REGISTRATION" && !activation) {
+    activation = { activated: false, reason: "BUSINESS_VERIFICATION_INCOMPLETE" };
   }
   return { id: document.id, status: input.status, activation };
 }

@@ -173,7 +173,7 @@ export async function POST(request: Request) {
           vatStatus: vatStatus as SellerVatStatus, vatNumber,
           ...(!existingBusiness?.inseeLegalUnitName ? { legalBusinessName: text(body.legalBusinessName, 160) } : {}),
         } });
-        if (frProfessional && siren.ok) {
+        if (frProfessional && siren.ok && registration) {
           const establishment = await tx.sellerBusinessEstablishment.findUnique({ where: { businessId_siret: { businessId: business.id, siret: registration! } }, select: { id: true, verificationState: true, legalUnitSiren: true } });
           establishmentState = establishment?.verificationState ?? null;
           if (establishment?.verificationState === "VERIFIED" && establishment.legalUnitSiren === siren.value && existingBusiness?.siren === siren.value && existingBusiness.inseeVerificationState === "VERIFIED") establishmentId = establishment.id;

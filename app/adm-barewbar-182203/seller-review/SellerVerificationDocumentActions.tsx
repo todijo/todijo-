@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Locale } from "@/i18n/config";
 import { sellerReviewMessages } from "@/i18n/seller-review";
 import { sellerVerificationDocumentCopy } from "@/i18n/seller-verification-documents";
 
 export default function SellerVerificationDocumentActions({ documentId, locale }: { documentId: string; locale: Locale }) {
+  const router = useRouter();
   const copy = sellerVerificationDocumentCopy[locale];
   const review = sellerReviewMessages[locale];
   const [reason, setReason] = useState("");
@@ -21,7 +23,8 @@ export default function SellerVerificationDocumentActions({ documentId, locale }
       const body = await response.json().catch(() => ({})) as { error?: string; activation?: { activated?: boolean; reason?: string } };
       if (!response.ok) { setFeedback(`${review.failed} (${body.error ?? "DOCUMENT_REVIEW_SAVE_FAILED"})`); setBusy(false); return; }
       if (body.activation && !body.activation.activated && body.activation.reason) setFeedback(body.activation.reason);
-      location.reload();
+      setBusy(false);
+      router.refresh();
     } catch { setFeedback(review.failed); setBusy(false); }
   }
 

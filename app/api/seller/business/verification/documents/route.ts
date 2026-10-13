@@ -20,7 +20,7 @@ export async function GET() {
   if (session.role === "ADMIN") return NextResponse.json({ error: "ADMIN_ROLE_PROTECTED" }, { status: 403 });
   try {
     const business = await prisma.sellerBusiness.findUnique({ where: { ownerId: session.userId }, select: { id: true } });
-    const documents = business ? await prisma.sellerVerificationDocument.findMany({ where: { businessId: business.id }, orderBy: [{ submittedAt: "desc" }, { id: "desc" }], select: { id: true, type: true, status: true, originalFilename: true, mimeType: true, sizeBytes: true, submittedAt: true, reviewedAt: true, reviewReason: true } }) : [];
+    const documents = business ? await prisma.sellerVerificationDocument.findMany({ where: { businessId: business.id }, orderBy: [{ submittedAt: "desc" }, { id: "desc" }], select: { id: true, type: true, status: true, businessSiren: true, originalFilename: true, mimeType: true, sizeBytes: true, submittedAt: true, reviewedAt: true, reviewReason: true } }) : [];
     return NextResponse.json({ documents }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return errorResponse(error); }
 }
