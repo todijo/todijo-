@@ -30,11 +30,14 @@ jobs:
         postgres: ["16", "18"]
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:${{ matrix.postgres }}
+        image: ${{ matrix.postgres == '18' && 'quay.io/sclorg/postgresql-18-c9s' || 'public.ecr.aws/docker/library/postgres:16' }}
         env:
           POSTGRES_USER: lifecycle
           POSTGRES_PASSWORD: lifecycle
           POSTGRES_DB: todijo_lifecycle_validation
+          POSTGRESQL_USER: lifecycle
+          POSTGRESQL_PASSWORD: lifecycle
+          POSTGRESQL_DATABASE: todijo_lifecycle_validation
         ports:
           - 5432:5432
         options: >-

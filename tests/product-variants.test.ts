@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { createProductWithVariants, MAX_OPTION_VALUES, MAX_PRODUCT_OPTIONS, MAX_PRODUCT_VARIANTS, ProductVariantError, productVariantCombinationKey, productVariantDraftKey, saveProductVariants, serializeProductVariantForEditor } from "../lib/product-variants";
+import { createProductWithVariants, MAX_OPTION_VALUES, MAX_PRODUCT_OPTIONS, MAX_PRODUCT_VARIANTS, ProductVariantError, productVariantCombinationKey, productVariantDraftKey, saveProductVariants, serializeProductVariantForEditor, upsertProductVariantsExact } from "../lib/product-variants";
 import { productStockForForm } from "../lib/product-variant-form";
 import { isSelectedVariantAvailable, resolveProductAvailability } from "../lib/product-availability";
 import { productCardOptionHref, resolveProductCardAction } from "../lib/product-card-action";
@@ -118,6 +118,36 @@ test("new product and generated variants are persisted in one transaction", asyn
   });
   assert.equal(productCreates, 1);
   assert.equal(variantCreates, 2);
+});
+
+test("supplier imports persist only explicitly supplied variant combinations", async () => {
+  const combinations: string[] = [];
+  const tx = {
+    product: { create: async () => ({ id: "product_import" }) },
+    productOption: { create: async ({ data }: { data: { name: string } }) => ({ id: `option_${data.name}` }) },
+    productOptionValue: { create: async ({ data }: { data: { value: string } }) => ({ id: `value_${data.value}`, value: data.value }) },
+    productVariant: { create: async ({ data }: { data: { combinationKey: string } }) => { combinations.push(data.combinationKey); return { id: `variant_${combinations.length}` }; } },
+  };
+  const db = { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) } as unknown as PrismaClient;
+  await createProductWithVariants(db, { name: "Shirt", slug: "shirt", description: "A sufficiently descriptive shirt.", category: "fashion", condition: "NEUF", status: "DRAFT", price: "10.00", stock: 0, images: [], colors: [], sizes: [], currency: "EUR", storeId: "store_a" }, {
+    options: [{ name: "Color", values: [{ value: "Blue" }, { value: "Black" }] }, { name: "Size", values: [{ value: "S" }, { value: "M" }] }], generate: false,
+    variants: ["Blue\u001fS", "Black\u001fM"].map((combinationKey, index) => ({ combinationKey, sku: `SKU-${index}`, stock: 5, active: true })),
+  });
+  assert.equal(combinations.length, 2);
+  assert.equal(combinations.includes("value_Blue:value_S") || combinations.includes("value_S:value_Blue"), true);
+  assert.equal(combinations.includes("value_Black:value_M") || combinations.includes("value_M:value_Black"), true);
+  assert.equal(combinations.some(key => key.includes("value_Blue") && key.includes("value_M")), false);
+  assert.equal(combinations.some(key => key.includes("value_Black") && key.includes("value_S")), false);
+});
+
+test("supplier update preserves a variant compare-at price when the import has no compare-at column", async () => {
+  let updateData: Record<string, unknown> | null = null;
+  const tx = {
+    product: { findUnique: async () => ({ id: "product_a", price: new Prisma.Decimal("10.00"), options: [{ id: "option_color", name: "Color", values: [{ id: "value_blue", value: "Blue", active: true }] }], variants: [{ id: "variant_a", combinationKey: "value_blue", priceOverride: null, compareAtPrice: new Prisma.Decimal("15.00"), stock: 4, sku: "SKU-BLUE" }] }) },
+    productVariant: { update: async ({ data }: { data: Record<string, unknown> }) => { updateData = data; } },
+  };
+  await upsertProductVariantsExact(tx as never, "product_a", { options: [{ name: "Color", values: [{ value: "Blue" }] }], generate: false, variants: [{ combinationKey: "Blue", priceOverride: null, stock: 6 }] });
+  assert.deepEqual(updateData, { priceOverride: null, stock: 6 });
 });
 
 test("invalid create-variant input is rejected before a product transaction starts", async () => {

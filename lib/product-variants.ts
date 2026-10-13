@@ -122,16 +122,24 @@ async function createProductOptionsAndVariants(tx: Prisma.TransactionClient, pro
     resolvedValues.push(values);
   }
 
-  if (!input.generate) return;
-  const generated = combinations(resolvedValues.map((values) => values.map(({ value }) => value)));
+  const provided = input.variants ?? [];
+  if (provided.length > MAX_PRODUCT_VARIANTS) throw new ProductVariantError(`A product can have at most ${MAX_PRODUCT_VARIANTS} variants.`);
+  const draftByKey = new Map(provided.map((variant) => [text(variant.combinationKey, 500, "Variant combination"), variant]));
+  if (draftByKey.size !== provided.length) throw new ProductVariantError("Variant combinations must be unique.");
+  const generated = input.generate
+    ? combinations(resolvedValues.map((values) => values.map(({ value }) => value)))
+    : provided.map((variant) => text(variant.combinationKey, 500, "Variant combination").split("\u001f"));
   if (generated.length === 0 || generated.length > MAX_PRODUCT_VARIANTS) throw new ProductVariantError(`A product can have at most ${MAX_PRODUCT_VARIANTS} variants.`);
-  const draftByKey = new Map((input.variants ?? []).map((variant) => [text(variant.combinationKey, 500, "Variant combination"), variant]));
-  if (draftByKey.size !== (input.variants ?? []).length) throw new ProductVariantError("Variant combinations must be unique.");
+  if (!input.generate && generated.some(labels => labels.length !== resolvedValues.length)) throw new ProductVariantError("Each imported variant must specify every option value.");
+  if (input.generate && draftByKey.size !== generated.length) throw new ProductVariantError("Variant configuration is incomplete.");
 
+  const seen = new Set<string>();
   for (const labels of generated) {
     const key = productVariantDraftKey(labels);
+    if (seen.has(key)) throw new ProductVariantError("Variant combinations must be unique.");
+    seen.add(key);
     const rawVariant = draftByKey.get(key);
-    if (!rawVariant) throw new ProductVariantError("Variant configuration is incomplete.");
+    if (!rawVariant) throw new ProductVariantError("Invalid product variant.");
     const selected = labels.map((label, optionIndex) => {
       const value = resolvedValues[optionIndex].find((candidate) => candidate.value === label);
       if (!value) throw new ProductVariantError("Invalid product variant.");
@@ -165,6 +173,69 @@ export async function createProductWithVariants(db: PrismaClient, data: Prisma.P
     if (afterCreate) await afterCreate(tx, product.id);
     return product;
   });
+}
+
+/**
+ * Apply only the concrete combinations present in an explicitly confirmed supplier
+ * update. Existing combinations not present in the file are deliberately preserved.
+ */
+export async function upsertProductVariantsExact(tx: Prisma.TransactionClient, productId: string, input: ProductVariantsInput) {
+  const options = normalizeOptions(input.options);
+  const drafts = input.variants ?? [];
+  if (!options.length || !drafts.length || drafts.length > MAX_PRODUCT_VARIANTS) throw new ProductVariantError("Invalid imported variant set.");
+  const current = await tx.product.findUnique({
+    where: { id: productId },
+    select: { id: true, price: true, options: { orderBy: { position: "asc" }, include: { values: true } }, variants: { include: { values: true } } },
+  });
+  if (!current) throw new ProductVariantError("Product not found.", 404);
+  if (current.options.length && (current.options.length !== options.length || current.options.some((option, index) => option.name.toLocaleLowerCase() !== options[index].name.toLocaleLowerCase()))) {
+    throw new ProductVariantError("IMPORT_VARIANT_OPTIONS_MISMATCH", 409);
+  }
+  if (!current.options.length && current.variants.length) throw new ProductVariantError("IMPORT_VARIANT_OPTIONS_MISMATCH", 409);
+
+  const resolvedValues: Array<Array<{ id: string; value: string }>> = [];
+  for (const [position, optionInput] of options.entries()) {
+    const existing = current.options[position];
+    const option = existing ?? await tx.productOption.create({ data: { productId, name: optionInput.name, position, active: true } });
+    const values: Array<{ id: string; value: string }> = [];
+    for (const [valuePosition, valueInput] of optionInput.values.entries()) {
+      const oldValue = existing?.values.find(value => value.value.toLocaleLowerCase() === valueInput.value.toLocaleLowerCase());
+      const value = oldValue ?? await tx.productOptionValue.create({ data: { optionId: option.id, value: valueInput.value, position: valuePosition, active: true } });
+      if (oldValue?.active === false) throw new ProductVariantError("IMPORT_VARIANT_VALUE_INACTIVE", 409);
+      values.push(value);
+    }
+    resolvedValues.push(values);
+  }
+
+  const seen = new Set<string>();
+  for (const draft of drafts) {
+    const labels = text(draft.combinationKey, 500, "Variant combination").split("\u001f");
+    if (labels.length !== options.length || seen.has(productVariantDraftKey(labels))) throw new ProductVariantError("Invalid product variant.");
+    seen.add(productVariantDraftKey(labels));
+    const selected = labels.map((label, index) => resolvedValues[index].find(value => value.value.toLocaleLowerCase() === label.toLocaleLowerCase()));
+    if (selected.some(value => !value)) throw new ProductVariantError("Invalid product variant.");
+    const selectedValues = selected as Array<{ id: string; value: string }>;
+    const combinationKey = productVariantCombinationKey(selectedValues.map(value => value.id));
+    const existingVariant = current.variants.find(variant => variant.combinationKey === combinationKey);
+    const priceOverride = decimal(draft.priceOverride, "Variant price");
+    const compareAtPrice = decimal(draft.compareAtPrice, "Variant compare-at price");
+    assertValidCompareAtPrice(compareAtPrice, priceOverride ?? new Prisma.Decimal(current.price.toString()));
+    const stock = nonNegativeInteger(draft.stock, "Variant stock");
+    const sku = optionalText(draft.sku, 120, "SKU");
+    if (existingVariant) {
+      await tx.productVariant.update({ where: { id: existingVariant.id }, data: {
+        ...(sku ? { sku } : {}), priceOverride,
+        ...(draft.compareAtPrice !== undefined ? { compareAtPrice } : {}),
+        stock,
+      } });
+    } else {
+      await tx.productVariant.create({ data: {
+        productId, combinationKey, sku, priceOverride, compareAtPrice, stock, active: true,
+        values: { create: selectedValues.map(value => ({ optionValueId: value.id })) },
+      } });
+    }
+  }
+  return { optionCount: options.length, variantCount: drafts.length };
 }
 
 export async function saveProductVariants(db: PrismaClient, sellerId: string, productId: string, input: ProductVariantsInput) {
