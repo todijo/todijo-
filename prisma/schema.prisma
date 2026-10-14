@@ -1332,6 +1332,8 @@ model SellerProductImportItem {
   sourceRow Json
   status    String   @default("PENDING") @db.VarChar(24)
   errorCode String?  @db.VarChar(80)
+  warningCode String? @db.VarChar(100)
+  warningDetails Json?
   productId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2700,6 +2702,7 @@ model ProductOptionValueImage {
 model ProductVariant {
   id              String   @id @default(cuid())
   productId       String
+  imageUrls       Json?
   combinationKey  String   @db.VarChar(500)
   sku             String?  @unique @db.VarChar(120)
   barcode         String?  @db.VarChar(120)

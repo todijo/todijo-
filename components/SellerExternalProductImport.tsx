@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { validateProductImages } from "@/lib/product-images";
+import { sellerImportMediaCopy } from "@/i18n/seller-import-media-copy";
 import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, hasSellerImportCategoryConflict, suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
 import type { SellerImportField, SellerImportMapping } from "@/lib/seller-product-import-workflow";
 import { feedbackCopy } from "@/lib/feedback-copy";
@@ -48,18 +48,18 @@ function isReady(row: Record<string, string>, mapping: SellerImportMapping, cate
   const value = (field: SellerImportField) => mappedValue(row, mapping, field);
   const title = value("parentTitle") || value("title"), description = value("description"), price = (value("variantPrice") || value("price")).replace(/\s/g, "").replace(",", "."), rawStock = value("variantStock") || value("stock"), stock = Number(rawStock);
   const suggestion = categorySuggestionForRow(row, mapping);
-  const category = categoryOverride || (suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? ""), images = [...value("images"), ...value("variantImages")].join("|").split(/[|;\r\n]+/).map(item => item.trim()).filter(Boolean);
+  const category = categoryOverride || (suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? "");
   if (title.length < 2 || title.length > 120 || description.length < 10 || description.length > 5000 || !/^\d+(?:\.\d{1,2})?$/.test(price) || Number(price) <= 0 || !rawStock || !Number.isSafeInteger(stock) || stock < 0 || !isValidSellerImportCategoryId(category)) return false;
-  if (images.length && !validateProductImages(images).ok) return false;
   const variantCell = value("variants"); if (variantCell) try { const parsed = JSON.parse(variantCell); if (!parsed || !Array.isArray(parsed.options) || !Array.isArray(parsed.variants) || parsed.variants.some((item: { combinationKey?: unknown }) => typeof item?.combinationKey !== "string")) return false; } catch { return false; }
   return true;
 }
 
 export default function SellerExternalProductImport({ storeId, storeName, backHref, labels, fieldLabels, locale, storeCurrency }: { storeId: string; storeName: string; backHref: string; labels: Labels; fieldLabels: Record<string, string>; locale: string; storeCurrency: string }) {
   const router = useRouter();
-  const [source, setSource] = useState("csv"), [file, setFile] = useState<File | null>(null), [parsed, setParsed] = useState<ParsedFile | null>(null), [mapping, setMapping] = useState<SellerImportMapping>({}), [rowCategories, setRowCategories] = useState<Record<string, string>>({}), [groupCategories, setGroupCategories] = useState<Record<string, string>>({}), [categorySuggestions, setCategorySuggestions] = useState<Record<number, CategorySuggestion>>({}), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [summary, setSummary] = useState(""), [rowResults, setRowResults] = useState<Record<number, { status: string; errorCode: string | null }>>({}), [idempotencyKey, setIdempotencyKey] = useState<string | null>(null), [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [source, setSource] = useState("csv"), [file, setFile] = useState<File | null>(null), [parsed, setParsed] = useState<ParsedFile | null>(null), [mapping, setMapping] = useState<SellerImportMapping>({}), [rowCategories, setRowCategories] = useState<Record<string, string>>({}), [groupCategories, setGroupCategories] = useState<Record<string, string>>({}), [categorySuggestions, setCategorySuggestions] = useState<Record<number, CategorySuggestion>>({}), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [summary, setSummary] = useState(""), [rowResults, setRowResults] = useState<Record<number, { status: string; errorCode: string | null; warningCode?: string | null; warningDetails?: unknown }>>({}), [idempotencyKey, setIdempotencyKey] = useState<string | null>(null), [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const copy = feedbackCopy(locale);
   const importCopy = labels.importWorkflow;
+  const mediaCopy = sellerImportMediaCopy(locale);
   const grouped = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, mapping) : [], [parsed, mapping]);
   const automaticGroups = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, { ...mapping, separatedRowGroups: undefined }).filter(group => group.rows.length > 1 && (group.key.startsWith("auto:") || group.key.startsWith("parent:"))) : [], [parsed, mapping]);
   const autoGroupedRows = useMemo(() => new Set(automaticGroups.flatMap(group => group.rowNumbers)), [automaticGroups]);
@@ -131,6 +131,16 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   }
   function rowErrorLabel(rowNumber: number, row: Record<string, string>) {
     const result = rowResults[rowNumber];
+    if (result?.warningCode === "IMPORT_ROW_MEDIA_PARTIAL" && Array.isArray(result.warningDetails)) {
+      const reasons: Record<string, string> = { UNSAFE: mediaCopy.unsafe, UNAVAILABLE: mediaCopy.unavailable, INVALID: mediaCopy.invalid, STORAGE_FAILED: mediaCopy.storageFailed };
+      return result.warningDetails.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const detail = entry as { position?: unknown; code?: unknown; mediaType?: unknown };
+        if (detail.mediaType === "VIDEO" && detail.code === "UNSUPPORTED") return [mediaCopy.videoUnsupported];
+        const number = Number(detail.position), reason = typeof detail.code === "string" ? reasons[detail.code] : undefined;
+        return Number.isSafeInteger(number) && number > 0 && reason ? [mediaCopy.imageFailure.replace("{number}", String(number)).replace("{reason}", reason)] : [];
+      }).join(" · ");
+    }
     if (duplicateSkuRows.has(rowNumber)) return importCopy.duplicateSku;
     if (result?.errorCode === "IMPORT_ROW_DUPLICATE_SKU") return importCopy.duplicateSku;
     if (result?.errorCode === "IMPORT_ROW_CURRENCY_MISMATCH") return importCopy.currencyMismatch;
@@ -165,7 +175,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
     setBusy(true); setMessage("");
     try {
       const payload = JSON.stringify({ action: "import", storeId, sourceFormat: parsed.sourceFormat, idempotencyKey, headers: parsed.headers, rows: parsed.rows, mapping: completeMapping });
-      type ImportResponse = { error?: string; status?: string; importedCount?: number; failedCount?: number; skippedCount?: number; requestedCount?: number; items?: Array<{ rowNumber: number; status: string; errorCode: string | null }> };
+      type ImportResponse = { error?: string; status?: string; importedCount?: number; failedCount?: number; skippedCount?: number; requestedCount?: number; items?: Array<{ rowNumber: number; status: string; errorCode: string | null; warningCode?: string | null; warningDetails?: unknown }> };
       let result: ImportResponse | null = null;
       for (let pass = 0; pass < 12; pass++) {
         const response = await fetch("/api/seller/products/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
@@ -173,7 +183,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
         if (!response.ok || !result) throw new Error(result?.error ?? "IMPORT_FAILED");
         const completed = (result.importedCount ?? 0) + (result.failedCount ?? 0) + (result.skippedCount ?? 0), total = result.requestedCount ?? parsed.rows.length;
         setProgress({ completed, total });
-        if (result.items) setRowResults(Object.fromEntries(result.items.map(item => [item.rowNumber, { status: item.status, errorCode: item.errorCode }])));
+        if (result.items) setRowResults(Object.fromEntries(result.items.map(item => [item.rowNumber, { status: item.status, errorCode: item.errorCode, warningCode: item.warningCode ?? null, warningDetails: item.warningDetails ?? null }])));
         if (result.status !== "PROCESSING") break;
         if (pass === 11) throw new Error("IMPORT_STILL_PROCESSING");
       }

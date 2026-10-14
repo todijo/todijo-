@@ -1,5 +1,5 @@
 export type BuyerOption = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
-export type BuyerVariant = { id: string; stock: number; active: boolean; priceOverride: number | null; supplierVariantId?: string | null; supplierSku?: string | null; supplierTitle?: string | null; supplierImageUrl?: string | null; supplierOptionValues?:Array<{name:string;value:string;visual?:boolean}>; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
+export type BuyerVariant = { id: string; stock: number; active: boolean; priceOverride: number | null; imageUrls?: string[]; supplierVariantId?: string | null; supplierSku?: string | null; supplierTitle?: string | null; supplierImageUrl?: string | null; supplierOptionValues?:Array<{name:string;value:string;visual?:boolean}>; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 
 const SIZE = /^(?:XXXS|XXS|XS|S|M|L|XL|XXL|2XL|XXXL|3XL|\d{1,3}(?:\.5)?|ONE\s*SIZE)$/i;
 const OPAQUE = /^(?:[A-Z]{1,5}\d{4,}[A-Z0-9-]*|[A-Z0-9]{8,})$/i;

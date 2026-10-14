@@ -117,6 +117,50 @@ function xmlDecode(value: string) {
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 }
 
+type XmlNode = { name: string; text: string; children: XmlNode[] };
+
+function parseXmlProducts(source: string) {
+  if (/<!DOCTYPE|<!ENTITY/i.test(source)) throw new SellerImportParseError("IMPORT_FILE_INVALID");
+  const root: XmlNode = { name: "#document", text: "", children: [] }, stack = [root];
+  let nodeCount = 0;
+  const tokens = source.matchAll(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<[^>]*>|[^<]+/g);
+  for (const match of tokens) {
+    const token = match[0];
+    if (token.startsWith("<!--") || token.startsWith("<?")) continue;
+    if (token.startsWith("<![CDATA[")) { stack[stack.length - 1].text += token.slice(9, -3); continue; }
+    if (token.startsWith("</")) {
+      const closing = token.match(/^<\/([A-Za-z_][\w:.-]*)\s*>$/)?.[1];
+      if (!closing || stack.length === 1 || stack[stack.length - 1].name !== closing) throw new SellerImportParseError("IMPORT_FILE_INVALID");
+      stack.pop(); continue;
+    }
+    if (token.startsWith("<")) {
+      const opening = token.match(/^<([A-Za-z_][\w:.-]*)\b[^>]*>$/)?.[1];
+      if (!opening || /\s+[^=\s]+\s*(?:=\s*)?(?:\s|>)/.test(token.slice(1, -1))) throw new SellerImportParseError("IMPORT_FILE_INVALID");
+      const node: XmlNode = { name: opening.split(":").pop()!, text: "", children: [] };
+      stack[stack.length - 1].children.push(node);
+      if (++nodeCount > 100_000) throw new SellerImportParseError("IMPORT_FILE_INVALID");
+      if (!/\/\s*>$/.test(token)) stack.push(node);
+      continue;
+    }
+    stack[stack.length - 1].text += xmlDecode(token);
+  }
+  if (stack.length !== 1) throw new SellerImportParseError("IMPORT_FILE_INVALID");
+  const toValue = (node: XmlNode): unknown => {
+    if (!node.children.length) return node.text.trim();
+    const result: Record<string, unknown> = {};
+    for (const child of node.children) {
+      const value = toValue(child), prior = result[child.name];
+      result[child.name] = prior === undefined ? value : Array.isArray(prior) ? [...prior, value] : [prior, value];
+    }
+    if (node.text.trim()) result.value = node.text.trim();
+    return result;
+  };
+  const findProducts = (node: XmlNode): XmlNode[] => node.children.flatMap(child => child.name.toLocaleLowerCase() === "product" ? [child] : findProducts(child));
+  const products = findProducts(root);
+  if (products.length > SELLER_IMPORT_MAX_ROWS) throw new SellerImportParseError("IMPORT_TOO_MANY_ROWS");
+  return products.map(product => toValue(product) as Record<string, unknown>);
+}
+
 function csvRows(source: string): string[][] {
   const firstLine = source.split(/\r?\n/, 1)[0] ?? "";
   const separator = [",", ";", "\t"].sort((a, b) => firstLine.split(b).length - firstLine.split(a).length)[0];
@@ -206,13 +250,8 @@ export function parseSellerProductImport(filename: string, bytes: Buffer): Selle
     if (ext === "csv") rows = csvRows(bytes.toString("utf8").replace(/^\uFEFF/, ""));
     else if (ext === "xlsx") rows = xlsxRows(bytes);
     else if (ext === "json") { const value = JSON.parse(bytes.toString("utf8")); const list = Array.isArray(value) ? value : value && Array.isArray(value.products) ? value.products : null; if (!list) throw new SellerImportParseError("IMPORT_FILE_INVALID"); return objectRows(list); }
-    else if (ext === "xml") {
-      const xml = bytes.toString("utf8"); if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw new SellerImportParseError("IMPORT_FILE_INVALID");
-      const products = [...xml.matchAll(/<product\b[^>]*>([\s\S]*?)<\/product>/gi)];
-      if (products.length > SELLER_IMPORT_MAX_ROWS) throw new SellerImportParseError("IMPORT_TOO_MANY_ROWS");
-      const values = products.map(product => Object.fromEntries([...product[1].matchAll(/<([A-Za-z_][\w:.-]*)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(field => [field[1].split(":").pop()!, xmlDecode(field[2].replace(/<[^>]*>/g, "")).trim()])));
-      return objectRows(values);
-    } else throw new SellerImportParseError("IMPORT_FORMAT_UNSUPPORTED");
+    else if (ext === "xml") return objectRows(parseXmlProducts(bytes.toString("utf8")));
+    else throw new SellerImportParseError("IMPORT_FORMAT_UNSUPPORTED");
   } catch (error) { if (error instanceof SellerImportParseError) throw error; throw new SellerImportParseError("IMPORT_FILE_INVALID"); }
   if (rows.length < 2) throw new SellerImportParseError("IMPORT_EMPTY");
   if (rows.length - 1 > SELLER_IMPORT_MAX_ROWS) throw new SellerImportParseError("IMPORT_TOO_MANY_ROWS");

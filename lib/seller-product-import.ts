@@ -3,15 +3,16 @@ import { Prisma, type PrismaClient, type SellerProductImportJob, type SellerProd
 import { createProductWithVariants, ProductVariantError, upsertProductVariantsExact, type ProductVariantsInput } from "./product-variants";
 import { requireStorePublishingAccess, lockSellerProductQuota } from "./seller-subscription";
 import { requireStoreCapability } from "./seller-business-access";
-import { replaceProductVariantImages } from "./product-variant-images";
+import { normalizeVariantImageAssignments, replaceProductVariantImages } from "./product-variant-images";
 import { requireProductCategoryScope } from "./seller-team-product-scope";
 import { groupSellerImportRows, hasSellerImportCategoryConflict, importCell, normalizeSellerImportCategorySource, sellerImportParentGroupKey, suggestSellerImportCategory, type SellerImportField, type SellerImportMapping, type SellerImportSourceRow } from "./seller-product-import-workflow";
 export type { SellerImportField, SellerImportMapping } from "./seller-product-import-workflow";
 import { isCanonicalLeafCategoryId } from "./desktop-category-taxonomy";
 import { isValidSellerImportCategoryId } from "./seller-import-category";
-import { validateProductImages } from "./product-images";
 import { readProductVideo } from "./product-media";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
+import { sellerImportImageUrls } from "./seller-import-image-values";
+import { SellerImportImageError, storeSellerImportImage, type SellerImportImageFailure, type StoredSellerImportImage } from "./seller-import-image-storage";
 
 export class SellerImportRowError extends Error {
   constructor(public readonly code: "IMPORT_ROW_INVALID" | "IMPORT_ROW_CATEGORY_REQUIRED" | "IMPORT_ROW_VARIANTS_INVALID" | "IMPORT_ROW_IMAGES_INVALID" | "IMPORT_ROW_VIDEO_INVALID" | "IMPORT_ROW_CURRENCY_MISMATCH" | "IMPORT_ROW_GROUP_FIELDS_MISMATCH" | "IMPORT_ROW_DUPLICATE_SKU" | "IMPORT_ROW_ATTRIBUTES_INVALID") { super(code); }
@@ -20,7 +21,11 @@ export class SellerImportRowError extends Error {
 function slugify(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60); }
 function positivePrice(value: string) { const normalized = value.trim().replace(/\s/g, "").replace(",", "."); return /^\d+(?:\.\d{1,2})?$/.test(normalized) && Number(normalized) > 0 && Number(normalized) <= 1_000_000 ? normalized : null; }
 function boundedInteger(value: string, max = 1_000_000) { if (!value.trim()) return null; const n = Number(value); return Number.isSafeInteger(n) && n >= 0 && n <= max ? n : undefined; }
-function imageList(value: string) { return value ? value.split(/[|;\r\n]+/).map(image => image.trim()).filter(Boolean) : []; }
+function imageList(value: string) { return sellerImportImageUrls(value); }
+function isExternalVideoUrl(value: string) {
+  try { const url = new URL(value.trim()); return (url.protocol === "https:" || url.protocol === "http:") && Boolean(url.hostname); }
+  catch { return false; }
+}
 function parseVariants(value: string): ProductVariantsInput | undefined {
   if (!value) return undefined;
   try { const parsed = JSON.parse(value) as ProductVariantsInput; if (!parsed || !Array.isArray(parsed.options) || !Array.isArray(parsed.variants)) throw new Error(); return { ...parsed, generate: false }; }
@@ -28,6 +33,7 @@ function parseVariants(value: string): ProductVariantsInput | undefined {
 }
 function parseVideo(value: string) {
   if (!value) return null;
+  if (isExternalVideoUrl(value)) return null;
   try { const input = JSON.parse(value) as unknown; return readProductVideo(input); }
   catch { throw new SellerImportRowError("IMPORT_ROW_VIDEO_INVALID"); }
 }
@@ -77,6 +83,9 @@ type PreparedImportGroup = {
   stock: number;
   images: string[];
   variantImages: unknown[];
+  mediaSources: Array<{ url: string; rowNumber: number; position: number }>;
+  mediaPreflightWarnings: Array<{ rowNumber: number; position: number; code: SellerImportImageFailure | "UNSUPPORTED"; mediaType: "IMAGE" | "VIDEO" }>;
+  variantImagesByCombination: Array<{ values: string[]; imageUrls: string[] }>;
   variants?: ProductVariantsInput;
   colors: string[];
   sizes: string[];
@@ -102,7 +111,7 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
     if (!explicitParentTitle && rows.some(row => normalized(importCell(row, mapping, "title")) !== normalized(importCell(rows[0], mapping, "title")))) throw new SellerImportRowError("IMPORT_ROW_GROUP_FIELDS_MISMATCH");
     if (rows.some(row => importCell(row, mapping, "description") && normalized(importCell(row, mapping, "description")) !== normalized(description))) throw new SellerImportRowError("IMPORT_ROW_GROUP_FIELDS_MISMATCH");
     for (const field of ["parentTitle", "brand", "condition", "video", "weightGrams", "lengthMm", "widthMm", "heightMm"] as const) {
-      const distinct = [...new Set(rows.map(row => normalized(importCell(row, mapping, field))).filter(Boolean))];
+      const distinct = [...new Set(rows.map(row => importCell(row, mapping, field)).filter(value => field !== "video" || !isExternalVideoUrl(value)).map(normalized).filter(Boolean))];
       if (distinct.length > 1) throw new SellerImportRowError("IMPORT_ROW_GROUP_FIELDS_MISMATCH");
     }
   }
@@ -157,6 +166,7 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
   const hasVariantDimensions = optionSpecs.length > 0;
   let variants: ProductVariantsInput | undefined;
   let variantImages: unknown[] = [];
+  let variantImagesByCombination: Array<{ values: string[]; imageUrls: string[] }> = [];
   if (rows.length > 1 && (!hasExplicitGrouping || !hasVariantDimensions)) throw new SellerImportRowError("IMPORT_ROW_VARIANTS_INVALID");
   const singleRowJson = rows.length === 1 ? parseVariants(importCell(rows[0], mapping, "variants")) : undefined;
   if (singleRowJson) variants = singleRowJson;
@@ -180,20 +190,31 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
     if (new Set(variantSkus).size !== variantSkus.length) throw new SellerImportRowError("IMPORT_ROW_DUPLICATE_SKU");
     if (optionSpecs.length) {
       const first = optionSpecs[0];
-      const imageMap = new Map<string, Set<string>>();
-      rows.forEach((row, index) => {
-        const urls = imageList(importCell(row, mapping, "variantImages") || importCell(row, mapping, "images"));
-        const value = valuesByRow[index][0];
-        const set = imageMap.get(value) ?? new Set<string>();
-        urls.forEach(url => set.add(url)); imageMap.set(value, set);
+      const explicitByCombination = rows.map((row, index) => ({ values: valuesByRow[index], urls: imageList(importCell(row, mapping, "variantImages")) }));
+      variantImagesByCombination = explicitByCombination.filter(item => item.urls.length).map(item => ({ values: item.values, imageUrls: item.urls }));
+      const byFirstValue = new Map<string, Array<string[]>>();
+      explicitByCombination.forEach(item => { const entries = byFirstValue.get(item.values[0]) ?? []; entries.push(item.urls); byFirstValue.set(item.values[0], entries); });
+      variantImages = [...byFirstValue.entries()].flatMap(([value, sets]) => {
+        if (!sets.length || sets.some(set => !set.length)) return [];
+        const identity = JSON.stringify(sets[0]);
+        if (sets.some(set => JSON.stringify(set) !== identity)) return [];
+        return [{ optionName: first.name, value, imageUrls: sets[0], primaryUrl: sets[0][0] }];
       });
-      variantImages = [...imageMap.entries()].filter(([, urls]) => urls.size).map(([value, urls]) => ({ optionName: first.name, value, imageUrls: [...urls], primaryUrl: [...urls][0] }));
     }
   }
 
-  const allImages = [...new Set(rows.flatMap(row => [...imageList(importCell(row, mapping, "images")), ...imageList(importCell(row, mapping, "variantImages"))]))];
-  const imageValidation = validateProductImages(allImages);
-  if (!imageValidation.ok) throw new SellerImportRowError("IMPORT_ROW_IMAGES_INVALID");
+  const rowMedia = rows.flatMap((row, index) => {
+    const itemImages = [...imageList(importCell(row, mapping, "images")), ...imageList(importCell(row, mapping, "variantImages"))];
+    return itemImages.map((url, mediaIndex) => ({ url, rowNumber: items[index].rowNumber, position: mediaIndex + 1 }));
+  });
+  const uniqueImages = [...new Set(rowMedia.map(image => image.url))];
+  const allowedImages = new Set(uniqueImages.slice(0, 30));
+  const mediaPreflightWarnings = [
+    ...rowMedia.filter(image => !allowedImages.has(image.url)).map(image => ({ rowNumber: image.rowNumber, position: image.position, code: "INVALID" as const, mediaType: "IMAGE" as const })),
+    ...rows.flatMap((row, index) => isExternalVideoUrl(importCell(row, mapping, "video")) ? [{ rowNumber: items[index].rowNumber, position: 1, code: "UNSUPPORTED" as const, mediaType: "VIDEO" as const }] : []),
+  ];
+  const mediaSources = rowMedia.filter(image => allowedImages.has(image.url));
+  const allImages = [...allowedImages];
   const dimensions = Object.fromEntries(([["weightGrams", "weightGrams"], ["lengthMm", "lengthMm"], ["widthMm", "widthMm"], ["heightMm", "heightMm"]] as const).map(([field, mappingField]) => [field, boundedInteger(firstValue(mappingField))]));
   if (Object.values(dimensions).some(value => value === undefined)) throw new SellerImportRowError("IMPORT_ROW_INVALID");
   const conditionInput = firstValue("condition");
@@ -206,7 +227,9 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
     const raw: Record<string, string> = {};
     for (const header of Object.keys(row)) if (!mappedHeaders.has(header)) {
       const value = String(row[header] ?? "").trim();
-      if (value) raw[header.slice(0, 80)] = value.slice(0, 500);
+      // Unmapped supplier URLs can contain signed query credentials. The import job
+      // already retains its private source row; never copy URLs into public product attributes.
+      if (value && !/https?:\/\//i.test(value)) raw[header.slice(0, 80)] = value.slice(0, 500);
     }
     sourceRows.push(raw);
   }
@@ -233,18 +256,109 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
     ...(rows.length > 1 && supplierIds.length ? { supplierProductIds: supplierIds } : {}),
     ...(parentId ? { parentProductId: parentId } : {}),
   };
-  const video = parseVideo(firstValue("video"));
+  const videoSource = rows.map(row => importCell(row, mapping, "video")).find(value => value && !isExternalVideoUrl(value)) ?? "";
+  const video = parseVideo(videoSource);
   const basePrice = prices.map(Number).reduce((lowest, value) => Math.min(lowest, value), Number.POSITIVE_INFINITY);
   return {
     items, rows, rowNumbers: items.map(item => item.rowNumber), groupKey,
     title, description, category: selectedCategory, price: basePrice.toFixed(2), stock,
-    images: imageValidation.images, variantImages, variants,
+    images: allImages, variantImages, mediaSources, mediaPreflightWarnings, variantImagesByCombination, variants,
     colors: [...new Set(rows.map(row => importCell(row, mapping, "color")).filter(Boolean))],
     sizes: [...new Set(rows.map(row => importCell(row, mapping, "size")).filter(Boolean))],
     productIdentifier: parentId || supplierId || (rows.length === 1 ? sku || null : null),
     manufacturerName: firstValue("brand").slice(0, 200) || null,
     condition, attributes, dimensions: dimensions as Record<string, number | null>, video,
   };
+}
+
+type ImportMediaWarning = { position: number; code: SellerImportImageFailure | "UNSUPPORTED"; mediaType: "IMAGE" | "VIDEO" };
+type StoredImportMedia = { images: string[]; optionImages: unknown[]; variantImages: Array<{ values: string[]; imageUrls: string[] }>; warnings: Map<number, ImportMediaWarning[]> };
+
+async function storePreparedImportMedia(prepared: PreparedImportGroup, storeImage: typeof storeSellerImportImage = storeSellerImportImage): Promise<StoredImportMedia> {
+  const storedBySource = new Map<string, StoredSellerImportImage>();
+  const failures = new Map<string, SellerImportImageFailure>();
+  const warnings = new Map<number, ImportMediaWarning[]>();
+  for (const warning of prepared.mediaPreflightWarnings) {
+    const entries = warnings.get(warning.rowNumber) ?? [];
+    entries.push({ position: warning.position, code: warning.code, mediaType: warning.mediaType }); warnings.set(warning.rowNumber, entries);
+  }
+  for (const source of new Set(prepared.mediaSources.map(media => media.url))) {
+    try { storedBySource.set(source, await storeImage(source)); }
+    catch (error) {
+      const code = error instanceof SellerImportImageError ? error.code : "UNAVAILABLE";
+      failures.set(source, code);
+    }
+  }
+  for (const source of prepared.mediaSources) {
+    const code = failures.get(source.url);
+    if (!code) continue;
+    const entries = warnings.get(source.rowNumber) ?? [];
+    entries.push({ position: source.position, code, mediaType: "IMAGE" }); warnings.set(source.rowNumber, entries);
+  }
+  const storedUrl = (source: string) => storedBySource.get(source)?.url;
+  const images = [...new Set(prepared.images.flatMap(source => storedUrl(source) ?? []))];
+  const optionImages = prepared.variantImages.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const assignment = raw as { optionName?: string; value?: string; imageUrls?: string[]; primaryUrl?: string };
+    const imageUrls = (assignment.imageUrls ?? []).map(storedUrl);
+    if (!imageUrls.length || imageUrls.some((url): url is undefined => !url)) return [];
+    return [{ ...assignment, imageUrls: imageUrls as string[], primaryUrl: storedUrl(assignment.primaryUrl ?? "") ?? (imageUrls[0] as string) }];
+  });
+  const variantImages = prepared.variantImagesByCombination.flatMap(assignment => {
+    const imageUrls = assignment.imageUrls.map(storedUrl).filter((url): url is string => Boolean(url));
+    return imageUrls.length ? [{ values: assignment.values, imageUrls }] : [];
+  });
+  return { images, optionImages, variantImages, warnings };
+}
+
+async function saveImportedVariantImages(tx: Prisma.TransactionClient, productId: string, images: Array<{ values: string[]; imageUrls: string[] }>, append = false) {
+  if (!images.length) return;
+  const variants = await tx.productVariant.findMany({ where: { productId }, select: { id: true, imageUrls: true, values: { select: { optionValue: { select: { value: true, option: { select: { position: true } } } } } } } });
+  for (const image of images) {
+    const variant = variants.find(candidate => {
+      const values = candidate.values.slice().sort((left, right) => left.optionValue.option.position - right.optionValue.option.position).map(value => normalized(value.optionValue.value));
+      return values.length === image.values.length && values.every((value, index) => value === normalized(image.values[index]));
+    });
+    if (!variant) throw new ProductVariantError("Invalid imported variant image mapping.");
+    const existing = Array.isArray(variant.imageUrls) ? variant.imageUrls.filter((value): value is string => typeof value === "string") : [];
+    const imageUrls = append ? [...new Set([...existing, ...image.imageUrls])] : image.imageUrls;
+    await tx.productVariant.update({ where: { id: variant.id }, data: { imageUrls: imageUrls as Prisma.InputJsonArray } });
+  }
+}
+
+async function appendProductImageRecords(tx: Prisma.TransactionClient, productId: string, images: string[], optionImages: unknown[] = []) {
+  if (!images.length) return;
+  const existing = await tx.productImage.findMany({ where: { productId }, orderBy: { position: "asc" }, select: { id: true, url: true, position: true } });
+  const urls = new Set(existing.map(image => image.url));
+  let position = existing.reduce((max, image) => Math.max(max, image.position), -1) + 1;
+  for (const url of images) if (!urls.has(url) && position < 30) {
+    const image = await tx.productImage.create({ data: { productId, url, position }, select: { id: true, url: true, position: true } });
+    existing.push(image); urls.add(url); position++;
+  }
+  if (!optionImages.length) return;
+  const assignments = normalizeVariantImageAssignments(optionImages, [...new Set(existing.map(image => image.url))]);
+  const imageByUrl = new Map(existing.map(image => [image.url, image.id]));
+  for (const assignment of assignments) {
+    const optionValue = await tx.productOptionValue.findFirst({ where: assignment.optionValueId
+      ? { id: assignment.optionValueId, option: { productId } }
+      : { value: { equals: assignment.value!, mode: "insensitive" }, option: { productId, name: { equals: assignment.optionName!, mode: "insensitive" } } }, select: { id: true } });
+    if (!optionValue) throw new ProductVariantError("Invalid imported option image mapping.");
+    const linked = await tx.productOptionValueImage.findMany({ where: { optionValueId: optionValue.id }, select: { imageId: true, position: true, isPrimary: true } });
+    const linkedIds = new Set(linked.map(image => image.imageId));
+    let imagePosition = linked.reduce((max, image) => Math.max(max, image.position), -1) + 1;
+    const hasPrimary = linked.some(image => image.isPrimary);
+    for (const url of assignment.imageUrls) {
+      const imageId = imageByUrl.get(url);
+      if (!imageId || linkedIds.has(imageId) || imagePosition >= 10) continue;
+      await tx.productOptionValueImage.create({ data: { optionValueId: optionValue.id, imageId, position: imagePosition++, isPrimary: !hasPrimary && url === assignment.primaryUrl } });
+      linkedIds.add(imageId);
+    }
+  }
+}
+
+function mediaWarningDetails(warnings: Map<number, ImportMediaWarning[]>, rowNumber: number) {
+  const entries = warnings.get(rowNumber) ?? [];
+  return entries.length ? { warningCode: "IMPORT_ROW_MEDIA_PARTIAL", warningDetails: entries as unknown as Prisma.InputJsonArray } : { warningCode: null, warningDetails: Prisma.JsonNull };
 }
 
 export async function createSellerProductImportJob(db: PrismaClient, input: { businessId: string; storeId: string; userId: string; key: string; sourceFormat: string; mapping: SellerImportMapping; headers: string[]; rows: Array<Record<string, string>> }) {
@@ -289,7 +403,7 @@ export async function getConfirmedSellerImportCategoryMappings(db: PrismaClient,
   return Object.fromEntries(confirmed);
 }
 
-export async function processSellerProductImport(db: PrismaClient, input: { job: SellerProductImportJob; businessId: string; userId: string; chunkSize?: number }) {
+export async function processSellerProductImport(db: PrismaClient, input: { job: SellerProductImportJob; businessId: string; userId: string; chunkSize?: number; storeImage?: typeof storeSellerImportImage }) {
   const job = await db.sellerProductImportJob.findFirst({ where: { id: input.job.id, businessId: input.businessId, createdById: input.userId }, include: { items: { orderBy: { rowNumber: "asc" } }, store: { select: { currency: true } } } });
   if (!job) throw Object.assign(new Error("IMPORT_JOB_NOT_FOUND"), { status: 404 });
   const mapping = job.mapping as SellerImportMapping;
@@ -323,6 +437,8 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
         await db.sellerProductImportItem.updateMany({ where: { id: { in: items.map(item => item.id) }, importId: job.id, status: "PENDING" }, data: { status: "SKIPPED", errorCode: null, productId: matchedIds[0] } });
         continue;
       }
+      const media = await storePreparedImportMedia(prepared, input.storeImage);
+      const hasMediaWarnings = media.warnings.size > 0;
       const existing = matchedIds.length ? await db.product.findFirst({ where: { id: matchedIds[0], storeId: job.storeId, removedAt: null, supplierLink: null }, select: { id: true, slug: true, status: true, stock: true, variants: { take: 1, select: { id: true } }, attributes: true, images: true, condition: true, manufacturerName: true, weightGrams: true, lengthMm: true, widthMm: true, heightMm: true, colors: true, sizes: true } }) : null;
       if (existing?.status === "PUBLISHED" && !isCanonicalLeafCategoryId(prepared.category)) throw new SellerImportRowError("IMPORT_ROW_CATEGORY_REQUIRED");
       const slugBase = slugify(prepared.title) || "product";
@@ -332,7 +448,7 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
         sourceLocale: "en", category: prepared.category, condition: prepared.condition,
         status: existing?.status ?? "DRAFT", dataClass: "PRODUCTION", price: prepared.price,
         colors: prepared.colors, sizes: prepared.sizes, stock: existing?.variants.length ? existing.stock : prepared.stock,
-        images: prepared.images, currency: job.store.currency, storeId: job.storeId,
+        images: media.images, currency: job.store.currency, storeId: job.storeId,
         productIdentifier: prepared.productIdentifier, manufacturerName: prepared.manufacturerName,
         allowPrepurchaseQuestions: true, loyaltyEligible: false, shippingOverrideEnabled: false,
         weightGrams: prepared.dimensions.weightGrams ?? null, lengthMm: prepared.dimensions.lengthMm ?? null,
@@ -344,16 +460,17 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
         if (skuConflicts.length) throw new SellerImportRowError("IMPORT_ROW_DUPLICATE_SKU");
       }
       if (!existing) {
-        await createProductWithVariants(db, productData, prepared.variants, prepared.variantImages, async tx => {
+        await createProductWithVariants(db, productData, prepared.variants, media.optionImages, async tx => {
           await lockSellerProductQuota(tx, job.storeId);
           await requireStorePublishingAccess(tx, input.userId, job.storeId, "PRODUCT_CREATE");
           await requireProductCategoryScope(tx, input.userId, job.storeId, "PRODUCT_CREATE", prepared.category);
           const claimed = await tx.sellerProductImportItem.updateMany({ where: { id: { in: items.map(item => item.id) }, importId: job.id, status: "PENDING" }, data: { status: "PROCESSING", errorCode: null } });
           if (claimed.count !== items.length) throw Object.assign(new Error("IMPORT_ITEM_ALREADY_PROCESSED"), { status: 409 });
         }, async (tx, productId) => {
+          await saveImportedVariantImages(tx, productId, media.variantImages);
           if (prepared.video) await tx.productMedia.create({ data: { productId, type: "VIDEO", provider: "CLOUDINARY", publicId: prepared.video.publicId, url: prepared.video.url, posterUrl: prepared.video.posterUrl, position: 15 } });
           await appendSellerBusinessAudit(tx, { businessId: job.businessId, storeId: job.storeId, actorId: input.userId, category: "PRODUCT", action: "PRODUCT_IMPORTED_AS_DRAFT", targetType: "Product", targetId: productId, metadata: { sourceFormat: job.sourceFormat, importId: job.id, rowNumbers: prepared.rowNumbers, status: "DRAFT" } });
-          await tx.sellerProductImportItem.updateMany({ where: { id: { in: items.map(item => item.id) }, importId: job.id }, data: { status: "IMPORTED", errorCode: null, productId } });
+          for (const item of items) await tx.sellerProductImportItem.update({ where: { id: item.id }, data: { status: "IMPORTED", errorCode: null, productId, ...mediaWarningDetails(media.warnings, item.rowNumber) } });
         });
       } else {
         await db.$transaction(async tx => {
@@ -370,7 +487,7 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
             ...(prepared.productIdentifier === null ? { productIdentifier: undefined } : {}),
             ...(prepared.colors.length ? {} : { colors: existing.colors }),
             ...(prepared.sizes.length ? {} : { sizes: existing.sizes }),
-            ...(prepared.images.length ? { images: prepared.images } : { images: existing.images }),
+            ...(media.images.length ? { images: hasMediaWarnings ? [...new Set([...existing.images, ...media.images])].slice(0, 30) : media.images } : { images: existing.images }),
             ...(prepared.condition === "NON_RENSEIGNE" ? { condition: existing.condition } : {}),
             ...(prepared.manufacturerName === null ? { manufacturerName: existing.manufacturerName } : {}),
             ...(prepared.dimensions.weightGrams === null ? { weightGrams: existing.weightGrams } : {}),
@@ -379,13 +496,15 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
             ...(prepared.dimensions.heightMm === null ? { heightMm: existing.heightMm } : {}),
           } });
           if (prepared.variants) await upsertProductVariantsExact(tx, existing.id, prepared.variants);
-          if (prepared.images.length) await replaceProductVariantImages(tx, existing.id, prepared.images, prepared.variantImages);
+          if (media.images.length && !hasMediaWarnings) await replaceProductVariantImages(tx, existing.id, media.images, media.optionImages);
+          else if (media.images.length) await appendProductImageRecords(tx, existing.id, media.images, media.optionImages);
+          await saveImportedVariantImages(tx, existing.id, media.variantImages, hasMediaWarnings);
           if (prepared.video) {
             await tx.productMedia.deleteMany({ where: { productId: existing.id, type: "VIDEO" } });
             await tx.productMedia.create({ data: { productId: existing.id, type: "VIDEO", provider: "CLOUDINARY", publicId: prepared.video.publicId, url: prepared.video.url, posterUrl: prepared.video.posterUrl, position: 15 } });
           }
           await appendSellerBusinessAudit(tx, { businessId: job.businessId, storeId: job.storeId, actorId: input.userId, category: "PRODUCT", action: "PRODUCT_IMPORT_UPDATED", targetType: "Product", targetId: existing.id, metadata: { sourceFormat: job.sourceFormat, importId: job.id, rowNumbers: prepared.rowNumbers, duplicatePolicy: policy, previousStatus: existing.status } });
-          await tx.sellerProductImportItem.updateMany({ where: { id: { in: items.map(item => item.id) }, importId: job.id }, data: { status: "IMPORTED", errorCode: null, productId: existing.id } });
+          for (const item of items) await tx.sellerProductImportItem.update({ where: { id: item.id }, data: { status: "IMPORTED", errorCode: null, productId: existing.id, ...mediaWarningDetails(media.warnings, item.rowNumber) } });
         });
       }
     } catch (error) {
@@ -401,6 +520,6 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
     db.sellerProductImportItem.count({ where: { importId: job.id, status: { in: ["PENDING", "PROCESSING"] } } }),
   ]);
   const status = pendingCount ? "PROCESSING" : failedCount ? importedCount || skippedCount ? "COMPLETED_WITH_ERRORS" : "FAILED" : "COMPLETED";
-  const result = await db.sellerProductImportJob.update({ where: { id: job.id }, data: { importedCount, failedCount, status }, include: { items: { orderBy: { rowNumber: "asc" }, select: { rowNumber: true, status: true, errorCode: true, productId: true } } } });
+  const result = await db.sellerProductImportJob.update({ where: { id: job.id }, data: { importedCount, failedCount, status }, include: { items: { orderBy: { rowNumber: "asc" }, select: { rowNumber: true, status: true, errorCode: true, warningCode: true, warningDetails: true, productId: true } } } });
   return { ...result, skippedCount };
 }

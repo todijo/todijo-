@@ -51,7 +51,7 @@ test("editor DTO serializes variant Decimals without changing precise values", (
     active: true,
     values: [{ optionValue: { value: "Red" } }, { optionValue: { value: "S" } }],
   });
-  assert.deepEqual(dto, { combinationKey: "red\u001fs", sku: "SKU-RED-S", barcode: "123456789", priceOverride: "123456.78", compareAtPrice: "123456.79", stock: 7, active: true, values: [{ optionValue: { value: "Red" } }, { optionValue: { value: "S" } }] });
+  assert.deepEqual(dto, { combinationKey: "red\u001fs", sku: "SKU-RED-S", barcode: "123456789", priceOverride: "123456.78", compareAtPrice: "123456.79", stock: 7, active: true, imageUrls: [], values: [{ optionValue: { value: "Red" } }, { optionValue: { value: "S" } }] });
   assert.equal(Object.getPrototypeOf(dto), Object.prototype);
   assert.equal(Object.getPrototypeOf(dto.values[0]!.optionValue), Object.prototype);
 });

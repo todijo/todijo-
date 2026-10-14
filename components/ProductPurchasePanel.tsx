@@ -13,7 +13,7 @@ import BuyerProductPrice from "@/components/BuyerProductPrice";
 import {productPriceUi} from "@/i18n/product-price-ui";
 import type {Locale} from "@/i18n/config";
 
-type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null;supplierVariantId?:string|null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
+type Variant = { id: string; stock: number; active: boolean; priceOverride: number | null; imageUrls?: string[]; supplierVariantId?:string|null; values: Array<{ optionValue: { id: string; value: string; option: { id: string; name: string; position: number } } }> };
 type Option = { id: string; name: string; position: number; values: Array<{ id: string; value: string; position: number; imageUrls?: string[]; imageOnly?: boolean; accessibleLabel?: string }> };
 
 type SelectedOptionStyle = CSSProperties & { "--selected-option-accent"?: string };
@@ -78,9 +78,9 @@ export default function ProductPurchasePanel({ product, colors, sizes, options =
   useEffect(()=>{
     const selectedValues=genericOptions.flatMap((option)=>option.values.filter((value)=>selection[option.id]===value.id));
     const imageValue=selectedValues.find((value)=>value.imageUrls?.length);
-    const images=imageValue?.imageUrls??[];
+    const images=selectedVariant?.imageUrls?.length?selectedVariant.imageUrls:imageValue?.imageUrls??[];
     window.dispatchEvent(new CustomEvent("todijo:variant-images",{detail:{images}}));
-  },[genericOptions,product.image,selection]);
+  },[genericOptions,product.image,selection,selectedVariant?.id,selectedVariant?.imageUrls]);
 
   function selectOption(optionId: string, valueId: string) {
     const position=genericOptions.find((option)=>option.id===optionId)?.position??0;
