@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { SignJWT } from "jose";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import { dismissCookieConsent } from "./helpers";
 
 const db = new PrismaClient();
 const suffix = randomUUID().slice(0, 8);
@@ -66,6 +67,7 @@ test("seller CSV preview and draft import persist four parent products and ten e
 
   await page.goto(`/en/seller/products/import?store=${storeId}`);
   await expect(page.getByRole("heading", { level: 1, name: "Import your products" })).toBeVisible();
+  await dismissCookieConsent(page);
 
   async function previewAndCategorize() {
     await page.locator('input[type="file"]').setInputFiles(fixturePath);
