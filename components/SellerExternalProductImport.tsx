@@ -3,23 +3,26 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CANONICAL_LEAF_CATEGORIES } from "@/lib/desktop-category-taxonomy";
 import { validateProductImages } from "@/lib/product-images";
 import { groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
 import type { SellerImportField, SellerImportMapping } from "@/lib/seller-product-import-workflow";
 import { feedbackCopy } from "@/lib/feedback-copy";
-import { localizedCategoryLeafLabel } from "@/lib/category-tree-localization";
+import { isValidSellerImportCategoryId } from "@/lib/seller-import-category";
+import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
+import { suggestSellerImportMainCategory } from "@/lib/seller-import-category-suggestions";
+import SellerImportCategoryPicker, { type SellerImportCategoryPickerLabels } from "@/components/SellerImportCategoryPicker";
 
 type ParsedFile = { sourceFormat: string; headers: string[]; rows: Array<Record<string, string>> };
-type CategorySuggestion = { canonicalCategoryId: string | null; confidence: number; source: string };
-type Labels = { title: string; source: string; file: string; formats: string; verify: string; importDrafts: string; ready: string; back: string; productName: string; description: string; price: string; category: string; stock: string; sku: string; images: string; variants: string; preview: string; importWorkflow: ReturnType<typeof import("@/i18n/seller-free-model").sellerFreeModelCopy>["importWorkflow"] };
-const requiredFields: Array<{ key: SellerImportField; label: string }> = [
+type CategorySuggestion = { canonicalCategoryId: string | null; canonicalMainCategoryId: string | null; confidence: number; source: string };
+type Labels = { title: string; source: string; file: string; formats: string; verify: string; importDrafts: string; ready: string; back: string; productName: string; description: string; price: string; category: string; stock: string; sku: string; images: string; variants: string; preview: string; advancedMappings: string; categoryPicker: SellerImportCategoryPickerLabels; importWorkflow: ReturnType<typeof import("@/i18n/seller-free-model").sellerFreeModelCopy>["importWorkflow"] };
+const essentialFields: Array<{ key: SellerImportField; label: string; optional?: boolean }> = [
   { key: "title", label: "productName" }, { key: "description", label: "description" },
+  { key: "price", label: "price" }, { key: "stock", label: "stock" },
+  { key: "sku", label: "sku", optional: true }, { key: "category", label: "category", optional: true },
 ];
-const mappingFields: Array<{ key: SellerImportField; label: string }> = [
+const advancedFields: Array<{ key: SellerImportField; label: string }> = [
   { key: "parentTitle", label: "parentTitle" }, { key: "parentProductId", label: "parentProductId" }, { key: "supplierProductId", label: "supplierProductId" },
-  { key: "price", label: "price" }, { key: "variantPrice", label: "variantPrice" }, { key: "stock", label: "stock" }, { key: "variantStock", label: "variantStock" },
-  { key: "category", label: "category" }, { key: "sku", label: "sku" }, { key: "variantSku", label: "variantSku" }, { key: "brand", label: "brand" },
+  { key: "variantPrice", label: "variantPrice" }, { key: "variantStock", label: "variantStock" }, { key: "variantSku", label: "variantSku" }, { key: "brand", label: "brand" },
   { key: "condition", label: "condition" }, { key: "currency", label: "currency" }, { key: "images", label: "images" }, { key: "variantImages", label: "variantImages" },
   { key: "video", label: "video" }, { key: "color", label: "color" }, { key: "size", label: "size" }, { key: "material", label: "material" },
   { key: "style", label: "style" }, { key: "attributes", label: "attributes" }, { key: "variants", label: "variants" }, { key: "weightGrams", label: "weightGrams" },
@@ -29,12 +32,23 @@ function mappedValue(row: Record<string, string>, mapping: SellerImportMapping, 
   const column = mapping[field];
   return typeof column === "string" ? String(row[column] ?? "").trim() : "";
 }
+function categorySuggestionForRow(row: Record<string, string>, mapping: SellerImportMapping): CategorySuggestion {
+  const suggestion = suggestSellerImportCategory(row, mapping);
+  const leaf = suggestion.canonicalCategoryId ? canonicalLeafCategory(suggestion.canonicalCategoryId) : null;
+  const mappedAttributes = ["brand", "color", "size", "material", "style", "attributes"] as const;
+  const attributes = Object.fromEntries(mappedAttributes.map(field => [field, mappedValue(row, mapping, field)]).filter(([, value]) => value));
+  const canonicalMainCategoryId = leaf?.categoryId ?? suggestSellerImportMainCategory({
+    supplierCategory: mappedValue(row, mapping, "category"), title: mappedValue(row, mapping, "title") || mappedValue(row, mapping, "parentTitle"),
+    description: mappedValue(row, mapping, "description"), attributes,
+  });
+  return { ...suggestion, canonicalMainCategoryId };
+}
 function isReady(row: Record<string, string>, mapping: SellerImportMapping, categoryOverride: string) {
   const value = (field: SellerImportField) => mappedValue(row, mapping, field);
   const title = value("parentTitle") || value("title"), description = value("description"), price = (value("variantPrice") || value("price")).replace(/\s/g, "").replace(",", "."), rawStock = value("variantStock") || value("stock"), stock = Number(rawStock);
-  const suggestion = suggestSellerImportCategory(row, mapping);
-  const category = categoryOverride || (suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : ""), images = [...value("images"), ...value("variantImages")].join("|").split(/[|;\r\n]+/).map(item => item.trim()).filter(Boolean);
-  if (title.length < 2 || title.length > 120 || description.length < 10 || description.length > 5000 || !/^\d+(?:\.\d{1,2})?$/.test(price) || Number(price) <= 0 || !rawStock || !Number.isSafeInteger(stock) || stock < 0 || !CANONICAL_LEAF_CATEGORIES.some(item => item.id === category)) return false;
+  const suggestion = categorySuggestionForRow(row, mapping);
+  const category = categoryOverride || (suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? ""), images = [...value("images"), ...value("variantImages")].join("|").split(/[|;\r\n]+/).map(item => item.trim()).filter(Boolean);
+  if (title.length < 2 || title.length > 120 || description.length < 10 || description.length > 5000 || !/^\d+(?:\.\d{1,2})?$/.test(price) || Number(price) <= 0 || !rawStock || !Number.isSafeInteger(stock) || stock < 0 || !isValidSellerImportCategoryId(category)) return false;
   if (images.length && !validateProductImages(images).ok) return false;
   const variantCell = value("variants"); if (variantCell) try { const parsed = JSON.parse(variantCell); if (!parsed || !Array.isArray(parsed.options) || !Array.isArray(parsed.variants) || parsed.variants.some((item: { combinationKey?: unknown }) => typeof item?.combinationKey !== "string")) return false; } catch { return false; }
   return true;
@@ -62,20 +76,23 @@ function rowGroupingCandidates(rows: Array<Record<string, string>>, mapping: Sel
 
 export default function SellerExternalProductImport({ storeId, storeName, backHref, labels, fieldLabels, locale, storeCurrency }: { storeId: string; storeName: string; backHref: string; labels: Labels; fieldLabels: Record<string, string>; locale: string; storeCurrency: string }) {
   const router = useRouter();
-  const [source, setSource] = useState("csv"), [file, setFile] = useState<File | null>(null), [parsed, setParsed] = useState<ParsedFile | null>(null), [mapping, setMapping] = useState<SellerImportMapping>({}), [rowCategories, setRowCategories] = useState<Record<string, string>>({}), [categorySuggestions, setCategorySuggestions] = useState<Record<number, CategorySuggestion>>({}), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [summary, setSummary] = useState(""), [rowResults, setRowResults] = useState<Record<number, { status: string; errorCode: string | null }>>({}), [idempotencyKey, setIdempotencyKey] = useState<string | null>(null), [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [source, setSource] = useState("csv"), [file, setFile] = useState<File | null>(null), [parsed, setParsed] = useState<ParsedFile | null>(null), [mapping, setMapping] = useState<SellerImportMapping>({}), [rowCategories, setRowCategories] = useState<Record<string, string>>({}), [groupCategories, setGroupCategories] = useState<Record<string, string>>({}), [categorySuggestions, setCategorySuggestions] = useState<Record<number, CategorySuggestion>>({}), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [summary, setSummary] = useState(""), [rowResults, setRowResults] = useState<Record<number, { status: string; errorCode: string | null }>>({}), [idempotencyKey, setIdempotencyKey] = useState<string | null>(null), [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const copy = feedbackCopy(locale);
   const importCopy = labels.importWorkflow;
   const grouped = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, mapping) : [], [parsed, mapping]);
   const candidates = useMemo(() => parsed ? rowGroupingCandidates(parsed.rows, mapping) : [], [parsed, mapping]);
   const validCount = useMemo(() => grouped.filter(group => {
-    if (!group.rows.every((row, index) => isReady(row, mapping, rowCategories[String(group.rowNumbers[index])] ?? ""))) return false;
-    const selectedCategories = group.rows.map((row, index) => rowCategories[String(group.rowNumbers[index])] || (() => { const suggestion = categorySuggestions[group.rowNumbers[index]] ?? suggestSellerImportCategory(row, mapping); return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : ""; })());
-    if (!selectedCategories[0] || selectedCategories.some(category => category !== selectedCategories[0])) return false;
+    const rowSelections = group.rows.map((row, index) => rowCategories[String(group.rowNumbers[index])] || (() => {
+      const suggestion = categorySuggestions[group.rowNumbers[index]] ?? categorySuggestionForRow(row, mapping);
+      return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? "";
+    })());
+    const category = groupCategories[group.key] ?? (rowSelections[0] && rowSelections.every(item => item === rowSelections[0]) ? rowSelections[0] : "");
+    if (!category || !group.rows.every(row => isReady(row, mapping, category))) return false;
     if (group.rows.length > 1) {
       if (!hasCompleteSellerImportVariantRows(group.rows, mapping)) return false;
     }
     return true;
-  }).length, [grouped, mapping, rowCategories, categorySuggestions]);
+  }).length, [grouped, mapping, rowCategories, groupCategories, categorySuggestions]);
   const variantCount = grouped.reduce((sum, group) => {
     if (group.rows.length > 1) return sum + group.rows.length;
     const raw = mappedValue(group.rows[0], mapping, "variants");
@@ -86,9 +103,9 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
     if (column) next[key] = column; else delete next[key];
     setMapping(next);
     if (["title", "parentTitle", "description", "brand", "attributes", "category"].includes(key) && parsed) {
-      const suggestions = Object.fromEntries(parsed.rows.map((row, index) => [index + 2, suggestSellerImportCategory(row, next)]));
+      const suggestions = Object.fromEntries(parsed.rows.map((row, index) => [index + 2, categorySuggestionForRow(row, next)]));
       setCategorySuggestions(suggestions);
-      setRowCategories({});
+      setRowCategories({}); setGroupCategories({});
     }
   }
   function setCandidateGroup(groupKey: string, rowNumbers: number[], checked: boolean) {
@@ -104,8 +121,13 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   function categoryForRow(row: Record<string, string>, rowNumber: number) {
     const chosen = rowCategories[String(rowNumber)];
     if (chosen) return chosen;
-    const suggestion = categorySuggestions[rowNumber] ?? suggestSellerImportCategory(row, mapping);
-    return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : "";
+    const suggestion = categorySuggestions[rowNumber] ?? categorySuggestionForRow(row, mapping);
+    return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? "";
+  }
+  function categoryForGroup(group: ReturnType<typeof groupSellerImportRows>[number]) {
+    if (groupCategories[group.key]) return groupCategories[group.key];
+    const selected = group.rows.map((row, index) => categoryForRow(row, group.rowNumbers[index]));
+    return selected.length && selected[0] && selected.every(category => category === selected[0]) ? selected[0] : "";
   }
   function rowErrorLabel(rowNumber: number, row: Record<string, string>) {
     const result = rowResults[rowNumber];
@@ -129,16 +151,16 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
       if (data.sourceFormat !== source) throw new Error("IMPORT_FORMAT_UNSUPPORTED");
       setParsed(data); setIdempotencyKey(crypto.randomUUID());
       const next = data.suggestedMapping ?? suggestSellerImportMapping(data.headers);
-      const suggestions = Object.fromEntries((data.categorySuggestions ?? []).map(item => [item.rowNumber, { canonicalCategoryId: item.canonicalCategoryId, confidence: item.confidence, source: item.source }]));
+      const suggestions = Object.fromEntries((data.categorySuggestions ?? []).map(item => [item.rowNumber, { canonicalCategoryId: item.canonicalCategoryId, canonicalMainCategoryId: item.canonicalMainCategoryId, confidence: item.confidence, source: item.source }]));
       setMapping(next); setCategorySuggestions(suggestions);
-      setRowCategories(Object.fromEntries(Object.entries(suggestions).filter(([, suggestion]) => suggestion.confidence >= .85 && suggestion.canonicalCategoryId).map(([rowNumber, suggestion]) => [rowNumber, suggestion.canonicalCategoryId!] )));
+      setRowCategories({}); setGroupCategories({});
     } catch { setMessage(copy.errorText); }
     finally { setBusy(false); }
   }
 
   async function importDrafts() {
     if (!parsed || !idempotencyKey || !validCount || busy) return;
-    const completeMapping: SellerImportMapping = { ...mapping, rowCategories };
+    const completeMapping: SellerImportMapping = { ...mapping, rowCategories, groupCategories };
     setBusy(true); setMessage("");
     try {
       const payload = JSON.stringify({ action: "import", storeId, sourceFormat: parsed.sourceFormat, idempotencyKey, headers: parsed.headers, rows: parsed.rows, mapping: completeMapping });
@@ -165,6 +187,10 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   }
 
   const selectField = (field: SellerImportField, label: string, required = false) => <label key={field}>{label}<select required={required} value={mapping[field] ?? ""} onChange={event => setField(field, event.target.value)}><option value="">—</option>{parsed?.headers.map(header => <option key={header} value={header}>{header}</option>)}</select></label>;
+  const essentialMappingField = (field: SellerImportField): SellerImportField => field === "title" && !mapping.title && mapping.parentTitle ? "parentTitle"
+    : field === "price" && !mapping.price && mapping.variantPrice ? "variantPrice"
+      : field === "stock" && !mapping.stock && mapping.variantStock ? "variantStock"
+        : field === "sku" && !mapping.sku && mapping.variantSku ? "variantSku" : field;
   return <section className="storeSetupCard sellerExternalImport" aria-labelledby="seller-import-title">
     <span className="dashboardBadge">PRO</span><h1 id="seller-import-title">{labels.title}</h1><p>{storeName}</p>
     <form onSubmit={checkFile} className="sellerExternalImportForm">
@@ -178,20 +204,21 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
       {busy && progress && <progress className="sellerExternalImportProgress" aria-label={labels.importDrafts} max={Math.max(1, progress.total)} value={progress.completed}/>}
       <div className="sellerExternalImportCounts" role="status"><span>{importCopy.sourceRows}: {parsed.rows.length}</span><span>{importCopy.parentProducts}: {grouped.length}</span><span>{importCopy.variants}: {variantCount}</span></div>
       <div className="sellerExternalImportMapping">
-        {requiredFields.map(item => {
-          const required = item.key === "title" ? !mapping.title && !mapping.parentTitle : true;
-          return selectField(item.key, fieldLabels[item.label] ?? item.label, required);
-        })}
-        {mappingFields.map(item => {
-          const fieldLabel = fieldLabels[item.label] ?? importCopy[item.label as keyof typeof importCopy] ?? item.label;
-          const required = (item.key === "price" || item.key === "variantPrice")
-            ? !mapping.price && !mapping.variantPrice
-            : (item.key === "stock" || item.key === "variantStock")
-              ? !mapping.stock && !mapping.variantStock
-              : false;
-          return selectField(item.key, fieldLabel, required);
+        {essentialFields.map(item => {
+          const required = item.key === "title" ? !mapping.title && !mapping.parentTitle
+            : item.key === "price" ? !mapping.price && !mapping.variantPrice
+              : item.key === "stock" ? !mapping.stock && !mapping.variantStock
+                : item.key === "description";
+          const fieldLabel = fieldLabels[item.label] ?? item.label;
+          return selectField(essentialMappingField(item.key), fieldLabel, !item.optional && required);
         })}
       </div>
+      <details className="sellerExternalImportAdvanced">
+        <summary>{labels.advancedMappings}</summary>
+        <div className="sellerExternalImportMapping">
+          {advancedFields.filter(item => !(item.key === "variantPrice" && !mapping.price) && !(item.key === "variantStock" && !mapping.stock) && !(item.key === "variantSku" && !mapping.sku)).map(item => selectField(item.key, fieldLabels[item.label] ?? importCopy[item.label as keyof typeof importCopy] ?? item.label))}
+        </div>
+      </details>
       <label>{importCopy.duplicateHeading}<select value={mapping.duplicatePolicy ?? "SKIP_EXISTING"} onChange={event => setMapping(current => ({ ...current, duplicatePolicy: event.target.value as SellerImportMapping["duplicatePolicy"] }))}><option value="SKIP_EXISTING">{importCopy.skipExisting}</option><option value="UPDATE_EXISTING">{importCopy.updateExisting}</option><option value="NEW_ONLY">{importCopy.newOnly}</option></select></label>
       {candidates.map(candidate => {
         const checked = candidate.rowNumbers.every(rowNumber => mapping.confirmedRowGroups?.[String(rowNumber)] === candidate.key);
@@ -200,16 +227,13 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
       <p>{labels.ready.replace("{count}", String(validCount))}</p>
       {summary && <p role="status">{summary}</p>}
       <div className="sellerExternalImportRows">{grouped.map(group => {
-        const groupCategories = group.rowNumbers.map(rowNumber => rowCategories[String(rowNumber)]).filter(Boolean);
-        const suggestedCategories = group.rows.map((row, index) => categoryForRow(row, group.rowNumbers[index]));
-        const selectedCategory = groupCategories.length ? (new Set(groupCategories).size === 1 ? groupCategories[0] : "") : (new Set(suggestedCategories).size === 1 ? suggestedCategories[0] : "");
+        const selectedCategory = categoryForGroup(group);
         return <article key={group.key} className="sellerExternalImportProductGroup">
           <h3>{importCopy.parentProducts}: {group.rows[0]?.[mapping.parentTitle ?? ""] || group.rows[0]?.[mapping.title ?? ""] || parsed.headers[0]}</h3>
-          <label>{importCopy.suggestedCategory}<select aria-label={importCopy.chooseCategory} value={selectedCategory} onChange={event => setRowCategories(current => Object.fromEntries([...Object.entries(current), ...group.rowNumbers.map(rowNumber => [String(rowNumber), event.target.value])]))}><option value="">{importCopy.chooseCategory}</option>{CANONICAL_LEAF_CATEGORIES.map(category => <option key={category.id} value={category.id}>{localizedCategoryLeafLabel(locale, category.categoryId, category.groupId, category.label)}</option>)}</select></label>
+          <div className="sellerExternalImportCategory"><span>{importCopy.suggestedCategory}</span><SellerImportCategoryPicker id={`seller-import-category-${group.rowNumbers[0]}`} value={selectedCategory} onChange={value => { setGroupCategories(current => { const next = { ...current }; if (value) next[group.key] = value; else delete next[group.key]; return next; }); setRowCategories(current => { const next = { ...current }; for (const rowNumber of group.rowNumbers) { if (value) next[String(rowNumber)] = value; else delete next[String(rowNumber)]; } return next; }); }} locale={locale} labels={labels.categoryPicker}/></div>
           <ul>{group.rows.map((row, index) => {
             const rowNumber = group.rowNumbers[index];
-            const suggestion = categorySuggestions[rowNumber] ?? suggestSellerImportCategory(row, mapping);
-            const isValid = isReady(row, mapping, rowCategories[String(rowNumber)] ?? (suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : ""));
+            const isValid = isReady(row, mapping, selectedCategory);
             const price = mappedValue(row, mapping, "variantPrice") || mappedValue(row, mapping, "price");
             const sku = mappedValue(row, mapping, "variantSku") || mappedValue(row, mapping, "sku");
             const variation = ["color", "size", "material", "style"].map(field => mappedValue(row, mapping, field as SellerImportField)).filter(Boolean).join(" / ");

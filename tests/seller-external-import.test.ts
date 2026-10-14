@@ -7,6 +7,7 @@ import { groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSelle
 import { prepareSellerImportGroup, SellerImportRowError } from "../lib/seller-product-import";
 import { locales } from "../i18n/config";
 import { sellerFreeModelCopy } from "../i18n/seller-free-model";
+import { sellerImportOtherCategoryId } from "../lib/seller-import-category";
 
 function xlsxFixture() {
   const files = new Map([["xl/worksheets/sheet1.xml", `<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>title</t></is></c><c r="B1" t="inlineStr"><is><t>price</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Sample item</t></is></c><c r="B2"><v>12.50</v></c></row></sheetData></worksheet>`]]);
@@ -65,6 +66,26 @@ test("seller import groups only explicit supplier parent IDs and retains all ten
   assert.equal(groups.reduce((sum, group) => sum + group.rows.length, 0), 10);
   assert.equal(groupSellerImportRows([{ title: "Cotton T-shirt" }, { title: "Cotton T-shirt" }], {}).length, 2);
   assert.equal(groupSellerImportRows([{ parent_product_id: "AB-C" }, { parent_product_id: "A-BC" }], mapping).length, 2);
+});
+
+test("a selected main category is shared by imported variant parents and Other remains scoped to its parent", () => {
+  const rows = [
+    { parent_id: "HOME-1", title: "Desk lamp", description: "A desk lamp for a home office", color: "Green", price: "12.00", stock: "3", sku: "LAMP-G" },
+    { parent_id: "HOME-1", title: "Desk lamp", description: "A desk lamp for a home office", color: "Gold", price: "13.00", stock: "2", sku: "LAMP-Y" },
+  ];
+  const mapping = { parentProductId: "parent_id", title: "title", description: "description", color: "color", price: "price", stock: "stock", sku: "sku", groupCategories: { "parent:HOME-1": "home" } };
+  const group = groupSellerImportRows(rows, mapping)[0];
+  const items = group.rows.map((sourceRow, index) => ({ rowNumber: group.rowNumbers[index], sourceRow }));
+  const prepared = prepareSellerImportGroup(items as never, mapping, "EUR", group.key);
+  assert.equal(group.rows.length, 2);
+  assert.equal(prepared.category, "home");
+  assert.deepEqual(prepared.variants?.variants?.map(variant => variant.sku), ["LAMP-G", "LAMP-Y"]);
+
+  const other = sellerImportOtherCategoryId("home");
+  const otherMapping = { title: "title", description: "description", price: "price", stock: "stock", groupCategories: { "row:2": other } };
+  const otherPrepared = prepareSellerImportGroup([{ rowNumber: 2, sourceRow: { title: "Desk lamp", description: "A desk lamp for a home office", price: "12.00", stock: "3" } }] as never, otherMapping, "EUR", "row:2");
+  assert.equal(otherPrepared.category, other);
+  assert.equal(otherPrepared.category.startsWith("home"), true);
 });
 
 test("seller-confirmed variant grouping accepts exact mapped dimensions and rejects incomplete or duplicate combinations", () => {
@@ -215,7 +236,7 @@ test("seller import endpoint remains isolated from Admin CJ import and writes on
   assert.match(route, /isTrustedMutationRequest\(request\)/); assert.match(route, /requireProProductImport\(prisma, session\.userId\)/); assert.match(route, /createSellerProductImportJob/); assert.match(route, /readBoundedSellerImportBody\(request\)/);
   assert.match(service, /status: "DRAFT"/); assert.match(service, /lockSellerProductQuota/); assert.match(service, /PRODUCT_IMPORTED_AS_DRAFT/); assert.match(service, /status: "PENDING"/); assert.match(service, /status: "IMPORTED"/);
   assert.doesNotMatch(route, /api\/admin\/supplier-products|api\/supplier\/cj\/import/); assert.match(page, /requireProProductImport/);
-  assert.match(route, /STORE_ACCESS_DENIED/); assert.match(route, /isCanonicalLeafCategoryId/); assert.match(route, /idempotencyKey/);
+  assert.match(route, /STORE_ACCESS_DENIED/); assert.match(route, /isValidSellerImportCategoryId/); assert.match(route, /idempotencyKey/);
   assert.match(route, /suggestSellerImportCategory/); assert.match(route, /requireStoreCapability/);
   assert.match(service, /duplicatePolicy/); assert.match(service, /status: "SKIPPED"/); assert.match(service, /upsertProductVariantsExact/);
   assert.match(route, /mapping\.price \|\| mapping\.variantPrice/); assert.match(route, /mapping\.stock \|\| mapping\.variantStock/);
