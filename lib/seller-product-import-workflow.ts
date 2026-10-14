@@ -4,7 +4,7 @@ import { locales } from "../i18n/config";
 
 export type SellerImportField =
   | "title" | "parentTitle" | "description" | "price" | "variantPrice" | "category" | "stock" | "variantStock"
-  | "sku" | "variantSku" | "supplierProductId" | "parentProductId" | "images" | "variantImages" | "variants" | "video"
+  | "sku" | "variantSku" | "barcode" | "supplier" | "supplierProductId" | "parentProductId" | "images" | "variantImages" | "variants" | "video"
   | "brand" | "condition" | "currency" | "color" | "size" | "material" | "style" | "attributes"
   | "weightGrams" | "lengthMm" | "widthMm" | "heightMm";
 
@@ -25,6 +25,8 @@ export type SellerImportRowGroup = {
 };
 
 const normalize = (value: string) => value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+// Keep punctuation and accents in identity comparisons because they may distinguish models or suppliers.
+const normalizeGroupIdentity = (value: string) => value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/gu, " ").trim();
 export const normalizeSellerImportCategorySource = normalize;
 
 const headerAliases: Record<SellerImportField, string[]> = {
@@ -38,6 +40,8 @@ const headerAliases: Record<SellerImportField, string[]> = {
   variantStock: ["variant stock", "variant quantity", "stock variante", "quantite variante", "quantité variante"],
   sku: ["sku", "reference", "référence", "product identifier", "productidentifier", "reference produit"],
   variantSku: ["variant sku", "sku variante", "variant reference", "reference variante"],
+  barcode: ["barcode", "bar code", "ean", "ean-13", "gtin", "upc", "code barre", "code-barres"],
+  supplier: ["supplier", "supplier name", "supplier identity", "supplier code", "vendor", "vendor name", "provider", "source supplier", "fournisseur", "nom du fournisseur", "identifiant fournisseur"],
   supplierProductId: ["supplier product id", "supplier id", "external product id", "product id", "item id", "id produit fournisseur", "reference fournisseur"],
   parentProductId: ["parent id", "parent product id", "parent sku", "product group id", "group id", "spu", "parent product identifier", "id parent", "id produit parent", "groupe produit"],
   images: ["images", "image", "image url", "photo", "photos", "image urls", "product images"],
@@ -72,13 +76,17 @@ function automaticFamilyGroups(rows: SellerImportSourceRow[], mapping: SellerImp
   const byIdentity = new Map<string, number[]>();
   rows.forEach((row, index) => {
     if (importCell(row, mapping, "parentProductId")) return;
-    const title = normalize(importCell(row, mapping, "parentTitle") || importCell(row, mapping, "title"));
-    const description = normalize(importCell(row, mapping, "description"));
-    const brand = normalize(importCell(row, mapping, "brand"));
-    // A title alone is not family evidence. Require matching non-empty
-    // description and brand, plus unique SKUs and complete distinct variants.
-    if (!title || !description || !brand) return;
-    const identity = `${title}\u001f${description}\u001f${brand}`;
+    const title = normalizeGroupIdentity(importCell(row, mapping, "parentTitle") || importCell(row, mapping, "title"));
+    const description = normalizeGroupIdentity(importCell(row, mapping, "description"));
+    const brand = normalizeGroupIdentity(importCell(row, mapping, "brand"));
+    const supplier = normalizeGroupIdentity(importCell(row, mapping, "supplier"));
+    const category = normalizeGroupIdentity(importCell(row, mapping, "category"));
+    // A title alone is not family evidence. Exact normalized product identity
+    // is only eligible when the rows also have unique SKUs and a complete,
+    // non-duplicated variant matrix (checked below). Descriptions and brands
+    // strengthen identity when supplied, but are optional catalog fields.
+    if (!title) return;
+    const identity = `${title}\u001f${description}\u001f${brand}\u001f${supplier}\u001f${category}`;
     const indexes = byIdentity.get(identity) ?? [];
     indexes.push(index); byIdentity.set(identity, indexes);
   });
@@ -100,6 +108,11 @@ function hashImportIdentity(value: string) {
   return (hash >>> 0).toString(36);
 }
 
+export function sellerImportParentGroupKey(parentIdentifier: string, supplierIdentity = "") {
+  const supplier = normalizeGroupIdentity(supplierIdentity);
+  return supplier ? `parent:${hashImportIdentity(supplier)}:${parentIdentifier}` : `parent:${parentIdentifier}`;
+}
+
 export function groupSellerImportRows(rows: SellerImportSourceRow[], mapping: SellerImportMapping, rowNumbers = rows.map((_, index) => index + 2)): SellerImportRowGroup[] {
   const groups = new Map<string, SellerImportRowGroup>();
   const automaticGroups = automaticFamilyGroups(rows, mapping, rowNumbers);
@@ -108,13 +121,55 @@ export function groupSellerImportRows(rows: SellerImportSourceRow[], mapping: Se
     const rowNumber = rowNumbers[index] ?? index + 2;
     const confirmedGroup = mapping.confirmedRowGroups?.[String(rowNumber)];
     const separated = mapping.separatedRowGroups?.[String(rowNumber)];
-    const key = separated ? `row:${rowNumber}` : parentIdentifier ? `parent:${parentIdentifier}` : confirmedGroup ? `confirmed:${confirmedGroup}` : automaticGroups.get(rowNumber) ?? `row:${rowNumber}`;
+    const parentKey = sellerImportParentGroupKey(parentIdentifier, importCell(row, mapping, "supplier"));
+    const key = separated ? `row:${rowNumber}` : parentIdentifier ? parentKey : confirmedGroup ? `confirmed:${confirmedGroup}` : automaticGroups.get(rowNumber) ?? `row:${rowNumber}`;
     const group = groups.get(key) ?? { key, parentIdentifier: parentIdentifier || null, rowNumbers: [], rows: [] };
     group.rowNumbers.push(rowNumber);
     group.rows.push(row);
     groups.set(key, group);
   });
   return [...groups.values()];
+}
+
+export type SellerImportGroupingCandidate = { key: string; title: string; rowNumbers: number[]; variantFields: Array<"color" | "size" | "material" | "style"> };
+export function findSellerImportGroupingCandidates(rows: SellerImportSourceRow[], mapping: SellerImportMapping, excludedRows: ReadonlySet<number> = new Set(), rowNumbers = rows.map((_, index) => index + 2)): SellerImportGroupingCandidate[] {
+  const byIdentity = new Map<string, number[]>();
+  rows.forEach((row, index) => {
+    const rowNumber = rowNumbers[index] ?? index + 2;
+    if (importCell(row, mapping, "parentProductId") || excludedRows.has(rowNumber)) return;
+    const title = normalizeGroupIdentity(importCell(row, mapping, "parentTitle") || importCell(row, mapping, "title"));
+    if (!title) return;
+    const identity = [title, normalizeGroupIdentity(importCell(row, mapping, "description")), normalizeGroupIdentity(importCell(row, mapping, "brand")), normalizeGroupIdentity(importCell(row, mapping, "supplier")), normalizeGroupIdentity(importCell(row, mapping, "category"))].join("\u001f");
+    const indexes = byIdentity.get(identity) ?? [];
+    indexes.push(index);
+    byIdentity.set(identity, indexes);
+  });
+
+  return [...byIdentity.values()].flatMap(indexes => {
+    if (indexes.length < 2) return [];
+    const familyRows = indexes.map(index => rows[index]);
+    if (!hasCompleteSellerImportVariantRows(familyRows, mapping)) return [];
+    const skus = familyRows.map(row => normalize(importCell(row, mapping, "variantSku") || importCell(row, mapping, "sku")));
+    const suppliedSkus = skus.filter(Boolean);
+    if (!skus.some(sku => !sku) || new Set(suppliedSkus).size !== suppliedSkus.length) return [];
+    const groupRowNumbers = indexes.map(index => rowNumbers[index] ?? index + 2);
+    const variantFields = (["color", "size", "material", "style"] as const).filter(field => familyRows.every(row => importCell(row, mapping, field)) && new Set(familyRows.map(row => importCell(row, mapping, field))).size > 1);
+    return [{ key: `candidate-${groupRowNumbers[0]}`, title: importCell(familyRows[0], mapping, "parentTitle") || importCell(familyRows[0], mapping, "title"), rowNumbers: groupRowNumbers, variantFields }];
+  });
+}
+
+export function hasSellerImportCategoryConflict(rows: SellerImportSourceRow[], mapping: SellerImportMapping): boolean {
+  const categories = rows.map(row => normalizeGroupIdentity(importCell(row, mapping, "category"))).filter(Boolean);
+  return new Set(categories).size > 1;
+}
+
+export function countSellerImportVariants(groups: SellerImportRowGroup[], mapping: SellerImportMapping): number {
+  return groups.reduce((sum, group) => {
+    if (group.rows.length > 1) return sum + group.rows.length;
+    const raw = importCell(group.rows[0] ?? {}, mapping, "variants");
+    try { return sum + (raw ? (JSON.parse(raw) as { variants?: unknown[] }).variants?.length ?? 0 : 0); }
+    catch { return sum; }
+  }, 0);
 }
 
 export function hasCompleteSellerImportVariantRows(rows: SellerImportSourceRow[], mapping: SellerImportMapping): boolean {

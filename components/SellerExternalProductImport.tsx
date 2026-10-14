@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { validateProductImages } from "@/lib/product-images";
-import { groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
+import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, hasSellerImportCategoryConflict, suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
 import type { SellerImportField, SellerImportMapping } from "@/lib/seller-product-import-workflow";
 import { feedbackCopy } from "@/lib/feedback-copy";
 import { isValidSellerImportCategoryId } from "@/lib/seller-import-category";
@@ -22,6 +22,7 @@ const essentialFields: Array<{ key: SellerImportField; label: string; optional?:
 ];
 const advancedFields: Array<{ key: SellerImportField; label: string }> = [
   { key: "parentTitle", label: "parentTitle" }, { key: "parentProductId", label: "parentProductId" }, { key: "supplierProductId", label: "supplierProductId" },
+  { key: "supplier", label: "supplier" }, { key: "barcode", label: "barcode" },
   { key: "variantPrice", label: "variantPrice" }, { key: "variantStock", label: "variantStock" }, { key: "variantSku", label: "variantSku" }, { key: "brand", label: "brand" },
   { key: "condition", label: "condition" }, { key: "currency", label: "currency" }, { key: "images", label: "images" }, { key: "variantImages", label: "variantImages" },
   { key: "video", label: "video" }, { key: "color", label: "color" }, { key: "size", label: "size" }, { key: "material", label: "material" },
@@ -54,26 +55,6 @@ function isReady(row: Record<string, string>, mapping: SellerImportMapping, cate
   return true;
 }
 
-function rowGroupingCandidates(rows: Array<Record<string, string>>, mapping: SellerImportMapping, excludedRows: Set<number>) {
-  const byTitle = new Map<string, number[]>();
-  rows.forEach((row, index) => {
-    if (mappedValue(row, mapping, "parentProductId") || excludedRows.has(index + 2)) return;
-    const title = (mappedValue(row, mapping, "parentTitle") || mappedValue(row, mapping, "title")).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-    if (!title) return;
-    const rowNumbers = byTitle.get(title) ?? [];
-    rowNumbers.push(index + 2); byTitle.set(title, rowNumbers);
-  });
-  return [...byTitle.entries()].flatMap(([, rowNumbers]) => {
-    if (rowNumbers.length < 2) return [];
-    const rowsForTitle = rowNumbers.map(rowNumber => rows[rowNumber - 2]);
-    const variantFields = (["color", "size", "material", "style"] as const).filter(field => rowsForTitle.every(row => mappedValue(row, mapping, field)) && new Set(rowsForTitle.map(row => mappedValue(row, mapping, field))).size > 1);
-    const hasVariation = hasCompleteSellerImportVariantRows(rowsForTitle, mapping);
-    const skus = rowsForTitle.map(row => mappedValue(row, mapping, "variantSku") || mappedValue(row, mapping, "sku"));
-    if (!hasVariation || skus.some(sku => !sku) || new Set(skus.map(sku => sku.toLocaleLowerCase())).size !== skus.length) return [];
-    return [{ key: `candidate-${rowNumbers[0]}`, title: mappedValue(rowsForTitle[0], mapping, "parentTitle") || mappedValue(rowsForTitle[0], mapping, "title"), rowNumbers, variantFields }];
-  });
-}
-
 export default function SellerExternalProductImport({ storeId, storeName, backHref, labels, fieldLabels, locale, storeCurrency }: { storeId: string; storeName: string; backHref: string; labels: Labels; fieldLabels: Record<string, string>; locale: string; storeCurrency: string }) {
   const router = useRouter();
   const [source, setSource] = useState("csv"), [file, setFile] = useState<File | null>(null), [parsed, setParsed] = useState<ParsedFile | null>(null), [mapping, setMapping] = useState<SellerImportMapping>({}), [rowCategories, setRowCategories] = useState<Record<string, string>>({}), [groupCategories, setGroupCategories] = useState<Record<string, string>>({}), [categorySuggestions, setCategorySuggestions] = useState<Record<number, CategorySuggestion>>({}), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [summary, setSummary] = useState(""), [rowResults, setRowResults] = useState<Record<number, { status: string; errorCode: string | null }>>({}), [idempotencyKey, setIdempotencyKey] = useState<string | null>(null), [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -82,7 +63,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   const grouped = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, mapping) : [], [parsed, mapping]);
   const automaticGroups = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, { ...mapping, separatedRowGroups: undefined }).filter(group => group.rows.length > 1 && (group.key.startsWith("auto:") || group.key.startsWith("parent:"))) : [], [parsed, mapping]);
   const autoGroupedRows = useMemo(() => new Set(automaticGroups.flatMap(group => group.rowNumbers)), [automaticGroups]);
-  const candidates = useMemo(() => parsed ? rowGroupingCandidates(parsed.rows, mapping, autoGroupedRows) : [], [parsed, mapping, autoGroupedRows]);
+  const candidates = useMemo(() => parsed ? findSellerImportGroupingCandidates(parsed.rows, mapping, autoGroupedRows) : [], [parsed, mapping, autoGroupedRows]);
   const duplicateSkuRows = useMemo(() => {
     if (!parsed) return new Set<number>();
     const rowBySku = new Map<string, number[]>();
@@ -96,6 +77,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   }, [parsed, mapping]);
   const validCount = useMemo(() => grouped.filter(group => {
     if (group.rowNumbers.some(rowNumber => duplicateSkuRows.has(rowNumber))) return false;
+    if (group.rows.length > 1 && hasSellerImportCategoryConflict(group.rows, mapping)) return false;
     const rowSelections = group.rows.map((row, index) => rowCategories[String(group.rowNumbers[index])] || (() => {
       const suggestion = categorySuggestions[group.rowNumbers[index]] ?? categorySuggestionForRow(row, mapping);
       return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? "";
@@ -107,11 +89,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
     }
     return true;
   }).length, [grouped, mapping, rowCategories, groupCategories, categorySuggestions, duplicateSkuRows]);
-  const variantCount = grouped.reduce((sum, group) => {
-    if (group.rows.length > 1) return sum + group.rows.length;
-    const raw = mappedValue(group.rows[0], mapping, "variants");
-    try { return sum + (raw ? (JSON.parse(raw) as { variants?: unknown[] }).variants?.length ?? 0 : 0); } catch { return sum; }
-  }, 0);
+  const variantCount = countSellerImportVariants(grouped, mapping);
   function setField(key: SellerImportField, column: string) {
     const next: SellerImportMapping = { ...mapping, confirmedRowGroups: undefined, separatedRowGroups: undefined };
     if (column) next[key] = column; else delete next[key];
@@ -255,7 +233,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
       <div className="sellerExternalImportRows">{grouped.map(group => {
         const selectedCategory = categoryForGroup(group);
         return <article key={group.key} className="sellerExternalImportProductGroup"><details>
-          <summary>{importCopy.parentProducts}: {group.rows[0]?.[mapping.parentTitle ?? ""] || group.rows[0]?.[mapping.title ?? ""] || parsed.headers[0]} ({group.rows.length} {importCopy.variants})</summary>
+          <summary>{importCopy.parentProducts}: {group.rows[0]?.[mapping.parentTitle ?? ""] || group.rows[0]?.[mapping.title ?? ""] || parsed.headers[0]}{group.rows.length > 1 ? ` (${group.rows.length} ${importCopy.variants})` : ""}</summary>
           <div className="sellerExternalImportCategory"><span>{importCopy.suggestedCategory}</span><SellerImportCategoryPicker id={`seller-import-category-${group.rowNumbers[0]}`} value={selectedCategory} onChange={value => { setGroupCategories(current => { const next = { ...current }; if (value) next[group.key] = value; else delete next[group.key]; return next; }); setRowCategories(current => { const next = { ...current }; for (const rowNumber of group.rowNumbers) { if (value) next[String(rowNumber)] = value; else delete next[String(rowNumber)]; } return next; }); }} locale={locale} labels={labels.categoryPicker}/></div>
           <ul>{group.rows.map((row, index) => {
             const rowNumber = group.rowNumbers[index];

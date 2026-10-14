@@ -23,7 +23,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testMatch: /(?:smoke|team-hardening|pro-multistore-repair|seller-store-settings-verification|seller-activation-pending|store-url-lifecycle|stage5-smoke|phase3-lifecycle|phase4-dashboard|phase6-country-currency|phase6-shipments|phase7-shipping-tracking|phase8-catalog-localization|phase8-5-admin-category-cj-ux|phase9-pwa|phase9-push|notifications-navigation)\.spec\.ts/,
+      testMatch: /(?:smoke|team-hardening|pro-multistore-repair|seller-store-settings-verification|seller-activation-pending|store-url-lifecycle|seller-import-variants|stage5-smoke|phase3-lifecycle|phase4-dashboard|phase6-country-currency|phase6-shipments|phase7-shipping-tracking|phase8-catalog-localization|phase8-5-admin-category-cj-ux|phase9-pwa|phase9-push|notifications-navigation)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {

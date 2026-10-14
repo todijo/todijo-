@@ -1,0 +1,11 @@
+sku,title,category,description,color,size,price,stock,weight_kg,currency,condition,image_url,video_url,length_cm,width_cm,height_cm,status,supplier
+TEST-TOD-001,T-shirt coton test,Vêtements pour hommes,"T-shirt fictif pour validation d'import. Ne pas publier.",Bleu,S,12.9,8,0.18,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-002,T-shirt coton test,Vêtements pour hommes,"T-shirt fictif pour validation d'import. Ne pas publier.",Bleu,M,12.9,12,0.2,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-003,T-shirt coton test,Vêtements pour hommes,"T-shirt fictif pour validation d'import. Ne pas publier.",Noir,S,12.9,5,0.18,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-004,T-shirt coton test,Vêtements pour hommes,"T-shirt fictif pour validation d'import. Ne pas publier.",Noir,M,12.9,9,0.2,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-005,Sac à dos test,Sacs et chaussures,"Sac fictif pour validation d'import. Ne pas publier.",Noir,Unique,24.9,7,0.6,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-006,Sac à dos test,Sacs et chaussures,"Sac fictif pour validation d'import. Ne pas publier.",Vert,Unique,24.9,4,0.6,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-007,Carnet A5 test,Fournitures scolaires,"Carnet fictif pour validation d'import. Ne pas publier.",Rouge,A5,4.5,30,0.25,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-008,Carnet A5 test,Fournitures scolaires,"Carnet fictif pour validation d'import. Ne pas publier.",Bleu,A5,4.5,24,0.25,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-009,Coussin décoratif test,"Maison, jardin et meubles",Coussin fictif pour validation d'import. Ne pas publier.,Beige,40x40,16.0,6,0.45,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER
+TEST-TOD-010,Coussin décoratif test,"Maison, jardin et meubles",Coussin fictif pour validation d'import. Ne pas publier.,Gris,50x50,19.0,3,0.55,EUR,NEW,,,30,20,5,DRAFT,TEST ONLY - NO REAL SUPPLIER

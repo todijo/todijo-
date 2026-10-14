@@ -225,12 +225,13 @@ export async function upsertProductVariantsExact(tx: Prisma.TransactionClient, p
     if (existingVariant) {
       await tx.productVariant.update({ where: { id: existingVariant.id }, data: {
         ...(sku ? { sku } : {}), priceOverride,
+        ...(draft.barcode !== undefined ? { barcode: optionalText(draft.barcode, 120, "Barcode") } : {}),
         ...(draft.compareAtPrice !== undefined ? { compareAtPrice } : {}),
         stock,
       } });
     } else {
       await tx.productVariant.create({ data: {
-        productId, combinationKey, sku, priceOverride, compareAtPrice, stock, active: true,
+        productId, combinationKey, sku, barcode: optionalText(draft.barcode, 120, "Barcode"), priceOverride, compareAtPrice, stock, active: true,
         values: { create: selectedValues.map(value => ({ optionValueId: value.id })) },
       } });
     }
