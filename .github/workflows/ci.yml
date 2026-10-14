@@ -129,11 +129,15 @@ jobs:
       TODIJO_CI_DISPOSABLE_DATABASE: "1"
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: quay.io/sclorg/postgresql-16-c9s
         env:
           POSTGRES_USER: e2e
           POSTGRES_PASSWORD: e2e
           POSTGRES_DB: todijo_e2e
+          POSTGRESQL_USER: e2e
+          POSTGRESQL_PASSWORD: e2e
+          POSTGRESQL_DATABASE: todijo_e2e
+          POSTGRESQL_ADMIN_PASSWORD: e2e
         ports:
           - 5432:5432
         options: >-
@@ -162,8 +166,8 @@ jobs:
         env:
           PGPASSWORD: e2e
         run: |
-          psql -h 127.0.0.1 -p 5432 -U e2e -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
-          createdb -h 127.0.0.1 -p 5432 -U e2e --maintenance-db=postgres -O validation todijo_browser
+          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O validation todijo_browser
 
       - name: Prepare ephemeral browser-test database
         run: npx prisma migrate deploy
