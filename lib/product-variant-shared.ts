@@ -26,6 +26,7 @@ export type ProductVariantsInput = {
 
 export type ProductVariantDraft = {
   combinationKey: string;
+  imageUrls?: string[];
   values: Array<{ optionValue: { value: string } }>;
   sku: string | null;
   barcode: string | null;

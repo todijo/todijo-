@@ -8,6 +8,8 @@ import { prepareSellerImportGroup, SellerImportRowError } from "../lib/seller-pr
 import { locales } from "../i18n/config";
 import { sellerFreeModelCopy } from "../i18n/seller-free-model";
 import { sellerImportOtherCategoryId } from "../lib/seller-import-category";
+import { sellerImportImageUrls } from "../lib/seller-import-image-values";
+import { sellerImportMediaLocaleKeys } from "../i18n/seller-import-media-copy";
 
 function xlsxFixture(headers = ["title", "price"], dataRows = [["Sample item", "12.50"]]) {
   const columnName = (index: number) => { let value = index + 1, name = ""; while (value) { value--; name = String.fromCharCode(65 + value % 26) + name; value = Math.floor(value / 26); } return name; };
@@ -38,6 +40,63 @@ test("JSON and XML import formats normalize product records without resolving ex
   const xml = parseSellerProductImport("catalog.xml", Buffer.from("<catalog><product><title>Sample &amp; item</title><stock>3</stock></product></catalog>"));
   assert.equal(xml.rows[0].title, "Sample & item"); assert.equal(xml.rows[0].stock, "3");
   assert.throws(() => parseSellerProductImport("catalog.xml", Buffer.from("<!DOCTYPE x [<!ENTITY secret SYSTEM 'file:///secret'>]><catalog/>")), (error: unknown) => error instanceof SellerImportParseError && error.code === "IMPORT_FILE_INVALID");
+});
+
+test("structured JSON and nested XML image arrays normalize to ordered image URL lists", () => {
+  const first = "https://cdn.example.test/product-a.webp", second = "https://cdn.example.test/product-b.webp";
+  const json = parseSellerProductImport("products.json", Buffer.from(JSON.stringify({ products: [{ title: "Gallery item", images: [first, { url: second }] }] })));
+  assert.deepEqual(sellerImportImageUrls(json.rows[0].images), [first, second]);
+  const xml = parseSellerProductImport("catalog.xml", Buffer.from(`<catalog><product><title>Gallery item</title><images><image>${first}</image><image><url>${second}</url></image></images></product></catalog>`));
+  assert.deepEqual(sellerImportImageUrls(xml.rows[0].images), [first, second]);
+});
+
+test("supplier variant images stay on exact combinations while equal color images can be shared by sizes", () => {
+  const rows = [
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Example", color: "Black", size: "S", sku: "BLACK-S", price: "12", stock: "2", category: "men--tshirts--solide", variant_images: "https://cdn.example.test/black.webp" },
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Example", color: "Black", size: "M", sku: "BLACK-M", price: "12", stock: "3", category: "men--tshirts--solide", variant_images: "https://cdn.example.test/black.webp" },
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Example", color: "Blue", size: "S", sku: "BLUE-S", price: "12", stock: "4", category: "men--tshirts--solide", variant_images: "https://cdn.example.test/blue-s.webp" },
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Example", color: "Blue", size: "M", sku: "BLUE-M", price: "12", stock: "5", category: "men--tshirts--solide", variant_images: "https://cdn.example.test/blue-m.webp" },
+  ];
+  const mapping = suggestSellerImportMapping(Object.keys(rows[0]));
+  const group = groupSellerImportRows(rows, mapping)[0];
+  const prepared = prepareSellerImportGroup(group.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, mapping, "EUR", group.key);
+  assert.deepEqual(prepared.variantImagesByCombination.map(item => [item.values, item.imageUrls]), [
+    [["Black", "S"], ["https://cdn.example.test/black.webp"]], [["Black", "M"], ["https://cdn.example.test/black.webp"]],
+    [["Blue", "S"], ["https://cdn.example.test/blue-s.webp"]], [["Blue", "M"], ["https://cdn.example.test/blue-m.webp"]],
+  ]);
+  assert.deepEqual(prepared.variantImages, [{ optionName: "color", value: "Black", imageUrls: ["https://cdn.example.test/black.webp"], primaryUrl: "https://cdn.example.test/black.webp" }]);
+  assert.deepEqual(prepared.images, ["https://cdn.example.test/black.webp", "https://cdn.example.test/blue-s.webp", "https://cdn.example.test/blue-m.webp"]);
+});
+
+test("supplier-import media warning translations cover all supported locales", () => {
+  assert.deepEqual(sellerImportMediaLocaleKeys(), [...locales].sort());
+});
+
+test("supplier video fields accept controlled Cloudinary metadata and warn without failing products for unsupported external links", () => {
+  const base = { title: "Video product", description: "A product with a seller-managed video field", price: "10", stock: "1", category: "home--storage--papeterie" };
+  const mapping = suggestSellerImportMapping([...Object.keys(base), "video_url"]);
+  const cloudinary = prepareSellerImportGroup([{ sourceRow: { ...base, video_url: JSON.stringify({ url: "https://res.cloudinary.com/demo/video/upload/sample.mp4", publicId: "todijo/sample", posterUrl: null }) }, rowNumber: 2 }] as never, mapping, "EUR");
+  assert.equal(cloudinary.video?.publicId, "todijo/sample");
+  const external = prepareSellerImportGroup([{ sourceRow: { ...base, video_url: "https://supplier.example.com/video.mp4" }, rowNumber: 2 }] as never, mapping, "EUR");
+  assert.equal(external.video, null);
+  assert.deepEqual(external.mediaPreflightWarnings, [{ rowNumber: 2, position: 1, code: "UNSUPPORTED", mediaType: "VIDEO" }]);
+  const rows = [
+    { ...base, color: "Blue", size: "S", sku: "BLUE-S", video_url: "https://supplier.example.com/blue.mp4" },
+    { ...base, color: "Black", size: "S", sku: "BLACK-S", video_url: "https://supplier.example.com/black.mp4" },
+  ];
+  const groupedMapping = suggestSellerImportMapping(Object.keys(rows[0]));
+  const group = groupSellerImportRows(rows, groupedMapping)[0];
+  const grouped = prepareSellerImportGroup(group.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, groupedMapping, "EUR", group.key);
+  assert.equal(grouped.video, null);
+  assert.equal(grouped.mediaPreflightWarnings.length, 2, "unsupported per-row video URLs do not block valid grouped product data");
+});
+
+test("unmapped supplier URLs are not copied into product attributes where signed media tokens could leak", () => {
+  const row = { title: "Storage item", description: "A durable storage product", price: "10", stock: "2", category: "home--storage--papeterie", supplier_private_image: "https://supplier.test/image?signature=private-token" };
+  const mapping = suggestSellerImportMapping(Object.keys(row));
+  const prepared = prepareSellerImportGroup([{ sourceRow: row, rowNumber: 2 }] as never, mapping, "EUR");
+  const attributes = prepared.attributes as { sourceRows?: Array<Record<string, string>> };
+  assert.equal(attributes.sourceRows?.[0]?.supplier_private_image, undefined);
 });
 
 test("XLSX reader accepts a bounded first worksheet and rejects invalid archives", () => {

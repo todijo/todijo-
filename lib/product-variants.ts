@@ -26,6 +26,7 @@ type DecimalLike = { toString(): string };
 
 type ProductVariantEditorSource = {
   combinationKey: string;
+  imageUrls?: unknown;
   sku: string | null;
   barcode: string | null;
   priceOverride: DecimalLike | null;
@@ -40,6 +41,7 @@ type ProductVariantEditorSource = {
 export function serializeProductVariantForEditor(variant: ProductVariantEditorSource): ProductVariantDraft {
   return {
     combinationKey: variant.combinationKey,
+    imageUrls: Array.isArray(variant.imageUrls) ? variant.imageUrls.filter((value): value is string => typeof value === "string") : [],
     sku: variant.sku,
     barcode: variant.barcode,
     priceOverride: variant.priceOverride?.toString() ?? null,
