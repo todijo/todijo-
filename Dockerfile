@@ -23,7 +23,7 @@ RUN apt-get update \
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 RUN npm prune --omit=dev
 
 FROM public.ecr.aws/docker/library/node:24.15.0-bookworm-slim AS runner
