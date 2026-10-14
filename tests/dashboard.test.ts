@@ -30,6 +30,23 @@ test("seller product actions keep the subscription and team capability gates", (
   assert.doesNotMatch(productsPage, /store\.subscription\?\.status \?\? "NOT_STARTED"/);
 });
 
+test("seller dashboard order and unread-message metrics are actionable and store-scoped",()=>{
+ const dashboard=readFileSync("app/dashboard/page.tsx","utf8");
+ assert.match(dashboard,/seller\/orders\?store=\$\{encodeURIComponent\(storeId\)\}/);
+ assert.match(dashboard,/messages\?store=\$\{encodeURIComponent\(storeId\)\}/);
+ assert.match(dashboard,/sellerUnreadMessageWhere\(session\.userId,activeStore\?\[activeStore\.id\]:selectedPrincipal\?\.storeIds\?\?\[\],canViewMessages\)/);
+ assert.match(readFileSync("app/messages/page.tsx","utf8"),/resolveSellerStoreContext\(prisma,session\.userId,params\.store,"MESSAGE_VIEW"\)/);
+ assert.match(dashboard,/canViewMessages&&unreadMessages>0&&<DashboardStatCard label=\{s\("unreadMessages"\)\}/);
+});
+
+test("multi-store dashboard revenue uses a database aggregate rather than loading all order groups",()=>{
+ const dashboard=readFileSync("app/dashboard/page.tsx","utf8");
+ const aggregate=readFileSync("lib/seller-dashboard-aggregate.ts","utf8");
+ assert.match(dashboard,/loadSellerBusinessRevenueByCurrency\(prisma,ids\)/);
+ assert.doesNotMatch(dashboard,/orderGroup\.findMany\(\{where:\{storeId:\{in:ids\}/);
+ assert.match(aggregate,/SUM\(g\."sellerNetAmountMinor"\)[\s\S]*?GROUP BY o\."currency"/);
+});
+
 test("dashboard polish preserves semantic loading and mobile touch targets", () => {
   const loading = readFileSync("app/dashboard/loading.tsx", "utf8");
   const css = readFileSync("app/globals.css", "utf8");

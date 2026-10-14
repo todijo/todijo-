@@ -40,6 +40,16 @@ test("the Notifications route retains its unauthenticated redirect and private q
   assert.match(page, /userId:session\.userId/);
 });
 
+test("seller dashboard message links preserve the selected authorized store scope",()=>{
+  const dashboard=read("app/dashboard/page.tsx");
+  const messages=read("app/messages/page.tsx");
+  assert.match(dashboard,/sellerUnreadMessageWhere\(session\.userId,activeStore\?\[activeStore\.id\]:selectedPrincipal\?\.storeIds\?\?\[\],canViewMessages\)/);
+  assert.match(dashboard,/messages\?store=\$\{encodeURIComponent\(storeId\)\}/);
+  assert.match(messages,/resolveSellerStoreContext\(prisma,session\.userId,params\.store,"MESSAGE_VIEW"\)/);
+  assert.match(messages,/storeId:selectedStoreId,OR:/);
+  assert.match(messages,/selectedStoreId\?Promise\.resolve\(\{count:0\}\):prisma\.notification\.updateMany/);
+});
+
 test("account and mobile links have semantic, focused, RTL-safe contained presentation", () => {
   const account = read("app/account/AccountSettings.tsx");
   const css = read("app/globals.css");

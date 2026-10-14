@@ -12,7 +12,7 @@ import { dashboardAudience, dashboardPaths, sellerDashboardGate } from "@/lib/da
 import { sellerOrderHistoryWhere } from "@/lib/order-history";
 import { prisma } from "@/lib/prisma";
 import { comparisonPercent } from "@/lib/seller-dashboard";
-import { loadSellerDashboardAggregate } from "@/lib/seller-dashboard-aggregate";
+import { loadSellerBusinessRevenueByCurrency, loadSellerDashboardAggregate } from "@/lib/seller-dashboard-aggregate";
 import { readSession } from "@/lib/session";
 import SellerAnalytics from "@/components/SellerAnalytics";
 import { fulfillmentStepFor } from "@/lib/order-status";
@@ -42,6 +42,7 @@ import { sellerReportCopy } from "@/i18n/seller-reports";
 import { loadSellerDispatchHealth } from "@/lib/seller-dispatch-health";
 import SellerStoreManagement from "@/components/SellerStoreManagement";
 import { getSellerStoreManagementCopy } from "@/i18n/seller-store-management";
+import { sellerUnreadMessageWhere } from "@/lib/seller-dashboard-unread";
 
 export const dynamic = "force-dynamic";
 const DASHBOARD_DATA_TIMEOUT_MS = 15_000;
@@ -124,12 +125,12 @@ async function loadSellerDashboardMetrics(userId:string,storeId:string,permissio
 type SellerDashboardMetrics = NonNullable<Awaited<ReturnType<typeof loadSellerDashboardMetrics>>>;
 type SellerDashboardMetricsPromise = Promise<SellerDashboardMetrics|null>;
 
-async function SellerDashboardHeroMetrics({metrics,locale,currency,canViewSales,canViewOrders,canViewMessages,unreadMessages,labels}:{metrics:SellerDashboardMetricsPromise;locale:string;currency:string;canViewSales:boolean;canViewOrders:boolean;canViewMessages:boolean;unreadMessages:number;labels:{todayRevenue:string;pendingOrders:string;newCustomers:string;unreadMessages:string}}) {
+async function SellerDashboardHeroMetrics({metrics,locale,currency,storeId,canViewSales,canViewOrders,canViewMessages,unreadMessages,labels}:{metrics:SellerDashboardMetricsPromise;locale:string;currency:string;storeId:string;canViewSales:boolean;canViewOrders:boolean;canViewMessages:boolean;unreadMessages:number;labels:{todayRevenue:string;pendingOrders:string;newCustomers:string;unreadMessages:string}}) {
   const data=await metrics;
   if(!data)return null;
   const [aggregate]=data;
   if(!aggregate)return null;
-  return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{moneyBreakdown(locale,aggregate.todayRevenueByCurrency,currency)}</strong></div>}{canViewOrders&&<><div><small>{labels.pendingOrders}</small><strong>{aggregate.pendingOrders}</strong></div><div><small>{labels.newCustomers}</small><strong>{aggregate.newCustomersToday}</strong></div></>}{canViewMessages&&<div><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></div>}</div>;
+  return <div className="sellerHeroMetrics">{canViewSales&&<div><small>{labels.todayRevenue}</small><strong>{moneyBreakdown(locale,aggregate.todayRevenueByCurrency,currency)}</strong></div>}{canViewOrders&&<><Link href={`/${locale}/seller/orders?store=${encodeURIComponent(storeId)}`}><small>{labels.pendingOrders}</small><strong>{aggregate.pendingOrders}</strong></Link><div><small>{labels.newCustomers}</small><strong>{aggregate.newCustomersToday}</strong></div></>}{canViewMessages&&<Link href={`/${locale}/messages?store=${encodeURIComponent(storeId)}`}><small>{labels.unreadMessages}</small><strong>{unreadMessages}</strong></Link>}</div>;
 }
 
 async function SellerStockActionAlerts({storeId,locale,canViewProducts}:{storeId:string;locale:string;canViewProducts:boolean}) {
@@ -225,10 +226,11 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
   const canViewSales=hasSellerPermission("SALES_VIEW");
   const canViewMessages=hasSellerPermission("MESSAGE_VIEW");
   const canEditStore=hasSellerPermission("STORE_EDIT_SETTINGS");
+  const sellerMessageWhere=isSeller?sellerUnreadMessageWhere(session.userId,activeStore?[activeStore.id]:selectedPrincipal?.storeIds??[],canViewMessages):null;
   const paths = dashboardPaths(locale);
   const [notificationCount, unreadMessages] = await dashboardData(Promise.all([
     prisma.notification.count({ where: { userId: session.userId, readAt: null } }),
-    prisma.message.count({ where: { readAt: null, senderId: { not: session.userId }, conversation: isSeller ? { sellerId: session.userId } : { buyerId: session.userId } } }),
+    sellerMessageWhere?prisma.message.count({where:sellerMessageWhere}):isSeller?Promise.resolve(0):prisma.message.count({ where: { readAt: null, senderId: { not: session.userId }, conversation: { buyerId: session.userId } } }),
   ]));
   const homeHref = paths.home;
   const buyerOrdersHref = paths.orders;
@@ -291,15 +293,14 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
     console.info("[dashboard-trace]",JSON.stringify({phase:"dashboard-render",audience:"seller-all-stores",storeCount:ownedStoreChoices.length}));
     const ids=ownedStoreChoices.map(store=>store.id);
     const activeStoreCount=ownedStoreChoices.filter(store=>!store.archivedAt).length;
-    const [productCount,groups,orderCount,business,commercialPlan]=await dashboardData(Promise.all([
+    const [productCount,revenueByCurrency,orderCount,business,commercialPlan]=await dashboardData(Promise.all([
       prisma.product.count({where:{storeId:{in:ids}}}),
-      prisma.orderGroup.findMany({where:{storeId:{in:ids},kind:"MARKETPLACE"},select:{sellerNetAmountMinor:true,order:{select:{currency:true}}}}),
+      loadSellerBusinessRevenueByCurrency(prisma,ids),
       prisma.order.count({where:{groups:{some:{storeId:{in:ids}}}}}),
       prisma.sellerBusiness.findUnique({where:{id:principal.businessId},select:{id:true,primaryStoreId:true}}),
       sellerBusinessCommercialPlan(prisma,principal.businessId),
     ]));
-    const revenueByCurrency=groups.reduce<Record<string,number>>((totals,group)=>{totals[group.order.currency]=(totals[group.order.currency]??0)+group.sellerNetAmountMinor;return totals},{});
-    const revenue=Object.entries(revenueByCurrency).map(([currency,minor])=>money(locale,minor/100,currency)).join(" · ")||money(locale,0,"EUR");
+    const revenue=moneyBreakdown(locale,revenueByCurrency,"EUR");
     const canCreateStore=Boolean(business&&canSellerSelfCreateStore(commercialPlan,activeStoreCount));
     const teaserCopy=user.role==="SELLER"&&hasLockedSellerMultiStoreTeaser(commercialPlan)?sellerMultiStoreTeaserCopy(locale):null;
     return <main className="premiumDashboard premiumSellerDashboard">
@@ -317,6 +318,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
             <DashboardStatCard label={p("nav.products")} value={productCount} icon={Boxes}/>
             <DashboardStatCard label={p("stats.orders")} value={orderCount} icon={ReceiptText} tone="blue"/>
             <DashboardStatCard label={p("nav.revenue")} value={revenue} icon={TrendingUp} tone="mint"/>
+            {canViewMessages&&unreadMessages>0&&<DashboardStatCard label={s("unreadMessages")} value={unreadMessages} href={`/${locale}/messages`} icon={MessageCircle} tone="amber"/>}
           </section>
           {user.role==="SELLER"&&business
             ? <DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><SellerStoreManagement stores={ownedStoreChoices} primaryStoreId={business.primaryStoreId} locale={locale} copy={getSellerStoreManagementCopy(locale)}/></DashboardSection>
@@ -359,7 +361,7 @@ export default async function DashboardPage({searchParams}:{searchParams:Promise
       {registrationDocumentUploadNeeded&&activeStore.status==="PENDING"&&<section className="subscriptionWarning" role="status"><strong>{sellerVerificationDocumentCopy[isLocale(locale)?locale:"en"].registrationDocument}</strong>{registrationDocument?.reviewReason&&<span>{registrationDocument.reviewReason}</span>}<Link href={`/${locale}/seller/onboarding`}>{sellerVerificationDocumentCopy[isLocale(locale)?locale:"en"].upload}</Link></section>}
       <SellerStoreSwitcher stores={storeChoices} selectedId={activeStore.id} allStoresLabel={teamCopy.allStores} storeLabel={p("nav.store")} allowAll={Boolean(principal?.owner&&ownedStoreChoices.length>1)}/>
       {user.role==="SELLER"&&selectedPrincipal?.owner&&ownedStoreChoices.length>1&&<DashboardSection title={p("nav.store")} description={teamCopy.selectStoreHelp}><SellerStoreManagement stores={ownedStoreChoices} primaryStoreId={activeStore.business?.primaryStoreId??null} locale={locale} copy={storeManagementCopy}/></DashboardSection>}
-      <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<Suspense fallback={null}><SellerDashboardHeroMetrics metrics={dashboardMetrics} locale={locale} currency={activeStore.currency} canViewSales={canViewSales} canViewOrders={canViewOrders} canViewMessages={canViewMessages} unreadMessages={unreadMessages} labels={{todayRevenue:s("todayRevenue"),pendingOrders:s("pendingOrders"),newCustomers:s("newCustomers"),unreadMessages:s("unreadMessages")}}/></Suspense>}<Link href={`/${locale}/store/${activeStore.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>
+      <section className="sellerOverviewHero"><div className="sellerOverviewIntro"><span>{p("seller.badge")}</span><h1>{p("welcome", { name: user.firstName })}</h1><p>{t("shop", { name: activeStore.name, city: activeStore.city, country: activeStore.country })}</p>{selectedPrincipal?.owner&&profileCompletion < 100 && <div className="storeProfileProgress"><div><span>{s("profileCompletion")}</span><strong>{profileCompletion}%</strong></div><progress max="100" value={profileCompletion}>{profileCompletion}%</progress></div>}</div>{(canViewSales||canViewOrders||canViewMessages)&&<Suspense fallback={null}><SellerDashboardHeroMetrics metrics={dashboardMetrics} locale={locale} currency={activeStore.currency} storeId={activeStore.id} canViewSales={canViewSales} canViewOrders={canViewOrders} canViewMessages={canViewMessages} unreadMessages={unreadMessages} labels={{todayRevenue:s("todayRevenue"),pendingOrders:s("pendingOrders"),newCustomers:s("newCustomers"),unreadMessages:s("unreadMessages")}}/></Suspense>}<Link href={`/${locale}/store/${activeStore.slug}`}>{t("viewShop")} <Store size={18}/></Link></section>
       <Suspense fallback={null}><SellerStockActionAlerts storeId={activeStore.id} locale={locale} canViewProducts={canViewProducts}/></Suspense>
       <Suspense fallback={null}><SellerDashboardSecondarySections metrics={dashboardMetrics} locale={locale} activeStore={activeStore} storeChoices={ownedStoreChoices} sellerCanAddProduct={sellerCanAddProduct} readinessAction={readinessAction} readinessHref={readinessHref} subscriptionActive={subscriptionActive} commercialPlan={selectedCommercialPlan} owner={Boolean(selectedPrincipal?.owner)} role={user.role} canViewProducts={canViewProducts} canViewOrders={canViewOrders} canViewAnalytics={canViewAnalytics} canViewSales={canViewSales} canViewMessages={canViewMessages} canEditStore={canEditStore} readinessUsesSettings={sellerTypeRequired||vatStatusRequired}/></Suspense>
       {sellerBenefitCatalogEnabled && <section className="storeSetupCard"><h2>Les cadeaux Todijo pour vous</h2><p>Découvrez les cadeaux et avantages sélectionnés par Todijo pour votre activité. Les disponibilités, quantités et tarifs sont indiqués pour chaque article.</p><Link href={`/${locale}/seller/benefits?store=${activeStore.id}`}>Découvrir mes avantages</Link></section>}
