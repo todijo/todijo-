@@ -30,7 +30,7 @@ jobs:
         postgres: ["16", "18"]
     services:
       postgres:
-        image: ${{ matrix.postgres == '18' && 'quay.io/sclorg/postgresql-18-c9s' || 'public.ecr.aws/docker/library/postgres:16' }}
+        image: ${{ matrix.postgres == '18' && 'quay.io/sclorg/postgresql-18-c9s' || 'quay.io/sclorg/postgresql-16-c9s' }}
         env:
           POSTGRES_USER: lifecycle
           POSTGRES_PASSWORD: lifecycle
@@ -80,7 +80,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'codex/buyer-seller-journey' || github.event.pull_request.head.ref == 'codex/seller-journey-repair' || github.event.pull_request.head.ref == 'codex/global-store-url-lifecycle-repair' || github.event.pull_request.head.ref == 'codex/seller-activation-pending-flow'
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: quay.io/sclorg/postgresql-16-c9s
         env:
           POSTGRES_USER: lifecycle
           POSTGRES_PASSWORD: lifecycle

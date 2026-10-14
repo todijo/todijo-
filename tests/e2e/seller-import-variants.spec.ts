@@ -42,11 +42,11 @@ test.afterAll(async () => {
       await tx.sellerProductImportJob.deleteMany({ where: { businessId } });
       await tx.sellerSubscription.deleteMany({ where: { storeId } });
       await tx.product.deleteMany({ where: { storeId } });
-      await tx.user.updateMany({ where: { id: userId }, data: { primaryStoreId: null } });
-      await tx.sellerBusiness.updateMany({ where: { id: businessId }, data: { primaryStoreId: null, billingStoreId: null } });
-      await tx.store.deleteMany({ where: { id: storeId } });
-      await tx.sellerBusiness.deleteMany({ where: { id: businessId } });
-      await tx.user.deleteMany({ where: { id: { in: [userId, adminId] } } });
+      await tx.user.deleteMany({ where: { id: adminId } });
+      // The import writes immutable SellerBusinessAuditEvent rows linked to this
+      // fixture's business, store, and actor. Keep those roots intact; this test
+      // is guarded to run only against the disposable browser database, which is
+      // discarded with the CI job. UUID-scoped records cannot affect other tests.
     });
   } finally {
     await db.$disconnect();
@@ -101,7 +101,10 @@ test("seller CSV preview and draft import persist four parent products and ten e
 
   const products = await db.product.findMany({
     where: { storeId, name: { in: ["T-shirt coton test", "Sac à dos test", "Carnet A5 test", "Coussin décoratif test"] } },
-    include: { variants: { include: { values: { include: { optionValue: true } } } } },
+    include: {
+      options: { orderBy: { position: "asc" }, include: { values: true } },
+      variants: { include: { values: { include: { optionValue: true } } } },
+    },
     orderBy: { name: "asc" },
   });
   expect(products).toHaveLength(4);
@@ -121,8 +124,16 @@ test("seller CSV preview and draft import persist four parent products and ten e
     expect(Number(record!.variant.priceOverride ?? record!.product.price)).toBe(price);
     expect(record!.variant.stock).toBe(stock);
     expect(record!.product.category).toBe(category);
-    expect(record!.variant.values.map(value => value.optionValue.value)).toContain(color);
-    expect(record!.variant.values.map(value => value.optionValue.value)).toContain(size);
+    const attributes = record!.product.attributes as { color?: string; size?: string; variantAttributes?: Array<{ sku: string | null; values: Record<string, string> }> };
+    for (const [field, value] of [["color", color], ["size", size]] as const) {
+      const option = record!.product.options.find(candidate => candidate.name.toLocaleLowerCase() === field);
+      if (option) {
+        expect(record!.variant.values.some(entry => entry.optionValue.optionId === option.id && entry.optionValue.value === value), `${sku} ${field} option value`).toBeTruthy();
+      } else {
+        expect(attributes[field], `${sku} constant parent ${field}`).toBe(value);
+      }
+      expect(attributes.variantAttributes?.find(entry => entry.sku === sku)?.values[field], `${sku} source ${field}`).toBe(value);
+    }
   }
   let job = await db.sellerProductImportJob.findFirst({ where: { storeId, createdById: userId }, orderBy: { createdAt: "desc" }, include: { items: true } });
   expect(job?.status).toBe("COMPLETED");
