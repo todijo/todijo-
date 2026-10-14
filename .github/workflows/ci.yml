@@ -129,11 +129,14 @@ jobs:
       TODIJO_CI_DISPOSABLE_DATABASE: "1"
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: quay.io/sclorg/postgresql-16-c9s
         env:
           POSTGRES_USER: e2e
           POSTGRES_PASSWORD: e2e
           POSTGRES_DB: todijo_e2e
+          POSTGRESQL_USER: e2e
+          POSTGRESQL_PASSWORD: e2e
+          POSTGRESQL_DATABASE: todijo_e2e
         ports:
           - 5432:5432
         options: >-
