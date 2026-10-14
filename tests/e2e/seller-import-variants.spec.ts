@@ -68,7 +68,7 @@ test("seller CSV preview and draft import persist four parent products and ten e
   await expect(page.getByRole("heading", { level: 1, name: "Import your products" })).toBeVisible();
 
   async function previewAndCategorize() {
-    await page.getByLabel("Catalog file").setInputFiles(fixturePath);
+    await page.locator('input[type="file"]').setInputFiles(fixturePath);
     await page.getByRole("button", { name: "Review file" }).click();
     await expect(page.getByText("Source rows: 10")).toBeVisible();
     await expect(page.getByText("Parent products: 4")).toBeVisible();
