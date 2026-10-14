@@ -54,10 +54,10 @@ function isReady(row: Record<string, string>, mapping: SellerImportMapping, cate
   return true;
 }
 
-function rowGroupingCandidates(rows: Array<Record<string, string>>, mapping: SellerImportMapping) {
+function rowGroupingCandidates(rows: Array<Record<string, string>>, mapping: SellerImportMapping, excludedRows: Set<number>) {
   const byTitle = new Map<string, number[]>();
   rows.forEach((row, index) => {
-    if (mappedValue(row, mapping, "parentProductId")) return;
+    if (mappedValue(row, mapping, "parentProductId") || excludedRows.has(index + 2)) return;
     const title = (mappedValue(row, mapping, "parentTitle") || mappedValue(row, mapping, "title")).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
     if (!title) return;
     const rowNumbers = byTitle.get(title) ?? [];
@@ -80,8 +80,22 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   const copy = feedbackCopy(locale);
   const importCopy = labels.importWorkflow;
   const grouped = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, mapping) : [], [parsed, mapping]);
-  const candidates = useMemo(() => parsed ? rowGroupingCandidates(parsed.rows, mapping) : [], [parsed, mapping]);
+  const automaticGroups = useMemo(() => parsed ? groupSellerImportRows(parsed.rows, { ...mapping, separatedRowGroups: undefined }).filter(group => group.rows.length > 1 && (group.key.startsWith("auto:") || group.key.startsWith("parent:"))) : [], [parsed, mapping]);
+  const autoGroupedRows = useMemo(() => new Set(automaticGroups.flatMap(group => group.rowNumbers)), [automaticGroups]);
+  const candidates = useMemo(() => parsed ? rowGroupingCandidates(parsed.rows, mapping, autoGroupedRows) : [], [parsed, mapping, autoGroupedRows]);
+  const duplicateSkuRows = useMemo(() => {
+    if (!parsed) return new Set<number>();
+    const rowBySku = new Map<string, number[]>();
+    parsed.rows.forEach((row, index) => {
+      const sku = mappedValue(row, mapping, "variantSku") || mappedValue(row, mapping, "sku");
+      if (!sku) return;
+      const key = sku.trim().toLocaleLowerCase();
+      rowBySku.set(key, [...(rowBySku.get(key) ?? []), index + 2]);
+    });
+    return new Set([...rowBySku.values()].filter(numbers => numbers.length > 1).flat());
+  }, [parsed, mapping]);
   const validCount = useMemo(() => grouped.filter(group => {
+    if (group.rowNumbers.some(rowNumber => duplicateSkuRows.has(rowNumber))) return false;
     const rowSelections = group.rows.map((row, index) => rowCategories[String(group.rowNumbers[index])] || (() => {
       const suggestion = categorySuggestions[group.rowNumbers[index]] ?? categorySuggestionForRow(row, mapping);
       return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? "";
@@ -92,14 +106,14 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
       if (!hasCompleteSellerImportVariantRows(group.rows, mapping)) return false;
     }
     return true;
-  }).length, [grouped, mapping, rowCategories, groupCategories, categorySuggestions]);
+  }).length, [grouped, mapping, rowCategories, groupCategories, categorySuggestions, duplicateSkuRows]);
   const variantCount = grouped.reduce((sum, group) => {
     if (group.rows.length > 1) return sum + group.rows.length;
     const raw = mappedValue(group.rows[0], mapping, "variants");
     try { return sum + (raw ? (JSON.parse(raw) as { variants?: unknown[] }).variants?.length ?? 0 : 0); } catch { return sum; }
   }, 0);
   function setField(key: SellerImportField, column: string) {
-    const next: SellerImportMapping = { ...mapping, confirmedRowGroups: undefined };
+    const next: SellerImportMapping = { ...mapping, confirmedRowGroups: undefined, separatedRowGroups: undefined };
     if (column) next[key] = column; else delete next[key];
     setMapping(next);
     if (["title", "parentTitle", "description", "brand", "attributes", "category"].includes(key) && parsed) {
@@ -111,11 +125,19 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   function setCandidateGroup(groupKey: string, rowNumbers: number[], checked: boolean) {
     setMapping(current => {
       const confirmedRowGroups = { ...(current.confirmedRowGroups ?? {}) };
+      const separatedRowGroups = { ...(current.separatedRowGroups ?? {}) };
       for (const rowNumber of rowNumbers) {
-        if (checked) confirmedRowGroups[String(rowNumber)] = groupKey;
-        else if (confirmedRowGroups[String(rowNumber)] === groupKey) delete confirmedRowGroups[String(rowNumber)];
+        if (checked) { confirmedRowGroups[String(rowNumber)] = groupKey; delete separatedRowGroups[String(rowNumber)]; }
+        else { if (confirmedRowGroups[String(rowNumber)] === groupKey) delete confirmedRowGroups[String(rowNumber)]; separatedRowGroups[String(rowNumber)] = true; }
       }
-      return { ...current, confirmedRowGroups };
+      return { ...current, confirmedRowGroups, separatedRowGroups };
+    });
+  }
+  function setAutomaticGroupSeparated(rowNumbers: number[], separated: boolean) {
+    setMapping(current => {
+      const separatedRowGroups = { ...(current.separatedRowGroups ?? {}) };
+      rowNumbers.forEach(rowNumber => { if (separated) separatedRowGroups[String(rowNumber)] = true; else delete separatedRowGroups[String(rowNumber)]; });
+      return { ...current, separatedRowGroups };
     });
   }
   function categoryForRow(row: Record<string, string>, rowNumber: number) {
@@ -131,6 +153,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   }
   function rowErrorLabel(rowNumber: number, row: Record<string, string>) {
     const result = rowResults[rowNumber];
+    if (duplicateSkuRows.has(rowNumber)) return importCopy.duplicateSku;
     if (result?.errorCode === "IMPORT_ROW_DUPLICATE_SKU") return importCopy.duplicateSku;
     if (result?.errorCode === "IMPORT_ROW_CURRENCY_MISMATCH") return importCopy.currencyMismatch;
     if (result?.errorCode === "IMPORT_ROW_CATEGORY_REQUIRED") return importCopy.categoryMissing;
@@ -220,6 +243,9 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
         </div>
       </details>
       <label>{importCopy.duplicateHeading}<select value={mapping.duplicatePolicy ?? "SKIP_EXISTING"} onChange={event => setMapping(current => ({ ...current, duplicatePolicy: event.target.value as SellerImportMapping["duplicatePolicy"] }))}><option value="SKIP_EXISTING">{importCopy.skipExisting}</option><option value="UPDATE_EXISTING">{importCopy.updateExisting}</option><option value="NEW_ONLY">{importCopy.newOnly}</option></select></label>
+      {automaticGroups.length > 0 && <p role="status">{importCopy.autoGrouped}</p>}
+      {candidates.length > 0 && <p role="status">{importCopy.ambiguousGroup}</p>}
+      {automaticGroups.map(group => <label key={`automatic-${group.key}`} className="sellerExternalImportGrouping"><input type="checkbox" checked={group.rowNumbers.every(rowNumber => mapping.separatedRowGroups?.[String(rowNumber)])} onChange={event => setAutomaticGroupSeparated(group.rowNumbers, event.target.checked)}/>{importCopy.keepSeparate} — {mappedValue(group.rows[0], mapping, "parentTitle") || mappedValue(group.rows[0], mapping, "title")}</label>)}
       {candidates.map(candidate => {
         const checked = candidate.rowNumbers.every(rowNumber => mapping.confirmedRowGroups?.[String(rowNumber)] === candidate.key);
         return <label key={candidate.key} className="sellerExternalImportGrouping"><input type="checkbox" checked={checked} onChange={event => setCandidateGroup(candidate.key, candidate.rowNumbers, event.target.checked)}/>{importCopy.groupRows} — {candidate.title}</label>;
@@ -228,8 +254,8 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
       {summary && <p role="status">{summary}</p>}
       <div className="sellerExternalImportRows">{grouped.map(group => {
         const selectedCategory = categoryForGroup(group);
-        return <article key={group.key} className="sellerExternalImportProductGroup">
-          <h3>{importCopy.parentProducts}: {group.rows[0]?.[mapping.parentTitle ?? ""] || group.rows[0]?.[mapping.title ?? ""] || parsed.headers[0]}</h3>
+        return <article key={group.key} className="sellerExternalImportProductGroup"><details>
+          <summary>{importCopy.parentProducts}: {group.rows[0]?.[mapping.parentTitle ?? ""] || group.rows[0]?.[mapping.title ?? ""] || parsed.headers[0]} ({group.rows.length} {importCopy.variants})</summary>
           <div className="sellerExternalImportCategory"><span>{importCopy.suggestedCategory}</span><SellerImportCategoryPicker id={`seller-import-category-${group.rowNumbers[0]}`} value={selectedCategory} onChange={value => { setGroupCategories(current => { const next = { ...current }; if (value) next[group.key] = value; else delete next[group.key]; return next; }); setRowCategories(current => { const next = { ...current }; for (const rowNumber of group.rowNumbers) { if (value) next[String(rowNumber)] = value; else delete next[String(rowNumber)]; } return next; }); }} locale={locale} labels={labels.categoryPicker}/></div>
           <ul>{group.rows.map((row, index) => {
             const rowNumber = group.rowNumbers[index];
@@ -240,7 +266,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
             const result = rowResults[rowNumber];
             return <li key={rowNumber}><strong>{group.rows.length > 1 ? `${importCopy.variants} ${index + 1}` : `${rowNumber}. ${mappedValue(row, mapping, "title") || row[parsed.headers[0]]}`}</strong>{variation && <span>{variation}</span>}{sku && <span>{fieldLabels.sku ?? "SKU"}: {sku}</span>}<span>{price} {storeCurrency}</span><span aria-label={labels.preview}>{result?.status === "IMPORTED" ? "✓" : result?.status === "SKIPPED" ? "—" : isValid ? "✓" : "—"}</span>{rowErrorLabel(rowNumber, row) && <p role="alert">{rowErrorLabel(rowNumber, row)}</p>}</li>;
           })}</ul>
-        </article>;
+        </details></article>;
       })}</div>
       <button type="button" className="sellerControlButton primary" disabled={busy || validCount === 0 || !idempotencyKey} onClick={() => void importDrafts()}>{busy ? "…" : labels.importDrafts}</button>
     </section>}

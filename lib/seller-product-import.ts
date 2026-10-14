@@ -152,7 +152,7 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
   }
   if (optionSpecs.length > 3) throw new SellerImportRowError("IMPORT_ROW_VARIANTS_INVALID");
 
-  const hasExplicitGrouping = Boolean(group.parentIdentifier || group.key.startsWith("confirmed:"));
+  const hasExplicitGrouping = Boolean(group.parentIdentifier || group.key.startsWith("confirmed:") || group.key.startsWith("auto:"));
   const hasVariantDimensions = optionSpecs.length > 0;
   let variants: ProductVariantsInput | undefined;
   let variantImages: unknown[] = [];
@@ -174,6 +174,8 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
         stock: Number(stockValues[index]), active: true,
       })),
     };
+    const variantSkus = variants.variants?.map(variant => typeof variant.sku === "string" ? variant.sku.trim().toLocaleLowerCase() : "").filter(Boolean) ?? [];
+    if (new Set(variantSkus).size !== variantSkus.length) throw new SellerImportRowError("IMPORT_ROW_DUPLICATE_SKU");
     if (optionSpecs.length) {
       const first = optionSpecs[0];
       const imageMap = new Map<string, Set<string>>();
