@@ -28,7 +28,7 @@ test.beforeAll(async () => {
       { id: adminId, firstName: "Fixture", lastName: "Admin", email: `${adminId}@e2e.todijo.test`, role: "ADMIN", emailVerified: true },
     ] });
     await tx.sellerBusiness.create({ data: { id: businessId, ownerId: userId, maxStores: 1 } });
-    await tx.store.create({ data: { id: storeId, businessId, ownerId: userId, name: "Import test store", slug: storeId, country: "FR", city: "Paris", contactEmail: `${userId}@e2e.todijo.test`, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "VERIFIED", onboardingStep: 4 } });
+    await tx.store.create({ data: { id: storeId, businessId, ownerId: userId, name: `Import test store ${suffix}`, slug: storeId, country: "FR", city: "Paris", contactEmail: `${userId}@e2e.todijo.test`, status: "ACTIVE", sellerType: "PRIVATE", onboardingStatus: "VERIFIED", onboardingStep: 4 } });
     await tx.sellerBusiness.update({ where: { id: businessId }, data: { primaryStoreId: storeId, billingStoreId: storeId } });
     await tx.user.update({ where: { id: userId }, data: { primaryStoreId: storeId } });
     await tx.sellerSubscription.create({ data: { id: `seller-import-sub-${suffix}`, storeId, stripeSubscriptionId: `sub_e2e_import_${suffix}`, stripePriceId: "price_test_pro_monthly", plan: "pro", billingInterval: "monthly", status: "ACTIVE", currentPeriodStart: new Date(Date.now() - 86_400_000), currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000) } });
@@ -37,10 +37,16 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   try {
-    await db.sellerProductImportJob.deleteMany({ where: { businessId } });
-    await db.store.deleteMany({ where: { id: storeId } });
-    await db.sellerBusiness.deleteMany({ where: { id: businessId } });
-    await db.user.deleteMany({ where: { id: { in: [userId, adminId] } } });
+    await db.$transaction(async tx => {
+      await tx.sellerProductImportJob.deleteMany({ where: { businessId } });
+      await tx.sellerSubscription.deleteMany({ where: { storeId } });
+      await tx.product.deleteMany({ where: { storeId } });
+      await tx.user.updateMany({ where: { id: userId }, data: { primaryStoreId: null } });
+      await tx.sellerBusiness.updateMany({ where: { id: businessId }, data: { primaryStoreId: null, billingStoreId: null } });
+      await tx.store.deleteMany({ where: { id: storeId } });
+      await tx.sellerBusiness.deleteMany({ where: { id: businessId } });
+      await tx.user.deleteMany({ where: { id: { in: [userId, adminId] } } });
+    });
   } finally {
     await db.$disconnect();
   }
@@ -59,7 +65,7 @@ test("seller CSV preview and draft import persist four parent products and ten e
   ];
 
   await page.goto(`/en/seller/products/import?store=${storeId}`);
-  await expect(page.getByRole("heading", { level: 1, name: "PRO product import" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Import your products" })).toBeVisible();
 
   async function previewAndCategorize() {
     await page.getByLabel("Catalog file").setInputFiles(fixturePath);
