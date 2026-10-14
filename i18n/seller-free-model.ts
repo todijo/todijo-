@@ -51,5 +51,14 @@ const variantGroupingCopy = {
   tr: { autoGrouped: "Eşleşen ürün bilgileri ve farklı varyant değerlerine göre otomatik gruplandı.", ambiguousGroup: "Olası varyant grubu. Yalnızca bu satırlar aynı ürüne aitse onaylayın.", keepSeparate: "Bu ürünleri ayrı tut." },
   zh: { autoGrouped: "根据匹配的商品详情和不同的变体值自动分组。", ambiguousGroup: "可能是变体组。仅在这些行属于同一商品时确认。", keepSeparate: "将这些商品分开。" },
 } as const;
+const supplierImportFieldCopy = {
+  en: { supplier: "Supplier", barcode: "Barcode" }, fr: { supplier: "Fournisseur", barcode: "Code-barres" },
+  ar: { supplier: "المورّد", barcode: "الرمز الشريطي" }, ku: { supplier: "دابینکەر", barcode: "بارکۆد" },
+  tr: { supplier: "Tedarikçi", barcode: "Barkod" }, de: { supplier: "Lieferant", barcode: "Barcode" },
+  es: { supplier: "Proveedor", barcode: "Código de barras" }, it: { supplier: "Fornitore", barcode: "Codice a barre" },
+  nl: { supplier: "Leverancier", barcode: "Barcode" }, zh: { supplier: "供应商", barcode: "条形码" },
+  fa: { supplier: "تأمین‌کننده", barcode: "بارکد" }, hi: { supplier: "आपूर्तिकर्ता", barcode: "बारकोड" },
+  pt: { supplier: "Fornecedor", barcode: "Código de barras" }, ru: { supplier: "Поставщик", barcode: "Штрихкод" },
+} as const;
 /** New copy uses the established English fallback for locales not yet translated. */
-export function sellerFreeModelCopy(locale: string) { const language = locale as keyof typeof importWorkflowCopy & keyof typeof variantGroupingCopy; return { ...(locale === "fr" ? fr : en), importWorkflow: { ...(importWorkflowCopy[language] ?? importWorkflowCopy.en), ...(variantGroupingCopy[language] ?? variantGroupingCopy.en) } }; }
+export function sellerFreeModelCopy(locale: string) { const language = locale as keyof typeof importWorkflowCopy & keyof typeof variantGroupingCopy & keyof typeof supplierImportFieldCopy; return { ...(locale === "fr" ? fr : en), importWorkflow: { ...(importWorkflowCopy[language] ?? importWorkflowCopy.en), ...(variantGroupingCopy[language] ?? variantGroupingCopy.en), ...(supplierImportFieldCopy[language] ?? supplierImportFieldCopy.en) } }; }

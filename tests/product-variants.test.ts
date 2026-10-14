@@ -140,14 +140,27 @@ test("supplier imports persist only explicitly supplied variant combinations", a
   assert.equal(combinations.some(key => key.includes("value_Black") && key.includes("value_S")), false);
 });
 
-test("supplier update preserves a variant compare-at price when the import has no compare-at column", async () => {
+test("supplier update preserves existing barcode and compare-at price when absent, and updates barcode when supplied", async () => {
   let updateData: Record<string, unknown> | null = null;
   const tx = {
-    product: { findUnique: async () => ({ id: "product_a", price: new Prisma.Decimal("10.00"), options: [{ id: "option_color", name: "Color", values: [{ id: "value_blue", value: "Blue", active: true }] }], variants: [{ id: "variant_a", combinationKey: "value_blue", priceOverride: null, compareAtPrice: new Prisma.Decimal("15.00"), stock: 4, sku: "SKU-BLUE" }] }) },
+    product: { findUnique: async () => ({ id: "product_a", price: new Prisma.Decimal("10.00"), options: [{ id: "option_color", name: "Color", values: [{ id: "value_blue", value: "Blue", active: true }] }], variants: [{ id: "variant_a", combinationKey: "value_blue", priceOverride: null, compareAtPrice: new Prisma.Decimal("15.00"), barcode: "1234567890123", stock: 4, sku: "SKU-BLUE" }] }) },
     productVariant: { update: async ({ data }: { data: Record<string, unknown> }) => { updateData = data; } },
   };
   await upsertProductVariantsExact(tx as never, "product_a", { options: [{ name: "Color", values: [{ value: "Blue" }] }], generate: false, variants: [{ combinationKey: "Blue", priceOverride: null, stock: 6 }] });
   assert.deepEqual(updateData, { priceOverride: null, stock: 6 });
+  await upsertProductVariantsExact(tx as never, "product_a", { options: [{ name: "Color", values: [{ value: "Blue" }] }], generate: false, variants: [{ combinationKey: "Blue", barcode: "9876543210123", priceOverride: null, stock: 6 }] });
+  assert.deepEqual(updateData, { barcode: "9876543210123", priceOverride: null, stock: 6 });
+});
+
+test("supplier import persists barcode on newly created exact variants", async () => {
+  const createdData: Array<Record<string, unknown>> = [];
+  const tx = {
+    product: { findUnique: async () => ({ id: "product_a", price: new Prisma.Decimal("10.00"), options: [{ id: "option_color", name: "Color", values: [{ id: "value_blue", value: "Blue", active: true }] }], variants: [] }) },
+    productVariant: { create: async ({ data }: { data: Record<string, unknown> }) => { createdData.push(data); return { id: "variant_a" }; } },
+  };
+  await upsertProductVariantsExact(tx as never, "product_a", { options: [{ name: "Color", values: [{ value: "Blue" }] }], generate: false, variants: [{ combinationKey: "Blue", sku: "SKU-BLUE", barcode: "1234567890123", priceOverride: null, stock: 6 }] });
+  assert.equal(createdData[0]?.barcode, "1234567890123");
+  assert.equal(createdData[0]?.sku, "SKU-BLUE");
 });
 
 test("invalid create-variant input is rejected before a product transaction starts", async () => {

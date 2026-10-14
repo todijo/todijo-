@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { parseSellerProductImport, parseSellerProductImportMultipart, readBoundedSellerImportBody, SellerImportParseError, SELLER_IMPORT_MAX_REQUEST_BYTES } from "../lib/seller-product-import-parser";
 import { readFileSync } from "node:fs";
-import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSellerImportCategory, suggestSellerImportMapping } from "../lib/seller-product-import-workflow";
+import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, hasSellerImportCategoryConflict, suggestSellerImportCategory, suggestSellerImportMapping } from "../lib/seller-product-import-workflow";
 import { prepareSellerImportGroup, SellerImportRowError } from "../lib/seller-product-import";
 import { locales } from "../i18n/config";
 import { sellerFreeModelCopy } from "../i18n/seller-free-model";
@@ -44,6 +44,25 @@ test("XLSX reader accepts a bounded first worksheet and rejects invalid archives
   const parsed = parseSellerProductImport("catalog.xlsx", xlsxFixture());
   assert.deepEqual(parsed.headers, ["title", "price"]); assert.equal(parsed.rows[0].title, "Sample item"); assert.equal(parsed.rows[0].price, "12.50");
   assert.throws(() => parseSellerProductImport("catalog.xlsx", Buffer.from("not a zip")), (error: unknown) => error instanceof SellerImportParseError && error.code === "IMPORT_FILE_INVALID");
+});
+
+test("CSV, XLSX, XML, and JSON use the same supplier variant grouping semantics", () => {
+  const headers = ["title", "description", "category", "supplier", "color", "size", "sku", "price", "stock"];
+  const data = [
+    ["Travel mug", "Insulated travel mug product", "home--kitchen--vaisselle", "Maker One", "Blue", "350 ml", "MUG-BLUE", "8.50", "3"],
+    ["Travel mug", "Insulated travel mug product", "home--kitchen--vaisselle", "Maker One", "Red", "500 ml", "MUG-RED", "9.50", "5"],
+  ];
+  const inputs = [
+    ["catalog.csv", Buffer.from([headers.join(","), ...data.map(row => row.join(","))].join("\n"))],
+    ["catalog.xlsx", xlsxFixture(headers, data)],
+    ["catalog.xml", Buffer.from(`<catalog>${data.map(row => `<product>${headers.map((header, index) => `<${header}>${row[index]}</${header}>`).join("")}</product>`).join("")}</catalog>`)],
+    ["catalog.json", Buffer.from(JSON.stringify({ products: data.map(row => Object.fromEntries(headers.map((header, index) => [header, row[index]]))) }))],
+  ] as const;
+  for (const [filename, bytes] of inputs) {
+    const parsed = parseSellerProductImport(filename, bytes);
+    const groups = groupSellerImportRows(parsed.rows, suggestSellerImportMapping(parsed.headers));
+    assert.deepEqual(groups.map(group => group.rows.length), [2], `${filename} groups the same two source variants`);
+  }
 });
 
 test("JSON/XML imports reject rows beyond the cap and normalize duplicate columns safely", () => {
@@ -226,6 +245,11 @@ test("seller import approved copy is translated with matching keys in every supp
   assert.equal(french.groupRows, "Regrouper ces lignes comme un seul produit à variantes.");
   assert.equal(english.parentTitle, "Parent product title");
   assert.equal(french.parentTitle, "Titre du produit parent");
+  for (const locale of locales) {
+    const copy = sellerFreeModelCopy(locale).importWorkflow;
+    assert.ok(copy.supplier, `${locale} supplier mapping label`);
+    assert.ok(copy.barcode, `${locale} barcode mapping label`);
+  }
 });
 
 test("seller category suggestions use canonical leaf IDs, localized category paths and safe confidence", () => {
@@ -288,6 +312,131 @@ test("ten-row example prepares four categorized parent products with exact varia
     assert.equal(prepared.variants?.variants?.length, assertion.variants.length);
     assert.deepEqual(prepared.variants?.variants?.map(variant => [variant.sku, variant.priceOverride ?? prepared.price, variant.stock]), assertion.variants);
   }
+});
+
+test("owner-provided todijo_test_catalog.csv automatically groups its exact ten rows and preserves source variant data", () => {
+  const sample = parseSellerProductImport("todijo_test_catalog.csv", readFileSync("tests/fixtures/todijo_test_catalog.csv"));
+  const mapping = suggestSellerImportMapping(sample.headers);
+  const groups = groupSellerImportRows(sample.rows, mapping);
+  assert.deepEqual(sample.headers, ["sku", "title", "category", "description", "color", "size", "price", "stock", "weight_kg", "currency", "condition", "image_url", "video_url", "length_cm", "width_cm", "height_cm", "status", "supplier"]);
+  assert.deepEqual(groups.map(group => group.rows.length), [4, 2, 2, 2]);
+  assert.equal(countSellerImportVariants(groups, mapping), 10);
+  assert.ok(groups.every(group => group.key.startsWith("auto:")));
+  assert.equal(findSellerImportGroupingCandidates(sample.rows, mapping).length, 0, "reliable families do not need a confirmation checkbox");
+
+  const chosenCategories = ["men--tshirts--solide", "kids--shoes--sacs-d-ecole", "home--storage--papeterie", "home--textiles--oreillers"];
+  const prepared = groups.map((group, index) => prepareSellerImportGroup(group.rows.map((sourceRow, itemIndex) => ({ sourceRow, rowNumber: group.rowNumbers[itemIndex] })) as never, { ...mapping, groupCategories: { [group.key]: chosenCategories[index] } }, "EUR", group.key));
+  assert.deepEqual(prepared.map(product => product.title), ["T-shirt coton test", "Sac à dos test", "Carnet A5 test", "Coussin décoratif test"]);
+  assert.deepEqual(prepared.map(product => product.category), chosenCategories);
+  assert.deepEqual(prepared.flatMap(product => product.variants?.variants?.map(variant => [variant.sku, Number(variant.priceOverride ?? product.price), variant.stock]) ?? []), sample.rows.map(row => [row.sku, Number(row.price), Number(row.stock)]));
+  assert.deepEqual(prepared[0].variants?.options.map(option => option.name), ["color", "size"]);
+  assert.deepEqual(prepared[0].variants?.variants?.map(variant => variant.barcode), [undefined, undefined, undefined, undefined]);
+  assert.equal((prepared[0].attributes as { supplierIdentity: string }).supplierIdentity, "TEST ONLY - NO REAL SUPPLIER");
+  assert.deepEqual((prepared[0].attributes as { sourceRows: Array<Record<string, string>> }).sourceRows.map(row => [row.weight_kg, row.length_cm, row.width_cm, row.height_cm, row.status]), sample.rows.slice(0, 4).map(row => [row.weight_kg, row.length_cm, row.width_cm, row.height_cm, row.status]));
+});
+
+test("generalized automatic grouping imports 25 color/size and 36 material/color/size variants without a small-family cap", () => {
+  const makeRows = (title: string, colors: string[], sizes: string[], materials: string[] = []) => {
+    const rows: Array<Record<string, string>> = [];
+    for (const material of materials.length ? materials : [""]) for (const color of colors) for (const size of sizes) rows.push({ title, description: `General-purpose catalog item ${title}`, brand: "Example Maker", supplier: "Supplier North", category: "home--storage--boxes", color, size, material, sku: `${title.replace(/\W/g, "")}-${material}-${color}-${size}`, barcode: `EAN-${rows.length + 1}`, price: String(10 + rows.length / 100), stock: String(rows.length + 1) });
+    return rows;
+  };
+  const mapping = suggestSellerImportMapping(["title", "description", "brand", "supplier", "category", "color", "size", "material", "sku", "barcode", "price", "stock"]);
+  for (const [rows, expectedCount] of [[makeRows("Travel Case", ["C1", "C2", "C3", "C4", "C5"], ["XS", "S", "M", "L", "XL"]), 25], [makeRows("Storage Basket", ["C1", "C2", "C3", "C4"], ["S", "M", "L"], ["Cotton", "Jute", "Wool"]), 36]] as const) {
+    rows.forEach(row => { row.category = "men--tshirts--solide"; });
+    const groups = groupSellerImportRows(rows, mapping);
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0].rows.length, expectedCount);
+    const prepared = prepareSellerImportGroup(groups[0].rows.map((sourceRow, index) => ({ sourceRow, rowNumber: groups[0].rowNumbers[index] })) as never, { ...mapping, groupCategories: { [groups[0].key]: "men--tshirts--solide" } }, "EUR", groups[0].key);
+    assert.equal(prepared.variants?.variants?.length, expectedCount);
+    assert.equal(prepared.variants?.options.length, expectedCount === 25 ? 2 : 3);
+    assert.equal(new Set(prepared.variants?.variants?.map(variant => variant.sku)).size, expectedCount);
+    assert.equal(new Set(prepared.variants?.variants?.map(variant => variant.barcode)).size, expectedCount);
+  }
+  const largeFamily = makeRows("Large Color Range", ["C1", "C2", "C3", "C4", "C5"], Array.from({ length: 11 }, (_, index) => `Size ${index + 1}`));
+  const largeGroup = groupSellerImportRows(largeFamily, mapping)[0];
+  assert.equal(largeFamily.length, 55);
+  assert.equal(largeGroup.rows.length, 55);
+  assert.equal(prepareSellerImportGroup(largeGroup.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, { ...mapping, groupCategories: { [largeGroup.key]: "men--tshirts--solide" } }, "EUR", largeGroup.key).variants?.variants?.length, 55);
+});
+
+test("sparse variants and supplier/category identity remain separate without inventing combinations", () => {
+  const rows = [
+    { title: "Model X-100", description: "A distinct storage model", supplier: "Vendor-A", category: "home--storage--boxes", brand: "Maker", color: "Blue", size: "Small", sku: "OVERLAP-1", price: "12", stock: "2" },
+    { title: "Model X-100", description: "A distinct storage model", supplier: "Vendor-A", category: "home--storage--boxes", brand: "Maker", color: "Red", size: "Large", sku: "OVERLAP-2", price: "13", stock: "3" },
+    { title: "Model X100", description: "A distinct storage model", supplier: "Vendor-A", category: "home--storage--boxes", brand: "Maker", color: "Blue", size: "Large", sku: "OVERLAP-3", price: "14", stock: "4" },
+    { title: "Model X-100", description: "A distinct storage model", supplier: "Vendor-B", category: "home--storage--boxes", brand: "Maker", color: "Green", size: "Medium", sku: "OVERLAP-1", price: "15", stock: "5" },
+    { title: "Model X-100", description: "A distinct storage model", supplier: "Vendor-A", category: "kids--toys--puzzles", brand: "Maker", color: "Blue", size: "Medium", sku: "OVERLAP-4", price: "16", stock: "6" },
+  ];
+  const mapping = { title: "title", description: "description", supplier: "supplier", category: "category", brand: "brand", color: "color", size: "size", sku: "sku", price: "price", stock: "stock" };
+  const groups = groupSellerImportRows(rows, mapping);
+  assert.deepEqual(groups.map(group => group.rows.length), [2, 1, 1, 1]);
+  assert.equal(groups.flatMap(group => group.rows).length, rows.length);
+  assert.equal(hasSellerImportCategoryConflict([rows[0], rows[4]], mapping), true);
+  assert.equal(hasSellerImportCategoryConflict([rows[0], rows[1]], mapping), false);
+  assert.equal(findSellerImportGroupingCandidates(rows, mapping).length, 0);
+
+  const explicitParentRows = [
+    { parent_id: "FAMILY-1", title: "Same family", description: "Same product family", supplier: "Vendor-A", color: "Blue", size: "S", sku: "A-1" },
+    { parent_id: "FAMILY-1", title: "Same family", description: "Same product family", supplier: "Vendor-B", color: "Red", size: "M", sku: "B-1" },
+  ];
+  assert.equal(groupSellerImportRows(explicitParentRows, { parentProductId: "parent_id", title: "title", description: "description", supplier: "supplier", color: "color", size: "size", sku: "sku" }).length, 2, "same parent identifiers from different suppliers remain isolated");
+
+  const overlappingSupplierSkus = [
+    { title: "Everyday bottle", description: "Stainless insulated bottle", category: "home--kitchen--vaisselle", supplier: "Supplier A", color: "Blue", size: "500 ml", sku: "MODEL-BLUE", price: "10", stock: "3" },
+    { title: "Everyday bottle", description: "Stainless insulated bottle", category: "home--kitchen--vaisselle", supplier: "Supplier A", color: "Red", size: "500 ml", sku: "MODEL-RED", price: "10", stock: "3" },
+    { title: "Everyday bottle", description: "Stainless insulated bottle", category: "home--kitchen--vaisselle", supplier: "Supplier B", color: "Blue", size: "500 ml", sku: "MODEL-BLUE", price: "12", stock: "8" },
+    { title: "Everyday bottle", description: "Stainless insulated bottle", category: "home--kitchen--vaisselle", supplier: "Supplier B", color: "Red", size: "500 ml", sku: "MODEL-RED", price: "12", stock: "8" },
+  ];
+  const supplierMapping = { title: "title", description: "description", category: "category", supplier: "supplier", color: "color", size: "size", sku: "sku", price: "price", stock: "stock" };
+  const supplierGroups = groupSellerImportRows(overlappingSupplierSkus, supplierMapping);
+  assert.deepEqual(supplierGroups.map(group => group.rows.length), [2, 2], "overlapping supplier SKUs do not merge different supplier families");
+});
+
+test("incomplete supplier variant evidence requests confirmation; duplicate SKUs and category conflicts cannot be silently persisted", () => {
+  const incompleteRows = [
+    { title: "Generic container", description: "A useful container model", category: "home--textiles--oreillers", color: "Blue", size: "Small", price: "10", stock: "2" },
+    { title: "Generic container", description: "A useful container model", category: "home--textiles--oreillers", color: "Red", size: "Large", price: "11", stock: "3" },
+  ];
+  const mapping = { title: "title", description: "description", category: "category", color: "color", size: "size", sku: "sku", price: "price", stock: "stock" };
+  const candidate = findSellerImportGroupingCandidates(incompleteRows, mapping)[0];
+  assert.ok(candidate);
+  const confirmed = groupSellerImportRows(incompleteRows, { ...mapping, confirmedRowGroups: { "2": candidate.key, "3": candidate.key } });
+  assert.equal(confirmed.length, 1);
+  assert.doesNotThrow(() => prepareSellerImportGroup(confirmed[0].rows.map((sourceRow, index) => ({ sourceRow, rowNumber: confirmed[0].rowNumbers[index] })) as never, { ...mapping, confirmedRowGroups: { "2": candidate.key, "3": candidate.key }, groupCategories: { [confirmed[0].key]: "home--textiles--oreillers" } }, "EUR", confirmed[0].key));
+
+  const duplicateRows = incompleteRows.map((row, index) => ({ ...row, sku: index ? "DUP" : "DUP" }));
+  assert.equal(groupSellerImportRows(duplicateRows, mapping).length, 2);
+  assert.equal(findSellerImportGroupingCandidates(duplicateRows, mapping).length, 0, "duplicate SKU data is not presented as a safe confirmation candidate");
+  const forgedDuplicateGroup = groupSellerImportRows(duplicateRows, { ...mapping, confirmedRowGroups: { "2": candidate.key, "3": candidate.key } })[0];
+  assert.throws(() => prepareSellerImportGroup(forgedDuplicateGroup.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: forgedDuplicateGroup.rowNumbers[index] })) as never, { ...mapping, confirmedRowGroups: { "2": candidate.key, "3": candidate.key }, groupCategories: { [forgedDuplicateGroup.key]: "home--textiles--oreillers" } }, "EUR", forgedDuplicateGroup.key), (error: unknown) => error instanceof SellerImportRowError && error.code === "IMPORT_ROW_DUPLICATE_SKU");
+
+  const conflictingRows = [{ ...incompleteRows[0], sku: "SKU-1" }, { ...incompleteRows[1], sku: "SKU-2", category: "kids--toys--puzzles" }];
+  const conflictMapping = { ...mapping, confirmedRowGroups: { "2": candidate.key, "3": candidate.key } };
+  const conflictGroup = groupSellerImportRows(conflictingRows, conflictMapping)[0];
+  assert.equal(hasSellerImportCategoryConflict(conflictGroup.rows, conflictMapping), true);
+  assert.throws(() => prepareSellerImportGroup(conflictGroup.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: conflictGroup.rowNumbers[index] })) as never, { ...conflictMapping, groupCategories: { [conflictGroup.key]: "home--textiles--oreillers" } }, "EUR", conflictGroup.key), (error: unknown) => error instanceof SellerImportRowError && error.code === "IMPORT_ROW_GROUP_FIELDS_MISMATCH");
+});
+
+test("supplier-defined variation attributes and barcode values survive variant preparation", () => {
+  const parsed = parseSellerProductImport("supplier-options.json", Buffer.from(JSON.stringify({ products: [
+    { title: "Travel mug", description: "Insulated travel mug product", supplier: "Maker One", category: "home--kitchen--vaisselle", sku: "MUG-BASIC", barcode: "1111111111111", price: "8.50", stock: 3, attributes: { Capacity: "350 ml", finish: "Matte" } },
+    { title: "Travel mug", description: "Insulated travel mug product", supplier: "Maker One", category: "home--kitchen--vaisselle", sku: "MUG-LARGE", barcode: "2222222222222", price: "9.50", stock: 5, attributes: { Capacity: "500 ml", finish: "Gloss" } },
+  ] })));
+  const mapping = suggestSellerImportMapping(parsed.headers);
+  const group = groupSellerImportRows(parsed.rows, mapping)[0];
+  assert.equal(group.rows.length, 2);
+  const prepared = prepareSellerImportGroup(group.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, { ...mapping, groupCategories: { [group.key]: "home--kitchen--vaisselle" } }, "EUR", group.key);
+  assert.deepEqual(prepared.variants?.options.map(option => option.name), ["Capacity", "finish"]);
+  assert.deepEqual(prepared.variants?.variants?.map(variant => [variant.sku, variant.barcode, variant.stock]), [["MUG-BASIC", "1111111111111", 3], ["MUG-LARGE", "2222222222222", 5]]);
+  assert.deepEqual((prepared.attributes as { variantAttributes: Array<{ values: Record<string, string> }> }).variantAttributes.map(variant => variant.values), [{ Capacity: "350 ml", finish: "Matte" }, { Capacity: "500 ml", finish: "Gloss" }]);
+
+  const single = { title: "Single product", description: "A product with only one catalog row", supplier: "Maker One", category: "home--kitchen--vaisselle", sku: "SINGLE-1", barcode: "3333333333333", price: "7.25", stock: "4" };
+  const singleMapping = suggestSellerImportMapping(Object.keys(single));
+  const singleGroup = groupSellerImportRows([single], singleMapping)[0];
+  const singlePrepared = prepareSellerImportGroup([{ rowNumber: 2, sourceRow: single }] as never, { ...singleMapping, groupCategories: { [singleGroup.key]: "home--kitchen--vaisselle" } }, "EUR", singleGroup.key);
+  assert.equal(singlePrepared.variants, undefined);
+  assert.equal((singlePrepared.attributes as { barcode: string }).barcode, "3333333333333");
 });
 
 test("import preparation preserves exact supplied variants, their price/stock/SKU and category attributes", () => {

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { validateProductImages } from "@/lib/product-images";
-import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
+import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, hasSellerImportCategoryConflict, suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
 import type { SellerImportField, SellerImportMapping } from "@/lib/seller-product-import-workflow";
 import { feedbackCopy } from "@/lib/feedback-copy";
 import { isValidSellerImportCategoryId } from "@/lib/seller-import-category";
@@ -22,6 +22,7 @@ const essentialFields: Array<{ key: SellerImportField; label: string; optional?:
 ];
 const advancedFields: Array<{ key: SellerImportField; label: string }> = [
   { key: "parentTitle", label: "parentTitle" }, { key: "parentProductId", label: "parentProductId" }, { key: "supplierProductId", label: "supplierProductId" },
+  { key: "supplier", label: "supplier" }, { key: "barcode", label: "barcode" },
   { key: "variantPrice", label: "variantPrice" }, { key: "variantStock", label: "variantStock" }, { key: "variantSku", label: "variantSku" }, { key: "brand", label: "brand" },
   { key: "condition", label: "condition" }, { key: "currency", label: "currency" }, { key: "images", label: "images" }, { key: "variantImages", label: "variantImages" },
   { key: "video", label: "video" }, { key: "color", label: "color" }, { key: "size", label: "size" }, { key: "material", label: "material" },
@@ -76,6 +77,7 @@ export default function SellerExternalProductImport({ storeId, storeName, backHr
   }, [parsed, mapping]);
   const validCount = useMemo(() => grouped.filter(group => {
     if (group.rowNumbers.some(rowNumber => duplicateSkuRows.has(rowNumber))) return false;
+    if (group.rows.length > 1 && hasSellerImportCategoryConflict(group.rows, mapping)) return false;
     const rowSelections = group.rows.map((row, index) => rowCategories[String(group.rowNumbers[index])] || (() => {
       const suggestion = categorySuggestions[group.rowNumbers[index]] ?? categorySuggestionForRow(row, mapping);
       return suggestion.confidence >= .85 ? suggestion.canonicalCategoryId ?? "" : suggestion.canonicalMainCategoryId ?? "";

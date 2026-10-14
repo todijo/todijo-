@@ -5,7 +5,7 @@ import { requireStorePublishingAccess, lockSellerProductQuota } from "./seller-s
 import { requireStoreCapability } from "./seller-business-access";
 import { replaceProductVariantImages } from "./product-variant-images";
 import { requireProductCategoryScope } from "./seller-team-product-scope";
-import { groupSellerImportRows, importCell, normalizeSellerImportCategorySource, suggestSellerImportCategory, type SellerImportField, type SellerImportMapping, type SellerImportSourceRow } from "./seller-product-import-workflow";
+import { groupSellerImportRows, hasSellerImportCategoryConflict, importCell, normalizeSellerImportCategorySource, sellerImportParentGroupKey, suggestSellerImportCategory, type SellerImportField, type SellerImportMapping, type SellerImportSourceRow } from "./seller-product-import-workflow";
 export type { SellerImportField, SellerImportMapping } from "./seller-product-import-workflow";
 import { isCanonicalLeafCategoryId } from "./desktop-category-taxonomy";
 import { isValidSellerImportCategoryId } from "./seller-import-category";
@@ -93,6 +93,7 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
   const rows = items.map(item => item.sourceRow as SellerImportSourceRow);
   const group = groupSellerImportRows(rows, mapping, items.map(item => item.rowNumber))[0];
   if (!group) throw new SellerImportRowError("IMPORT_ROW_INVALID");
+  if (rows.length > 1 && hasSellerImportCategoryConflict(rows, mapping)) throw new SellerImportRowError("IMPORT_ROW_GROUP_FIELDS_MISMATCH");
   const firstValue = (field: SellerImportField) => rows.map(row => importCell(row, mapping, field)).find(Boolean) ?? "";
   const title = (firstValue("parentTitle") || firstValue("title")).slice(0, 120);
   const description = firstValue("description").slice(0, 5000);
@@ -170,6 +171,7 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
       variants: rows.map((row, index) => ({
         combinationKey: valuesByRow[index].join("\u001f"),
         sku: importCell(row, mapping, "variantSku") || importCell(row, mapping, "sku") || undefined,
+        barcode: importCell(row, mapping, "barcode") || undefined,
         priceOverride: Number(prices[index]) === basePrice ? null : prices[index],
         stock: Number(stockValues[index]), active: true,
       })),
@@ -214,6 +216,8 @@ export function prepareSellerImportGroup(items: SellerProductImportItem[], mappi
   const sku = importCell(rows[0], mapping, "sku");
   const attributes: Prisma.InputJsonObject = {
     ...productAttributes,
+    ...(importCell(rows[0], mapping, "supplier") ? { supplierIdentity: importCell(rows[0], mapping, "supplier").slice(0, 200) } : {}),
+    ...(rows.length === 1 && importCell(rows[0], mapping, "barcode") ? { barcode: importCell(rows[0], mapping, "barcode").slice(0, 120) } : {}),
     ...(sourceRows.some(row => Object.keys(row).length) ? { sourceRows } : {}),
     ...(conditionInput && !recognizedCondition ? { conditionSource: conditionInput.slice(0, 120) } : {}),
     ...(rows.length > 1 ? { variantAttributes: rows.map((row, index) => ({
@@ -273,7 +277,7 @@ export async function getConfirmedSellerImportCategoryMappings(db: PrismaClient,
       const sourceValue = importCell(row, mapping, "category");
       if (!sourceValue) continue;
       const parent = importCell(row, mapping, "parentProductId");
-      const groupKey = parent ? `parent:${normalizeSellerImportCategorySource(parent)}` : `row:${item.rowNumber}`;
+      const groupKey = parent ? sellerImportParentGroupKey(parent, importCell(row, mapping, "supplier")) : `row:${item.rowNumber}`;
       const canonical = mapping.rowCategories?.[String(item.rowNumber)] ?? mapping.groupCategories?.[groupKey] ?? null;
       if (!canonical || !isCanonicalLeafCategoryId(canonical)) continue;
       const key = normalizeSellerImportCategorySource(sourceValue);
