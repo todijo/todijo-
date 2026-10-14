@@ -52,7 +52,7 @@ test("JSON/XML imports reject rows beyond the cap and normalize duplicate column
   assert.throws(() => parseSellerProductImport("products.xml", Buffer.from(tooManyXml)), (error: unknown) => error instanceof SellerImportParseError && error.code === "IMPORT_TOO_MANY_ROWS");
 });
 
-test("seller import groups only explicit supplier parent IDs and retains all ten rows as four parent products", () => {
+test("seller import automatically groups explicit parent IDs and retains all ten rows as four parent products", () => {
   const rows = [
     ["TSHIRT-1", "Men cotton T-shirt", "Blue", "S"], ["TSHIRT-1", "Men cotton T-shirt", "Blue", "M"], ["TSHIRT-1", "Men cotton T-shirt", "Black", "S"], ["TSHIRT-1", "Men cotton T-shirt", "Black", "M"],
     ["BAG-1", "School backpack", "Blue", "Small"], ["BAG-1", "School backpack", "Black", "Large"],
@@ -66,6 +66,63 @@ test("seller import groups only explicit supplier parent IDs and retains all ten
   assert.equal(groups.reduce((sum, group) => sum + group.rows.length, 0), 10);
   assert.equal(groupSellerImportRows([{ title: "Cotton T-shirt" }, { title: "Cotton T-shirt" }], {}).length, 2);
   assert.equal(groupSellerImportRows([{ parent_product_id: "AB-C" }, { parent_product_id: "A-BC" }], mapping).length, 2);
+});
+
+test("seller import automatically groups reliable families without parent IDs but leaves title-only matches separate", () => {
+  const rows = [
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Acme", color: "Blue", size: "S", sku: "ACME-B-S", price: "10.00", stock: "2", category: "men--tshirts--solide" },
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Acme", color: "Blue", size: "M", sku: "ACME-B-M", price: "11.00", stock: "3", category: "men--tshirts--solide" },
+    { title: "Cotton shirt", description: "Different fabric and cut", brand: "Other", color: "Blue", size: "S", sku: "OTHER-B-S", price: "12.00", stock: "4", category: "men--tshirts--solide" },
+    { title: "Cotton shirt", description: "Different fabric and cut", brand: "Other", color: "Black", size: "S", sku: "OTHER-K-S", price: "13.00", stock: "5", category: "men--tshirts--solide" },
+  ];
+  const mapping = { title: "title", description: "description", brand: "brand", color: "color", size: "size", sku: "sku", price: "price", stock: "stock", category: "category" };
+  const groups = groupSellerImportRows(rows, mapping);
+  assert.deepEqual(groups.map(group => group.rows.length), [2, 2]);
+  assert.ok(groups.every(group => group.key.startsWith("auto:")));
+  const prepared = prepareSellerImportGroup(groups[0].rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, mapping, "EUR", groups[0].key);
+  assert.deepEqual(prepared.variants?.variants?.map(variant => [variant.sku, variant.priceOverride ?? prepared.price, variant.stock]), [["ACME-B-S", "10.00", 2], ["ACME-B-M", "11.00", 3]]);
+  assert.equal(groupSellerImportRows([{ title: "Cotton shirt" }, { title: "Cotton shirt" }], {}).length, 2);
+  const ambiguous = [{ title: "Cotton shirt", color: "Blue", size: "S", sku: "SKU-1" }, { title: "Cotton shirt", color: "Blue", size: "M", sku: "SKU-2" }];
+  assert.equal(groupSellerImportRows(ambiguous, { title: "title", color: "color", size: "size", sku: "sku" }).length, 2);
+  assert.equal(groupSellerImportRows(ambiguous, { title: "title", color: "color", size: "size", sku: "sku", confirmedRowGroups: { "2": "candidate-2", "3": "candidate-2" } }).length, 1);
+});
+
+test("seller can split an automatically grouped family and regrouping retains its stable category key", () => {
+  const rows = [
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Acme", color: "Blue", size: "S", sku: "ACME-B-S" },
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", brand: "Acme", color: "Blue", size: "M", sku: "ACME-B-M" },
+  ];
+  const baseMapping = { title: "title", description: "description", brand: "brand", color: "color", size: "size", sku: "sku" };
+  const automatic = groupSellerImportRows(rows, baseMapping)[0];
+  assert.equal(groupSellerImportRows(rows, { ...baseMapping, separatedRowGroups: { "2": true, "3": true } }).length, 2);
+  const regrouped = groupSellerImportRows(rows, baseMapping)[0];
+  assert.equal(regrouped.key, automatic.key);
+});
+
+test("explicit parent identities remain isolated and duplicate SKU or variant combinations are rejected", () => {
+  const mapping = { parentProductId: "parent_id", title: "title", description: "description", color: "color", size: "size", sku: "sku", price: "price", stock: "stock", groupCategories: { "parent:FAMILY-A": "men--tshirts--solide" } };
+  const groups = groupSellerImportRows([
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "S", sku: "A-1", price: "10", stock: "2" },
+    { parent_id: "FAMILY-B", title: "Shirt B", description: "B shirt description", color: "Black", size: "M", sku: "B-1", price: "10", stock: "2" },
+  ], mapping);
+  assert.equal(groups.length, 2);
+  assert.equal(groupSellerImportRows([
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "S", sku: "A-1", price: "10", stock: "2" },
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "M", sku: "A-2", price: "10", stock: "2" },
+  ], mapping).length, 1);
+  assert.equal(groupSellerImportRows([
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "S", sku: "A-1", price: "10", stock: "2" },
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "M", sku: "A-2", price: "10", stock: "2" },
+  ], { ...mapping, separatedRowGroups: { "2": true, "3": true } }).length, 2);
+  const duplicateSkuRows = [
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "S", sku: "DUP", price: "10", stock: "2" },
+    { parent_id: "FAMILY-A", title: "Shirt A", description: "A shirt description", color: "Blue", size: "M", sku: "DUP", price: "10", stock: "2" },
+  ];
+  const duplicateGroup = groupSellerImportRows(duplicateSkuRows, mapping)[0];
+  assert.throws(() => prepareSellerImportGroup(duplicateGroup.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, mapping, "EUR"), (error: unknown) => error instanceof SellerImportRowError && error.code === "IMPORT_ROW_DUPLICATE_SKU");
+  const duplicateCombination = duplicateSkuRows.map((row, index) => ({ ...row, sku: `UNIQUE-${index}`, size: "S" }));
+  const comboGroup = groupSellerImportRows(duplicateCombination, mapping)[0];
+  assert.throws(() => prepareSellerImportGroup(comboGroup.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, mapping, "EUR"), (error: unknown) => error instanceof SellerImportRowError && error.code === "IMPORT_ROW_VARIANTS_INVALID");
 });
 
 test("a selected main category is shared by imported variant parents and Other remains scoped to its parent", () => {

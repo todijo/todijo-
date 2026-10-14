@@ -24,11 +24,15 @@ jobs:
       SESSION_SECRET: ci-only-placeholder-secret-at-least-32-characters
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: quay.io/sclorg/postgresql-16-c9s
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
           POSTGRES_DB: todijo_ci
+          POSTGRESQL_USER: ci
+          POSTGRESQL_PASSWORD: ci
+          POSTGRESQL_DATABASE: todijo_ci
+          POSTGRESQL_ADMIN_PASSWORD: ci
         ports:
           - 5432:5432
         options: >-
@@ -60,13 +64,13 @@ jobs:
         env:
           PGPASSWORD: ci
         run: |
-          psql -h 127.0.0.1 -p 5432 -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
-          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O ci todijo_e2e
-          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_free_test
-          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_transition_test
-          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_dashboard_test
-          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_statement_test
-          createdb -h 127.0.0.1 -p 5432 -U ci --maintenance-db=postgres -O validation todijo_archive_test
+          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE validation LOGIN PASSWORD 'validation'"
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O ci todijo_e2e
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O validation todijo_free_test
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O validation todijo_transition_test
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O validation todijo_dashboard_test
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O validation todijo_statement_test
+          createdb -h 127.0.0.1 -p 5432 -U postgres --maintenance-db=postgres -O validation todijo_archive_test
           DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/todijo_e2e?schema=public npx prisma migrate deploy
           DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_free_test?schema=public npx prisma migrate deploy
           DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/todijo_transition_test?schema=public npx prisma migrate deploy
@@ -113,9 +117,9 @@ jobs:
       - name: Test migration-gated production startup
         env:
           POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
-          POSTGRES_USER: ci
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ci
-          POSTGRES_DB: todijo_ci
+          POSTGRES_DB: postgres
         run: bash scripts/test-production-entrypoint.sh todijo-security-phase1
 
   e2e:

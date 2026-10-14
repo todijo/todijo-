@@ -12,6 +12,7 @@ export type SellerImportMapping = Partial<Record<SellerImportField, string>> & {
   rowCategories?: Record<string, string>;
   groupCategories?: Record<string, string>;
   confirmedRowGroups?: Record<string, string>;
+  separatedRowGroups?: Record<string, boolean>;
   duplicatePolicy?: "SKIP_EXISTING" | "UPDATE_EXISTING" | "NEW_ONLY";
 };
 
@@ -67,15 +68,47 @@ export function importCell(row: SellerImportSourceRow, mapping: SellerImportMapp
   return column ? String(row[column] ?? "").trim() : "";
 }
 
+function automaticFamilyGroups(rows: SellerImportSourceRow[], mapping: SellerImportMapping, rowNumbers: number[]) {
+  const byIdentity = new Map<string, number[]>();
+  rows.forEach((row, index) => {
+    if (importCell(row, mapping, "parentProductId")) return;
+    const title = normalize(importCell(row, mapping, "parentTitle") || importCell(row, mapping, "title"));
+    const description = normalize(importCell(row, mapping, "description"));
+    const brand = normalize(importCell(row, mapping, "brand"));
+    // A title alone is not family evidence. Require matching non-empty
+    // description and brand, plus unique SKUs and complete distinct variants.
+    if (!title || !description || !brand) return;
+    const identity = `${title}\u001f${description}\u001f${brand}`;
+    const indexes = byIdentity.get(identity) ?? [];
+    indexes.push(index); byIdentity.set(identity, indexes);
+  });
+  const result = new Map<number, string>();
+  for (const [identity, indexes] of byIdentity) {
+    if (indexes.length < 2) continue;
+    const familyRows = indexes.map(index => rows[index]);
+    const skus = familyRows.map(row => importCell(row, mapping, "variantSku") || importCell(row, mapping, "sku")).map(normalize);
+    if (skus.some(sku => !sku) || new Set(skus).size !== skus.length || !hasCompleteSellerImportVariantRows(familyRows, mapping)) continue;
+    const key = `auto:${hashImportIdentity(identity)}:${rowNumbers[indexes[0]]}`;
+    indexes.forEach(index => result.set(rowNumbers[index], key));
+  }
+  return result;
+}
+
+function hashImportIdentity(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
 export function groupSellerImportRows(rows: SellerImportSourceRow[], mapping: SellerImportMapping, rowNumbers = rows.map((_, index) => index + 2)): SellerImportRowGroup[] {
   const groups = new Map<string, SellerImportRowGroup>();
+  const automaticGroups = automaticFamilyGroups(rows, mapping, rowNumbers);
   rows.forEach((row, index) => {
     const parentIdentifier = importCell(row, mapping, "parentProductId");
-    // Explicit supplier IDs group automatically; otherwise the seller must
-    // confirm a candidate group in the import preview.
     const rowNumber = rowNumbers[index] ?? index + 2;
     const confirmedGroup = mapping.confirmedRowGroups?.[String(rowNumber)];
-    const key = parentIdentifier ? `parent:${parentIdentifier}` : confirmedGroup ? `confirmed:${confirmedGroup}` : `row:${rowNumber}`;
+    const separated = mapping.separatedRowGroups?.[String(rowNumber)];
+    const key = separated ? `row:${rowNumber}` : parentIdentifier ? `parent:${parentIdentifier}` : confirmedGroup ? `confirmed:${confirmedGroup}` : automaticGroups.get(rowNumber) ?? `row:${rowNumber}`;
     const group = groups.get(key) ?? { key, parentIdentifier: parentIdentifier || null, rowNumbers: [], rows: [] };
     group.rowNumbers.push(rowNumber);
     group.rows.push(row);
