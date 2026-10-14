@@ -68,6 +68,7 @@ test("seller CSV preview and draft import persist four parent products and ten e
   await page.goto(`/en/seller/products/import?store=${storeId}`);
   await expect(page.getByRole("heading", { level: 1, name: "Import your products" })).toBeVisible();
   await dismissCookieConsent(page);
+  await expect(page.locator(".cookieConsent")).toBeHidden();
 
   async function previewAndCategorize() {
     await page.locator('input[type="file"]').setInputFiles(fixturePath);
@@ -88,7 +89,14 @@ test("seller CSV preview and draft import persist four parent products and ten e
   }
 
   await previewAndCategorize();
+  const importResponsePromise = page.waitForResponse(response => response.url().endsWith("/api/seller/products/import")
+    && response.request().method() === "POST"
+    && response.request().headers()["content-type"]?.includes("application/json"));
   await page.getByRole("button", { name: "Import as drafts" }).click();
+  const importResponse = await importResponsePromise;
+  const importResult = await importResponse.json() as { error?: string; status?: string; requestedCount?: number; importedCount?: number; failedCount?: number; skippedCount?: number; items?: Array<{ rowNumber: number; status: string; errorCode: string | null }> };
+  expect(importResponse.ok(), `Import API returned ${importResponse.status()}: ${JSON.stringify(importResult)}`).toBeTruthy();
+  expect(importResult, "first import should persist all ten fixture rows").toMatchObject({ status: "COMPLETED", requestedCount: 10, importedCount: 10, failedCount: 0, skippedCount: 0 });
   await expect(page.getByText("Rows processed: 10 imported, 0 skipped, 0 need correction.")).toBeVisible({ timeout: 30_000 });
 
   const products = await db.product.findMany({
