@@ -35,7 +35,9 @@ export function categoryKey(value: string): CategoryKey | null {
 }
 
 export function categoryLabel(value: string, translate: (key: CategoryKey) => string) {
+  if (sellerImportOtherParent(value)) return translate("other");
   const key = categoryKey(value);
   return key ? translate(key) : canonicalCategoryLabel(value).trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 }
 import { canonicalCategoryLabel } from "./desktop-category-taxonomy";
+import { sellerImportOtherParent } from "./seller-import-category";

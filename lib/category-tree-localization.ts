@@ -2,6 +2,8 @@ import { isLocale } from "../i18n/config";
 import { CATEGORY_LABELS, categoryGroupTranslationKey, categoryLeafTranslationKey, type TranslatedCategoryLocale } from "./category-locales";
 import { frCategoryLabelOverrides } from "./category-locales/fr";
 import { DESKTOP_CATEGORY_TAXONOMY, subcategoryId } from "./desktop-category-taxonomy";
+import { localizedSellerImportMainCategory, localizedSellerImportOtherCategory } from "./seller-import-category-labels";
+import { sellerImportOtherParent } from "./seller-import-category";
 
 export type CategoryTranslationSource = "canonical-fr" | "explicit" | "unknown-locale" | "unknown-node";
 
@@ -34,7 +36,10 @@ export function categoryLeafTranslationSource(locale: string, categoryId: string
 }
 
 export function localizedCategoryTreeValue(locale: string, value: string) {
+  const otherParentId = sellerImportOtherParent(value);
+  if (otherParentId) return `${localizedSellerImportMainCategory(locale, otherParentId)} › ${localizedSellerImportOtherCategory(locale)}`;
   for (const category of DESKTOP_CATEGORY_TAXONOMY) {
+    if (value === category.id) return localizedSellerImportMainCategory(locale, category.id);
     for (const group of category.groups) {
       if (value === group.label) return localizedCategoryGroupLabel(locale, category.id, group.id, group.label);
       const leaf = group.items.find((item) => item === value || subcategoryId(category.id, group.id, item) === value);

@@ -8,6 +8,7 @@ import { requireProductCategoryScope } from "./seller-team-product-scope";
 import { groupSellerImportRows, importCell, normalizeSellerImportCategorySource, suggestSellerImportCategory, type SellerImportField, type SellerImportMapping, type SellerImportSourceRow } from "./seller-product-import-workflow";
 export type { SellerImportField, SellerImportMapping } from "./seller-product-import-workflow";
 import { isCanonicalLeafCategoryId } from "./desktop-category-taxonomy";
+import { isValidSellerImportCategoryId } from "./seller-import-category";
 import { validateProductImages } from "./product-images";
 import { readProductVideo } from "./product-media";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
@@ -50,12 +51,12 @@ function attributesObject(value: string): Record<string, string> {
 function normalized(value: string) { return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().replace(/\s+/g, " ").trim(); }
 function categoryForGroup(items: SellerProductImportItem[], rows: SellerImportSourceRow[], mapping: SellerImportMapping, key: string) {
   const override = mapping.groupCategories?.[key];
-  if (override && isCanonicalLeafCategoryId(override)) return override;
+  if (override && isValidSellerImportCategoryId(override)) return override;
   const selected: string[] = [];
   for (let index = 0; index < rows.length; index++) {
     const item = items[index], row = rows[index];
     const rowOverride = mapping.rowCategories?.[String(item.rowNumber)];
-    if (rowOverride && isCanonicalLeafCategoryId(rowOverride)) { selected.push(rowOverride); continue; }
+    if (rowOverride && isValidSellerImportCategoryId(rowOverride)) { selected.push(rowOverride); continue; }
     const suggestion = suggestSellerImportCategory(row, mapping);
     if (!suggestion.canonicalCategoryId || suggestion.confidence < .85) throw new SellerImportRowError("IMPORT_ROW_CATEGORY_REQUIRED");
     selected.push(suggestion.canonicalCategoryId);
@@ -317,6 +318,7 @@ export async function processSellerProductImport(db: PrismaClient, input: { job:
         continue;
       }
       const existing = matchedIds.length ? await db.product.findFirst({ where: { id: matchedIds[0], storeId: job.storeId, removedAt: null, supplierLink: null }, select: { id: true, slug: true, status: true, stock: true, variants: { take: 1, select: { id: true } }, attributes: true, images: true, condition: true, manufacturerName: true, weightGrams: true, lengthMm: true, widthMm: true, heightMm: true, colors: true, sizes: true } }) : null;
+      if (existing?.status === "PUBLISHED" && !isCanonicalLeafCategoryId(prepared.category)) throw new SellerImportRowError("IMPORT_ROW_CATEGORY_REQUIRED");
       const slugBase = slugify(prepared.title) || "product";
       const slug = existing?.slug ?? `${slugBase}-${job.id.slice(-6)}-${items[0].rowNumber}`.slice(0, 90);
       const productData: Prisma.ProductUncheckedCreateInput = {

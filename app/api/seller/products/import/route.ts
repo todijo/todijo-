@@ -8,7 +8,9 @@ import { ProProductImportError, requireProProductImport } from "@/lib/pro-produc
 import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
 import { parseSellerProductImport, parseSellerProductImportMultipart, readBoundedSellerImportBody, SellerImportParseError } from "@/lib/seller-product-import-parser";
 import { createSellerProductImportJob, getConfirmedSellerImportCategoryMappings, processSellerProductImport, type SellerImportMapping } from "@/lib/seller-product-import";
-import { isCanonicalLeafCategoryId } from "@/lib/desktop-category-taxonomy";
+import { canonicalLeafCategory } from "@/lib/desktop-category-taxonomy";
+import { isValidSellerImportCategoryId } from "@/lib/seller-import-category";
+import { suggestSellerImportMainCategory } from "@/lib/seller-import-category-suggestions";
 import { suggestSellerImportCategory, suggestSellerImportMapping } from "@/lib/seller-product-import-workflow";
 
 export const runtime = "nodejs";
@@ -38,7 +40,17 @@ export async function POST(request: Request) {
       const parsed = parseSellerProductImport(filename, bytes);
       const suggestedMapping = suggestSellerImportMapping(parsed.headers);
       const confirmedMappings = await getConfirmedSellerImportCategoryMappings(prisma, principal.businessId, store.id);
-      const categorySuggestions = parsed.rows.map((row, index) => ({ rowNumber: index + 2, ...suggestSellerImportCategory(row, suggestedMapping, confirmedMappings) }));
+      const categorySuggestions = parsed.rows.map((row, index) => {
+        const suggestion = suggestSellerImportCategory(row, suggestedMapping, confirmedMappings);
+        const leaf = suggestion.canonicalCategoryId ? canonicalLeafCategory(suggestion.canonicalCategoryId) : null;
+        const canonicalMainCategoryId = leaf?.categoryId ?? suggestSellerImportMainCategory({
+          supplierCategory: suggestedMapping.category ? String(row[suggestedMapping.category] ?? "") : "",
+          title: suggestedMapping.title ? String(row[suggestedMapping.title] ?? "") : "",
+          description: suggestedMapping.description ? String(row[suggestedMapping.description] ?? "") : "",
+          attributes: Object.fromEntries(Object.entries(row).filter(([key]) => key !== suggestedMapping.category && key !== suggestedMapping.title && key !== suggestedMapping.description)),
+        });
+        return { rowNumber: index + 2, ...suggestion, canonicalMainCategoryId };
+      });
       return NextResponse.json({ sourceFormat: filename.split(".").pop()?.toLowerCase(), headers: parsed.headers, rows: parsed.rows, suggestedMapping, categorySuggestions }, { headers: { "Cache-Control": "private, no-store" } });
     }
     let body: { action?: unknown; storeId?: unknown; sourceFormat?: unknown; idempotencyKey?: unknown; mapping?: unknown; headers?: unknown; rows?: unknown };
@@ -54,8 +66,8 @@ export async function POST(request: Request) {
     if (!(mapping.price || mapping.variantPrice) || !(mapping.stock || mapping.variantStock)) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
     for (const [key, value] of Object.entries(mapping)) if (!new Set(["rowCategories", "groupCategories", "confirmedRowGroups", "duplicatePolicy"]).has(key) && value !== undefined && (typeof value !== "string" || !headers.includes(value))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
     if (mapping.duplicatePolicy !== undefined && !["SKIP_EXISTING", "UPDATE_EXISTING", "NEW_ONLY"].includes(mapping.duplicatePolicy)) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
-    if (mapping.rowCategories !== undefined && (!mapping.rowCategories || typeof mapping.rowCategories !== "object" || Array.isArray(mapping.rowCategories) || Object.entries(mapping.rowCategories).some(([rowNumber, category]) => !/^([2-9]|[1-9]\d|100|101)$/.test(rowNumber) || Number(rowNumber) > (body.rows as unknown[]).length + 1 || typeof category !== "string" || !isCanonicalLeafCategoryId(category)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
-    if (mapping.groupCategories !== undefined && (!mapping.groupCategories || typeof mapping.groupCategories !== "object" || Array.isArray(mapping.groupCategories) || Object.entries(mapping.groupCategories).some(([key, category]) => !key || key.length > 180 || typeof category !== "string" || !isCanonicalLeafCategoryId(category)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (mapping.rowCategories !== undefined && (!mapping.rowCategories || typeof mapping.rowCategories !== "object" || Array.isArray(mapping.rowCategories) || Object.entries(mapping.rowCategories).some(([rowNumber, category]) => !/^([2-9]|[1-9]\d|100|101)$/.test(rowNumber) || Number(rowNumber) > (body.rows as unknown[]).length + 1 || typeof category !== "string" || !isValidSellerImportCategoryId(category)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
+    if (mapping.groupCategories !== undefined && (!mapping.groupCategories || typeof mapping.groupCategories !== "object" || Array.isArray(mapping.groupCategories) || Object.entries(mapping.groupCategories).some(([key, category]) => !key || key.length > 180 || typeof category !== "string" || !isValidSellerImportCategoryId(category)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
     if (mapping.confirmedRowGroups !== undefined && (!mapping.confirmedRowGroups || typeof mapping.confirmedRowGroups !== "object" || Array.isArray(mapping.confirmedRowGroups) || Object.entries(mapping.confirmedRowGroups).some(([rowNumber, groupKey]) => !/^([2-9]|[1-9]\d|100|101)$/.test(rowNumber) || Number(rowNumber) > (body.rows as unknown[]).length + 1 || typeof groupKey !== "string" || !/^[a-z0-9-]{1,80}$/.test(groupKey)))) return NextResponse.json({ error: "IMPORT_MAPPING_INVALID" }, { status: 400 });
     const job = await createSellerProductImportJob(prisma, { businessId: principal.businessId, storeId: body.storeId, userId: session.userId, key: body.idempotencyKey, sourceFormat: body.sourceFormat, mapping, headers, rows: body.rows as Array<Record<string, string>> });
     const result = await processSellerProductImport(prisma, { job, businessId: principal.businessId, userId: session.userId });
