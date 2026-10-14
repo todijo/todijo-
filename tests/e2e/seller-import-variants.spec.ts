@@ -96,7 +96,7 @@ test("seller CSV preview and draft import persist four parent products and ten e
   const importResponse = await importResponsePromise;
   const importResult = await importResponse.json() as { error?: string; status?: string; requestedCount?: number; importedCount?: number; failedCount?: number; skippedCount?: number; items?: Array<{ rowNumber: number; status: string; errorCode: string | null }> };
   expect(importResponse.ok(), `Import API returned ${importResponse.status()}: ${JSON.stringify(importResult)}`).toBeTruthy();
-  expect(importResult, "first import should persist all ten fixture rows").toMatchObject({ status: "COMPLETED", requestedCount: 10, importedCount: 10, failedCount: 0, skippedCount: 0 });
+  expect(importResult, `first import should persist all ten fixture rows; API response: ${JSON.stringify(importResult)}`).toMatchObject({ status: "COMPLETED", requestedCount: 10, importedCount: 10, failedCount: 0, skippedCount: 0 });
   await expect(page.getByText("Rows processed: 10 imported, 0 skipped, 0 need correction.")).toBeVisible({ timeout: 30_000 });
 
   const products = await db.product.findMany({
