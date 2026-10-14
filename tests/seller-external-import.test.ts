@@ -3,14 +3,18 @@ import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
 import { parseSellerProductImport, parseSellerProductImportMultipart, readBoundedSellerImportBody, SellerImportParseError, SELLER_IMPORT_MAX_REQUEST_BYTES } from "../lib/seller-product-import-parser";
 import { readFileSync } from "node:fs";
-import { groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSellerImportCategory, suggestSellerImportMapping } from "../lib/seller-product-import-workflow";
+import { countSellerImportVariants, findSellerImportGroupingCandidates, groupSellerImportRows, hasCompleteSellerImportVariantRows, suggestSellerImportCategory, suggestSellerImportMapping } from "../lib/seller-product-import-workflow";
 import { prepareSellerImportGroup, SellerImportRowError } from "../lib/seller-product-import";
 import { locales } from "../i18n/config";
 import { sellerFreeModelCopy } from "../i18n/seller-free-model";
 import { sellerImportOtherCategoryId } from "../lib/seller-import-category";
 
-function xlsxFixture() {
-  const files = new Map([["xl/worksheets/sheet1.xml", `<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>title</t></is></c><c r="B1" t="inlineStr"><is><t>price</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Sample item</t></is></c><c r="B2"><v>12.50</v></c></row></sheetData></worksheet>`]]);
+function xlsxFixture(headers = ["title", "price"], dataRows = [["Sample item", "12.50"]]) {
+  const columnName = (index: number) => { let value = index + 1, name = ""; while (value) { value--; name = String.fromCharCode(65 + value % 26) + name; value = Math.floor(value / 26); } return name; };
+  const escapeXml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const rows = [headers, ...dataRows];
+  const sheet = `<worksheet><sheetData>${rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => `<c r="${columnName(columnIndex)}${rowIndex + 1}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`).join("")}</row>`).join("")}</sheetData></worksheet>`;
+  const files = new Map([["xl/worksheets/sheet1.xml", sheet]]);
   const locals: Buffer[] = [], centrals: Buffer[] = []; let offset = 0;
   for (const [name, content] of files) {
     const nameBytes = Buffer.from(name), data = Buffer.from(content), compressed = deflateRawSync(data);
@@ -82,9 +86,67 @@ test("seller import automatically groups reliable families without parent IDs bu
   const prepared = prepareSellerImportGroup(groups[0].rows.map((sourceRow, index) => ({ sourceRow, rowNumber: index + 2 })) as never, mapping, "EUR", groups[0].key);
   assert.deepEqual(prepared.variants?.variants?.map(variant => [variant.sku, variant.priceOverride ?? prepared.price, variant.stock]), [["ACME-B-S", "10.00", 2], ["ACME-B-M", "11.00", 3]]);
   assert.equal(groupSellerImportRows([{ title: "Cotton shirt" }, { title: "Cotton shirt" }], {}).length, 2);
-  const ambiguous = [{ title: "Cotton shirt", color: "Blue", size: "S", sku: "SKU-1" }, { title: "Cotton shirt", color: "Blue", size: "M", sku: "SKU-2" }];
-  assert.equal(groupSellerImportRows(ambiguous, { title: "title", color: "color", size: "size", sku: "sku" }).length, 2);
-  assert.equal(groupSellerImportRows(ambiguous, { title: "title", color: "color", size: "size", sku: "sku", confirmedRowGroups: { "2": "candidate-2", "3": "candidate-2" } }).length, 1);
+  const ambiguous = [{ title: "Cotton shirt", description: "First cut", color: "Blue", size: "S", sku: "SKU-1" }, { title: "Cotton shirt", description: "Different cut", color: "Blue", size: "M", sku: "SKU-2" }];
+  assert.equal(groupSellerImportRows(ambiguous, { title: "title", description: "description", color: "color", size: "size", sku: "sku" }).length, 2);
+  assert.equal(findSellerImportGroupingCandidates(ambiguous, { title: "title", description: "description", color: "color", size: "size", sku: "sku" }).length, 0);
+});
+
+test("seller confirmation is offered only for complete matching families with genuinely missing SKU evidence", () => {
+  const rows = [
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", color: "Blue", size: "S" },
+    { title: "Cotton shirt", description: "Soft cotton shirt for daily wear", color: "Blue", size: "M" },
+  ];
+  const mapping = { title: "title", description: "description", color: "color", size: "size" };
+  const candidates = findSellerImportGroupingCandidates(rows, mapping);
+  assert.equal(candidates.length, 1);
+  assert.deepEqual(candidates[0].rowNumbers, [2, 3]);
+  assert.equal(groupSellerImportRows(rows, mapping).length, 2);
+  assert.equal(groupSellerImportRows(rows, { ...mapping, confirmedRowGroups: { "2": candidates[0].key, "3": candidates[0].key } }).length, 1);
+});
+
+test("ten-row seller catalog without supplier parent IDs auto-groups to four parents and preserves variant data", () => {
+  // Representative fixture: the production file todijo_test_catalog.csv was not available locally.
+  const rows = [
+    ["T-shirt coton test", "Soft cotton T-shirt for everyday wear", "Blue", "S", "TSHIRT-BLUE-S", "8.99", "8", "men--tshirts--solide"],
+    ["T-shirt coton test", "Soft cotton T-shirt for everyday wear", "Blue", "M", "TSHIRT-BLUE-M", "8.99", "12", "men--tshirts--solide"],
+    ["T-shirt coton test", "Soft cotton T-shirt for everyday wear", "Black", "S", "TSHIRT-BLACK-S", "9.49", "5", "men--tshirts--solide"],
+    ["T-shirt coton test", "Soft cotton T-shirt for everyday wear", "Black", "M", "TSHIRT-BLACK-M", "9.49", "9", "men--tshirts--solide"],
+    ["Sac à dos test", "Lightweight school backpack with a front pocket", "Blue", "Small", "BAG-BLUE", "18.00", "4", "kids--shoes--sacs-d-ecole"],
+    ["Sac à dos test", "Lightweight school backpack with a front pocket", "Black", "Large", "BAG-BLACK", "19.00", "7", "kids--shoes--sacs-d-ecole"],
+    ["Carnet A5 test", "A5 notebook with a durable paper cover", "Blue", "Lined", "NOTEBOOK-BLUE", "4.50", "20", "home--storage--papeterie"],
+    ["Carnet A5 test", "A5 notebook with a durable paper cover", "Green", "Blank", "NOTEBOOK-GREEN", "4.75", "15", "home--storage--papeterie"],
+    ["Coussin décoratif test", "Decorative cushion for a living room", "Green", "Small", "CUSHION-GREEN", "12.00", "6", "home--textiles--oreillers"],
+    ["Coussin décoratif test", "Decorative cushion for a living room", "Gold", "Large", "CUSHION-GOLD", "13.00", "3", "home--textiles--oreillers"],
+  ];
+  const headers = ["title", "description", "color", "size", "sku", "price", "stock", "category"];
+  const csv = [headers.join(","), ...rows.map(row => row.join(","))].join("\n");
+  const parsed = parseSellerProductImport("representative-catalog.csv", Buffer.from(csv));
+  const json = parseSellerProductImport("representative-catalog.json", Buffer.from(JSON.stringify({ products: rows.map(([title, description, color, size, sku, price, stock, category]) => ({ title, description, color, size, sku, price, stock, category })) })));
+  const xml = parseSellerProductImport("representative-catalog.xml", Buffer.from(`<catalog>${rows.map(([title, description, color, size, sku, price, stock, category]) => `<product><title>${title}</title><description>${description}</description><color>${color}</color><size>${size}</size><sku>${sku}</sku><price>${price}</price><stock>${stock}</stock><category>${category}</category></product>`).join("")}</catalog>`));
+  const xlsx = parseSellerProductImport("representative-catalog.xlsx", xlsxFixture(headers, rows));
+  const mapping = suggestSellerImportMapping(parsed.headers);
+  const importRows = parsed.rows;
+  const groups = groupSellerImportRows(importRows, mapping);
+  assert.deepEqual(groups.map(group => group.rows.length), [4, 2, 2, 2]);
+  assert.equal(groups.length, 4);
+  assert.equal(groups.reduce((sum, group) => sum + group.rows.length, 0), 10);
+  assert.equal(countSellerImportVariants(groups, mapping), 10);
+  assert.deepEqual(groupSellerImportRows(json.rows, suggestSellerImportMapping(json.headers)).map(group => group.rows.length), [4, 2, 2, 2]);
+  assert.deepEqual(groupSellerImportRows(xml.rows, suggestSellerImportMapping(xml.headers)).map(group => group.rows.length), [4, 2, 2, 2]);
+  assert.deepEqual(groupSellerImportRows(xlsx.rows, suggestSellerImportMapping(xlsx.headers)).map(group => group.rows.length), [4, 2, 2, 2]);
+  const separated = groupSellerImportRows(importRows, { ...mapping, separatedRowGroups: Object.fromEntries(importRows.map((_, index) => [String(index + 2), true])) });
+  assert.equal(separated.length, 10);
+  assert.equal(countSellerImportVariants(separated, mapping), 0);
+  assert.ok(groups.every(group => group.key.startsWith("auto:")));
+  const expectedTitles = ["T-shirt coton test", "Sac à dos test", "Carnet A5 test", "Coussin décoratif test"];
+  assert.deepEqual(groups.map(group => group.rows[0].title), expectedTitles);
+  const prepared = groups.map(group => prepareSellerImportGroup(group.rows.map((sourceRow, index) => ({ sourceRow, rowNumber: group.rowNumbers[index] })) as never, mapping, "EUR", group.key));
+  assert.deepEqual(prepared.map(product => product.title), expectedTitles);
+  assert.deepEqual(prepared.map(product => product.description), rows.filter((_, index) => [0, 4, 6, 8].includes(index)).map(row => row[1]));
+  assert.deepEqual(prepared.flatMap(product => product.variants?.variants?.map(variant => [variant.sku, variant.priceOverride ?? product.price, variant.stock]) ?? []), importRows.map(row => [row.sku, row.price, Number(row.stock)]));
+  assert.deepEqual(prepared.map(product => product.category), ["men--tshirts--solide", "kids--shoes--sacs-d-ecole", "home--storage--papeterie", "home--textiles--oreillers"]);
+  assert.deepEqual(prepared[0].colors, ["Blue", "Black"]);
+  assert.deepEqual(prepared[0].sizes, ["S", "M"]);
 });
 
 test("seller can split an automatically grouped family and regrouping retains its stable category key", () => {
@@ -308,4 +370,14 @@ test("seller import schema adds durable idempotent jobs and optional measurement
   assert.match(workflowMigration, /DROP INDEX "SellerProductImportItem_productId_key"/);
   assert.match(workflowMigration, /CREATE INDEX "SellerProductImportItem_productId_idx"/);
   assert.doesNotMatch(workflowMigration, /DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE/i);
+});
+
+test("SellerControl store label resolves for all supported locales without missing French messages", () => {
+  const translatedLocales = new Set(["fa", "fr", "hi", "pt", "ru", "zh"]);
+  for (const locale of locales) {
+    const fileLocale = translatedLocales.has(locale) ? locale : "en";
+    const messages = JSON.parse(readFileSync(`messages/seller-control/${fileLocale}.json`, "utf8")) as Record<string, unknown>;
+    assert.equal(typeof messages.store, "string", `${locale} SellerControl.store`);
+    assert.ok((messages.store as string).length > 0, `${locale} SellerControl.store is non-empty`);
+  }
 });

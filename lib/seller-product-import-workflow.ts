@@ -75,9 +75,11 @@ function automaticFamilyGroups(rows: SellerImportSourceRow[], mapping: SellerImp
     const title = normalize(importCell(row, mapping, "parentTitle") || importCell(row, mapping, "title"));
     const description = normalize(importCell(row, mapping, "description"));
     const brand = normalize(importCell(row, mapping, "brand"));
-    // A title alone is not family evidence. Require matching non-empty
-    // description and brand, plus unique SKUs and complete distinct variants.
-    if (!title || !description || !brand) return;
+    // A title alone is not family evidence. Exact normalized product identity
+    // is only eligible when the rows also have unique SKUs and a complete,
+    // non-duplicated variant matrix (checked below). Descriptions and brands
+    // strengthen identity when supplied, but are optional catalog fields.
+    if (!title) return;
     const identity = `${title}\u001f${description}\u001f${brand}`;
     const indexes = byIdentity.get(identity) ?? [];
     indexes.push(index); byIdentity.set(identity, indexes);
@@ -115,6 +117,42 @@ export function groupSellerImportRows(rows: SellerImportSourceRow[], mapping: Se
     groups.set(key, group);
   });
   return [...groups.values()];
+}
+
+export type SellerImportGroupingCandidate = { key: string; title: string; rowNumbers: number[]; variantFields: Array<"color" | "size" | "material" | "style"> };
+export function findSellerImportGroupingCandidates(rows: SellerImportSourceRow[], mapping: SellerImportMapping, excludedRows: ReadonlySet<number> = new Set(), rowNumbers = rows.map((_, index) => index + 2)): SellerImportGroupingCandidate[] {
+  const byIdentity = new Map<string, number[]>();
+  rows.forEach((row, index) => {
+    const rowNumber = rowNumbers[index] ?? index + 2;
+    if (importCell(row, mapping, "parentProductId") || excludedRows.has(rowNumber)) return;
+    const title = normalize(importCell(row, mapping, "parentTitle") || importCell(row, mapping, "title"));
+    if (!title) return;
+    const identity = [title, normalize(importCell(row, mapping, "description")), normalize(importCell(row, mapping, "brand"))].join("\u001f");
+    const indexes = byIdentity.get(identity) ?? [];
+    indexes.push(index);
+    byIdentity.set(identity, indexes);
+  });
+
+  return [...byIdentity.values()].flatMap(indexes => {
+    if (indexes.length < 2) return [];
+    const familyRows = indexes.map(index => rows[index]);
+    if (!hasCompleteSellerImportVariantRows(familyRows, mapping)) return [];
+    const skus = familyRows.map(row => normalize(importCell(row, mapping, "variantSku") || importCell(row, mapping, "sku")));
+    const suppliedSkus = skus.filter(Boolean);
+    if (!skus.some(sku => !sku) || new Set(suppliedSkus).size !== suppliedSkus.length) return [];
+    const groupRowNumbers = indexes.map(index => rowNumbers[index] ?? index + 2);
+    const variantFields = (["color", "size", "material", "style"] as const).filter(field => familyRows.every(row => importCell(row, mapping, field)) && new Set(familyRows.map(row => importCell(row, mapping, field))).size > 1);
+    return [{ key: `candidate-${groupRowNumbers[0]}`, title: importCell(familyRows[0], mapping, "parentTitle") || importCell(familyRows[0], mapping, "title"), rowNumbers: groupRowNumbers, variantFields }];
+  });
+}
+
+export function countSellerImportVariants(groups: SellerImportRowGroup[], mapping: SellerImportMapping): number {
+  return groups.reduce((sum, group) => {
+    if (group.rows.length > 1) return sum + group.rows.length;
+    const raw = importCell(group.rows[0] ?? {}, mapping, "variants");
+    try { return sum + (raw ? (JSON.parse(raw) as { variants?: unknown[] }).variants?.length ?? 0 : 0); }
+    catch { return sum; }
+  }, 0);
 }
 
 export function hasCompleteSellerImportVariantRows(rows: SellerImportSourceRow[], mapping: SellerImportMapping): boolean {

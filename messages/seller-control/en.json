@@ -107,6 +107,7 @@
   "settingsTitle": "Store settings",
   "settingsDescription": "Manage your public storefront, preferences, subscription and account controls.",
   "viewStore": "View store",
+  "store": "Store",
   "storeProfile": "Store profile",
   "storeProfileHelp": "The public identity customers see across Todijo.",
   "storeName": "Store name",
