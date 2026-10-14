@@ -3,6 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
+import type { Prisma } from "@prisma/client";
 import { getLocale, getTranslations } from "next-intl/server";
 import { EmptyState } from "@/components/FeedbackState";
 import { MessageCircle } from "lucide-react";
@@ -17,7 +18,7 @@ export default async function MessagesPage({searchParams}:{searchParams:Promise<
   if (!session) redirect("/login?next=/messages");
   let selectedStoreId:string|undefined;
   if(session.role!=="CUSTOMER"&&params.store){try{selectedStoreId=(await resolveSellerStoreContext(prisma,session.userId,params.store,"MESSAGE_VIEW")).selected.id}catch{redirect(`/${locale}/dashboard`)}}
-  const messageWhere=selectedStoreId?{storeId:selectedStoreId,OR:[{sellerId:session.userId},{store:{teamAssignments:{some:{membership:{userId:session.userId,status:"ACTIVE",permissions:{has:"MESSAGE_VIEW"}}}}}}]}:{OR:[{ buyerId: session.userId }, { sellerId: session.userId },{store:{teamAssignments:{some:{membership:{userId:session.userId,status:"ACTIVE",permissions:{has:"MESSAGE_VIEW"}}}}}}]};
+  const messageWhere:Prisma.ConversationWhereInput=selectedStoreId?{storeId:selectedStoreId,OR:[{sellerId:session.userId},{store:{teamAssignments:{some:{membership:{userId:session.userId,status:"ACTIVE",permissions:{has:"MESSAGE_VIEW"}}}}}}]}:{OR:[{ buyerId: session.userId }, { sellerId: session.userId },{store:{teamAssignments:{some:{membership:{userId:session.userId,status:"ACTIVE",permissions:{has:"MESSAGE_VIEW"}}}}}}]};
   const [, conversations] = await Promise.all([
     selectedStoreId?Promise.resolve({count:0}):prisma.notification.updateMany({ where: { userId: session.userId, type: "NEW_MESSAGE", readAt: null }, data: { readAt: new Date() } }),
     prisma.conversation.findMany({
