@@ -117,9 +117,9 @@ jobs:
       - name: Test migration-gated production startup
         env:
           POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
-          POSTGRES_USER: ci
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ci
-          POSTGRES_DB: todijo_ci
+          POSTGRES_DB: postgres
         run: bash scripts/test-production-entrypoint.sh todijo-security-phase1
 
   e2e:
