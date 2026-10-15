@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Prisma } from "@prisma/client";
-import { loadSellerDashboardAggregate } from "../lib/seller-dashboard-aggregate";
+import { loadSellerBusinessRevenueByCurrency, loadSellerDashboardAggregate } from "../lib/seller-dashboard-aggregate";
 
 function database(rows: Array<unknown[]>) {
   const calls: Array<{ sql: string; values: unknown[] }> = [];
@@ -71,4 +71,16 @@ test("PostgreSQL numeric SUM results decode from Prisma Decimal without losing i
 
   const decimalOverflow = database([[summary("EUR", { revenueMinor: new Prisma.Decimal((BigInt(Number.MAX_SAFE_INTEGER) + BigInt("1")).toString()) })], [], [], []]);
   await assert.rejects(() => loadSellerDashboardAggregate(decimalOverflow.db, "decimal-store"), /safe integer bounds/);
+});
+
+test("PRO all-store revenue is aggregated in the database by currency and scoped to authorized stores",async()=>{
+ const calls:Array<{sql:string;values:unknown[]}> = [];
+ const db={$queryRaw:async(query:{sql:string;values:unknown[]})=>{calls.push(query);return[{currency:"EUR",amountMinor:BigInt(12345)},{currency:"JPY",amountMinor:BigInt(900)}]}} as any;
+ assert.deepEqual(await loadSellerBusinessRevenueByCurrency(db,["store-a","store-b","store-a"]),[{currency:"EUR",amountMinor:12345},{currency:"JPY",amountMinor:900}]);
+ assert.equal(calls.length,1);
+ assert.match(calls[0].sql,/SUM\(g\."sellerNetAmountMinor"\)/);
+ assert.match(calls[0].sql,/GROUP BY o\."currency"/);
+ assert.deepEqual(calls[0].values,["store-a","store-b"]);
+ assert.deepEqual(await loadSellerBusinessRevenueByCurrency(db,[]),[]);
+ assert.equal(calls.length,1,"empty scope never runs an unbounded query");
 });

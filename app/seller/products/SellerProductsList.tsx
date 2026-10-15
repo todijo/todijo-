@@ -45,6 +45,7 @@ export default function SellerProductsList({ initialProducts, total, page, pages
       if (query.q) params.set("q", query.q);
       if (query.status !== "all") params.set("status", query.status);
       if (query.sort !== "newest") params.set("sort", query.sort);
+      if (query.stock !== "all") params.set("stock", query.stock);
       const response = await fetch(`/api/seller/products/page?${params}`, { cache: "no-store" });
       if (!response.ok) throw new Error("SELLER_PRODUCTS_PAGE_FAILED");
       const result = await response.json() as PageResponse;
@@ -57,7 +58,7 @@ export default function SellerProductsList({ initialProducts, total, page, pages
       busy.current = false;
       setLoading(false);
     }
-  }, [error, loadedPage, pages, query.q, query.sort, query.status,storeId]);
+  }, [error, loadedPage, pages, query.q, query.sort, query.status, query.stock, storeId]);
 
   useEffect(() => {
     if (!mobile || error || loadedPage >= pages || !sentinel.current) return;
@@ -71,7 +72,7 @@ export default function SellerProductsList({ initialProducts, total, page, pages
     {total === 0 && <p className="sellerProductsNoResults">{market("empty")}</p>}
     <section className="sellerProductsGrid sellerProductsGridPremium">{products.map((product) => <article className="sellerProductCard" key={product.id} data-product-id={product.id}>
       <Link className="sellerProductVisual" href={`/${locale}/seller/products/${product.id}/edit`}>{product.image ? <Image src={product.image} alt={product.name} fill sizes="(max-width: 620px) 46vw, (max-width: 1100px) 50vw, 340px" unoptimized/> : <span className="sellerProductPlaceholder"><Package size={48}/></span>}</Link>
-      <div className="sellerProductBody"><div className="productStatusLine"><span className={product.status === "PUBLISHED" ? "statusPublished" : "statusDraft"}>{product.status === "PUBLISHED" ? control("published") : control("draftStatus")}</span><span>{control("stockCount", { count: product.stock })}</span></div><h2>{product.name}</h2><strong>{product.automaticCjPrice ? dynamicPriceLabel[locale] ?? dynamicPriceLabel.en : `${product.price} ${product.currency}`}</strong><div className="sellerProductActions"><Link href={`/${locale}/seller/products/${product.id}/edit`}><Pencil size={16} aria-hidden="true"/>{common("edit")}</Link>{product.status === "PUBLISHED" ? <Link href={`/${locale}/product/${product.id}`}><Eye size={16} aria-hidden="true"/>{seller("viewListing")}</Link> : <span className="draftHint">{seller("draft")}</span>}</div></div>
+      <div className="sellerProductBody"><div className="productStatusLine"><span className={product.status === "PUBLISHED" ? "statusPublished" : "statusDraft"}>{product.status === "PUBLISHED" ? control("published") : control("draftStatus")}</span><span>{control("stockCount", { count: product.stock })}</span>{product.variantCount>0&&<span>{product.variantCount} {control("variants")}</span>}</div><h2>{product.name}</h2><strong>{product.automaticCjPrice ? dynamicPriceLabel[locale] ?? dynamicPriceLabel.en : `${product.price} ${product.currency}`}</strong><div className="sellerProductActions"><Link href={`/${locale}/seller/products/${product.id}/edit`}><Pencil size={16} aria-hidden="true"/>{common("edit")}</Link>{product.status === "PUBLISHED" ? <Link href={`/${locale}/product/${product.id}`}><Eye size={16} aria-hidden="true"/>{seller("viewListing")}</Link> : <span className="draftHint">{seller("draft")}</span>}</div></div>
     </article>)}</section>
     <nav className="sellerProductsPagination" aria-label={orders("history.pagination")}><span>{page > 1 ? <Link href={sellerProductsHref(locale, query, page - 1,storeId)}>{market("previous")}</Link> : <span aria-disabled="true">{market("previous")}</span>}</span><div>{sellerPageNumbers(page, pages).map((number) => <Link key={number} href={sellerProductsHref(locale, query, number,storeId)} aria-current={number === page ? "page" : undefined}>{number}</Link>)}</div><span>{page < pages ? <Link href={sellerProductsHref(locale, query, page + 1,storeId)}>{market("next")}</Link> : <span aria-disabled="true">{market("next")}</span>}</span><small>{orders("history.page", { page, pages })}</small></nav>
     <div className="sellerProductsInfiniteStatus" aria-live="polite"><div ref={sentinel}/>{loading && <p>{common("loading")}</p>}{error && <p role="alert">{feedback.errorText} <button type="button" onClick={() => setError(false)}>{feedback.retry}</button></p>}</div>

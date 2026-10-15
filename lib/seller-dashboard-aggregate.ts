@@ -56,7 +56,7 @@ function eligibleOrders(storeId: string, now: Date) {
   ` };
 }
 
-function safeInt(value: unknown) {
+export function safeInt(value: unknown) {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) throw new Error("Seller dashboard aggregate exceeded safe integer bounds");
@@ -73,6 +73,18 @@ function safeInt(value: unknown) {
     throw new Error("Seller dashboard aggregate exceeded safe integer bounds");
   }
   return Number(integer);
+}
+
+export async function loadSellerBusinessRevenueByCurrency(db: Db, storeIds: string[]) {
+  const ids = [...new Set(storeIds.filter(Boolean))];
+  if (!ids.length) return [];
+  const rows = await db.$queryRaw<Array<{ currency: string; amountMinor: bigint | number | Prisma.Decimal | null }>>(Prisma.sql`
+    SELECT o."currency", SUM(g."sellerNetAmountMinor") AS "amountMinor"
+    FROM "OrderGroup" g JOIN "Order" o ON o."id" = g."orderId"
+    WHERE g."kind" = 'MARKETPLACE' AND g."storeId" IN (${Prisma.join(ids)})
+    GROUP BY o."currency" ORDER BY o."currency"
+  `);
+  return rows.map(row => ({ currency: row.currency, amountMinor: safeInt(row.amountMinor) }));
 }
 
 export async function loadSellerDashboardAggregate(db: Db, storeId: string, now = new Date()): Promise<SellerDashboardAggregate> {
