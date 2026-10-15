@@ -11,15 +11,20 @@ const MAX_ATTEMPTS=5,CLAIM_TIMEOUT_MS=15*60_000,PER_RUN=20;
 type SaleItem={name:string;quantity:number};
 type Sender=typeof sendSellerSaleEmail;
 
+export function sellerSaleOrderHref(storeId:string,orderId:string){
+  const params=new URLSearchParams({store:storeId,q:orderId});
+  return `/seller/orders?${params.toString()}`;
+}
+
 export async function enqueueSellerSaleNotifications(tx:Prisma.TransactionClient,input:{orderId:string;currency:string}){
   const groups=await tx.orderGroup.findMany({where:{orderId:input.orderId,kind:"MARKETPLACE",storeId:{not:null}},orderBy:{id:"asc"},select:{id:true,sellerNetAmountMinor:true,store:{select:{id:true,language:true,owner:{select:{id:true,email:true,firstName:true}},teamAssignments:{where:{membership:{status:"ACTIVE",permissions:{has:"ORDER_VIEW"}}},select:{membership:{select:{user:{select:{id:true,email:true,firstName:true}}}}}}}},items:{select:{quantity:true,productNameSnapshot:true,product:{select:{name:true}}}}}});
   for(const group of groups){
     if(!group.store)continue;
     const locale=isLocale(group.store.language)?group.store.language:defaultLocale,copy=sellerSaleCopy(locale),values={order:input.orderId};
     const items:SaleItem[]=group.items.map(item=>({name:item.productNameSnapshot??item.product.name,quantity:item.quantity})),totalQuantity=items.reduce((sum,item)=>sum+item.quantity,0);
-    const notification=await tx.notification.create({data:{userId:group.store.owner.id,type:"SELLER_SALE",title:copy.notificationTitle,body:formatSellerSaleCopy(copy.notificationBody,values),href:"/seller/orders"},select:{id:true}});
+    const notification=await tx.notification.create({data:{userId:group.store.owner.id,type:"SELLER_SALE",title:copy.notificationTitle,body:formatSellerSaleCopy(copy.notificationBody,values),href:sellerSaleOrderHref(group.store.id,input.orderId)},select:{id:true}});
     await tx.sellerSaleDelivery.create({data:{orderId:input.orderId,orderGroupId:group.id,sellerId:group.store.owner.id,notificationId:notification.id,locale,recipientEmail:group.store.owner.email,recipientName:group.store.owner.firstName,orderReference:input.orderId,currency:input.currency,sellerAmountMinor:group.sellerNetAmountMinor,totalQuantity,items:items as unknown as Prisma.InputJsonValue}});
-    for(const assignment of group.store.teamAssignments??[]){const recipient=assignment.membership.user;if(recipient.id===group.store.owner.id)continue;try{await requireStoreCapability(tx,recipient.id,group.store.id,"ORDER_VIEW")}catch{continue}const teamNotification=await tx.notification.create({data:{userId:recipient.id,type:"SELLER_SALE",title:copy.notificationTitle,body:formatSellerSaleCopy(copy.notificationBody,values),href:`/seller/orders?store=${group.store.id}`},select:{id:true}});await tx.sellerSaleRecipientDelivery.create({data:{orderGroupId:group.id,recipientId:recipient.id,notificationId:teamNotification.id,locale,recipientEmail:recipient.email,recipientName:recipient.firstName,orderReference:input.orderId,currency:input.currency,sellerAmountMinor:group.sellerNetAmountMinor,totalQuantity,items:items as unknown as Prisma.InputJsonValue}})}
+    for(const assignment of group.store.teamAssignments??[]){const recipient=assignment.membership.user;if(recipient.id===group.store.owner.id)continue;try{await requireStoreCapability(tx,recipient.id,group.store.id,"ORDER_VIEW")}catch{continue}const teamNotification=await tx.notification.create({data:{userId:recipient.id,type:"SELLER_SALE",title:copy.notificationTitle,body:formatSellerSaleCopy(copy.notificationBody,values),href:sellerSaleOrderHref(group.store.id,input.orderId)},select:{id:true}});await tx.sellerSaleRecipientDelivery.create({data:{orderGroupId:group.id,recipientId:recipient.id,notificationId:teamNotification.id,locale,recipientEmail:recipient.email,recipientName:recipient.firstName,orderReference:input.orderId,currency:input.currency,sellerAmountMinor:group.sellerNetAmountMinor,totalQuantity,items:items as unknown as Prisma.InputJsonValue}})}
     console.info("[seller-sale-notification]",JSON.stringify({event:"queued",orderId:input.orderId,orderGroupId:group.id,sellerId:group.store.owner.id}));
   }
   return groups.length;

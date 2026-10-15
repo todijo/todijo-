@@ -1,24 +1,33 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { enqueueSellerSaleNotifications, processSellerSaleDelivery } from "../lib/seller-sale-notifications";
+import { enqueueSellerSaleNotifications, processSellerSaleDelivery, sellerSaleOrderHref } from "../lib/seller-sale-notifications";
 import { locales } from "../i18n/config";
 import { sellerSaleCopy } from "../i18n/seller-sale-notifications";
 
 test("authoritative paid transaction queues one isolated dashboard notification and email per seller group",async()=>{
   const notifications:any[]=[],deliveries:any[]=[];
   const groups=[
-    {id:"group_a",sellerNetAmountMinor:1200,store:{language:"fr",owner:{id:"seller_a",email:"a@example.test",firstName:"A"}},items:[{quantity:2,productNameSnapshot:"Produit A",product:{name:"Fallback A"}}]},
-    {id:"group_b",sellerNetAmountMinor:900,store:{language:"ar",owner:{id:"seller_b",email:"b@example.test",firstName:"B"}},items:[{quantity:1,productNameSnapshot:"Produit B",product:{name:"Fallback B"}}]},
+    {id:"group_a",sellerNetAmountMinor:1200,store:{id:"store_a",language:"fr",owner:{id:"seller_a",email:"a@example.test",firstName:"A"}},items:[{quantity:2,productNameSnapshot:"Produit A",product:{name:"Fallback A"}}]},
+    {id:"group_b",sellerNetAmountMinor:900,store:{id:"store_b",language:"ar",owner:{id:"seller_b",email:"b@example.test",firstName:"B"}},items:[{quantity:1,productNameSnapshot:"Produit B",product:{name:"Fallback B"}}]},
   ];
   const tx:any={orderGroup:{findMany:async(args:any)=>{assert.deepEqual(args.where,{orderId:"order_1",kind:"MARKETPLACE",storeId:{not:null}});return groups}},notification:{create:async({data}:any)=>{notifications.push(data);return{id:`notification_${notifications.length}`}}},sellerSaleDelivery:{create:async({data}:any)=>{deliveries.push(data);return data}}};
   assert.equal(await enqueueSellerSaleNotifications(tx,{orderId:"order_1",currency:"EUR"}),2);
   assert.deepEqual(notifications.map(row=>row.userId),["seller_a","seller_b"]);
-  assert.ok(notifications.every(row=>row.type==="SELLER_SALE"&&row.href==="/seller/orders"));
+  assert.deepEqual(notifications.map(row=>row.href),["/seller/orders?store=store_a&q=order_1","/seller/orders?store=store_b&q=order_1"]);
+  assert.ok(notifications.every(row=>row.type==="SELLER_SALE"));
   assert.deepEqual(deliveries.map(row=>row.orderGroupId),["group_a","group_b"]);
   assert.deepEqual(deliveries[0].items,[{name:"Produit A",quantity:2}]);
   assert.equal(JSON.stringify(deliveries[0]).includes("Produit B"),false);
   assert.equal(JSON.stringify(deliveries[1]).includes("Produit A"),false);
+});
+
+test("order notification links keep store scope and safely encode the direct order search",()=>{
+  const href=sellerSaleOrderHref("store / one","order?two=1");
+  const url=new URL(href,"https://todijo.test");
+  assert.equal(url.pathname,"/seller/orders");
+  assert.equal(url.searchParams.get("store"),"store / one");
+  assert.equal(url.searchParams.get("q"),"order?two=1");
 });
 
 function deliveryDb(){

@@ -1,11 +1,34 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeVariantImageAssignments, ProductVariantImageError } from "../lib/product-variant-images";
+import { normalizeProductVariantImageUrls, normalizeVariantImageAssignments, ProductVariantImageError, pruneProductVariantImages } from "../lib/product-variant-images";
 
 const images = ["https://img.test/front.jpg", "https://img.test/back.jpg"];
 
 test("variant image assignments accept product images and select the first as primary", () => {
   assert.deepEqual(normalizeVariantImageAssignments([{ optionValueId: "red", imageUrls: images }], images), [{ optionValueId: "red", optionName: undefined, value: undefined, imageUrls: images, primaryUrl: images[0] }]);
+});
+
+test("per-variant image selections accept only unique images from the product gallery", () => {
+  const images = ["https://cdn.test/front.jpg", "https://cdn.test/back.jpg"];
+  assert.deepEqual(normalizeProductVariantImageUrls([images[1], images[0]], images), [images[1], images[0]]);
+  assert.deepEqual(normalizeProductVariantImageUrls([], images), []);
+  assert.throws(() => normalizeProductVariantImageUrls(["https://other.test/unowned.jpg"], images), ProductVariantImageError);
+  assert.throws(() => normalizeProductVariantImageUrls([images[0], images[0]], images), ProductVariantImageError);
+});
+
+test("removing a product gallery image prunes only that image from saved variants", async () => {
+  const updates: Array<{ where: { id: string }; data: { imageUrls: string[] } }> = [];
+  const tx = {
+    productVariant: {
+      findMany: async () => [
+        { id: "variant_keep", imageUrls: ["https://cdn.test/kept.jpg"] },
+        { id: "variant_prune", imageUrls: ["https://cdn.test/kept.jpg", "https://cdn.test/removed.jpg"] },
+      ],
+      update: async (input: { where: { id: string }; data: { imageUrls: string[] } }) => { updates.push(input); },
+    },
+  };
+  await pruneProductVariantImages(tx as never, "product_a", ["https://cdn.test/kept.jpg"]);
+  assert.deepEqual(updates, [{ where: { id: "variant_prune" }, data: { imageUrls: ["https://cdn.test/kept.jpg"] } }]);
 });
 
 test("variant image assignments reject foreign images", () => {

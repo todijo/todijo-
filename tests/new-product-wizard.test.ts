@@ -5,14 +5,15 @@ import test from "node:test";
 const form = fs.readFileSync("app/seller/products/new/NewProductForm.tsx", "utf8");
 const css = fs.readFileSync("app/globals.css", "utf8");
 
-test("add product exposes the six French seller steps", () => {
-  for (const label of ["Produit", "Photos", "Variantes", "Prix & stock", "Livraison", "Vérification"]) assert.ok(form.includes(label));
+test("add product exposes six locale-aware seller steps", () => {
+  assert.match(form,/const steps = wizard\.steps/);
+  assert.match(form,/aria-label=\{wizard\.progressLabel\}/);
   assert.match(form, /steps\.map/);
 });
 
 test("wizard navigation never submits", () => {
-  assert.match(form, /type="button" onClick=\{continueStep\}>Continuer/);
-  assert.match(form, /type="button" onClick=\{\(\)=>goToStep\(step-1\)\}>Retour/);
+  assert.match(form, /type="button" onClick=\{continueStep\}>\{wizard\.continue\}/);
+  assert.match(form, /type="button" onClick=\{\(\)=>goToStep\(step-1\)\}>\{wizard\.back\}/);
 });
 
 test("all panels stay mounted so back and forward preserve inputs", () => {
@@ -30,9 +31,9 @@ test("photo step reuses existing media managers", () => {
   assert.equal(form.match(/<ProductVideoManager/g)?.length, 1);
 });
 
-test("variant choice uses plain French and the existing editor", () => {
-  assert.match(form, /Votre produit existe-t-il en plusieurs couleurs, tailles, modèles ou versions \?/);
-  assert.match(form, />Non<\/button>[\s\S]*>Oui<\/button>/);
+test("variant choice is localized and keeps the existing editor", () => {
+  assert.match(form, /description=\{wizard\.variantsQuestion\}/);
+  assert.match(form, />\{wizard\.no\}<\/button>[\s\S]*>\{wizard\.yes\}<\/button>/);
   assert.equal(form.match(/<ProductVariantEditor/g)?.length, 1);
   assert.equal(form.match(/<VariantImageManager/g)?.length, 1);
 });
@@ -43,14 +44,14 @@ test("simple pricing and stock retain existing fields", () => {
 });
 
 test("shipping makes inheritance primary and override explicit", () => {
-  assert.match(form, /Utiliser les paramètres de livraison de ma boutique/);
-  assert.match(form, /Modifier la livraison pour ce produit/);
+  assert.match(form, /shipping\("inheritStoreShipping"\)/);
+  assert.match(form, /shipping\("customProductShipping"\)/);
   assert.match(form, /<ShippingRuleFields value=\{shippingRule\}/);
 });
 
 test("verification displays missing required information and owns final actions", () => {
   assert.match(form, /querySelectorAll<[^>]+>\(":invalid"\)/);
-  assert.match(form, /Toutes les informations obligatoires sont renseignées/);
+  assert.match(form, /\{wizard\.complete\}/);
   assert.ok(form.indexOf('data-wizard-step="5"') < form.indexOf('value="DRAFT"'));
   assert.ok(form.indexOf('data-wizard-step="5"') < form.indexOf('value="PUBLISHED"'));
 });

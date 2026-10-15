@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/session";
 import { lockSellerProductQuota, requireStorePublishingAccess, SellerSubscriptionError } from "@/lib/seller-subscription";
 import { MAX_PRODUCT_IMAGES, validateProductImages } from "@/lib/product-images";
-import { ProductVariantImageError, replaceProductVariantImages } from "@/lib/product-variant-images";
+import { ProductVariantImageError, pruneProductVariantImages, replaceProductVariantImages } from "@/lib/product-variant-images";
 import { ProductComplianceError, readProductCompliance } from "@/lib/product-compliance";
 import { parseProductShipping, ShippingError } from "@/lib/shipping";
 import { replaceProductVideo } from "@/lib/product-media";
@@ -97,6 +97,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         ...productShipping,
         complianceDeclaredAt: product.complianceDeclaredAt ?? (status === "PUBLISHED" ? new Date() : null),
       } });
+      await pruneProductVariantImages(tx, id, images);
       const content=readProductContentMetadata(product.supplierLink?.sourceMetadata);
       if(product.supplierLink&&content){
         const previous=product.supplierLink.sourceMetadata&&typeof product.supplierLink.sourceMetadata==="object"&&!Array.isArray(product.supplierLink.sourceMetadata)?product.supplierLink.sourceMetadata as Record<string,unknown>:{};

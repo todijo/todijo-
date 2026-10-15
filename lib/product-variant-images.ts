@@ -22,6 +22,17 @@ export class ProductVariantImageError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 
+export function normalizeProductVariantImageUrls(value: unknown, productImages: readonly string[]) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > MAX_VARIANT_IMAGES_PER_VALUE) throw new ProductVariantImageError(`A variant can have at most ${MAX_VARIANT_IMAGES_PER_VALUE} images.`);
+  const allowedImages = new Set(productImages);
+  const imageUrls = value.map((url) => typeof url === "string" ? url.trim() : "");
+  if (imageUrls.some((url) => !url || !allowedImages.has(url)) || new Set(imageUrls).size !== imageUrls.length) {
+    throw new ProductVariantImageError("Variant images must be unique images from this product.");
+  }
+  return imageUrls;
+}
+
 function optionalIdentifier(value: unknown, max: number) {
   if (value == null || value === "") return undefined;
   if (typeof value !== "string" || !value.trim() || value.trim().length > max) throw new ProductVariantImageError("Invalid option value assignment.");
@@ -66,5 +77,15 @@ export async function replaceProductVariantImages(tx: Prisma.TransactionClient, 
       : { value: { equals: assignment.value!, mode: "insensitive" }, option: { productId, name: { equals: assignment.optionName!, mode: "insensitive" } } }, select: { id: true } });
     if (!optionValue) throw new ProductVariantImageError("An assigned option value does not belong to this product.");
     for (const [position, url] of assignment.imageUrls.entries()) await tx.productOptionValueImage.create({ data: { optionValueId: optionValue.id, imageId: imageByUrl.get(url)!, position, isPrimary: url === assignment.primaryUrl } });
+  }
+}
+
+export async function pruneProductVariantImages(tx: Prisma.TransactionClient, productId: string, productImages: readonly string[]) {
+  const allowed = new Set(productImages);
+  const variants = await tx.productVariant.findMany({ where: { productId }, select: { id: true, imageUrls: true } });
+  for (const variant of variants) {
+    const current = Array.isArray(variant.imageUrls) ? variant.imageUrls.filter((url): url is string => typeof url === "string") : [];
+    const retained = current.filter((url) => allowed.has(url));
+    if (retained.length !== current.length) await tx.productVariant.update({ where: { id: variant.id }, data: { imageUrls: retained as Prisma.InputJsonArray } });
   }
 }
