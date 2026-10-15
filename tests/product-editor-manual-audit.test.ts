@@ -25,6 +25,9 @@ test("product images precede product options on create and edit", () => {
   assert.ok(create.indexOf('title={t("images")}') < create.indexOf('title={t("productOptions")}'));
 
   const edit = source("app/seller/products/[id]/edit/EditProductForm.tsx");
-  assert.ok(edit.indexOf('title={t("images")}') < edit.indexOf("{variantEditor}"));
-  assert.ok(edit.indexOf("{variantEditor}") < edit.indexOf('title={t("variantImages")}'));
+  const imagesSection = edit.indexOf('title={t("images")}');
+  const variantEditorRender = edit.indexOf("isValidElement(variantEditor) ? cloneElement");
+  const variantImagesSection = edit.indexOf('title={t("variantImages")}');
+  assert.ok(imagesSection >= 0 && variantEditorRender > imagesSection);
+  assert.ok(variantImagesSection > variantEditorRender);
 });
