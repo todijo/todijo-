@@ -5,6 +5,7 @@ import { createProductWithVariants, MAX_OPTION_VALUES, MAX_PRODUCT_OPTIONS, MAX_
 import { productStockForForm } from "../lib/product-variant-form";
 import { isSelectedVariantAvailable, resolveProductAvailability } from "../lib/product-availability";
 import { productCardOptionHref, resolveProductCardAction } from "../lib/product-card-action";
+import { ProductVariantImageError } from "../lib/product-variant-images";
 
 test("product cards require option selection only for available variant products", () => {
   assert.equal(resolveProductCardAction({ hasActiveVariants: false, isGenerallyAvailable: true }), "ADD_TO_CART");
@@ -138,6 +139,55 @@ test("supplier imports persist only explicitly supplied variant combinations", a
   assert.equal(combinations.includes("value_Black:value_M") || combinations.includes("value_M:value_Black"), true);
   assert.equal(combinations.some(key => key.includes("value_Blue") && key.includes("value_M")), false);
   assert.equal(combinations.some(key => key.includes("value_Black") && key.includes("value_S")), false);
+});
+
+test("new seller variants persist selected images from the same product gallery", async () => {
+  const created: Array<Record<string, unknown>> = [];
+  const tx = {
+    product: { create: async () => ({ id: "product_with_variant_images" }) },
+    productOption: { create: async () => ({ id: "option_color" }) },
+    productVariant: { create: async ({ data }: { data: Record<string, unknown> }) => { created.push(data); return { id: "variant_black" }; } },
+    productOptionValueImage: { deleteMany: async () => ({}), create: async () => ({}) },
+    productImage: { deleteMany: async () => ({}), create: async ({ data }: { data: { url: string } }) => ({ id: `image:${data.url}`, url: data.url }) },
+    productOptionValue: { create: async () => ({ id: "value_black", value: "Black" }), findFirst: async () => ({ id: "value_black" }) },
+  };
+  const db = { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) } as unknown as PrismaClient;
+  const image = "https://cdn.test/black-shirt.jpg";
+  await createProductWithVariants(db, { name: "Shirt", slug: "shirt", description: "A sufficiently descriptive shirt.", category: "fashion", condition: "NEUF", status: "DRAFT", price: "10.00", stock: 0, images: [image], colors: [], sizes: [], currency: "EUR", storeId: "store_a" }, {
+    options: [{ name: "Color", values: [{ value: "Black" }] }], generate: true,
+    variants: [{ combinationKey: productVariantDraftKey(["Black"]), imageUrls: [image], stock: 2, active: true }],
+  });
+  assert.deepEqual(created[0]?.imageUrls, [image]);
+  await assert.rejects(() => createProductWithVariants(db, { name: "Shirt", price: "10.00", images: [image] } as never, {
+    options: [{ name: "Color", values: [{ value: "Black" }] }], generate: true,
+    variants: [{ combinationKey: productVariantDraftKey(["Black"]), imageUrls: ["https://external.test/not-in-gallery.jpg"], stock: 2, active: true }],
+  }), ProductVariantImageError);
+});
+
+test("editing a seller variant saves its selected product-gallery images through the authorized variant path", async () => {
+  const image = "https://cdn.test/black-shirt.jpg";
+  let updated: Record<string, unknown> | null = null;
+  const tx = {
+    product: { findFirst: async () => ({ id: "product_a", storeId: "store_a", category: "fashion", price: new Prisma.Decimal("10.00"), images: [image], options: [{ id: "option_color", name: "Color", position: 0, values: [{ id: "value_black", value: "Black", position: 0, active: true }] }], variants: [{ id: "variant_black", combinationKey: "value_black", priceOverride: null, compareAtPrice: null, stock: 2, active: true, values: [{ optionValue: { id: "value_black" } }] }] }) },
+    store: { findUnique: async () => ({ businessId: "business_a", ownerId: "seller_a", archivedAt: null, business: { sellerClosedAt: null }, owner: { role: "SELLER" } }) },
+    sellerTeamMembership: { findFirst: async () => null },
+    productOption: { updateMany: async () => ({}), update: async ({ data }: { data: unknown }) => ({ id: "option_color", ...data as object }) },
+    productOptionValue: { updateMany: async () => ({}), update: async ({ data }: { data: unknown }) => ({ id: "value_black", value: "Black", ...data as object }) },
+    productVariant: { updateMany: async () => ({}), findFirst: async () => ({ id: "variant_black" }), update: async ({ data }: { data: Record<string, unknown> }) => { updated = data; } },
+    sellerBusinessAuditEvent: { create: async () => ({ id: "audit_event" }) },
+  };
+  const db = { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) } as unknown as PrismaClient;
+  await saveProductVariants(db, "seller_a", "product_a", {
+    options: [{ id: "option_color", name: "Color", values: [{ id: "value_black", value: "Black" }] }],
+    generate: true,
+    variants: [{ combinationKey: "value_black", imageUrls: [image], priceOverride: null, compareAtPrice: null, stock: 2, active: true }],
+  });
+  assert.deepEqual((updated as Record<string, unknown> | null)?.imageUrls, [image]);
+  await assert.rejects(() => saveProductVariants(db, "seller_a", "product_a", {
+    options: [{ id: "option_color", name: "Color", values: [{ id: "value_black", value: "Black" }] }],
+    generate: true,
+    variants: [{ combinationKey: "value_black", imageUrls: ["https://other.test/not-owned.jpg"], priceOverride: null, compareAtPrice: null, stock: 2, active: true }],
+  }), ProductVariantImageError);
 });
 
 test("supplier update preserves existing barcode and compare-at price when absent, and updates barcode when supplied", async () => {

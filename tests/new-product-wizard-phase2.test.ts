@@ -15,7 +15,7 @@ test("Continue validates only the visible current step and focuses its first inv
 
 test("future progress steps are disabled while Back remains available",()=>{
   assert.match(form,/disabled=\{index>step\}/);
-  assert.match(form,/step>0[\s\S]*goToStep\(step-1\)[\s\S]*>Retour/);
+  assert.match(form,/step>0[\s\S]*goToStep\(step-1\)[\s\S]*>\{wizard\.back\}/);
 });
 
 test("mounted step panels preserve seller-entered state",()=>{
@@ -41,9 +41,9 @@ test("normal seller workflow has no manual Generate action",()=>{
 });
 
 test("variant price and stock use a compact matrix with bulk helpers",()=>{
-  assert.match(variants,/<table><thead><tr><th>Variante<\/th><th>Prix<\/th><th>Stock<\/th><th>Disponible<\/th>/);
-  assert.match(variants,/Appliquer le prix à toutes/);
-  assert.match(variants,/Appliquer le stock à toutes/);
+  assert.match(variants,/<table><thead><tr><th>\{copy\.variant\}<\/th><th>\{copy\.price\}<\/th><th>\{copy\.stock\}<\/th><th>\{copy\.available\}<\/th>/);
+  assert.match(variants,/\{copy\.applyPrice\}/);
+  assert.match(variants,/\{copy\.applyStock\}/);
   assert.match(variants,/priceOverride:bulkPrice\|\|null/);
   assert.match(variants,/stock:Number\(bulkStock\)/);
 });
@@ -55,7 +55,7 @@ test("variant products require their own prices and derive the canonical product
 });
 
 test("SKU barcode and compare price remain available behind Options avancées",()=>{
-  assert.match(variants,/<details className="sellerVariantAdvanced"><summary>Options avancées<\/summary>/);
+  assert.match(variants,/<details className="sellerVariantAdvanced"><summary>\{copy\.advancedOptions\}<\/summary>/);
   for(const field of ["variantSku","variantBarcode","comparePrice"])assert.ok(variants.includes(field));
 });
 
@@ -67,7 +67,7 @@ test("seller-first image assignment targets color or the first meaningful option
 
 test("verification enumerates every blocker with a correction action",()=>{
   assert.match(form,/publishBlockers\.map\(blocker=>/);
-  assert.match(form,/>Corriger<\/button>/);
+  assert.match(form,/>\{wizard\.fix\}<\/button>/);
   assert.match(form,/focusBlocker\(blocker\)/);
 });
 

@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { replaceProductVariantImages } from "./product-variant-images";
+import { normalizeProductVariantImageUrls, replaceProductVariantImages } from "./product-variant-images";
 import { requireStoreCapability } from "./seller-business-access";
 import { requireProductCategoryScope } from "./seller-team-product-scope";
 import { appendSellerBusinessAudit } from "./seller-business-audit";
@@ -112,7 +112,7 @@ function assertValidCompareAtPrice(compareAtPrice: Prisma.Decimal | null | undef
   }
 }
 
-async function createProductOptionsAndVariants(tx: Prisma.TransactionClient, productId: string, basePrice: Prisma.Decimal, options: NormalizedOption[], input: ProductVariantsInput) {
+async function createProductOptionsAndVariants(tx: Prisma.TransactionClient, productId: string, basePrice: Prisma.Decimal, options: NormalizedOption[], input: ProductVariantsInput, productImages: readonly string[]) {
   const resolvedValues: Array<Array<{ id: string; value: string }>> = [];
   for (const [position, optionInput] of options.entries()) {
     const option = await tx.productOption.create({ data: { productId, name: optionInput.name, position, active: true } });
@@ -149,11 +149,13 @@ async function createProductOptionsAndVariants(tx: Prisma.TransactionClient, pro
     });
     const priceOverride = decimal(rawVariant.priceOverride, "Variant price");
     const compareAtPrice = decimal(rawVariant.compareAtPrice, "Variant compare-at price");
+    const imageUrls = normalizeProductVariantImageUrls(rawVariant.imageUrls, productImages);
     assertValidCompareAtPrice(compareAtPrice, priceOverride ?? basePrice);
     await tx.productVariant.create({ data: {
       productId, combinationKey: productVariantCombinationKey(selected.map(({ id }) => id)), sku: optionalText(rawVariant.sku, 120, "SKU"),
       barcode: optionalText(rawVariant.barcode, 120, "Barcode"), priceOverride, compareAtPrice,
       stock: nonNegativeInteger(rawVariant.stock, "Variant stock"), active: rawVariant.active !== false,
+      imageUrls: imageUrls as Prisma.InputJsonArray,
       values: { create: selected.map(({ id }) => ({ optionValueId: id })) },
     } });
   }
@@ -169,8 +171,8 @@ export async function createProductWithVariants(db: PrismaClient, data: Prisma.P
   return db.$transaction(async (tx) => {
     if (authorize) await authorize(tx);
     const product = await tx.product.create({ data, select: { id: true } });
-    if (input && options.length) await createProductOptionsAndVariants(tx, product.id, new Prisma.Decimal(String(data.price)), options, input);
     const productImages = Array.isArray(data.images) ? data.images as string[] : [];
+    if (input && options.length) await createProductOptionsAndVariants(tx, product.id, new Prisma.Decimal(String(data.price)), options, input, productImages);
     if (productImages.length || variantImages != null) await replaceProductVariantImages(tx, product.id, productImages, variantImages);
     if (afterCreate) await afterCreate(tx, product.id);
     return product;
@@ -187,7 +189,7 @@ export async function upsertProductVariantsExact(tx: Prisma.TransactionClient, p
   if (!options.length || !drafts.length || drafts.length > MAX_PRODUCT_VARIANTS) throw new ProductVariantError("Invalid imported variant set.");
   const current = await tx.product.findUnique({
     where: { id: productId },
-    select: { id: true, price: true, options: { orderBy: { position: "asc" }, include: { values: true } }, variants: { include: { values: true } } },
+    select: { id: true, price: true, images: true, options: { orderBy: { position: "asc" }, include: { values: true } }, variants: { include: { values: true } } },
   });
   if (!current) throw new ProductVariantError("Product not found.", 404);
   if (current.options.length && (current.options.length !== options.length || current.options.some((option, index) => option.name.toLocaleLowerCase() !== options[index].name.toLocaleLowerCase()))) {
@@ -223,17 +225,19 @@ export async function upsertProductVariantsExact(tx: Prisma.TransactionClient, p
     const compareAtPrice = decimal(draft.compareAtPrice, "Variant compare-at price");
     assertValidCompareAtPrice(compareAtPrice, priceOverride ?? new Prisma.Decimal(current.price.toString()));
     const stock = nonNegativeInteger(draft.stock, "Variant stock");
+    const imageUrls = normalizeProductVariantImageUrls(draft.imageUrls, current.images);
     const sku = optionalText(draft.sku, 120, "SKU");
     if (existingVariant) {
       await tx.productVariant.update({ where: { id: existingVariant.id }, data: {
         ...(sku ? { sku } : {}), priceOverride,
         ...(draft.barcode !== undefined ? { barcode: optionalText(draft.barcode, 120, "Barcode") } : {}),
         ...(draft.compareAtPrice !== undefined ? { compareAtPrice } : {}),
+        ...(draft.imageUrls !== undefined ? { imageUrls: imageUrls as Prisma.InputJsonArray } : {}),
         stock,
       } });
     } else {
       await tx.productVariant.create({ data: {
-        productId, combinationKey, sku, barcode: optionalText(draft.barcode, 120, "Barcode"), priceOverride, compareAtPrice, stock, active: true,
+        productId, combinationKey, sku, barcode: optionalText(draft.barcode, 120, "Barcode"), priceOverride, compareAtPrice, stock, active: true, imageUrls: imageUrls as Prisma.InputJsonArray,
         values: { create: selectedValues.map(value => ({ optionValueId: value.id })) },
       } });
     }
@@ -249,7 +253,7 @@ export async function saveProductVariants(db: PrismaClient, sellerId: string, pr
   return db.$transaction(async (tx) => {
     const product = await tx.product.findFirst({
       where: { id: productId },
-      select: { id: true, storeId: true, category: true, price: true, options: { include: { values: true } }, variants: { include: { values: true } } },
+      select: { id: true, storeId: true, category: true, price: true, images: true, options: { include: { values: true } }, variants: { include: { values: true } } },
     });
     if (!product) throw new ProductVariantError("Product not found.", 404);
     const principal=await requireProductCategoryScope(tx, sellerId, product.storeId, "PRODUCT_MANAGE_VARIANTS",product.category);
@@ -314,10 +318,12 @@ export async function saveProductVariants(db: PrismaClient, sellerId: string, pr
         const priceOverride = decimal(rawVariant.priceOverride, "Variant price");
         const hasCompareAtPrice = Object.hasOwn(rawVariant, "compareAtPrice");
         const compareAtPrice = hasCompareAtPrice ? decimal(rawVariant.compareAtPrice, "Variant compare-at price") : undefined;
+        const imageUrls = normalizeProductVariantImageUrls(rawVariant.imageUrls, product.images);
         assertValidCompareAtPrice(compareAtPrice, priceOverride ?? product.price);
         await tx.productVariant.update({ where: { id: variant.id }, data: {
           sku: optionalText(rawVariant.sku, 120, "SKU"), barcode: optionalText(rawVariant.barcode, 120, "Barcode"), priceOverride,
           ...(hasCompareAtPrice ? { compareAtPrice } : {}),
+          ...(rawVariant.imageUrls !== undefined ? { imageUrls: imageUrls as Prisma.InputJsonArray } : {}),
           stock: nonNegativeInteger(rawVariant.stock, "Variant stock"), active: rawVariant.active !== false,
         } });
       }

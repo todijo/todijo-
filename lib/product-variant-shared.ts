@@ -10,6 +10,7 @@ export type VariantOptionInput = {
 
 export type VariantUpdateInput = {
   combinationKey: unknown;
+  imageUrls?: unknown;
   sku?: unknown;
   barcode?: unknown;
   priceOverride?: unknown;

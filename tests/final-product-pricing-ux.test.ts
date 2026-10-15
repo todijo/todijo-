@@ -21,7 +21,9 @@ test("missing active variant prices are explicit while disabled variants are ign
 
 test("client and server share pricing validation and preserve submitted variants",()=>{
  const form=source("app/seller/products/new/NewProductForm.tsx"),route=source("app/api/products/route.ts");
- assert.match(form,/required=\{!variantsEnabled\}/);assert.match(form,/variants:variantDraft\.variants/);assert.match(form,/Renseignez un prix valide pour chaque variante active/);
+ const wizard=source("i18n/seller-product-wizard.ts");
+ assert.match(form,/required=\{!variantsEnabled\}/);assert.match(form,/variants:variantDraft\.variants/);assert.match(form,/wizard\.variantPriceRequired\.replace\("\{variants\}"/);
+ assert.match(wizard,/fr:\s*\{[^\n]*variantPriceRequired:"Renseignez un prix valide pour chaque variante active/);
  assert.match(route,/resolveProductPriceInput\(\{variantsEnabled,basePrice:body\.price,variants:variantInput\?\.variants\}\)/);assert.match(route,/const price=Number\(resolvedPrice\.price\)/);
 });
 

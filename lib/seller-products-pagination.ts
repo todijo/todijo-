@@ -7,7 +7,7 @@ export type SellerProductsStatus = "all" | "PUBLISHED" | "DRAFT";
 export type SellerProductsSort = "newest" | "oldest" | "name";
 export type SellerProductsStock = "all" | "low" | "out";
 export type SellerProductsQuery = { page: number; q: string; status: SellerProductsStatus; sort: SellerProductsSort; stock: SellerProductsStock };
-export type SellerProductCardData = { id: string; name: string; price: string; currency: string; stock: number; variantCount: number; status: "PUBLISHED" | "DRAFT"; image: string | null; automaticCjPrice: boolean };
+export type SellerProductCardData = { id: string; name: string; price: string; currency: string; stock: number; variantCount: number; status: "PUBLISHED" | "DRAFT"; image: string | null; automaticCjPrice: boolean; supplierManaged: boolean };
 
 export function parseSellerProductsQuery(params: URLSearchParams): SellerProductsQuery {
   const rawPage = Number(params.get("page"));
@@ -72,6 +72,6 @@ export async function listSellerProducts(db: ProductDb, storeId: string, query: 
   const page = Math.min(query.page, pages);
   const orderBy: Prisma.ProductOrderByWithRelationInput[] = query.sort === "name" ? [{ name: "asc" }, { id: "asc" }] : [{ createdAt: query.sort === "oldest" ? "asc" : "desc" }, { id: query.sort === "oldest" ? "asc" : "desc" }];
   const rows = await db.product.findMany({ where, orderBy, skip: (page - 1) * SELLER_PRODUCTS_PAGE_SIZE, take: SELLER_PRODUCTS_PAGE_SIZE, select: { id: true, name: true, price: true, currency: true, stock: true, status: true, images: true, _count: { select: { variants: true } }, supplierLink: { select: { provider: true, sourceMetadata: true } } } });
-  const products: SellerProductCardData[] = rows.map((row) => ({ id: row.id, name: row.name, price: row.price.toString(), currency: row.currency, stock: row.stock, variantCount: row._count.variants, status: row.status, image: row.images[0] ?? null, automaticCjPrice: automaticCjPrice(row.supplierLink?.provider, row.supplierLink?.sourceMetadata) }));
+  const products: SellerProductCardData[] = rows.map((row) => ({ id: row.id, name: row.name, price: row.price.toString(), currency: row.currency, stock: row.stock, variantCount: row._count.variants, status: row.status, image: row.images[0] ?? null, automaticCjPrice: automaticCjPrice(row.supplierLink?.provider, row.supplierLink?.sourceMetadata), supplierManaged: Boolean(row.supplierLink) }));
   return { products, total, allTotal, published, lowStock, page, pages, pageSize: SELLER_PRODUCTS_PAGE_SIZE };
 }

@@ -20,11 +20,13 @@ import {resolveProductPriceInput} from "@/lib/product-price-input";
 import {isLocale} from "@/i18n/config";
 import {loyaltyMessages} from "@/i18n/loyalty";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
+import { sellerProductWizardCopy } from "@/i18n/seller-product-wizard";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="" }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const requestedLocale = useLocale();
+  const wizard = sellerProductWizardCopy(requestedLocale);
   const loyaltyCopy = loyaltyMessages[isLocale(requestedLocale) ? requestedLocale : "fr"];
   const ux = useTranslations("Ux");
   const compliance = useTranslations("Compliance");
@@ -52,26 +54,27 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const submitLock = useRef(false);
   const successRef = useRef<HTMLParagraphElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const steps = ["Produit", "Photos", "Variantes", "Prix & stock", "Livraison", "Vérification"];
+  const steps = wizard.steps;
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   function blockerForField(field:HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement):PublicationBlocker {
     const key=field.id||field.name;
-    const labels:Record<string,string>={name:"Nom du produit",description:"Description",category:"Catégorie",price:"Prix",stock:"Stock",shippingMethodName:"Mode de livraison",shippingPrice:"Prix de livraison",shippingMinDays:"Délai minimum de livraison",shippingMaxDays:"Délai maximum de livraison",complianceDeclaration:"Déclaration de conformité"};
-    return {key,label:labels[key]??field.labels?.[0]?.textContent?.trim()??"Information obligatoire",step:Number(field.closest<HTMLElement>("[data-wizard-step]")?.dataset.wizardStep??0),fieldId:field.id||undefined};
+    const label=field.labels?.[0]?.textContent?.trim()||field.getAttribute("aria-label")||field.name||"";
+    return {key,label,step:Number(field.closest<HTMLElement>("[data-wizard-step]")?.dataset.wizardStep??0),fieldId:field.id||undefined};
   }
 
   function collectBlockers() {
     const fields=Array.from(formRef.current?.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>(":invalid")??[]);
     const next=fields.map(blockerForField);
-    if(variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)) next.push({key:"variants",label:"Variantes — ajoutez au moins une option et une valeur",step:2});
-    const pricing=resolveProductPriceInput({variantsEnabled,basePrice,variants:variantDraft.variants});if(variantsEnabled&&variantDraft.generated&&!pricing.ok)for(const missing of pricing.missing)next.push({key:`variantPrice-${missing}`,label:`Prix requis pour la variante ${missing}`,step:2});
-    if(disabledByLimit&&productLimit!==null) next.push({key:"productLimit",label:`Votre forfait autorise ${productLimit} produits et votre boutique en contient déjà ${productCount}.`,step:5,href:"/seller/subscription",actionLabel:"Voir mon forfait"});
+    if(variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)) next.push({key:"variants",label:wizard.chooseVariantValues,step:2});
+    const pricing=resolveProductPriceInput({variantsEnabled,basePrice,variants:variantDraft.variants});if(variantsEnabled&&variantDraft.generated&&!pricing.ok)for(const missing of pricing.missing)next.push({key:`variantPrice-${missing}`,label:wizard.variantPriceRequired.replace("{variants}",missing),step:2});
+    if(disabledByLimit&&productLimit!==null) next.push({key:"productLimit",label:sellerFreeModelCopy(requestedLocale).quota,step:5,href:"/seller/subscription",actionLabel:sellerFreeModelCopy(requestedLocale).modify});
     const unique=next.filter((item,index)=>next.findIndex(candidate=>candidate.key===item.key)===index);
     setBlockers(unique); setBlockersReady(true); return unique;
   }
 
   function focusBlocker(blocker:PublicationBlocker) {
-    setStep(blocker.step); setStepValidation({step:blocker.step,message:`Veuillez corriger : ${blocker.label}.`});
+    setStep(blocker.step); setStepValidation({step:blocker.step,message:wizard.invalidPrefix.replace("{field}",blocker.label)});
     requestAnimationFrame(()=>{const field=blocker.fieldId?document.getElementById(blocker.fieldId):formRef.current?.querySelector<HTMLElement>(`[name="${blocker.key}"]`);field?.scrollIntoView({behavior:"smooth",block:"center"});field?.focus();if(field instanceof HTMLInputElement||field instanceof HTMLSelectElement||field instanceof HTMLTextAreaElement)field.reportValidity();});
   }
 
@@ -83,12 +86,12 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   function continueStep() {
     const panel=formRef.current?.querySelector<HTMLElement>(`[data-wizard-step="${step}"]`);
     const invalid=panel?.querySelector<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>(":invalid");
-    if(invalid){const blocker=blockerForField(invalid);setStepValidation({step,message:`Veuillez compléter correctement : ${blocker.label}.`});invalid.scrollIntoView({behavior:"smooth",block:"center"});invalid.focus();invalid.reportValidity();return;}
+    if(invalid){const blocker=blockerForField(invalid);setStepValidation({step,message:wizard.completePrefix.replace("{field}",blocker.label)});invalid.scrollIntoView({behavior:"smooth",block:"center"});invalid.focus();invalid.reportValidity();return;}
     if(step===1&&uploading){setStepValidation({step,message:t("waitUpload")});return;}
-    if(step===2&&variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)){setStepValidation({step,message:"Ajoutez au moins une option et une valeur pour créer les variantes."});return;}
+    if(step===2&&variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)){setStepValidation({step,message:wizard.chooseVariantValues});return;}
     if(step===2&&variantsEnabled){
       const pricing=resolveProductPriceInput({variantsEnabled:true,basePrice,variants:variantDraft.variants});
-      if(!pricing.ok){setStepValidation({step,message:`Renseignez un prix valide pour chaque variante active : ${pricing.missing.join(", ")}.`});return;}
+      if(!pricing.ok){setStepValidation({step,message:wizard.variantPriceRequired.replace("{variants}",pricing.missing.join(", "))});return;}
     }
     goToStep(step+1);
   }
@@ -98,7 +101,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     const invalid = event.currentTarget.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(":invalid");
     if (invalid) {
       const invalidStep = Number(invalid.closest<HTMLElement>("[data-wizard-step]")?.dataset.wizardStep ?? 0);
-      setStep(invalidStep); setStepValidation({step:invalidStep,message:`Veuillez compléter correctement : ${blockerForField(invalid).label}.`}); collectBlockers();
+      setStep(invalidStep); setStepValidation({step:invalidStep,message:wizard.completePrefix.replace("{field}",blockerForField(invalid).label)}); collectBlockers();
       requestAnimationFrame(() => invalid.reportValidity());
       return;
     }
@@ -134,7 +137,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const draftBlockers=blockers;
   const publishBlockers=blockers;
   return <form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { requestAnimationFrame(() => { const panel=formRef.current?.querySelector<HTMLElement>(`[data-wizard-step="${step}"]`); if(stepValidation?.step===step&&!panel?.querySelector(":invalid"))setStepValidation(null); if(step===5)collectBlockers(); }); }}>
-    <nav className="sellerProductWizardProgress" aria-label="Étapes d’ajout du produit"><ol>{steps.map((label,index)=><li key={label} className={index===step?"isCurrent":index<step?"isComplete":""}><button type="button" disabled={index>step} onClick={()=>goToStep(index)} aria-current={index===step?"step":undefined}><span>{index+1}</span>{label}</button></li>)}</ol></nav>
+    <nav className="sellerProductWizardProgress" aria-label={wizard.progressLabel}><ol>{steps.map((label,index)=><li key={label} className={index===step?"isCurrent":index<step?"isComplete":""}><button type="button" disabled={index>step} onClick={()=>goToStep(index)} aria-current={index===step?"step":undefined}><span>{index+1}</span>{label}</button></li>)}</ol></nav>
     <div className="sellerProductWizardBody">
       <div className="sellerControlFormMain">
         <div data-wizard-step="0" hidden={step!==0}>
@@ -149,7 +152,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         </SellerSection>
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
           <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
+            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector onChange={setSelectedCategory} labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
             <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
           </div>
           <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
@@ -163,13 +166,13 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         </div>
         <div data-wizard-step="2" hidden={step!==2}>
         {stepValidation?.step===2&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
-        <SellerSection icon={Boxes} title={t("productOptions")} description="Votre produit existe-t-il en plusieurs couleurs, tailles, modèles ou versions ?">
-          <div className="sellerProductWizardChoices" role="group" aria-label="Ce produit a-t-il des variantes ?">
-            <button type="button" className={!variantsEnabled?"isSelected":""} aria-pressed={!variantsEnabled} onClick={()=>setVariantsEnabled(false)}>Non</button>
-            <button type="button" className={variantsEnabled?"isSelected":""} aria-pressed={variantsEnabled} onClick={()=>{setVariantsEnabled(true);setVariantsInitialized(true);}}>Oui</button>
+        <SellerSection icon={Boxes} title={t("productOptions")} description={wizard.variantsQuestion}>
+          <div className="sellerProductWizardChoices" role="group" aria-label={wizard.variantsQuestion}>
+            <button type="button" className={!variantsEnabled?"isSelected":""} aria-pressed={!variantsEnabled} onClick={()=>setVariantsEnabled(false)}>{wizard.no}</button>
+            <button type="button" className={variantsEnabled?"isSelected":""} aria-pressed={variantsEnabled} onClick={()=>{setVariantsEnabled(true);setVariantsInitialized(true);}}>{wizard.yes}</button>
           </div>
           {variantsInitialized && <div hidden={!variantsEnabled}>
-            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} onDraftChange={setVariantDraft} embedded sellerFirst />
+            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} productImages={images} onDraftChange={setVariantDraft} embedded sellerFirst suggestionCategory={selectedCategory} />
           </div>}
         </SellerSection>
         {variantsInitialized && <div hidden={!variantsEnabled}><SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages} primaryOptionOnly/></SellerSection></div>}
@@ -179,29 +182,29 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         <SellerSection icon={Tag} title={t("pricing")} description={t("pricingHelp")}>
           <label className="sellerQuestionPreference"><input type="checkbox" name="loyaltyEligible"/><span><strong>{loyaltyCopy.title}</strong><small>{loyaltyCopy.eligibleProducts}</small></span></label>
           <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("price", { currency })} htmlFor="price" required={!variantsEnabled}><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required={!variantsEnabled} placeholder={variantsEnabled?"Calculé depuis les variantes":"29.99"} value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
+            <SellerFormField label={t("price", { currency })} htmlFor="price" required={!variantsEnabled}><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required={!variantsEnabled} placeholder={variantsEnabled?undefined:"29.99"} value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
             <SellerFormField label={t("comparePrice", { currency })} htmlFor="compareAtPrice" hint={t("comparePriceHint")}><input id="compareAtPrice" name="compareAtPrice" type="number" min="0.01" max="1000000" step="0.01" aria-describedby="compareAtPrice-hint" placeholder="39.99" /></SellerFormField>
           </div>
         </SellerSection>
         {!variantsEnabled && <SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><SellerFormField label={t("stock")} htmlFor="stock" hint={t("stockHint")} required><input id="stock" name="stock" type="number" min="0" max="1000000" step="1" value={productStock} onChange={(event) => setProductStock(event.target.value)} required /></SellerFormField></SellerSection>}
-        {variantsEnabled && <p className="sellerProductWizardNote">Les prix et le stock de chaque variante sont conservés dans l’étape Variantes.</p>}
+        {variantsEnabled && <p className="sellerProductWizardNote">{wizard.priceFromVariants}</p>}
         </div>
         <div data-wizard-step="4" hidden={step!==4}>
         {stepValidation?.step===4&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
-        <SellerSection icon={Truck} title={shipping("productSettingsTitle")} description={shipping("productSettingsHelp")}><label className="shippingToggle"><input type="checkbox" checked={shippingOverrideEnabled} onChange={e=>setShippingOverrideEnabled(e.target.checked)}/><span><strong>{shippingOverrideEnabled?"Modifier la livraison pour ce produit":"Utiliser les paramètres de livraison de ma boutique"}</strong><small>{storeShippingSummary||shipping("storeShippingUnconfigured")}</small></span></label>{shippingOverrideEnabled&&<ShippingRuleFields value={shippingRule} onChange={setShippingRule} currency={currency}/>}</SellerSection>
+        <SellerSection icon={Truck} title={shipping("productSettingsTitle")} description={shipping("productSettingsHelp")}><label className="shippingToggle"><input type="checkbox" checked={shippingOverrideEnabled} onChange={e=>setShippingOverrideEnabled(e.target.checked)}/><span><strong>{shippingOverrideEnabled?shipping("customProductShipping"):shipping("inheritStoreShipping")}</strong><small>{storeShippingSummary||shipping("storeShippingUnconfigured")}</small></span></label>{shippingOverrideEnabled&&<ShippingRuleFields value={shippingRule} onChange={setShippingRule} currency={currency}/>}</SellerSection>
         </div>
         <div data-wizard-step="5" hidden={step!==5}>
         {stepValidation?.step===5&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
-        <SellerSection icon={FileText} title="Vérification" description="Vérifiez les informations avant d’enregistrer ou de publier.">
-          {!blockersReady?<p className="sellerProductWizardReview">Vérification des informations…</p>:publishBlockers.length?<div className="sellerProductWizardBlockers"><strong>{publishBlockers.length} information{publishBlockers.length>1?"s":""} à corriger avant enregistrement ou publication</strong><ul>{publishBlockers.map(blocker=><li key={blocker.key}><span>{blocker.label}</span>{blocker.href?<a className="sellerProductWizardBlockerLink" href={blocker.href}>{blocker.actionLabel}</a>:<button type="button" onClick={()=>focusBlocker(blocker)}>Corriger</button>}</li>)}</ul></div>:<p className="sellerProductWizardReview">Toutes les informations obligatoires sont renseignées.</p>}
+        <SellerSection icon={FileText} title={wizard.reviewTitle} description={wizard.reviewDescription}>
+          {!blockersReady?<p className="sellerProductWizardReview">{wizard.reviewLoading}</p>:publishBlockers.length?<div className="sellerProductWizardBlockers"><strong>{wizard.reviewFix}</strong><ul>{publishBlockers.map(blocker=><li key={blocker.key}><span>{blocker.label}</span>{blocker.href?<a className="sellerProductWizardBlockerLink" href={blocker.href}>{blocker.actionLabel}</a>:<button type="button" onClick={()=>focusBlocker(blocker)}>{wizard.fix}</button>}</li>)}</ul></div>:<p className="sellerProductWizardReview">{wizard.complete}</p>}
         </SellerSection>
         <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
         </div>
       </div>
     </div>
     <SellerActionBar status={message && <p ref={successRef} className={`sellerControlFeedback${published ? " isSuccess" : ""}`} role={published ? "status" : "alert"} tabIndex={published ? -1 : undefined}>{message}</p>}>
-      {step>0 && <button className="sellerControlButton secondary" type="button" onClick={()=>goToStep(step-1)}>Retour</button>}
-      {step<5 ? <button className="sellerControlButton primary" type="button" onClick={continueStep}>Continuer</button> : <>
+      {step>0 && <button className="sellerControlButton secondary" type="button" onClick={()=>goToStep(step-1)}>{wizard.back}</button>}
+      {step<5 ? <button className="sellerControlButton primary" type="button" onClick={continueStep}>{wizard.continue}</button> : <>
         <a className="sellerControlButton secondary" href="/seller/products">{t("cancel")}</a>
         <button className="sellerControlButton secondary" type="submit" name="intent" value="DRAFT" disabled={submitting || !blockersReady || draftBlockers.length>0} aria-busy={submitting}>{t("saveDraft")}</button>
         <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || !blockersReady || publishBlockers.length>0} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
