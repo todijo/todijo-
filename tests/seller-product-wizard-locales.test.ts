@@ -15,3 +15,9 @@ test("guided product wizard has complete translated keys in every supported loca
     for(const value of [...copy.steps,copy.progressLabel,copy.variantsQuestion,copy.reviewTitle,copy.back,copy.continue,copy.variantImageAssignment,...Object.values(copy.optionPresets),...Object.values(copy.colors)])assert.ok(value.trim().length>0,locale);
   }
 });
+
+test("wizard step names match the reorganized product creation flow",()=>{
+  assert.deepEqual(sellerProductWizardCopy("fr").steps,["Catégorie et type de produit","Informations et médias","Attributs et variantes","Prix et stock","Livraison","Vérification"]);
+  assert.deepEqual(sellerProductWizardCopy("en").steps,["Category and product type","Product information and media","Attributes and variants","Pricing and inventory","Shipping","Final review"]);
+  for(const locale of locales)assert.equal(new Set(sellerProductWizardCopy(locale).steps).size,6,locale);
+});

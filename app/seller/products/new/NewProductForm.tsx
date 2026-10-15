@@ -3,10 +3,11 @@
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import Image from "next/image";
 import { Boxes, FileText, ImagePlus, Shapes, Tag, Truck } from "lucide-react";
 import { SellerActionBar, SellerFormField, SellerSection } from "@/components/SellerControlPanel";
 import ProductImageManager from "@/components/ProductImageManager";
-import ProductVariantEditor, { type ProductVariantsDraft } from "@/components/ProductVariantEditor";
+import ProductVariantEditor, { ProductVariantInventoryFields, type ProductVariantsDraft } from "@/components/ProductVariantEditor";
 import VariantImageManager, { type VariantImageAssignment } from "@/components/VariantImageManager";
 import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
 import ProductVideoManager from "@/components/ProductVideoManager";
@@ -22,6 +23,7 @@ import {loyaltyMessages} from "@/i18n/loyalty";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { sellerProductWizardCopy } from "@/i18n/seller-product-wizard";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
+type ProductReviewSnapshot={name:string;description:string;category:string;condition:string;images:string[];video:ProductVideoInput|null;variantsEnabled:boolean;variantDraft:ProductVariantsDraft;variantImages:VariantImageAssignment[];price:string;compareAtPrice:string;stock:string;allowPrepurchaseQuestions:boolean;loyaltyEligible:boolean;shippingOverrideEnabled:boolean;shippingRule:ShippingDraft};
 export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="" }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
@@ -51,6 +53,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const [blockers,setBlockers]=useState<PublicationBlocker[]>([]);
   const [blockersReady,setBlockersReady]=useState(false);
   const [stepValidation,setStepValidation]=useState<{step:number;message:string}|null>(null);
+  const [reviewSnapshot,setReviewSnapshot]=useState<ProductReviewSnapshot|null>(null);
   const submitLock = useRef(false);
   const successRef = useRef<HTMLParagraphElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -67,7 +70,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     const fields=Array.from(formRef.current?.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>(":invalid")??[]);
     const next=fields.map(blockerForField);
     if(variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)) next.push({key:"variants",label:wizard.chooseVariantValues,step:2});
-    const pricing=resolveProductPriceInput({variantsEnabled,basePrice,variants:variantDraft.variants});if(variantsEnabled&&variantDraft.generated&&!pricing.ok)for(const missing of pricing.missing)next.push({key:`variantPrice-${missing}`,label:wizard.variantPriceRequired.replace("{variants}",missing),step:2});
+    const pricing=resolveProductPriceInput({variantsEnabled,basePrice,variants:variantDraft.variants});if(variantsEnabled&&variantDraft.generated&&!pricing.ok)for(const missing of pricing.missing){const index=variantDraft.variants.findIndex(variant=>variant.active&&variant.values.map(value=>value.optionValue.value).join(" / ")===missing);next.push({key:`variantPrice-${missing}`,label:wizard.variantPriceRequired.replace("{variants}",missing),step:3,fieldId:index>=0?`variant-price-${index}`:undefined});}
     if(disabledByLimit&&productLimit!==null) next.push({key:"productLimit",label:sellerFreeModelCopy(requestedLocale).quota,step:5,href:"/seller/subscription",actionLabel:sellerFreeModelCopy(requestedLocale).modify});
     const unique=next.filter((item,index)=>next.findIndex(candidate=>candidate.key===item.key)===index);
     setBlockers(unique); setBlockersReady(true); return unique;
@@ -78,9 +81,28 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     requestAnimationFrame(()=>{const field=blocker.fieldId?document.getElementById(blocker.fieldId):formRef.current?.querySelector<HTMLElement>(`[name="${blocker.key}"]`);field?.scrollIntoView({behavior:"smooth",block:"center"});field?.focus();if(field instanceof HTMLInputElement||field instanceof HTMLSelectElement||field instanceof HTMLTextAreaElement)field.reportValidity();});
   }
 
+  function makeReviewSnapshot():ProductReviewSnapshot {
+    const form=formRef.current;
+    const category=form?.querySelector<HTMLSelectElement>("#category");
+    const condition=form?.querySelector<HTMLSelectElement>("#condition");
+    return {
+      name:form?.querySelector<HTMLInputElement>("#name")?.value??"",
+      description:form?.querySelector<HTMLTextAreaElement>("#description")?.value??"",
+      category:category?.selectedOptions[0]?.textContent?.trim()??"",
+      condition:condition?.selectedOptions[0]?.textContent?.trim()??"",
+      images:[...images],video,variantsEnabled,variantDraft,variantImages:variantImages.map(assignment=>({...assignment,imageUrls:[...assignment.imageUrls]})),
+      price:form?.querySelector<HTMLInputElement>("#price")?.value??"",
+      compareAtPrice:form?.querySelector<HTMLInputElement>("#compareAtPrice")?.value??"",
+      stock:productStock,
+      allowPrepurchaseQuestions:form?.querySelector<HTMLInputElement>('[name="allowPrepurchaseQuestions"]')?.checked??false,
+      loyaltyEligible:form?.querySelector<HTMLInputElement>('[name="loyaltyEligible"]')?.checked??false,
+      shippingOverrideEnabled,shippingRule,
+    };
+  }
+
   function goToStep(nextStep:number) {
     setStepValidation(null); setStep(nextStep);
-    if(nextStep===5){setBlockersReady(false);requestAnimationFrame(collectBlockers);}
+    if(nextStep===5){setReviewSnapshot(makeReviewSnapshot());setBlockersReady(false);requestAnimationFrame(collectBlockers);}
   }
 
   function continueStep() {
@@ -89,9 +111,9 @@ export default function NewProductForm({ currency, productCount, productLimit, s
     if(invalid){const blocker=blockerForField(invalid);setStepValidation({step,message:wizard.completePrefix.replace("{field}",blocker.label)});invalid.scrollIntoView({behavior:"smooth",block:"center"});invalid.focus();invalid.reportValidity();return;}
     if(step===1&&uploading){setStepValidation({step,message:t("waitUpload")});return;}
     if(step===2&&variantsEnabled&&(!variantDraft.options.length||!variantDraft.variants.length||!variantDraft.generated)){setStepValidation({step,message:wizard.chooseVariantValues});return;}
-    if(step===2&&variantsEnabled){
+    if(step===3&&variantsEnabled){
       const pricing=resolveProductPriceInput({variantsEnabled:true,basePrice,variants:variantDraft.variants});
-      if(!pricing.ok){setStepValidation({step,message:wizard.variantPriceRequired.replace("{variants}",pricing.missing.join(", "))});return;}
+      if(!pricing.ok){const missing=pricing.missing[0];const index=variantDraft.variants.findIndex(variant=>variant.active&&variant.values.map(value=>value.optionValue.value).join(" / ")===missing);setStepValidation({step,message:wizard.variantPriceRequired.replace("{variants}",pricing.missing.join(", "))});requestAnimationFrame(()=>document.getElementById(`variant-price-${index}`)?.focus());return;}
     }
     goToStep(step+1);
   }
@@ -142,6 +164,15 @@ export default function NewProductForm({ currency, productCount, productLimit, s
       <div className="sellerControlFormMain">
         <div data-wizard-step="0" hidden={step!==0}>
         {stepValidation?.step===0&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
+        <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
+          <div className="sellerControlFieldGrid">
+            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector onChange={setSelectedCategory} labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
+            <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
+          </div>
+        </SellerSection>
+        </div>
+        <div data-wizard-step="1" hidden={step!==1}>
+        {stepValidation?.step===1&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={FileText} title={t("basicInfo")} description={t("basicInfoHelp")}>
           <SellerFormField label={t("productName")} htmlFor="name" hint={t("productNameHint")} required>
             <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} />
@@ -150,19 +181,10 @@ export default function NewProductForm({ currency, productCount, productLimit, s
             <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required aria-describedby="description-hint" placeholder={t("descriptionPlaceholder")} />
           </SellerFormField>
         </SellerSection>
-        <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
-          <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector onChange={setSelectedCategory} labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
-            <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
-          </div>
-          <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
-        </SellerSection>
-        </div>
-        <div data-wizard-step="1" hidden={step!==1}>
-        {stepValidation?.step===1&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
           <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/><ProductVideoManager key={`video-${resetGeneration}`} onChange={setVideo} onUploadingChange={setUploading}/>
         </SellerSection>
+        <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
         </div>
         <div data-wizard-step="2" hidden={step!==2}>
         {stepValidation?.step===2&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
@@ -172,7 +194,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
             <button type="button" className={variantsEnabled?"isSelected":""} aria-pressed={variantsEnabled} onClick={()=>{setVariantsEnabled(true);setVariantsInitialized(true);}}>{wizard.yes}</button>
           </div>
           {variantsInitialized && <div hidden={!variantsEnabled}>
-            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} productImages={images} onDraftChange={setVariantDraft} embedded sellerFirst suggestionCategory={selectedCategory} />
+            <ProductVariantEditor key={`variants-${resetGeneration}`} currency={currency} basePrice={basePrice} productImages={images} initialOptions={variantDraft.options} initialVariants={variantDraft.variants} onDraftChange={setVariantDraft} embedded sellerFirst suggestionCategory={selectedCategory} hideSellerInventory />
           </div>}
         </SellerSection>
         {variantsInitialized && <div hidden={!variantsEnabled}><SellerSection icon={ImagePlus} title={t("variantImages")} description={t("variantImagesHelp")}><VariantImageManager images={images} options={variantDraft.options} onChange={setVariantImages} primaryOptionOnly/></SellerSection></div>}
@@ -187,7 +209,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
           </div>
         </SellerSection>
         {!variantsEnabled && <SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><SellerFormField label={t("stock")} htmlFor="stock" hint={t("stockHint")} required><input id="stock" name="stock" type="number" min="0" max="1000000" step="1" value={productStock} onChange={(event) => setProductStock(event.target.value)} required /></SellerFormField></SellerSection>}
-        {variantsEnabled && <p className="sellerProductWizardNote">{wizard.priceFromVariants}</p>}
+        {variantsEnabled&&variantDraft.variants.length>0&&<SellerSection icon={Boxes} title={t("inventory")} description={t("inventoryHelp")}><ProductVariantInventoryFields draft={variantDraft} onChange={setVariantDraft} productImages={images} basePrice={basePrice} currency={currency}/></SellerSection>}
         </div>
         <div data-wizard-step="4" hidden={step!==4}>
         {stepValidation?.step===4&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
@@ -196,6 +218,22 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         <div data-wizard-step="5" hidden={step!==5}>
         {stepValidation?.step===5&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={FileText} title={wizard.reviewTitle} description={wizard.reviewDescription}>
+          {reviewSnapshot&&<div className="sellerProductWizardSummary" aria-label={wizard.reviewTitle}>
+            <dl>
+              <div><dt>{t("category")}</dt><dd>{reviewSnapshot.category||"—"}</dd></div>
+              <div><dt>{t("condition")}</dt><dd>{reviewSnapshot.condition||"—"}</dd></div>
+              <div><dt>{t("productName")}</dt><dd>{reviewSnapshot.name||"—"}</dd></div>
+              <div><dt>{t("description")}</dt><dd className="sellerProductWizardSummaryDescription">{reviewSnapshot.description||"—"}</dd></div>
+              <div><dt>{t("images")}</dt><dd><div className="sellerProductWizardMediaSummary">{reviewSnapshot.images.map((url,index)=><Image key={url} src={url} alt={t("imageAlt",{number:index+1})} width={72} height={56} unoptimized/>)}{reviewSnapshot.video&&<a href={reviewSnapshot.video.url} target="_blank" rel="noreferrer">{reviewSnapshot.video.url}</a>}{!reviewSnapshot.images.length&&!reviewSnapshot.video&&"—"}</div></dd></div>
+              <div><dt>{t("productOptions")}</dt><dd>{reviewSnapshot.variantsEnabled?<div className="sellerProductWizardVariantSummary">{reviewSnapshot.variantDraft.options.map((option,index)=><p key={`${String(option.name)}-${index}`}><strong>{String(option.name)}</strong>: {option.values.map(value=>value.value).join(", ")||"—"}</p>)}<div className="sellerProductWizardTableWrap"><table><thead><tr><th>{wizard.variant}</th><th>{t("variantSku")}</th><th>{wizard.price}</th><th>{wizard.stock}</th><th>{wizard.available}</th><th>{t("variantImages")}</th></tr></thead><tbody>{reviewSnapshot.variantDraft.variants.map(variant=><tr key={variant.combinationKey}><th>{variant.values.map(value=>value.optionValue.value).join(" / ")}</th><td>{variant.sku||"—"}</td><td>{(variant.priceOverride??reviewSnapshot.price)||"—"}</td><td>{variant.stock}</td><td>{variant.active?wizard.yes:wizard.no}</td><td><div className="sellerProductWizardMediaSummary">{variant.imageUrls?.map((url,index)=><Image key={url} src={url} alt={t("imageAlt",{number:index+1})} width={48} height={40} unoptimized/>)}{!variant.imageUrls?.length&&"—"}</div></td></tr>)}</tbody></table></div></div>:wizard.no}</dd></div>
+              {reviewSnapshot.variantsEnabled&&reviewSnapshot.variantImages.length>0&&<div><dt>{t("variantImages")}</dt><dd><div className="sellerProductWizardVariantSummary">{reviewSnapshot.variantImages.map((assignment,index)=><p key={assignment.optionValueId??`${assignment.optionName}-${assignment.value}-${index}`}><strong>{[assignment.optionName,assignment.value].filter(Boolean).join(": ")}</strong>: {assignment.imageUrls.map((url,imageIndex)=><Image key={url} src={url} alt={t("imageAlt",{number:imageIndex+1})} width={48} height={40} unoptimized/>)}{assignment.primaryUrl&&<span> · {t("variantPrimaryImage")}</span>}</p>)}</div></dd></div>}
+              <div><dt>{t("pricing")}</dt><dd>{reviewSnapshot.variantsEnabled?reviewSnapshot.variantDraft.variants.map(variant=>`${variant.values.map(value=>value.optionValue.value).join(" / ")}: ${(variant.priceOverride??reviewSnapshot.price)||"—"}`).join(" · "):reviewSnapshot.price||"—"}{reviewSnapshot.compareAtPrice?` · ${t("comparePrice",{currency})}: ${reviewSnapshot.compareAtPrice}`:""}</dd></div>
+              {!reviewSnapshot.variantsEnabled&&<div><dt>{t("stock")}</dt><dd>{reviewSnapshot.stock}</dd></div>}
+              <div><dt>{ux("questionLabel")}</dt><dd>{reviewSnapshot.allowPrepurchaseQuestions?wizard.yes:wizard.no}</dd></div>
+              <div><dt>{loyaltyCopy.title}</dt><dd>{reviewSnapshot.loyaltyEligible?wizard.yes:wizard.no}</dd></div>
+              <div><dt>{shipping("productSettingsTitle")}</dt><dd>{reviewSnapshot.shippingOverrideEnabled?(reviewSnapshot.shippingRule.enabled?[shipping("customProductShipping"),reviewSnapshot.shippingRule.method,reviewSnapshot.shippingRule.carrier,reviewSnapshot.shippingRule.worldwide?shipping("worldwide"):shipping("selectedDestinationsCount",{count:reviewSnapshot.shippingRule.countries.length}),reviewSnapshot.shippingRule.free?shipping("alwaysFree"):`${shipping("paidShipping")} · ${reviewSnapshot.shippingRule.price} ${currency}`,reviewSnapshot.shippingRule.freeThreshold?`${shipping("freeThreshold",{currency})}: ${reviewSnapshot.shippingRule.freeThreshold}`:"",reviewSnapshot.shippingRule.minDays?`${shipping("minDays")}: ${reviewSnapshot.shippingRule.minDays}`:"",reviewSnapshot.shippingRule.maxDays?`${shipping("maxDays")}: ${reviewSnapshot.shippingRule.maxDays}`:""].filter(Boolean).join(" · "):shipping("disabledHelp")):`${shipping("inheritStoreShipping")} · ${storeShippingSummary||shipping("storeShippingUnconfigured")}`}</dd></div>
+            </dl>
+          </div>}
           {!blockersReady?<p className="sellerProductWizardReview">{wizard.reviewLoading}</p>:publishBlockers.length?<div className="sellerProductWizardBlockers"><strong>{wizard.reviewFix}</strong><ul>{publishBlockers.map(blocker=><li key={blocker.key}><span>{blocker.label}</span>{blocker.href?<a className="sellerProductWizardBlockerLink" href={blocker.href}>{blocker.actionLabel}</a>:<button type="button" onClick={()=>focusBlocker(blocker)}>{wizard.fix}</button>}</li>)}</ul></div>:<p className="sellerProductWizardReview">{wizard.complete}</p>}
         </SellerSection>
         <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
