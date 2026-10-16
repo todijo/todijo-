@@ -40,7 +40,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const product = await prisma.product.findFirst({
       where: { id, removedAt:null },
       select: {
-        id: true,storeId:true,name:true,description:true,sourceLocale:true,category:true,condition:true,status:true,price:true,compareAtPrice:true,stock:true,colors:true,sizes:true,images:true,allowPrepurchaseQuestions:true,complianceDeclaredAt: true, deactivationReason: true, loyaltyEligible: true,
+        id: true,storeId:true,name:true,description:true,sourceLocale:true,category:true,condition:true,status:true,price:true,compareAtPrice:true,stock:true,colors:true,sizes:true,images:true,allowPrepurchaseQuestions:true,complianceDeclaredAt: true, deactivationReason: true, loyaltyEligible: true, sharedCatalogProductId:true,
         productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
         media:{where:{type:"VIDEO"},take:1,select:{url:true}},
         supplierLink: { select: { id:true, provider: true, ownerType: true, connectionId: true, supplierProductId: true, supplierAvailable: true, syncStatus: true, classificationStatus:true, sourceMetadata:true, connection: { select: { id: true, status: true, store: { select: { dropshippingEnabled: true } } } } } },
@@ -52,9 +52,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const body = await request.json();
     const requiredPermissions=productUpdatePermissions(product,body);
     await requireProductPermissions(prisma,session.userId,product.id,requiredPermissions.length?requiredPermissions:["PRODUCT_EDIT_CONTENT"]);
-    const name = String(body.name ?? "").trim();
-    const description = String(body.description ?? "").trim();
-    const category = String(body.category ?? "").trim();
+    const sharedCatalogProduct = product.sharedCatalogProductId ? await prisma.sharedCatalogProduct.findFirst({ where: { id: product.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, brand: true, gtin: true } }) : null;
+    const name = sharedCatalogProduct?.title ?? String(body.name ?? "").trim();
+    const description = sharedCatalogProduct?.description ?? String(body.description ?? "").trim();
+    const category = sharedCatalogProduct?.category ?? String(body.category ?? "").trim();
     const condition = String(body.condition ?? "NEUF").trim().toUpperCase();
     const status = body.status === "DRAFT" ? "DRAFT" : "PUBLISHED";
     const compliance = readProductCompliance(body);
@@ -88,12 +89,15 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       const currentSupplierLink = await tx.supplierProductLink.findUnique({ where: { productId: id }, select: { id: true } });
       await tx.product.update({ where: { id }, data: {
         name, description, sourceLocale:name!==product.name||description!==product.description?contentSourceLocale(request):product.sourceLocale, category, condition, status,
+        ...(product.sharedCatalogProductId && !sharedCatalogProduct ? { sharedCatalogProductId: null } : {}),
         deactivationReason: status === "PUBLISHED" ? "NONE" : "SELLER",
         price: price.toFixed(2),
         compareAtPrice: compareAtPrice && compareAtPrice > price ? compareAtPrice.toFixed(2) : null,
         colors, sizes, stock, images, allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
         loyaltyEligible: productLoyaltyEligibility(body.loyaltyEligible, Boolean(currentSupplierLink), product.loyaltyEligible),
         ...compliance,
+        productIdentifier: sharedCatalogProduct?.gtin ?? compliance.productIdentifier,
+        manufacturerName: sharedCatalogProduct?.brand ?? compliance.manufacturerName,
         ...productShipping,
         complianceDeclaredAt: product.complianceDeclaredAt ?? (status === "PUBLISHED" ? new Date() : null),
       } });

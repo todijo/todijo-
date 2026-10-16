@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 import "./globals.css";
+import "./shared-catalog.css";
 import { CartProvider } from "@/components/CartProvider";
 import { locales, rtlLocales, type Locale } from "@/i18n/config";
 import { ToastProvider } from "@/components/ToastProvider";

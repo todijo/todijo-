@@ -15,13 +15,15 @@ import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 import { BUYER_PRODUCT_PAGE_SIZE, buyerProductPage, buyerProductPageCount } from "@/lib/buyer-marketplace-pagination";
 import { proHomepageDiscovery } from "@/lib/pro-homepage-discovery";
 import { homepageLowPricePage, homepageLowPricePageCount, homepageLowPriceWhere, HOMEPAGE_LOW_PRICE_PAGE_SIZE } from "@/lib/homepage-low-price-products";
+import { dedupeSharedCatalogOffers } from "@/lib/shared-catalog-offers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const productSelect = {
   id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true,
-  category: true, stock: true, condition: true, images: true, createdAt: true,
+  category: true, stock: true, condition: true, images: true, createdAt: true, sharedCatalogProductId: true,
+  sharedCatalogProduct: { select: { id: true, title: true, category: true, images: true, status: true } },
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
   store: { select: { name: true, slug: true, city: true, country: true, sellerType:true, displayBusinessAddress:true } },
@@ -32,9 +34,10 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 function serializeProduct(p: ProductRow, locale: string) {
   const availability = resolveProductAvailability({ stock: p.stock, activeOptionCount: p.options.length, variants: p.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  const content=resolveBuyerProductContent({name:p.name,description:"",sourceMetadata:p.supplierLink?.sourceMetadata,locale,sourceLocale:p.sourceLocale,translations:p.translations});
-  return { id: p.id, name: content.title, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
-    currency: p.currency, category: p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: p.images[0] ?? null,
+  const shared = !p.supplierLink && p.sharedCatalogProduct?.status === "PUBLISHED" ? p.sharedCatalogProduct : null;
+  const content=shared ? { title: shared.title } : resolveBuyerProductContent({name:p.name,description:"",sourceMetadata:p.supplierLink?.sourceMetadata,locale,sourceLocale:p.sourceLocale,translations:p.translations});
+  return { id: p.id, sharedCatalogProductId: shared?.id ?? null, name: content.title, price: p.price.toString(), compareAtPrice: p.compareAtPrice?.toString() ?? null,
+    currency: p.currency, category: shared?.category ?? p.category, stock: availability.hasActiveVariants ? null : p.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: p.condition, image: (shared?.images.length ? shared.images : p.images)[0] ?? null,
     storeName: p.store.name, storeSlug: p.store.slug, city: publicStoreCity({ sellerType:p.store.sellerType,country:p.store.country,displayBusinessAddress:p.store.displayBusinessAddress,city:p.store.city }), country: p.store.country, createdAt: p.createdAt.toISOString(),requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(p.supplierLink?.sourceMetadata) };
 }
 
@@ -167,7 +170,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       orderBy: { updatedAt: "desc" },
       take: 5,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, sellerType:true, displayBusinessAddress:true,
-        products: { where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}} } } },
+        products: { where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, sharedCatalogProductId:true, sharedCatalogProduct:{select:{id:true,title:true,images:true,status:true}}, supplierLink:{select:{sourceMetadata:true}} } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
     prisma.product.findMany({
@@ -196,10 +199,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
 
   const bestSellerIds = bestSellerCounts.map((item) => item.productId);
   const bestSellerRows = bestSellerIds.length ? await prisma.product.findMany({ where: { id: { in: bestSellerIds }, status: "PUBLISHED", ...publicProductAccess }, select: productSelect }) : [];
-  const bestSellerById = new Map(bestSellerRows.map((product) => [product.id, product]));
-  const bestSellers = bestSellerIds.map((id) => bestSellerById.get(id)).filter((product): product is ProductRow => Boolean(product)).map(product=>serializeProduct(product,locale));
   const proDiscovery = resultsOnly ? [] : await proHomepageDiscovery(prisma, productSelect, now);
-  const products = rows.map(product=>serializeProduct(product,locale));
+  const products = dedupeSharedCatalogOffers(rows).map(product=>serializeProduct(product,locale));
   const isColorName = (name: string) => /^(color|colour|couleur|farbe|لون|ڕەنگ)$/i.test(name.trim());
   const isSizeName = (name: string) => /^(size|taille|größe|groesse|قەبارە)$/i.test(name.trim());
   const isSeasonName = (name: string) => /^(season|saison)$/i.test(name.trim());
@@ -217,14 +218,14 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   return (
     <HomeClient
       products={products}
-      heroProducts={heroRows.map(product=>serializeProduct(product,locale))}
-      newArrivals={newArrivalRows.map(product=>serializeProduct(product,locale))}
-      bestSellers={bestSellers}
-      proDiscovery={proDiscovery.map(product => serializeProduct(product, locale))}
-      lowPriceProducts={lowPriceRows.map(product => serializeProduct(product, locale))}
+      heroProducts={dedupeSharedCatalogOffers(heroRows).map(product=>serializeProduct(product,locale))}
+      newArrivals={dedupeSharedCatalogOffers(newArrivalRows).map(product=>serializeProduct(product,locale))}
+      bestSellers={dedupeSharedCatalogOffers(bestSellerRows).map(product=>serializeProduct(product,locale))}
+      proDiscovery={dedupeSharedCatalogOffers(proDiscovery).map(product => serializeProduct(product, locale))}
+      lowPriceProducts={dedupeSharedCatalogOffers(lowPriceRows).map(product => serializeProduct(product, locale))}
       lowPricePage={lowPricePage}
       lowPriceTotalPages={lowPriceTotalPages}
-      stores={storeRows.map((store) => ({id:store.id,name:store.name,slug:store.slug,description:store.description,logo:store.logo,city:publicStoreCity({sellerType:store.sellerType,country:store.country,displayBusinessAddress:store.displayBusinessAddress,city:store.city}),country:store.country,products: store.products.map((product) => ({ id: product.id, name: resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: product.images[0] ?? null })) }))}
+      stores={storeRows.map((store) => ({id:store.id,name:store.name,slug:store.slug,description:store.description,logo:store.logo,city:publicStoreCity({sellerType:store.sellerType,country:store.country,displayBusinessAddress:store.displayBusinessAddress,city:store.city}),country:store.country,products: dedupeSharedCatalogOffers(store.products).map((product) => ({ id: product.id, name: !product.supplierLink&&product.sharedCatalogProduct?.status==="PUBLISHED"?product.sharedCatalogProduct.title:resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}).title, image: !product.supplierLink&&product.sharedCatalogProduct?.images.length?product.sharedCatalogProduct.images[0]:product.images[0] ?? null })) }))}
       categories={categoryRows.map((item) => item.category).filter(Boolean)}
       total={total}
       page={normalizedPage}
