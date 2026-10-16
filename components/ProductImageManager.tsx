@@ -3,10 +3,10 @@
 import { ChangeEvent, DragEvent, KeyboardEvent, useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { MAX_PRODUCT_IMAGES, makeCoverImage, moveProductImage } from "@/lib/product-images";
+import { MAX_PRODUCT_IMAGES, MAX_PRODUCT_IMAGE_BYTES, makeCoverImage, moveProductImage } from "@/lib/product-images";
 import { SellerStatusBadge } from "@/components/SellerControlPanel";
 
-const MAX_FILE_SIZE = 8 * 1024 * 1024;
+const MAX_FILE_SIZE = MAX_PRODUCT_IMAGE_BYTES;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 type ManagedImage = { id: string; url: string; name: string; source: "existing" | "new" };
 

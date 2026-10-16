@@ -1,4 +1,5 @@
 export const MAX_PRODUCT_IMAGES = 30;
+export const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export type ProductImageValidation =
   | { ok: true; images: string[] }

@@ -25,7 +25,7 @@ test("preset and custom values retain the established variant payload representa
 });
 
 test("empty seller-first state has no fake combination and real values auto-generate",()=>{
-  assert.match(variants,/function combinations\(options: Option\[\]\) \{ return options\.length \?/);
+  assert.match(variants,/function combinations\(options: Option\[\]\) \{[\s\S]*?if \(!options\.length[\s\S]*?return \[\];[\s\S]*?const all = options\.reduce/);
   assert.match(variants,/\{copy\.emptyOptions\}/);
   assert.match(variants,/setVariants\(\(current\) => current\.length \? \[\] : current\)/);
   assert.match(variants,/const next = combinationLabels\.map/);

@@ -36,7 +36,7 @@ test("photo step reuses existing media managers", () => {
 });
 
 test("variant choice is localized and keeps the existing editor", () => {
-  assert.match(form, /description=\{wizard\.variantsQuestion\}/);
+  assert.match(form, /description=\{<span className="sellerProductWizardHelpLabel">\{wizard\.variantsQuestion\}<SellerHelpPopover/);
   assert.match(form, />\{wizard\.no\}<\/button>[\s\S]*>\{wizard\.yes\}<\/button>/);
   assert.equal(form.match(/<ProductVariantEditor/g)?.length, 1);
   assert.equal(form.match(/<VariantImageManager/g)?.length, 1);
