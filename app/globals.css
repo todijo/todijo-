@@ -1513,6 +1513,38 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 .marketplaceFooterNews{display:inline-flex;width:max-content;margin-top:12px;padding:9px 14px;border:1px solid rgba(255,255,255,.3);border-radius:999px;color:#fff;font-weight:800}.newsShell,.newsArticleShell{width:min(1040px,calc(100% - 32px));margin:34px auto 64px}.newsShell>header{padding:28px;border-radius:24px;background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff}.newsShell>header h1{margin:6px 0 0;color:#fff}.newsHeadlineList{display:grid;gap:12px;margin-top:22px}.newsHeadlineList article{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:#fff}.newsHeadlineList a{color:var(--ink);font-size:18px;font-weight:850}.newsHeadlineList time,.newsArticleShell>time{color:var(--muted);font-size:13px}.newsArticleShell>a{display:inline-block;margin-bottom:16px;color:var(--purple);font-weight:800}.newsArticleShell>time{display:block;margin-bottom:8px}.productRecommendationSection{width:min(1480px,calc(100% - 40px));margin:32px auto}.productRecommendationGrid{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:900px){.productRecommendationGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.newsHeadlineList article{align-items:flex-start;flex-direction:column;gap:6px}.productRecommendationSection{width:min(100% - 20px,1480px)}}
 .sellerProductWizard .sellerVariantImages{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));align-items:start}.sellerProductWizard .sellerVariantImages fieldset{min-width:0}.sellerProductWizard .sellerVariantImages legend{max-width:100%;flex-wrap:wrap}.sellerProductWizard .sellerVariantImages fieldset>div{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:900px){.sellerProductWizard .sellerVariantImages{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.sellerProductWizard .sellerVariantImages{grid-template-columns:1fr}}
 
+/* The add-product wizard keeps its actions in document flow so they never cover fields. */
+.sellerProductWizard>.sellerControlActionBar{position:static;z-index:auto;bottom:auto;margin-top:4px;padding-inline-end:78px;scroll-margin-block:20px}
+.sellerProductWizard .sellerVariantEditorConfigurationOnly .sellerVariantMatrix{display:none!important}
+.sellerProductWizard [data-wizard-step]{min-width:0;scroll-margin-block:24px 150px}
+.sellerProductWizardSummary{padding:16px;border:1px solid var(--dash-border);border-radius:14px;background:var(--dash-surface-elevated)}
+.sellerProductWizardSummary dl{display:grid;gap:0;margin:0}
+.sellerProductWizardSummary dl>div{display:grid;grid-template-columns:minmax(150px,.38fr) minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--dash-border)}
+.sellerProductWizardSummary dl>div:first-child{padding-top:0}
+.sellerProductWizardSummary dl>div:last-child{padding-bottom:0;border-bottom:0}
+.sellerProductWizardSummary dt{color:var(--dash-muted);font-size:12px;font-weight:850}
+.sellerProductWizardSummary dd{min-width:0;margin:0;color:var(--dash-text);overflow-wrap:anywhere;white-space:pre-wrap}
+.sellerProductWizardSummaryDescription{max-height:180px;overflow:auto}
+.sellerProductWizardMediaSummary{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px}
+.sellerProductWizardMediaSummary img{width:72px;height:56px;border:1px solid var(--dash-border);border-radius:8px;object-fit:cover}
+.sellerProductWizardMediaSummary a{max-width:100%;overflow-wrap:anywhere}
+.sellerProductWizardVariantSummary{display:grid;gap:8px}
+.sellerProductWizardVariantSummary p{margin:0}
+.sellerProductWizardTableWrap{max-width:100%;overflow-x:auto;border:1px solid var(--dash-border);border-radius:10px}
+.sellerProductWizardTableWrap table{width:100%;min-width:500px;border-collapse:collapse}
+.sellerProductWizard .sellerVariantTableWrap table{min-width:680px}
+.sellerProductWizardTableWrap th,.sellerProductWizardTableWrap td{padding:8px;border-bottom:1px solid var(--dash-border);text-align:start;white-space:nowrap}
+.sellerProductWizardTableWrap tbody tr:last-child>*{border-bottom:0}
+@media(max-width:720px){
+  .sellerProductWizardProgress ol{min-width:0;grid-template-columns:minmax(0,1fr)}
+  .sellerProductWizardProgress li:not(.isCurrent){display:none}
+  .sellerProductWizardProgress li::after{display:none!important}
+  .sellerProductWizardProgress button{grid-template-columns:32px minmax(0,1fr);justify-items:start;gap:10px;text-align:start;font-size:13px}
+  .sellerProductWizard>.sellerControlActionBar{padding-inline-end:14px;padding-block-end:calc(142px + env(safe-area-inset-bottom))}
+  .sellerProductWizardSummary dl>div{grid-template-columns:1fr;gap:5px}
+}
+@media(max-width:780px){body:has(.premiumDashboardMobileNav) .sellerProductWizard>.sellerControlActionBar{padding-block-end:calc(150px + env(safe-area-inset-bottom))}}
+
 /* Approved homepage mockup alignment. Presentation only. */
 .marketUtilityBar{height:32px;background:#063c2e;color:#fff;font-size:11px}
 .marketUtilityInner{width:min(1160px,calc(100% - 36px));height:100%;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px}
