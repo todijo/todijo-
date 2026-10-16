@@ -13,19 +13,29 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const admin = await requireAdmin(prisma, await readSession());
     const { id } = await context.params;
     const body = await request.json() as { decision?: unknown; confirmImageRights?: unknown };
-    if (body.decision !== "ACCEPTED" && body.decision !== "REJECTED") return NextResponse.json({ error: "INVALID_DECISION" }, { status: 400 });
+    const decision = body.decision;
+    if (decision !== "ACCEPTED" && decision !== "REJECTED") return NextResponse.json({ error: "INVALID_DECISION" }, { status: 400 });
 
     const result = await prisma.$transaction(async (tx) => {
       const correction = await tx.sharedCatalogCorrection.findUnique({ where: { id }, include: { sharedProduct: true } });
       if (!correction) return { status: 404 as const, error: "CORRECTION_NOT_FOUND" };
       if (correction.status !== "PENDING") return { status: 409 as const, error: "CORRECTION_ALREADY_REVIEWED" };
-      if (body.decision === "ACCEPTED") {
+      if (decision === "ACCEPTED") {
         const { field, proposedValue } = correction;
         if (!validateSharedCatalogCorrection(field, proposedValue)) return { status: 409 as const, error: "CORRECTION_VALUE_INVALID" };
         if (field === "category" && (typeof proposedValue !== "string" || !isCanonicalLeafCategoryId(proposedValue))) return { status: 409 as const, error: "CORRECTION_VALUE_INVALID" };
         if (field === "images" && body.confirmImageRights !== true) return { status: 409 as const, error: "CATALOG_MEDIA_PROVENANCE_REQUIRED" };
         const previousValue = correction.sharedProduct[field as keyof typeof correction.sharedProduct];
-        const normalizedValue = field === "images" ? validateProductImages(proposedValue).ok ? validateProductImages(proposedValue).images : [] : field === "gtin" ? (typeof proposedValue === "string" && proposedValue ? normalizeGtin(proposedValue) : null) : typeof proposedValue === "string" ? proposedValue.trim() || (field === "brand" || field === "modelReference" ? null : "") : proposedValue;
+        let normalizedValue: unknown;
+        if (field === "images") {
+          const imageValidation = validateProductImages(proposedValue);
+          if (!imageValidation.ok) return { status: 409 as const, error: "CORRECTION_VALUE_INVALID" };
+          normalizedValue = imageValidation.images;
+        } else if (field === "gtin") {
+          normalizedValue = typeof proposedValue === "string" && proposedValue ? normalizeGtin(proposedValue) : null;
+        } else {
+          normalizedValue = typeof proposedValue === "string" ? proposedValue.trim() || (field === "brand" || field === "modelReference" ? null : "") : proposedValue;
+        }
         let data: Record<string, unknown> = field === "images"
           ? { images: normalizedValue as string[], mediaProvenance: (normalizedValue as string[]).map((url) => ({ imageUrl: url, sourceUrl: url, rightsConfirmedByAdminId: admin.id, rightsConfirmedAt: new Date().toISOString() })) }
           : { [field]: normalizedValue };
@@ -41,9 +51,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       } else {
         await tx.sharedCatalogAdminEvent.create({ data: { sharedProductId: correction.sharedProductId, actorAdminId: admin.id, action: "CORRECTION_REJECTED", snapshot: { correctionId: correction.id, offerProductId: correction.offerProductId, storeId: correction.storeId, field: correction.field } } });
       }
-      const updated = await tx.sharedCatalogCorrection.updateMany({ where: { id, status: "PENDING" }, data: { status: body.decision, reviewedByUserId: admin.id, reviewedAt: new Date() } });
+      const updated = await tx.sharedCatalogCorrection.updateMany({ where: { id, status: "PENDING" }, data: { status: decision, reviewedByUserId: admin.id, reviewedAt: new Date() } });
       if (updated.count !== 1) throw new Error("CORRECTION_REVIEW_CONFLICT");
-      return { status: 200 as const, id, decision: body.decision };
+      return { status: 200 as const, id, decision };
     }, { isolationLevel: "Serializable" });
 
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });

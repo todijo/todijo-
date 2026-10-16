@@ -121,8 +121,6 @@ export async function POST(request: Request) {
         description,
         sourceLocale:contentSourceLocale(request),
         category,
-        productIdentifier: sharedCatalogProduct?.gtin ?? (typeof body.productIdentifier === "string" ? body.productIdentifier : null),
-        manufacturerName: sharedCatalogProduct?.brand ?? (typeof body.manufacturerName === "string" ? body.manufacturerName : null),
         condition,
         status,
         price: price.toFixed(2),

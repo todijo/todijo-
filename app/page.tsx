@@ -170,7 +170,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       orderBy: { updatedAt: "desc" },
       take: 5,
       select: { id: true, name: true, slug: true, description: true, logo: true, city: true, country: true, sellerType:true, displayBusinessAddress:true,
-        products: { where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, sharedCatalogProductId:true, sharedCatalogProduct:{select:{id:true,title:true,images:true,status:true}}, supplierLink:{select:{sourceMetadata:true}} } } },
+        products: { where: { status: "PUBLISHED", ...publicProductAccess }, orderBy: { createdAt: "desc" }, take: 3, select: { id: true, name: true, description:true,sourceLocale:true,createdAt:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, sharedCatalogProductId:true, sharedCatalogProduct:{select:{id:true,title:true,images:true,status:true}}, supplierLink:{select:{sourceMetadata:true}} } } },
     }),
     prisma.product.count({ where: { status: "PUBLISHED", ...publicProductAccess, images: { isEmpty: false } } }),
     prisma.product.findMany({
