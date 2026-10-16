@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
@@ -9,7 +9,7 @@ import { SellerActionBar, SellerFormField, SellerSection } from "@/components/Se
 import ProductImageManager from "@/components/ProductImageManager";
 import ProductVariantEditor, { ProductVariantInventoryFields, type ProductVariantsDraft } from "@/components/ProductVariantEditor";
 import VariantImageManager, { type VariantImageAssignment } from "@/components/VariantImageManager";
-import { MAX_PRODUCT_IMAGES } from "@/lib/product-images";
+import { MAX_PRODUCT_IMAGES, MAX_PRODUCT_IMAGE_BYTES } from "@/lib/product-images";
 import ProductVideoManager from "@/components/ProductVideoManager";
 import type { ProductVideoInput } from "@/lib/product-media";
 import { productStockForForm } from "@/lib/product-variant-form";
@@ -17,19 +17,22 @@ import { useToast } from "@/components/ToastProvider";
 import ProductComplianceFields from "@/components/ProductComplianceFields";
 import SellerCategorySelector from "@/components/SellerCategorySelector";
 import ShippingRuleFields,{emptyShippingDraft,shippingDraftPayload,type ShippingDraft} from "@/components/ShippingRuleFields";
+import SellerHelpPopover from "@/components/SellerHelpPopover";
 import {resolveProductPriceInput} from "@/lib/product-price-input";
 import {isLocale} from "@/i18n/config";
 import {loyaltyMessages} from "@/i18n/loyalty";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { sellerProductWizardCopy } from "@/i18n/seller-product-wizard";
+import { localizedProductOptionName, localizedProductVariantValue, productVariantPreset, sellerProductUxCopy } from "@/i18n/seller-product-ux";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 type ProductReviewSnapshot={name:string;description:string;category:string;condition:string;images:string[];video:ProductVideoInput|null;variantsEnabled:boolean;variantDraft:ProductVariantsDraft;variantImages:VariantImageAssignment[];price:string;compareAtPrice:string;stock:string;allowPrepurchaseQuestions:boolean;loyaltyEligible:boolean;shippingOverrideEnabled:boolean;shippingRule:ShippingDraft};
-export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="" }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string }) {
+export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="",loyaltyRateBps,loyaltyProgramEnabled }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string;loyaltyRateBps:number;loyaltyProgramEnabled:boolean }) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const requestedLocale = useLocale();
   const wizard = sellerProductWizardCopy(requestedLocale);
   const loyaltyCopy = loyaltyMessages[isLocale(requestedLocale) ? requestedLocale : "fr"];
+  const uxCopy = sellerProductUxCopy(requestedLocale);
   const ux = useTranslations("Ux");
   const compliance = useTranslations("Compliance");
   const shipping = useTranslations("Shipping");
@@ -57,8 +60,19 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const submitLock = useRef(false);
   const successRef = useRef<HTMLParagraphElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const scrollAfterStepChange = useRef(false);
   const steps = wizard.steps;
   const [selectedCategory, setSelectedCategory] = useState("");
+  const loyaltyRate = new Intl.NumberFormat(requestedLocale, { style: "percent", maximumFractionDigits: 2 }).format(loyaltyRateBps / 10000);
+
+  useEffect(() => {
+    if (!scrollAfterStepChange.current) return;
+    scrollAfterStepChange.current = false;
+    requestAnimationFrame(() => {
+      const panel = formRef.current?.querySelector<HTMLElement>(`[data-wizard-step="${step}"]`);
+      panel?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    });
+  }, [step]);
 
   function blockerForField(field:HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement):PublicationBlocker {
     const key=field.id||field.name;
@@ -101,6 +115,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   }
 
   function goToStep(nextStep:number) {
+    scrollAfterStepChange.current = true;
     setStepValidation(null); setStep(nextStep);
     if(nextStep===5){setReviewSnapshot(makeReviewSnapshot());setBlockersReady(false);requestAnimationFrame(collectBlockers);}
   }
@@ -177,18 +192,18 @@ export default function NewProductForm({ currency, productCount, productLimit, s
           <SellerFormField label={t("productName")} htmlFor="name" hint={t("productNameHint")} required>
             <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} />
           </SellerFormField>
-          <SellerFormField label={t("description")} htmlFor="description" hint={t("descriptionHint")} required>
+          <SellerFormField label={t("description")} labelAside={<SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.descriptionHelp}</p></SellerHelpPopover>} htmlFor="description" hint={t("descriptionHint")} required>
             <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required aria-describedby="description-hint" placeholder={t("descriptionPlaceholder")} />
           </SellerFormField>
         </SellerSection>
-        <SellerSection icon={ImagePlus} title={t("images")} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
+        <SellerSection icon={ImagePlus} title={<span className="sellerProductWizardHelpLabel">{t("images")}<SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.imagesHelp}</p><ul><li>{uxCopy.imageFormats}</li><li>{uxCopy.imageCountLimit.replace("{max}", String(MAX_PRODUCT_IMAGES))}</li><li>{uxCopy.imageSizeLimit.replace("{size}", String(MAX_PRODUCT_IMAGE_BYTES / 1024 / 1024))}</li></ul></SellerHelpPopover></span>} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
           <ProductImageManager key={`images-${resetGeneration}`} onChange={setImages} onUploadingChange={setUploading} disabled={submitting}/><ProductVideoManager key={`video-${resetGeneration}`} onChange={setVideo} onUploadingChange={setUploading}/>
         </SellerSection>
-        <label className="sellerQuestionPreference"><input name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><strong>{ux("questionLabel")}</strong><small>{ux("questionHelp")}</small></span></label>
+        <div className="sellerQuestionPreference"><input id="allowPrepurchaseQuestions" name="allowPrepurchaseQuestions" type="checkbox" defaultChecked/><span><label htmlFor="allowPrepurchaseQuestions"><strong>{ux("questionLabel")}</strong></label><small>{uxCopy.questionsHelp}</small></span><SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.questionsHelp}</p></SellerHelpPopover></div>
         </div>
         <div data-wizard-step="2" hidden={step!==2}>
         {stepValidation?.step===2&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
-        <SellerSection icon={Boxes} title={t("productOptions")} description={wizard.variantsQuestion}>
+        <SellerSection icon={Boxes} title={t("productOptions")} description={<span className="sellerProductWizardHelpLabel">{wizard.variantsQuestion}<SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.variantsHelp}</p></SellerHelpPopover></span>}>
           <div className="sellerProductWizardChoices" role="group" aria-label={wizard.variantsQuestion}>
             <button type="button" className={!variantsEnabled?"isSelected":""} aria-pressed={!variantsEnabled} onClick={()=>setVariantsEnabled(false)}>{wizard.no}</button>
             <button type="button" className={variantsEnabled?"isSelected":""} aria-pressed={variantsEnabled} onClick={()=>{setVariantsEnabled(true);setVariantsInitialized(true);}}>{wizard.yes}</button>
@@ -202,7 +217,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         <div data-wizard-step="3" hidden={step!==3}>
         {stepValidation?.step===3&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={Tag} title={t("pricing")} description={t("pricingHelp")}>
-          <label className="sellerQuestionPreference"><input type="checkbox" name="loyaltyEligible"/><span><strong>{loyaltyCopy.title}</strong><small>{loyaltyCopy.eligibleProducts}</small></span></label>
+          <div className="sellerQuestionPreference"><input id="loyaltyEligible" type="checkbox" name="loyaltyEligible"/><span><label htmlFor="loyaltyEligible"><strong>{loyaltyCopy.title}</strong></label><small>{loyaltyCopy.eligibleProducts}</small>{!loyaltyProgramEnabled&&<small>{uxCopy.loyaltyPaused}</small>}</span><SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.loyaltyHelp.replace("{rate}", loyaltyRate)}</p>{!loyaltyProgramEnabled&&<p>{uxCopy.loyaltyPaused}</p>}</SellerHelpPopover></div>
           <div className="sellerControlFieldGrid">
             <SellerFormField label={t("price", { currency })} htmlFor="price" required={!variantsEnabled}><input id="price" name="price" type="number" min="0.01" max="1000000" step="0.01" required={!variantsEnabled} placeholder={variantsEnabled?undefined:"29.99"} value={basePrice} onChange={(event) => setBasePrice(event.target.value)} /></SellerFormField>
             <SellerFormField label={t("comparePrice", { currency })} htmlFor="compareAtPrice" hint={t("comparePriceHint")}><input id="compareAtPrice" name="compareAtPrice" type="number" min="0.01" max="1000000" step="0.01" aria-describedby="compareAtPrice-hint" placeholder="39.99" /></SellerFormField>
@@ -225,9 +240,9 @@ export default function NewProductForm({ currency, productCount, productLimit, s
               <div><dt>{t("productName")}</dt><dd>{reviewSnapshot.name||"—"}</dd></div>
               <div><dt>{t("description")}</dt><dd className="sellerProductWizardSummaryDescription">{reviewSnapshot.description||"—"}</dd></div>
               <div><dt>{t("images")}</dt><dd><div className="sellerProductWizardMediaSummary">{reviewSnapshot.images.map((url,index)=><Image key={url} src={url} alt={t("imageAlt",{number:index+1})} width={72} height={56} unoptimized/>)}{reviewSnapshot.video&&<a href={reviewSnapshot.video.url} target="_blank" rel="noreferrer">{reviewSnapshot.video.url}</a>}{!reviewSnapshot.images.length&&!reviewSnapshot.video&&"—"}</div></dd></div>
-              <div><dt>{t("productOptions")}</dt><dd>{reviewSnapshot.variantsEnabled?<div className="sellerProductWizardVariantSummary">{reviewSnapshot.variantDraft.options.map((option,index)=><p key={`${String(option.name)}-${index}`}><strong>{String(option.name)}</strong>: {option.values.map(value=>value.value).join(", ")||"—"}</p>)}<div className="sellerProductWizardTableWrap"><table><thead><tr><th>{wizard.variant}</th><th>{t("variantSku")}</th><th>{wizard.price}</th><th>{wizard.stock}</th><th>{wizard.available}</th><th>{t("variantImages")}</th></tr></thead><tbody>{reviewSnapshot.variantDraft.variants.map(variant=><tr key={variant.combinationKey}><th>{variant.values.map(value=>value.optionValue.value).join(" / ")}</th><td>{variant.sku||"—"}</td><td>{(variant.priceOverride??reviewSnapshot.price)||"—"}</td><td>{variant.stock}</td><td>{variant.active?wizard.yes:wizard.no}</td><td><div className="sellerProductWizardMediaSummary">{variant.imageUrls?.map((url,index)=><Image key={url} src={url} alt={t("imageAlt",{number:index+1})} width={48} height={40} unoptimized/>)}{!variant.imageUrls?.length&&"—"}</div></td></tr>)}</tbody></table></div></div>:wizard.no}</dd></div>
-              {reviewSnapshot.variantsEnabled&&reviewSnapshot.variantImages.length>0&&<div><dt>{t("variantImages")}</dt><dd><div className="sellerProductWizardVariantSummary">{reviewSnapshot.variantImages.map((assignment,index)=><p key={assignment.optionValueId??`${assignment.optionName}-${assignment.value}-${index}`}><strong>{[assignment.optionName,assignment.value].filter(Boolean).join(": ")}</strong>: {assignment.imageUrls.map((url,imageIndex)=><Image key={url} src={url} alt={t("imageAlt",{number:imageIndex+1})} width={48} height={40} unoptimized/>)}{assignment.primaryUrl&&<span> · {t("variantPrimaryImage")}</span>}</p>)}</div></dd></div>}
-              <div><dt>{t("pricing")}</dt><dd>{reviewSnapshot.variantsEnabled?reviewSnapshot.variantDraft.variants.map(variant=>`${variant.values.map(value=>value.optionValue.value).join(" / ")}: ${(variant.priceOverride??reviewSnapshot.price)||"—"}`).join(" · "):reviewSnapshot.price||"—"}{reviewSnapshot.compareAtPrice?` · ${t("comparePrice",{currency})}: ${reviewSnapshot.compareAtPrice}`:""}</dd></div>
+              <div><dt>{t("productOptions")}</dt><dd>{reviewSnapshot.variantsEnabled?<div className="sellerProductWizardVariantSummary">{reviewSnapshot.variantDraft.options.map((option,index)=><p key={`${String(option.name)}-${index}`}><strong>{localizedProductOptionName(requestedLocale,String(option.name))}</strong>: {option.values.map(value=>localizedProductVariantValue(requestedLocale,productVariantPreset(requestedLocale,String(option.name))??undefined,String(value.value))).join(", ")||"—"}</p>)}<div className="sellerProductWizardTableWrap"><table><thead><tr><th>{wizard.variant}</th><th>{t("variantSku")}</th><th>{wizard.price}</th><th>{wizard.stock}</th><th>{wizard.available}</th><th>{t("variantImages")}</th></tr></thead><tbody>{reviewSnapshot.variantDraft.variants.map(variant=><tr key={variant.combinationKey}><th>{variant.values.map((value,index)=>localizedProductVariantValue(requestedLocale,productVariantPreset(requestedLocale,String(reviewSnapshot.variantDraft.options[index]?.name??""))??undefined,value.optionValue.value)).join(" / ")}</th><td>{variant.sku||"—"}</td><td>{(variant.priceOverride??reviewSnapshot.price)||"—"}</td><td>{variant.stock}</td><td>{variant.active?wizard.yes:wizard.no}</td><td><div className="sellerProductWizardMediaSummary">{variant.imageUrls?.map((url,index)=><Image key={url} src={url} alt={t("imageAlt",{number:index+1})} width={48} height={40} unoptimized/>)}{!variant.imageUrls?.length&&"—"}</div></td></tr>)}</tbody></table></div></div>:wizard.no}</dd></div>
+              {reviewSnapshot.variantsEnabled&&reviewSnapshot.variantImages.length>0&&<div><dt>{t("variantImages")}</dt><dd><div className="sellerProductWizardVariantSummary">{reviewSnapshot.variantImages.map((assignment,index)=><p key={assignment.optionValueId??`${assignment.optionName}-${assignment.value}-${index}`}><strong>{[localizedProductOptionName(requestedLocale,assignment.optionName??""),assignment.value?localizedProductVariantValue(requestedLocale,productVariantPreset(requestedLocale,assignment.optionName??"")??undefined,assignment.value):""].filter(Boolean).join(": ")}</strong>: {assignment.imageUrls.map((url,imageIndex)=><Image key={url} src={url} alt={t("imageAlt",{number:imageIndex+1})} width={48} height={40} unoptimized/>)}{assignment.primaryUrl&&<span> · {t("variantPrimaryImage")}</span>}</p>)}</div></dd></div>}
+              <div><dt>{t("pricing")}</dt><dd>{reviewSnapshot.variantsEnabled?reviewSnapshot.variantDraft.variants.map(variant=>`${variant.values.map((value,index)=>localizedProductVariantValue(requestedLocale,productVariantPreset(requestedLocale,String(reviewSnapshot.variantDraft.options[index]?.name??""))??undefined,value.optionValue.value)).join(" / ")}: ${(variant.priceOverride??reviewSnapshot.price)||"—"}`).join(" · "):reviewSnapshot.price||"—"}{reviewSnapshot.compareAtPrice?` · ${t("comparePrice",{currency})}: ${reviewSnapshot.compareAtPrice}`:""}</dd></div>
               {!reviewSnapshot.variantsEnabled&&<div><dt>{t("stock")}</dt><dd>{reviewSnapshot.stock}</dd></div>}
               <div><dt>{ux("questionLabel")}</dt><dd>{reviewSnapshot.allowPrepurchaseQuestions?wizard.yes:wizard.no}</dd></div>
               <div><dt>{loyaltyCopy.title}</dt><dd>{reviewSnapshot.loyaltyEligible?wizard.yes:wizard.no}</dd></div>

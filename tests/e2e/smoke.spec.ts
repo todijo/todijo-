@@ -497,7 +497,7 @@ test("pre-purchase setting copy and checkbox render with the existing field", as
   await expect(page.locator('[data-wizard-step="1"]')).toBeVisible();
   const checkbox = page.getByRole("checkbox", { name: /Allow questions before purchase/ });
   await expect(checkbox).toBeChecked();
-  await expect(page.getByText("Buyers can contact you about this product before purchasing it.", { exact: false })).toBeVisible();
+  await expect(page.getByText("When enabled, potential buyers can ask you questions about this product before buying.", { exact: false })).toBeVisible();
   await checkbox.uncheck();
   await expect(checkbox).not.toBeChecked();
   await expect(checkbox).toHaveAttribute("name", "allowPrepurchaseQuestions");

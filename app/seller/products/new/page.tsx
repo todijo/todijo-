@@ -10,6 +10,7 @@ import { isLocale } from "@/i18n/config";
 import { sellerEntitlementSubscriptionMessages } from "@/i18n/seller-entitlement-subscription";
 import { resolveSellerStoreContext } from "@/lib/seller-business-access";
 import { sellerBusinessCommercialPlan } from "@/lib/seller-business";
+import { readLoyaltySettings } from "@/lib/loyalty-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ export default async function NewProductPage({searchParams}:{searchParams:Promis
   const businessPlan=storeContext.selected.businessId?await sellerBusinessCommercialPlan(prisma,storeContext.selected.businessId):null;
   const quota = sellerProductQuota({ role: businessPlan==="admin-exempt"?"ADMIN":store.owner.role, plan: businessPlan, productCount: store._count.products });
   const productLimit = quota.productLimit;
+  const loyaltySettings = await readLoyaltySettings(prisma);
   const labels = {
     dashboard: p("nav.dashboard"), products: p("nav.products"), orders: p("nav.orders"), messages: p("nav.messages"),
     statistics: p("nav.statistics"), revenue: p("nav.revenue"), reviews: p("nav.reviews"), store: p("nav.store"),
@@ -63,6 +65,6 @@ export default async function NewProductPage({searchParams}:{searchParams:Promis
         </SellerStatusBadge>
       </>}
     />
-    <NewProductForm storeId={storeContext.selected.id} currency={store.currency} productCount={store._count.products} productLimit={productLimit} storeShippingSummary={store.shippingEnabled?`${store.shippingMethodName??""} · ${store.shippingWorldwide?"Worldwide":store.shippingCountries.map(code=>countryNames.of(code)??code).join(", ")} · ${store.shippingFree?"Free":store.shippingPrice?.toString()??""} · ${store.shippingMinDays??"?"}–${store.shippingMaxDays??"?"} days`:undefined}/>
+    <NewProductForm storeId={storeContext.selected.id} currency={store.currency} productCount={store._count.products} productLimit={productLimit} loyaltyRateBps={loyaltySettings.rateBps} loyaltyProgramEnabled={loyaltySettings.enabled} storeShippingSummary={store.shippingEnabled?`${store.shippingMethodName??""} · ${store.shippingWorldwide?"Worldwide":store.shippingCountries.map(code=>countryNames.of(code)??code).join(", ")} · ${store.shippingFree?"Free":store.shippingPrice?.toString()??""} · ${store.shippingMinDays??"?"}–${store.shippingMaxDays??"?"} days`:undefined}/>
   </SellerDashboardLayout>;
 }

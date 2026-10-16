@@ -3,16 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
+import { useLocale } from "next-intl";
+import { localizedProductOptionName, localizedProductVariantValue, productVariantPreset } from "@/i18n/seller-product-ux";
 
 export type VariantImageAssignment = { optionValueId?: string; optionName?: string; value?: string; imageUrls: string[]; primaryUrl: string | null };
-type Option = { id?: string; name: unknown; values: Array<{ id?: string; value: unknown }> };
+type Option = { id?: string; name: unknown; preset?: string; values: Array<{ id?: string; value: unknown }> };
 
 export default function VariantImageManager({ images, options, initialAssignments = [], onChange, primaryOptionOnly = false }: { images: string[]; options: Option[]; initialAssignments?: VariantImageAssignment[]; onChange: (value: VariantImageAssignment[]) => void; primaryOptionOnly?: boolean }) {
   const t = useTranslations("SellerControl");
+  const locale = useLocale();
   const values = useMemo(() => {
-    const visibleOptions = primaryOptionOnly ? [options.find((option)=>["color","couleur"].includes(String(option.name).toLocaleLowerCase()))??options[0]].filter(Boolean) as Option[] : options;
-    return visibleOptions.flatMap((option) => option.values.map((value) => ({ optionValueId: value.id, optionName: String(option.name), value: String(value.value), key: value.id ?? `${String(option.name).toLocaleLowerCase()}\0${String(value.value).toLocaleLowerCase()}` })));
-  }, [options, primaryOptionOnly]);
+    const visibleOptions = primaryOptionOnly ? [options.find((option)=>productVariantPreset(locale,String(option.name))==="color")??options[0]].filter(Boolean) as Option[] : options;
+    return visibleOptions.flatMap((option) => option.values.map((value) => ({ optionValueId: value.id, optionName: String(option.name), displayOptionName: localizedProductOptionName(locale,String(option.name),option.preset), displayValue:localizedProductVariantValue(locale,option.preset??productVariantPreset(locale,String(option.name))??undefined,String(value.value)), value: String(value.value), key: value.id ?? `${String(option.name).toLocaleLowerCase()}\0${String(value.value).toLocaleLowerCase()}` })));
+  }, [locale, options, primaryOptionOnly]);
   const [assignments, setAssignments] = useState<Record<string, VariantImageAssignment>>(() => Object.fromEntries(initialAssignments.map((entry) => [entry.optionValueId ?? `${entry.optionName?.toLocaleLowerCase()}\0${entry.value?.toLocaleLowerCase()}`, entry])));
   useEffect(() => {
     const visible = new Set(values.map(({ key }) => key));
@@ -23,5 +26,5 @@ export default function VariantImageManager({ images, options, initialAssignment
   function toggle(target: typeof values[number], url: string) {
     setAssignments((current) => { const entry = current[target.key] ?? { optionValueId: target.optionValueId, optionName: target.optionName, value: target.value, imageUrls: [], primaryUrl: null }; const selected = entry.imageUrls.includes(url); const imageUrls = selected ? entry.imageUrls.filter((item) => item !== url) : [...entry.imageUrls, url]; return { ...current, [target.key]: { ...entry, imageUrls, primaryUrl: imageUrls.includes(entry.primaryUrl ?? "") ? entry.primaryUrl : imageUrls[0] ?? null } }; });
   }
-  return <div className="sellerVariantImages">{values.map((target) => { const entry = assignments[target.key]; return <fieldset key={target.key}><legend><strong>{target.optionName}: {target.value}</strong><span>{t("variantImagesSelected", { count: entry?.imageUrls.length ?? 0 })}</span></legend><div>{images.map((url, index) => { const selected = entry?.imageUrls.includes(url) ?? false; return <label key={url} className={selected ? "selected" : ""}><Image src={url} alt={t("imageAlt", { number: index + 1 })} width={160} height={94} unoptimized/><input type="checkbox" checked={selected} onChange={() => toggle(target, url)}/><span>{t("assignVariantImage")}</span>{selected && <button type="button" className={entry?.primaryUrl === url ? "isPrimary" : ""} onClick={(event) => { event.preventDefault(); setAssignments((current) => ({ ...current, [target.key]: { ...current[target.key], primaryUrl: url } })); }}>{entry?.primaryUrl === url ? t("variantPrimaryImage") : t("makeVariantPrimary")}</button>}</label>; })}</div></fieldset>; })}</div>;
+  return <div className="sellerVariantImages">{values.map((target) => { const entry = assignments[target.key]; return <fieldset key={target.key}><legend><strong>{target.displayOptionName}: {target.displayValue}</strong><span>{t("variantImagesSelected", { count: entry?.imageUrls.length ?? 0 })}</span></legend><div>{images.map((url, index) => { const selected = entry?.imageUrls.includes(url) ?? false; return <label key={url} className={selected ? "selected" : ""}><Image src={url} alt={t("imageAlt", { number: index + 1 })} width={160} height={94} unoptimized/><input type="checkbox" checked={selected} onChange={() => toggle(target, url)}/><span>{t("assignVariantImage")}</span>{selected && <button type="button" className={entry?.primaryUrl === url ? "isPrimary" : ""} onClick={(event) => { event.preventDefault(); setAssignments((current) => ({ ...current, [target.key]: { ...current[target.key], primaryUrl: url } })); }}>{entry?.primaryUrl === url ? t("variantPrimaryImage") : t("makeVariantPrimary")}</button>}</label>; })}</div></fieldset>; })}</div>;
 }
