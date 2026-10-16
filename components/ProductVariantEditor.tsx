@@ -67,7 +67,10 @@ export default function ProductVariantEditor({ productId, currency, basePrice = 
   }, [productImages]);
   useEffect(() => {
     if (!sellerFirst || productId) return;
-    if (!combinationLabels.length || options.some((option) => !option.name.trim() || !option.values.length)) return;
+    if (!combinationLabels.length || options.some((option) => !option.name.trim() || !option.values.length)) {
+      setVariants((current) => current.length ? [] : current);
+      return;
+    }
     if (combinationLabels.length > MAX_PRODUCT_VARIANTS) return;
     setVariants((current) => {
       const previous = new Map(current.map((variant) => [variant.combinationKey, variant]));
