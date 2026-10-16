@@ -22,10 +22,12 @@ test("Style and custom option controls add through the atomic option updater", (
 
 test("product images precede product options on create and edit", () => {
   const create = source("app/seller/products/new/NewProductForm.tsx");
-  assert.ok(create.indexOf('title={t("images")}') < create.indexOf('title={t("productOptions")}'));
+  const createImagesSection = create.indexOf('>{t("images")}<SellerHelpPopover');
+  const productOptionsSection = create.indexOf('title={t("productOptions")}');
+  assert.ok(createImagesSection >= 0 && productOptionsSection > createImagesSection);
 
   const edit = source("app/seller/products/[id]/edit/EditProductForm.tsx");
-  const imagesSection = edit.indexOf('title={t("images")}');
+  const imagesSection = edit.indexOf('>{t("images")}<SellerHelpPopover');
   const variantEditorRender = edit.indexOf("isValidElement(variantEditor) ? cloneElement");
   const variantImagesSection = edit.indexOf('title={t("variantImages")}');
   assert.ok(imagesSection >= 0 && variantEditorRender > imagesSection);
