@@ -68,7 +68,8 @@ test("seller-first image assignment targets the localized color option or first 
 });
 
 test("incomplete option dimensions do not erase existing variant data",()=>{
-  assert.match(variants,/if \(!combinationLabels\.length \|\| options\.some\(\(option\) => !option\.name\.trim\(\) \|\| !option\.values\.length\)\) return/);
+  assert.match(variants,/if \(!combinationLabels\.length\) \{[\s\S]*?if \(options\.length === 0\) setVariants\(\(current\) => current\.length \? \[\] : current\)/);
+  assert.match(variants,/if \(options\.some\(\(option\) => !option\.name\.trim\(\) \|\| !option\.values\.length\)\) \{\s*return;/);
   assert.match(variants,/const previous = new Map\(current\.map\(\(variant\) => \[variant\.combinationKey, variant\]\)\)/);
   assert.match(variants,/previous\.get\(key\) \?\?/);
 });
