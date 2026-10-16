@@ -99,6 +99,11 @@ test("help popovers expose keyboard and assistive-technology state",()=>{
   assert.match(popover,/aria-controls=\{id\}/);
   assert.match(popover,/event\.key !== "Escape"/);
   assert.match(popover,/role="note"/);
+  assert.match(popover,/createPortal\([\s\S]*document\.body/);
+  assert.match(popover,/position: "fixed"/);
+  assert.match(popover,/window\.addEventListener\("scroll", scheduleUpdate, true\)/);
+  assert.match(popover,/window\.visualViewport\?\.addEventListener\("resize", scheduleUpdate\)/);
+  assert.match(popover,/!panel\.current\?\.contains\(target\)/);
   assert.match(controls,/labelAside \? <div className="sellerControlFieldLabel"><label htmlFor=\{htmlFor\}>/);
 });
 
