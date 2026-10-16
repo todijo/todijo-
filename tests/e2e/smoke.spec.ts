@@ -489,6 +489,12 @@ test("favorites remain isolated across logout and two authenticated buyers", asy
 
 test("pre-purchase setting copy and checkbox render with the existing field", async ({ page }) => {
   await page.goto("/en/e2e-ux?view=seller");
+  await dismissCookieConsent(page);
+  await page.locator("#category-main").selectOption({ index: 1 });
+  await page.locator("#category-group").selectOption({ index: 1 });
+  await page.locator("#category").selectOption({ index: 1 });
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator('[data-wizard-step="1"]')).toBeVisible();
   const checkbox = page.getByRole("checkbox", { name: /Allow questions before purchase/ });
   await expect(checkbox).toBeChecked();
   await expect(page.getByText("Buyers can contact you about this product before purchasing it.", { exact: false })).toBeVisible();
@@ -544,19 +550,23 @@ test("seller compliance inputs and contact-message validation remain readable", 
   await expect(page.getByRole("button", { name: "Envoyer le message" })).toBeEnabled();
 });
 
-test("seller product wizard validates Step 1 and preserves it through Back",async({page})=>{
+test("seller product wizard validates category and product details, then preserves details through Back",async({page})=>{
   await page.goto("/fr/e2e-ux?view=seller");
   await dismissCookieConsent(page);
   await page.getByRole("button",{name:"Continuer"}).click();
   await expect(page.getByText(/Veuillez compléter correctement/)).toBeVisible();
-  await expect(page.getByLabel(/Nom du produit/)).toBeFocused();
-  await page.locator("#name").fill("Produit de démonstration");
-  await page.locator("#description").fill("Description complète pour vérifier le parcours vendeur.");
+  await expect(page.locator("#category-main")).toBeFocused();
   await page.locator("#category-main").selectOption({index:1});
   await page.locator("#category-group").selectOption({index:1});
   await page.locator("#category").selectOption({index:1});
   await page.getByRole("button",{name:"Continuer"}).click();
   await expect(page.locator('[data-wizard-step="1"]')).toBeVisible();
+  await page.getByRole("button",{name:"Continuer"}).click();
+  await expect(page.getByText(/Veuillez compléter correctement/)).toBeVisible();
+  await expect(page.getByLabel(/Nom du produit/)).toBeFocused();
+  await page.locator("#name").fill("Produit de démonstration");
+  await page.locator("#description").fill("Description complète pour vérifier le parcours vendeur.");
+  await page.getByRole("button",{name:"Continuer"}).click();
   await page.getByRole("button",{name:"Retour"}).click();
   await expect(page.locator("#name")).toHaveValue("Produit de démonstration");
 });
