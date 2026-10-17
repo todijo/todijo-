@@ -100,8 +100,31 @@ jobs:
       - name: Build production application
         run: npm run build
 
+      - name: Pull verified Node.js base image for Docker build
+        env:
+          NODE_BASE_TAG: 24.15.0-bookworm-slim
+          # Official Node image index digest from Docker Hub; keep mirror/fallback content-identical.
+          NODE_BASE_DIGEST: sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d
+        run: |
+          set -euo pipefail
+          mirror_image="mirror.gcr.io/library/node:${NODE_BASE_TAG}@${NODE_BASE_DIGEST}"
+          docker_hub_image="docker.io/library/node:${NODE_BASE_TAG}@${NODE_BASE_DIGEST}"
+
+          if docker pull "$mirror_image"; then
+            source_image="mirror.gcr.io/library/node:${NODE_BASE_TAG}"
+          else
+            echo "::warning::Node image cache unavailable; falling back to the official Docker Hub image at the same digest."
+            docker pull "$docker_hub_image"
+            source_image="docker.io/library/node:${NODE_BASE_TAG}"
+          fi
+
+          docker image tag "$source_image" todijo-node-ci:24.15.0-bookworm-slim
+
       - name: Build production image
-        run: docker build --tag todijo-security-phase1 .
+        run: >-
+          docker build --pull=false
+          --build-arg NODE_BASE_IMAGE=todijo-node-ci:24.15.0-bookworm-slim
+          --tag todijo-security-phase1 .
 
       - name: Verify production runtime contents
         run: |
