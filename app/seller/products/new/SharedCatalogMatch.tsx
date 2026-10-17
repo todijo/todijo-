@@ -76,7 +76,7 @@ export default function SharedCatalogMatch({ storeId, initialValues, onValuesCha
   return <section className="sharedCatalogMatch" aria-labelledby="shared-catalog-title">
     <h2 id="shared-catalog-title">{t("title")}</h2><p>{t("intro")}</p>
     <form onSubmit={submit} className="sharedCatalogSearchFields" aria-busy={busy}>
-      {(["title", "brand", "modelReference", "gtin"] as const).map((field) => <label key={field}>{t(field)}<input value={values[field]} onChange={(event) => { const next={...values,[field]:event.target.value};setValues(next);onValuesChange(next); }} maxLength={180}/></label>)}
+      {(["title", "brand", "modelReference", "gtin"] as const).map((field) => <label key={field}>{t(field === "title" ? "productTitle" : field)}<input value={values[field]} onChange={(event) => { const next={...values,[field]:event.target.value};setValues(next);onValuesChange(next); }} maxLength={180}/></label>)}
       <button type="submit" disabled={busy || !Object.values(values).some((value) => value.trim())}>{busy ? t("searching") : t("search")}</button>
     </form>
     {busy && <p role="status" aria-live="polite" className="sharedCatalogSearchStatus">{t("searching")}</p>}

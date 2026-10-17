@@ -165,7 +165,7 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
     }
     await route.continue();
   });
-  await sellerPage.getByLabel("Product title", { exact: true }).fill(title);
+  await sellerPage.getByLabel(sharedCatalogMessages.en.productTitle, { exact: true }).fill(title);
   await sellerPage.getByRole("button", { name: "Search catalog", exact: true }).click();
   await expect(sellerPage.getByText(sellerCopy.searchError)).toBeVisible();
   await expect(sellerPage.getByText(sharedCatalogMessages.en.noResults)).toHaveCount(0);
@@ -186,7 +186,7 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   await sellerPage.locator(".sharedCatalogConfirmation").getByRole("button", { name: "Sell this product", exact: true }).click();
   await expect(sellerPage.locator("#category-main")).toBeVisible();
   await sellerPage.getByRole("button", { name: "Back to catalog search", exact: true }).click();
-  await expect(sellerPage.getByLabel("Product title", { exact: true })).toHaveValue(title);
+  await expect(sellerPage.getByLabel(sharedCatalogMessages.en.productTitle, { exact: true })).toHaveValue(title);
   await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
   await expect(sellerPage.locator("#name")).toHaveValue(title);
   await expect(sellerPage.locator('input[name="manufacturerName"]')).toHaveValue(brand);
