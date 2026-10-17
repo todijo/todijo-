@@ -46,10 +46,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [{ id }, locale, metadataText] = await Promise.all([params, getLocale() as Promise<Locale>, getTranslations("Metadata")]);
   const product = await prisma.product.findFirst({
     where: { id, status: "PUBLISHED", ...publicProductAccessWhere() },
-    select: { name: true, description: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, supplierLink:{select:{sourceMetadata:true}}, store: { select: { name: true } } },
+    select: { name: true, description: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, images: true, sharedCatalogProductId:true, supplierLink:{select:{sourceMetadata:true}}, store: { select: { name: true } } },
   });
   if (!product) return { title: metadataText("title"), robots: { index: false, follow: false } };
-  const content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
+  const sharedCatalog = product.sharedCatalogProductId && !product.supplierLink ? await prisma.sharedCatalogProduct.findFirst({ where: { id: product.sharedCatalogProductId, status: "PUBLISHED" }, select: { title: true, description: true, images: true, sourceLocale: true } }) : null;
+  const content=sharedCatalog ? { title: sharedCatalog.title, description: sharedCatalog.description } : resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   const description = concise(`${content.description} ${product.store.name}`);
   const pathname = `product/${id}/${productSlug(content.title)}`;
   const canonical = localizedPath(locale, pathname);
@@ -58,16 +59,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: content.title,
     description,
     alternates: {canonical,languages},
-    openGraph: { type: "website", title: `${content.title} · Todijo`, description, url: canonical, images: product.images[0] ? [{ url: product.images[0], alt: content.title }] : undefined },
-    twitter: { card: product.images[0] ? "summary_large_image" : "summary", title: `${content.title} · Todijo`, description, images: product.images[0] ? [product.images[0]] : undefined },
+    openGraph: { type: "website", title: `${content.title} · Todijo`, description, url: canonical, images: (sharedCatalog?.images ?? product.images)[0] ? [{ url: (sharedCatalog?.images ?? product.images)[0], alt: content.title }] : undefined },
+    twitter: { card: (sharedCatalog?.images ?? product.images)[0] ? "summary_large_image" : "summary", title: `${content.title} · Todijo`, description, images: (sharedCatalog?.images ?? product.images)[0] ? [(sharedCatalog?.images ?? product.images)[0]] : undefined },
   };
 }
 
 export default async function ProductPage({ params, searchParams }: Props) {
-  const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, ordersText, resolvedParams, session, locale, requestHeaders, query] = await Promise.all([
+  const [common, market, productText, detailText, compliance, categoryText, shippingText, sellerControlText, ordersText, sharedCatalogText, resolvedParams, session, locale, requestHeaders, query] = await Promise.all([
     getTranslations("Common"), getTranslations("Marketplace"), getTranslations("Product"),
     getTranslations("ProductDetail"), getTranslations("Compliance"), getTranslations("Categories"), getTranslations("Shipping"), getTranslations("SellerControl"),
-    getTranslations("Orders"), params, readSession(), getLocale(), headers(), searchParams ?? Promise.resolve<PageSearchParams>({}),
+    getTranslations("Orders"), getTranslations("SharedCatalog"), params, readSession(), getLocale(), headers(), searchParams ?? Promise.resolve<PageSearchParams>({}),
   ]);
   const { id,slug } = resolvedParams;
   const previewRequested=(Array.isArray(query.adminPreview)?query.adminPreview[0]:query.adminPreview)==="1";
@@ -76,7 +77,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const product = await prisma.product.findFirst({
     where: { id, ...(previewRequested?{}:{status:"PUBLISHED" as const}), ...publicAccess },
     select: {
-      id: true, name: true, description: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
+      id: true, name: true, description: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true, sharedCatalogProductId:true,
       condition: true, stock: true, images: true, colors: true, sizes: true, allowPrepurchaseQuestions: true, productIdentifier:true,manufacturerName:true,manufacturerContact:true,responsiblePerson:true,safetyInformation:true,complianceInformation:true,shippingOverrideEnabled:true,shippingEnabled:true,shippingMethodName:true,shippingPrice:true,shippingFree:true,shippingFreeThreshold:true,shippingMinDays:true,shippingMaxDays:true,shippingCountries:true,shippingWorldwide:true,shippingPostalCodes:true,shippingCarrier:true,
       media: { orderBy: { position: "asc" }, select: { type: true, url: true, posterUrl: true } },
       options: { where: { active: true }, orderBy: { position: "asc" }, select: {
@@ -92,7 +93,9 @@ export default async function ProductPage({ params, searchParams }: Props) {
     },
   });
   if (!product) notFound();
-  const buyerContent=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
+  const sharedCatalog = product.sharedCatalogProductId && !product.supplierLink ? await prisma.sharedCatalogProduct.findFirst({ where: { id: product.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, images: true, status: true, offers: { where: { id: { not: product.id }, status: "PUBLISHED", supplierLink: { is: null }, ...publicProductAccessWhere() }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100, select: { id: true, price: true, currency: true, condition: true, stock: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { active: true, stock: true, _count: { select: { values: true } } } }, store: { select: { name: true, slug: true, currency: true, shippingEnabled: true, shippingFree: true, shippingFreeThreshold: true, shippingPrice: true, shippingMinDays: true, shippingMaxDays: true, shippingMethodName: true } } } } } }) : null;
+  if(sharedCatalog){product.name=sharedCatalog.title;product.description=sharedCatalog.description;product.category=sharedCatalog.category;if(sharedCatalog.images.length)product.images=sharedCatalog.images;}
+  const buyerContent=sharedCatalog?{title:sharedCatalog.title,description:sharedCatalog.description}:resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   const canonicalSlug=productSlug(buyerContent.title);
   if(!previewRequested&&slug!==canonicalSlug)permanentRedirect(productPath(locale,id,buyerContent.title));
   product.name=buyerContent.title;product.description=buyerContent.description;
@@ -140,6 +143,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
         {!usesDropshippingShipping&&shippingRule.shippingEnabled&&shippingRule.shippingMethodName&&shippingRule.shippingMinDays&&shippingRule.shippingMaxDays&&<aside className="productShippingSummary"><strong>{shippingText("productTitle")}</strong><span>{shippingRule.shippingMethodName}{shippingRule.shippingCarrier?` · ${shippingRule.shippingCarrier}`:""}</span><span>{shippingText("estimate",{min:shippingRule.shippingMinDays,max:shippingRule.shippingMaxDays})}</span><span>{shippingRule.shippingWorldwide?shippingText("worldwide"):shippingRule.shippingPostalCodes.length?shippingText("postalZones"):shippingText("selectedDestinations")}</span><b>{shippingRule.shippingFree?shippingText("freeLabel"):<BuyerShippingPrice productId={product.id} kind={shippingRule.shippingFreeThreshold?"freeThreshold":"shippingPrice"}/>}</b></aside>}
       </div>
     </div>
+    {sharedCatalog?.status === "PUBLISHED" && sharedCatalog.offers.length > 0 && <section className="sharedCatalogOffers" aria-labelledby="shared-catalog-offers-title"><h2 id="shared-catalog-offers-title">{sharedCatalogText("otherOffers")}</h2><div className="sharedCatalogOffersGrid">{sharedCatalog.offers.map((offer) => { const offerAvailability=resolveProductAvailability({stock:offer.stock,activeOptionCount:offer.options.length,variants:offer.variants.map(variant=>({active:variant.active,stock:variant.stock,valueCount:variant._count.values}))}); return <article key={offer.id}><h3><Link href={productPath(locale, offer.id, sharedCatalog.title)}>{offer.store.name}</Link></h3><p>{sharedCatalogText("price")}: <strong>{new Intl.NumberFormat(locale, { style: "currency", currency: offer.currency }).format(Number(offer.price))}</strong></p><p>{market("condition")}: {offer.condition.replaceAll("_", " ")}</p><p>{offerAvailability.isGenerallyAvailable?common("available"):common("soldOut")}</p><p>{sharedCatalogText("shipping")}: {offer.store.shippingEnabled ? offer.store.shippingFree ? shippingText("freeLabel") : <BuyerShippingPrice productId={offer.id} kind={offer.store.shippingFreeThreshold ? "freeThreshold" : "shippingPrice"}/> : shippingText("storeShippingUnconfigured")}</p>{offer.store.shippingMinDays&&offer.store.shippingMaxDays&&<small>{shippingText("estimate",{min:offer.store.shippingMinDays,max:offer.store.shippingMaxDays})}</small>}<Link className="sellerControlButton secondary" href={productPath(locale, offer.id, sharedCatalog.title)}>{detailText("details")}</Link></article>; })}</div></section>}
     <nav className="productDetailSections" aria-label={detailText("pageSections")}><a href="#description">{detailText("description")}</a><a className="productFactsDesktopLink" href="#product-facts">{detailText("details")}</a><a className="productFactsMobileLink" href="#product-facts-mobile">{detailText("details")}</a><a href="#reviews">{detailText("reviews")}</a></nav>
     <section className="productDetailDescriptionSection" id="description" aria-labelledby="product-details-title">
       <h2 id="product-details-title">{detailText("description")}</h2>

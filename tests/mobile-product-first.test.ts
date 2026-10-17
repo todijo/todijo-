@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { marketplaceProductIdentityKey, uniqueProductsByCatalog } from "../lib/marketplace-product-identity";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
@@ -9,13 +10,18 @@ test("mobile home incrementally loads deduplicated product batches", () => {
   const route = read("app/api/marketplace/products/route.ts");
   assert.match(home, /new IntersectionObserver/);
   assert.match(home, /rootMargin: "700px 0px"/);
-  assert.match(home, /new Set\(current\.map\(\(product\) => product\.id\)\)/);
+  assert.match(home, /marketplaceProductIdentityKey/);
+  assert.match(home, /setVisibleProducts\(\(current\) => appendUnique\(current, payload\.products\)\)/);
   assert.match(home, /const MOBILE_BATCH_SIZE = 24/);
   assert.match(home, /products\.slice\(0, MOBILE_BATCH_SIZE\)/);
   assert.match(route, /const PAGE_SIZE = 24/);
-  assert.match(route, /hasMore: offset \+ rows\.length < total/);
-  assert.match(route, /nextOffset: offset \+ rows\.length/);
-  assert.match(home, /incoming\.filter\(\(product\) => !seen\.has\(product\.id\)\)/);
+  assert.match(route, /hasMore: offset \+ sourceRows\.length < total/);
+  assert.match(route, /nextOffset: offset \+ sourceRows\.length/);
+  assert.match(home, /uniqueProductsByCatalog\(\[\.\.\.current, \.\.\.incoming\]\)/);
+  const offers = [{ id: "offer-a", sharedCatalogProductId: "catalog-a" }, { id: "offer-b", sharedCatalogProductId: "catalog-a" }, { id: "legacy-a", sharedCatalogProductId: null }, { id: "legacy-b", sharedCatalogProductId: null }];
+  assert.deepEqual(uniqueProductsByCatalog(offers).map(({ id }) => id), ["offer-a", "legacy-a", "legacy-b"]);
+  assert.equal(marketplaceProductIdentityKey(offers[0]), "shared:catalog-a");
+  assert.equal(marketplaceProductIdentityKey(offers[2]), "offer:legacy-a");
 });
 
 test("desktop keeps its hundred-product server pagination while mobile starts from server-rendered products", () => {
@@ -26,7 +32,7 @@ test("desktop keeps its hundred-product server pagination while mobile starts fr
   assert.match(pagination, /BUYER_PRODUCT_PAGE_SIZE = 100/);
   assert.match(page, /buyerProductPage\(requestedPage\)/);
   assert.match(page, /products=\{products\}/);
-  assert.match(home, /setVisibleProducts\(mobile && page === 1 \? products\.slice\(0, MOBILE_BATCH_SIZE\) : products\)/);
+  assert.match(home, /setVisibleProducts\(uniqueProductsByCatalog\(mobile && page === 1 \? products\.slice\(0, MOBILE_BATCH_SIZE\) : products\)\)/);
   assert.match(css, /\.buyerHomePage \.pagination\{display:none\}/);
 });
 

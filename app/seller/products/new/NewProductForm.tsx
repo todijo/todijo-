@@ -24,9 +24,19 @@ import {loyaltyMessages} from "@/i18n/loyalty";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { sellerProductWizardCopy } from "@/i18n/seller-product-wizard";
 import { localizedProductOptionName, localizedProductVariantValue, productVariantPreset, sellerProductUxCopy } from "@/i18n/seller-product-ux";
+import SharedCatalogMatch, { type SharedCatalogCandidate } from "./SharedCatalogMatch";
+import { sharedCatalogSellerMessages } from "@/i18n/shared-catalog";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 type ProductReviewSnapshot={name:string;description:string;category:string;condition:string;images:string[];video:ProductVideoInput|null;variantsEnabled:boolean;variantDraft:ProductVariantsDraft;variantImages:VariantImageAssignment[];price:string;compareAtPrice:string;stock:string;allowPrepurchaseQuestions:boolean;loyaltyEligible:boolean;shippingOverrideEnabled:boolean;shippingRule:ShippingDraft};
-export default function NewProductForm({ currency, productCount, productLimit, storeShippingSummary,storeId="",loyaltyRateBps,loyaltyProgramEnabled }: { currency: string; productCount: number; productLimit: number | null; storeShippingSummary?:string;storeId?:string;loyaltyRateBps:number;loyaltyProgramEnabled:boolean }) {
+type NewProductFormProps={currency:string;productCount:number;productLimit:number|null;storeShippingSummary?:string;storeId?:string;loyaltyRateBps:number;loyaltyProgramEnabled:boolean};
+export default function NewProductForm(props:NewProductFormProps) {
+  const [catalogProduct,setCatalogProduct]=useState<SharedCatalogCandidate|null>(null);
+  const [wizardStarted,setWizardStarted]=useState(false);
+  if(!wizardStarted)return <SharedCatalogMatch onSelect={candidate=>{setCatalogProduct(candidate);setWizardStarted(true)}} onCreateNew={()=>{setCatalogProduct(null);setWizardStarted(true)}}/>;
+  return <ProductDetailsForm {...props} sharedCatalogProduct={catalogProduct} onBackToCatalog={()=>setWizardStarted(false)}/>;
+}
+
+function ProductDetailsForm({ currency, productCount, productLimit, storeShippingSummary,storeId="",loyaltyRateBps,loyaltyProgramEnabled,sharedCatalogProduct,onBackToCatalog }: NewProductFormProps & {sharedCatalogProduct:SharedCatalogCandidate|null;onBackToCatalog:()=>void}) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const requestedLocale = useLocale();
@@ -36,6 +46,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const ux = useTranslations("Ux");
   const compliance = useTranslations("Compliance");
   const shipping = useTranslations("Shipping");
+  const catalogMessages = sharedCatalogSellerMessages[isLocale(requestedLocale) ? requestedLocale : "fr"];
   const { showToast } = useToast();
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -157,11 +168,11 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
         images, video, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on", loyaltyEligible: form.get("loyaltyEligible") === "on",
-        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}),
+        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}), sharedCatalogProductId:sharedCatalogProduct?.id??null, sharedCatalogExactMatchConfirmed:Boolean(sharedCatalogProduct),
       }),
     });
     const data = await response.json() as { error?: string; code?: string; product?: { id?: string } };
-    if (!response.ok) { const text = data.code === "SELLER_PRODUCT_LIMIT_REACHED" && productLimit === 5 ? sellerFreeModelCopy(requestedLocale).quota : data.error ?? t("errorGeneric"); setMessage(text); showToast({ message: text, tone: "error" }); setSubmitting(false); submitLock.current = false; return; }
+    if (!response.ok) { const text = data.code === "SELLER_PRODUCT_LIMIT_REACHED" && productLimit === 5 ? sellerFreeModelCopy(requestedLocale).quota : data.error === "SHARED_CATALOG_VARIANT_MISMATCH" ? catalogMessages.variantMismatch : data.error ?? t("errorGeneric"); setMessage(text); showToast({ message: text, tone: "error" }); setSubmitting(false); submitLock.current = false; return; }
     if (status === "DRAFT") { router.push(data.product?.id ? `/seller/products/${data.product.id}/edit` : "/seller/products"); router.refresh(); return; }
     setImages([]); setVariantsEnabled(false); setVariantsInitialized(false); setVariantDraft({ options: [], generate: true, variants: [], generated: false }); setVariantImages([]);
     setBasePrice(""); setProductStock("1"); setUploading(false); setStep(0); setBlockers([]); setBlockersReady(false); setMessage(t("productPublishedSuccess")); showToast({ message: t("productPublishedSuccess"), tone: "success" }); setPublished(true); setResetGeneration((value) => value + 1);
@@ -173,7 +184,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
   const disabledByLimit = productLimit !== null && productCount >= productLimit;
   const draftBlockers=blockers;
   const publishBlockers=blockers;
-  return <form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { requestAnimationFrame(() => { const panel=formRef.current?.querySelector<HTMLElement>(`[data-wizard-step="${step}"]`); if(stepValidation?.step===step&&!panel?.querySelector(":invalid"))setStepValidation(null); if(step===5)collectBlockers(); }); }}>
+  return <><button type="button" className="sellerControlButton secondary" onClick={onBackToCatalog}>{wizard.back}</button>{sharedCatalogProduct&&<div className="sharedCatalogOfferNotice"><strong>{sharedCatalogProduct.title}</strong><span>{sharedCatalogProduct.brand} {sharedCatalogProduct.modelReference}</span></div>}<form ref={formRef} key={resetGeneration} className="sellerControlForm sellerProductWizard" noValidate onSubmit={submit} onInput={() => { requestAnimationFrame(() => { const panel=formRef.current?.querySelector<HTMLElement>(`[data-wizard-step="${step}"]`); if(stepValidation?.step===step&&!panel?.querySelector(":invalid"))setStepValidation(null); if(step===5)collectBlockers(); }); }}>
     <nav className="sellerProductWizardProgress" aria-label={wizard.progressLabel}><ol>{steps.map((label,index)=><li key={label} className={index===step?"isCurrent":index<step?"isComplete":""}><button type="button" disabled={index>step} onClick={()=>goToStep(index)} aria-current={index===step?"step":undefined}><span>{index+1}</span>{label}</button></li>)}</ol></nav>
     <div className="sellerProductWizardBody">
       <div className="sellerControlFormMain">
@@ -181,7 +192,7 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         {stepValidation?.step===0&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={Shapes} title={t("details")} description={t("detailsHelp")}>
           <div className="sellerControlFieldGrid">
-            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector onChange={setSelectedCategory} labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
+            <SellerFormField label={t("category")} htmlFor="category" required><SellerCategorySelector initialValue={sharedCatalogProduct?.category} disabled={Boolean(sharedCatalogProduct)} onChange={setSelectedCategory} labels={{main:t("mainCategory"),group:t("categoryGroup"),leaf:t("leafCategory"),chooseMain:t("chooseMainCategory"),chooseGroup:t("chooseCategoryGroup"),chooseLeaf:t("chooseLeafCategory"),legacyInvalid:t("legacyCategoryInvalid")}}/></SellerFormField>
             <SellerFormField label={t("condition")} htmlFor="condition"><select id="condition" name="condition" defaultValue="NEUF"><option value="NEUF">{t("conditions.new")}</option><option value="COMME_NEUF">{t("conditions.likeNew")}</option><option value="BON_ETAT">{t("conditions.good")}</option><option value="OCCASION">{t("conditions.used")}</option></select></SellerFormField>
           </div>
         </SellerSection>
@@ -190,10 +201,10 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         {stepValidation?.step===1&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={FileText} title={t("basicInfo")} description={t("basicInfoHelp")}>
           <SellerFormField label={t("productName")} htmlFor="name" hint={t("productNameHint")} required>
-            <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} />
+            <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} defaultValue={sharedCatalogProduct?.title} readOnly={Boolean(sharedCatalogProduct)} />
           </SellerFormField>
           <SellerFormField label={t("description")} labelAside={<SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.descriptionHelp}</p></SellerHelpPopover>} htmlFor="description" hint={t("descriptionHint")} required>
-            <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required aria-describedby="description-hint" placeholder={t("descriptionPlaceholder")} />
+            <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required aria-describedby="description-hint" placeholder={t("descriptionPlaceholder")} defaultValue={sharedCatalogProduct?.description} readOnly={Boolean(sharedCatalogProduct)} />
           </SellerFormField>
         </SellerSection>
         <SellerSection icon={ImagePlus} title={<span className="sellerProductWizardHelpLabel">{t("images")}<SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.imagesHelp}</p><ul><li>{uxCopy.imageFormats}</li><li>{uxCopy.imageCountLimit.replace("{max}", String(MAX_PRODUCT_IMAGES))}</li><li>{uxCopy.imageSizeLimit.replace("{size}", String(MAX_PRODUCT_IMAGE_BYTES / 1024 / 1024))}</li></ul></SellerHelpPopover></span>} description={t("imagesHelp", { max: MAX_PRODUCT_IMAGES })}>
@@ -263,5 +274,5 @@ export default function NewProductForm({ currency, productCount, productLimit, s
         <button className="sellerControlButton primary" type="submit" name="intent" value="PUBLISHED" disabled={submitting || !blockersReady || publishBlockers.length>0} aria-busy={submitting}>{submitting ? t("saving") : t("publishNow")}</button>
       </>}
     </SellerActionBar>
-  </form>;
+  </form></>;
 }

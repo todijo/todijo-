@@ -18,6 +18,7 @@ import { publicStorePageSize } from "@/lib/public-store-pagination";
 import { requireStoreCapability, SellerCapabilityError } from "@/lib/seller-business-access";
 import { sellerBusinessCommercialEntitlement } from "@/lib/seller-business";
 import { storeUrlLifecycleCopy } from "@/i18n/store-url-lifecycle";
+import { dedupeSharedCatalogOffers } from "@/lib/shared-catalog-offers";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +116,7 @@ export default async function StorePage({ params, searchParams }: Props) {
       establishment: { select: { verificationState: true, address: true, postalCode: true, city: true } },
       owner: { select: { firstName: true, lastName: true, createdAt: true, emailVerified: true } },
       _count: { select: { products: { where: { status: "PUBLISHED", ...publicProductAccessWhere() } } } },
-      products: { where: { status: "PUBLISHED", ...publicProductAccessWhere() }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize, select: { id: true, name: true,description:true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
+      products: { where: { status: "PUBLISHED", ...publicProductAccessWhere() }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize * 2, select: { id: true, name: true,description:true,sourceLocale:true,createdAt:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, images: true, stock: true, condition: true, category: true, sharedCatalogProductId:true, sharedCatalogProduct:{select:{id:true,title:true,category:true,images:true,status:true}}, options: { where: { active: true }, select: { id: true } }, variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },supplierLink:{select:{sourceMetadata:true}} } },
     },
   });
 
@@ -177,7 +178,7 @@ export default async function StorePage({ params, searchParams }: Props) {
     initialSort: ["newest", "price-low", "price-high"].includes(Array.isArray(query.sort) ? query.sort[0] ?? "" : query.sort ?? "") ? (Array.isArray(query.sort) ? query.sort[0] : query.sort) as string : "newest",
     page,
     pages,
-    products: store.products.map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }),content=resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}); return { id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, images: product.images, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: product.condition, category: product.category,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) }; }),
+    products: dedupeSharedCatalogOffers(store.products).map((product) => { const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) }),shared=!product.supplierLink&&product.sharedCatalogProduct?.status==="PUBLISHED"?product.sharedCatalogProduct:null,content=shared?{title:shared.title}:resolveBuyerProductContent({name:product.name,description:product.description,sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations}); return { id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null, currency: product.currency, images: shared?.images.length?shared.images:product.images, stock: availability.hasActiveVariants ? null : product.stock, hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable, condition: product.condition, category: shared?.category??product.category,requiresAuthoritativePrice:requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata) }; }),
   };
 
   return (

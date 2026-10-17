@@ -23,6 +23,7 @@ import {resolveProductPriceInput} from "@/lib/product-price-input";
 import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
 import { requireStoreCapability } from "@/lib/seller-business-access";
 import { requireProductCategoryScope } from "@/lib/seller-team-product-scope";
+import { normalizeCatalogVariantIdentity } from "@/lib/shared-catalog-matching";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -58,9 +59,16 @@ export async function POST(request: Request) {
     const storeId=requestedStoreId??availableStores[0]?.id;
     if(!storeId)return NextResponse.json({error:"STORE_REQUIRED"},{status:403});
     const store = await requireStorePublishingAccess(prisma, session.userId,storeId,"PRODUCT_CREATE");
-    const name = String(body.name ?? "").trim();
-    const description = String(body.description ?? "").trim();
-    const category = String(body.category ?? "").trim();
+    if (body.sharedCatalogProductId != null && body.sharedCatalogExactMatchConfirmed !== true) return NextResponse.json({ error: "SHARED_CATALOG_MATCH_CONFIRMATION_REQUIRED" }, { status: 400 });
+    const sharedCatalogProduct = typeof body.sharedCatalogProductId === "string"
+      ? await prisma.sharedCatalogProduct.findFirst({ where: { id: body.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, brand: true, gtin: true, variants: { select: { id: true, identityKey: true } } } })
+      : null;
+    if (body.sharedCatalogProductId != null && !sharedCatalogProduct) return NextResponse.json({ error: "SHARED_CATALOG_PRODUCT_UNAVAILABLE" }, { status: 404 });
+    // Shared identity fields come from the Admin-published catalog record. The
+    // seller controls only their offer fields (price, stock, shipping, condition).
+    const name = sharedCatalogProduct?.title ?? String(body.name ?? "").trim();
+    const description = sharedCatalogProduct?.description ?? String(body.description ?? "").trim();
+    const category = sharedCatalogProduct?.category ?? String(body.category ?? "").trim();
     const condition = String(body.condition ?? "NEUF").trim().toUpperCase();
     const status = body.status === "DRAFT" ? "DRAFT" : "PUBLISHED";
     const compliance = readProductCompliance(body);
@@ -123,19 +131,34 @@ export async function POST(request: Request) {
         images,
         currency: store.currency,
         storeId: store.id,
+        sharedCatalogProductId: sharedCatalogProduct?.id ?? null,
         allowPrepurchaseQuestions: body.allowPrepurchaseQuestions !== false,
         loyaltyEligible: productLoyaltyEligibility(body.loyaltyEligible, false),
         ...compliance,
+        productIdentifier: sharedCatalogProduct?.gtin ?? compliance.productIdentifier,
+        manufacturerName: sharedCatalogProduct?.brand ?? compliance.manufacturerName,
         ...productShipping,
         complianceDeclaredAt: status === "PUBLISHED" ? new Date() : null,
       }, variantInput, body.variantImages, async tx => {
         await lockSellerProductQuota(tx, store.id);
         await requireStorePublishingAccess(tx, session.userId, store.id, status === "PUBLISHED" ? "PRODUCT_PUBLISH" : "PRODUCT_CREATE");
         await requireProductCategoryScope(tx,session.userId,store.id,"PRODUCT_CREATE",category);
+      }, async (tx, productId) => {
+        if (!sharedCatalogProduct?.variants.length) return;
+        const canonicalByIdentity = new Map(sharedCatalogProduct.variants.map((variant) => [variant.identityKey, variant.id]));
+        const offerVariants = await tx.productVariant.findMany({ where: { productId }, select: { id: true, values: { select: { optionValue: { select: { value: true, option: { select: { name: true } } } } } } } });
+        const matches = offerVariants.map((variant) => {
+          const attributes = Object.fromEntries(variant.values.map(({ optionValue }) => [optionValue.option.name, optionValue.value]));
+          return { id: variant.id, canonicalVariantId: canonicalByIdentity.get(normalizeCatalogVariantIdentity(attributes)) };
+        });
+        if (matches.some((variant) => !variant.canonicalVariantId)) throw new ProductVariantError("SHARED_CATALOG_VARIANT_MISMATCH", 409);
+        for (const variant of matches) {
+          await tx.productVariant.update({ where: { id: variant.id }, data: { sharedCatalogVariantId: variant.canonicalVariantId } });
+        }
       });
     await prisma.$transaction((tx)=>replaceProductVideo(tx,product.id,body.video));
     const principal=await requireStoreCapability(prisma,session.userId,store.id,"PRODUCT_CREATE");
-    await appendSellerBusinessAudit(prisma,{businessId:principal.businessId,storeId:store.id,actorId:session.userId,category:"PRODUCT",action:"PRODUCT_CREATED",targetType:"Product",targetId:product.id,metadata:{status}});
+    await appendSellerBusinessAudit(prisma,{businessId:principal.businessId,storeId:store.id,actorId:session.userId,category:"PRODUCT",action:"PRODUCT_CREATED",targetType:"Product",targetId:product.id,metadata:{status,sharedCatalogProductId:sharedCatalogProduct?.id??null}});
 
     revalidateTag(PUBLIC_STORES_CACHE_TAG);
     return NextResponse.json({ ok: true, product });

@@ -30,8 +30,11 @@ test("Admin legacy header labels use dark foregrounds without changing non-Admin
 
 test("homepage sections avoid new-arrival and best-seller repetition without static merchandising", () => {
   const home = read("app/HomeClient.tsx");
+  const identity = read("lib/marketplace-product-identity.ts");
   assert.match(home, /uniqueProductsById\(newArrivals\)\.filter\(\(product\) => !bestSellerIds\.has\(product\.id\)\)/);
-  assert.match(home, /visibleProducts\.filter\(\(product\) => !featuredRailIds\.has\(product\.id\)\)/);
+  assert.match(home, /visibleProducts\.filter\(\(product\) => !featuredRailIds\.has\(marketplaceProductIdentityKey\(product\)\)\)/);
+  assert.match(identity, /shared:\$\{product\.sharedCatalogProductId\}/);
+  assert.match(identity, /offer:\$\{product\.id\}/);
   assert.doesNotMatch(home, /const\s+(?:newArrivals|bestSellers)\s*=\s*\[/);
 });
 

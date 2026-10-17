@@ -23,11 +23,13 @@ import { selectDistinctHeroProducts, shouldShowHomepageStores } from "@/lib/home
 import { pageNumbers } from "@/lib/pagination";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { HOMEPAGE_LOW_PRICE_PAGE_SIZE } from "@/lib/homepage-low-price-products";
+import { marketplaceProductIdentityKey, uniqueProductsByCatalog } from "@/lib/marketplace-product-identity";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
   country: string;
   createdAt: string;
+  sharedCatalogProductId?: string | null;
 };
 
 type MarketplaceStore = { id: string; name: string; slug: string; description: string | null; logo: string | null; city: string; country: string; products: Array<{ id: string; name: string; image: string | null }> };
@@ -44,7 +46,6 @@ function uniqueProductsById<T extends { id: string }>(products: readonly T[]) {
     return true;
   });
 }
-
 
 function ProductRail({ id, title, titleHref, products, soldOut, icon = "sparkles", viewAll, carousel = false, previous, next }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string; icon?: "sparkles" | "shopping"; viewAll: string; carousel?: boolean; previous?: string; next?: string }) {
   const rail = useRef<HTMLDivElement>(null);
@@ -74,7 +75,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   resultsOnly?: boolean;
 }) {
   const [filters, setFilters] = useState(initialFilters);
-  const [visibleProducts, setVisibleProducts] = useState(products);
+  const [visibleProducts, setVisibleProducts] = useState(() => uniqueProductsByCatalog(products));
   const [nextOffset, setNextOffset] = useState(MOBILE_BATCH_SIZE);
   const [hasMore, setHasMore] = useState(page * pageSize < total);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -105,8 +106,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const distinctBestSellers = useMemo(() => uniqueProductsById(bestSellers), [bestSellers]);
   const bestSellerIds = useMemo(() => new Set(distinctBestSellers.map((product) => product.id)), [distinctBestSellers]);
   const distinctNewArrivals = useMemo(() => uniqueProductsById(newArrivals).filter((product) => !bestSellerIds.has(product.id)), [bestSellerIds, newArrivals]);
-  const featuredRailIds = useMemo(() => new Set([...distinctBestSellers, ...distinctNewArrivals.slice(0,10)].map((product) => product.id)), [distinctBestSellers, distinctNewArrivals]);
-  const distinctVisibleProducts = useMemo(() => resultsOnly ? visibleProducts : visibleProducts.filter((product) => !featuredRailIds.has(product.id)), [featuredRailIds, resultsOnly, visibleProducts]);
+  const featuredRailIds = useMemo(() => new Set([...distinctBestSellers, ...distinctNewArrivals.slice(0,10)].map(marketplaceProductIdentityKey)), [distinctBestSellers, distinctNewArrivals]);
+  const distinctVisibleProducts = useMemo(() => uniqueProductsByCatalog(resultsOnly ? visibleProducts : visibleProducts.filter((product) => !featuredRailIds.has(marketplaceProductIdentityKey(product)))), [featuredRailIds, resultsOnly, visibleProducts]);
   const featuredCategories = categories.slice(0, 4);
   const listingKey = useMemo(() => JSON.stringify(filters), [filters]);
   const incrementalUrl = useCallback((offset: number) => {
@@ -117,8 +118,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   }, [filters]);
 
   const appendUnique = useCallback((current: MarketplaceProduct[], incoming: MarketplaceProduct[]) => {
-    const seen = new Set(current.map((product) => product.id));
-    return [...current, ...incoming.filter((product) => !seen.has(product.id))];
+    return uniqueProductsByCatalog([...current, ...incoming]);
   }, []);
 
   const loadMobileBatch = useCallback(async (offset: number) => {
@@ -150,7 +150,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
     listingKeyRef.current = listingKey;
     inFlightOffsetRef.current = null;
     setLoadError(false);
-    setVisibleProducts(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products);
+    setVisibleProducts(uniqueProductsByCatalog(mobile && page === 1 ? products.slice(0, MOBILE_BATCH_SIZE) : products));
     setNextOffset(page === 1 ? Math.min(MOBILE_BATCH_SIZE, products.length) : page * pageSize);
     setHasMore(page === 1 && mobile ? Math.min(MOBILE_BATCH_SIZE, products.length) < total : page * pageSize < total);
     if (restorationAppliedRef.current) return;
@@ -166,7 +166,7 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
       setRestoring(true);
       try {
         if (mobile && page === 1) {
-          let restored = products.slice(0, Math.min(saved.nextOffset, products.length));
+          let restored = uniqueProductsByCatalog(products.slice(0, Math.min(saved.nextOffset, products.length)));
           let offset = restored.length;
           while (offset < saved.nextOffset) {
             const response = await fetch(incrementalUrl(offset), { credentials: "same-origin" });

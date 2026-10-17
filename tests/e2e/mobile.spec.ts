@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectRuntimeErrors, dismissCookieConsent, expectNoDocumentOverflow, expectWithinViewport } from "./helpers";
+import { collectRuntimeErrors, dismissCookieConsent, expectNoDocumentOverflow, expectWithinViewport, startNewProductWizard } from "./helpers";
 
 test("mobile startup image stays inside the viewport before styles and hydration", async ({ browser, baseURL }) => {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,javaScriptEnabled:false});
@@ -160,6 +160,7 @@ test("mobile category browser opens from bottom navigation and preserves locale"
 test("mobile compliance fields and contact seller remain readable", async ({ page }) => {
   await page.goto("/ar/e2e-ux?view=seller");
   await dismissCookieConsent(page);
+  await startNewProductWizard(page, "ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await page.locator('[data-wizard-step="5"]').evaluate((element)=>{(element as HTMLElement).hidden=false;});
   const complianceInput = page.locator('input[name="productIdentifier"]');

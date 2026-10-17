@@ -10,11 +10,13 @@ import { requiresAuthoritativeDropshippingPrice } from "@/lib/suppliers/buyer-pr
 import { resolveBuyerProductContent } from "@/lib/product-content";
 import{localizedSupplierContentSearch}from"@/lib/product-content-search";
 import { publicStoreCity } from "@/lib/seller-business-verification-policy";
+import { dedupeSharedCatalogOffers } from "@/lib/shared-catalog-offers";
 
 const PAGE_SIZE = 24;
 const productSelect = {
   id: true, name: true,sourceLocale:true,translations:{select:{locale:true,title:true,description:true,automatic:true}}, price: true, compareAtPrice: true, currency: true, category: true,
-  stock: true, condition: true, images: true, createdAt: true,
+  stock: true, condition: true, images: true, createdAt: true, sharedCatalogProductId: true,
+  sharedCatalogProduct: { select: { id: true, title: true, category: true, images: true, status: true } },
   options: { where: { active: true }, select: { id: true } },
   variants: { where: buyerVisibleVariantWhere(), select: { stock: true, active: true, _count: { select: { values: true } } } },
   store: { select: { name: true, slug: true, city: true, country: true, sellerType:true, displayBusinessAddress:true } },
@@ -24,12 +26,13 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
 
 function serializeProduct(product: ProductRow,locale:string) {
   const availability = resolveProductAvailability({ stock: product.stock, activeOptionCount: product.options.length, variants: product.variants.map((variant) => ({ active: variant.active, stock: variant.stock, valueCount: variant._count.values })) });
-  const content=resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
+  const shared = !product.supplierLink && product.sharedCatalogProduct?.status === "PUBLISHED" ? product.sharedCatalogProduct : null;
+  const content=shared ? { title: shared.title } : resolveBuyerProductContent({name:product.name,description:"",sourceMetadata:product.supplierLink?.sourceMetadata,locale,sourceLocale:product.sourceLocale,translations:product.translations});
   return {
-    id: product.id, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null,
-    currency: product.currency, category: product.category, stock: availability.hasActiveVariants ? null : product.stock,
+    id: product.id, sharedCatalogProductId: shared?.id ?? null, name: content.title, price: product.price.toString(), compareAtPrice: product.compareAtPrice?.toString() ?? null,
+    currency: product.currency, category: shared?.category ?? product.category, stock: availability.hasActiveVariants ? null : product.stock,
     hasActiveVariants: availability.hasActiveVariants, isGenerallyAvailable: availability.isGenerallyAvailable,
-    condition: product.condition, image: product.images[0] ?? null, storeName: product.store.name,
+    condition: product.condition, image: (shared?.images.length ? shared.images : product.images)[0] ?? null, storeName: product.store.name,
     storeSlug: product.store.slug, city: publicStoreCity(product.store), country: product.store.country,
     createdAt: product.createdAt.toISOString(), requiresAuthoritativePrice: requiresAuthoritativeDropshippingPrice(product.supplierLink?.sourceMetadata),
   };
@@ -46,6 +49,13 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const publicProductAccess = publicProductAccessWhere(now), publicStoreAccess = publicStoreAccessWhere(now);
   const refinements: Prisma.ProductWhereInput[] = [];
+  if (category) {
+    const categoryValues = categoryFilterValues(category);
+    refinements.push({ OR: [
+      { category: { in: categoryValues } },
+      { sharedCatalogProduct: { is: { status: "PUBLISHED", category: { in: categoryValues } } }, supplierLink: { is: null } },
+    ] });
+  }
   if (availability === "in-stock") refinements.push(productGenerallyAvailableWhere());
   if (color) {
     const aliases = marketplaceColorAliases(color);
@@ -56,13 +66,13 @@ export async function GET(request: NextRequest) {
   const baseWhere: Prisma.ProductWhereInput = {
     status: "PUBLISHED", ...publicProductAccess,
     ...(refinements.length ? { AND: refinements } : {}),
-    ...(category ? { category: { in: categoryFilterValues(category) } } : {}),
     ...(condition ? { condition } : {}),
     ...(!invalidPriceRange && filters.minPrice ? { price: { gte: minPrice } } : {}),
     ...(!invalidPriceRange && filters.maxPrice ? { price: { ...(Number.isFinite(minPrice) && minPrice >= 0 ? { gte: minPrice } : {}), lte: maxPrice } } : {}),
     ...(country ? { store: { ...publicStoreAccess, OR: countryAliasesForCode(country).map((alias) => ({ country: { equals: alias, mode: "insensitive" as const } })) } } : {}),
     ...(q ? { OR: [
       { name: { contains: q, mode: "insensitive" } },{translations:{some:{locale,OR:[{title:{contains:q,mode:"insensitive"}},{description:{contains:q,mode:"insensitive"}}]}}},...localizedSupplierContentSearch(q,locale), { description: { contains: q, mode: "insensitive" } },
+      { sharedCatalogProduct: { is: { status: "PUBLISHED", OR: [{ title: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }, { brand: { contains: q, mode: "insensitive" } }, { modelReference: { contains: q, mode: "insensitive" } }, { gtin: { contains: q, mode: "insensitive" } }] } }, supplierLink: { is: null } },
       { category: { contains: q, mode: "insensitive" } }, { condition: { contains: q, mode: "insensitive" } },
       { store: { name: { contains: q, mode: "insensitive" } } }, { store: { city: { contains: q, mode: "insensitive" } } },
       { store: { country: { contains: q, mode: "insensitive" } } },
@@ -74,17 +84,18 @@ export async function GET(request: NextRequest) {
   const rated = filters.rating ? await prisma.review.groupBy({ by: ["productId"], where: { status: "PUBLISHED", product: baseWhere }, _avg: { rating: true }, having: { rating: { _avg: { gte: threshold } } } }) : [];
   const where: Prisma.ProductWhereInput = filters.rating ? { ...baseWhere, id: { in: rated.map((item) => item.productId) } } : baseWhere;
   const qualifying: OrderStatus[] = ["PAID", "PROCESSING", "SHIPPED", "DELIVERED"];
-  let rows: ProductRow[];
+  let sourceRows: ProductRow[];
   if (sort === "best-selling") {
     const sales = await prisma.orderItem.groupBy({ by: ["productId"], where: { order: { status: { in: qualifying } }, product: where }, _sum: { quantity: true }, orderBy: [{ _sum: { quantity: "desc" } }, { productId: "asc" }], skip: offset, take: PAGE_SIZE });
     const ids = sales.map((item) => item.productId);
     const unordered = ids.length ? await prisma.product.findMany({ where: { ...where, id: { in: ids } }, select: productSelect }) : [];
     const byId = new Map(unordered.map((product) => [product.id, product]));
-    rows = ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product));
+    sourceRows = ids.map((id) => byId.get(id)).filter((product): product is ProductRow => Boolean(product));
   } else {
     const primaryOrder: Prisma.ProductOrderByWithRelationInput = sort === "price-asc" ? { price: "asc" } : sort === "price-desc" ? { price: "desc" } : { createdAt: "desc" };
-    rows = await prisma.product.findMany({ where, orderBy: [primaryOrder, { id: "asc" }], skip: offset, take: PAGE_SIZE, select: productSelect });
+    sourceRows = await prisma.product.findMany({ where, orderBy: [primaryOrder, { id: "asc" }], skip: offset, take: PAGE_SIZE, select: productSelect });
   }
+  const rows = dedupeSharedCatalogOffers(sourceRows);
   const total = await prisma.product.count({ where: sort === "best-selling" ? { ...where, orderItems: { some: { order: { status: { in: qualifying } } } } } : where });
-  return NextResponse.json({ products: rows.map(product=>serializeProduct(product,locale)), hasMore: offset + rows.length < total, nextOffset: offset + rows.length });
+  return NextResponse.json({ products: rows.map(product=>serializeProduct(product,locale)), hasMore: offset + sourceRows.length < total, nextOffset: offset + sourceRows.length });
 }

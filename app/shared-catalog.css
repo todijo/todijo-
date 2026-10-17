@@ -1,0 +1,49 @@
+.sharedCatalogMatch,.sharedCatalogAdmin,.sharedCatalogCorrectionForm{display:grid;gap:1rem;min-width:0}
+.sharedCatalogMatch{padding:clamp(1rem,3vw,1.5rem);border:1px solid #d9c98f;border-radius:18px;background:linear-gradient(145deg,#fffdf7,#f2f7f2);color:#173c2d}
+.sharedCatalogMatch h2,.sharedCatalogAdmin h2{margin:0;color:#173c2d}
+.sharedCatalogMatch>p{margin:0;color:#526b63;line-height:1.6}
+.sharedCatalogSearchFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;align-items:end}
+.sharedCatalogSearchFields label{display:grid;gap:.35rem;font-weight:750}
+.sharedCatalogSearchFields input,.sharedCatalogAdmin textarea{min-width:0;width:100%;box-sizing:border-box;border:1px solid #cad9cf;border-radius:10px;padding:.7rem .8rem;background:#fff;color:#173c2d;font:inherit}
+.sharedCatalogSearchFields button,.sharedCatalogCandidates button,.sharedCatalogConfirmation button,.sharedCatalogCorrectionActions button{min-height:42px;border:1px solid #0a7754;border-radius:10px;padding:.55rem .9rem;background:#087756;color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.sharedCatalogSearchFields button{grid-column:1/-1;justify-self:start}
+.sharedCatalogCandidates{display:grid;gap:.7rem}
+.sharedCatalogCandidates article{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.8rem;border:1px solid #d5e4dc;border-radius:13px;background:#fff}
+.sharedCatalogCandidates article.isSelected{border-color:#087756;box-shadow:0 0 0 2px #08775622}
+.sharedCatalogCandidates img{width:88px;height:88px;object-fit:cover;border-radius:9px;background:#f4f5ef}
+.sharedCatalogCandidates h3,.sharedCatalogCandidates p{margin:.15rem 0;overflow-wrap:anywhere}
+.sharedCatalogCandidates p{color:#526b63;font-size:.9rem}
+.sharedCatalogConfirmation{display:grid;gap:.7rem;border:1px solid #c9dbc9;border-radius:12px;background:#fff;padding:1rem}
+.sharedCatalogConfirmation label{display:flex;gap:.6rem;align-items:flex-start}
+.sharedCatalogConfirmation button:disabled,.sharedCatalogAdmin button:disabled{opacity:.55;cursor:not-allowed}
+.sharedCatalogOffers{margin:1.5rem 0;padding:clamp(1rem,3vw,1.5rem);border:1px solid #d9c98f;border-radius:18px;background:#fffdf7}
+.sharedCatalogOffers h2{margin:0 0 1rem;color:#173c2d}
+.sharedCatalogOffersGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:.8rem}
+.sharedCatalogOffersGrid article{display:grid;align-content:start;gap:.35rem;padding:1rem;border:1px solid #d5e4dc;border-radius:13px;background:#fff}
+.sharedCatalogOffersGrid h3,.sharedCatalogOffersGrid p{margin:0;overflow-wrap:anywhere}
+.sharedCatalogOffersGrid h3 a{color:#07513d}
+.sharedCatalogOffersGrid .sellerControlButton{margin-top:.5rem;justify-self:start}
+.sharedCatalogCorrections{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:.8rem}
+.sharedCatalogCorrection{min-width:0;padding:1rem;border:1px solid #d5e4dc;border-radius:14px;background:#fff}
+.sharedCatalogCorrection h3{margin:.1rem 0 .8rem;overflow-wrap:anywhere}
+.sharedCatalogCorrection dl{display:grid;gap:.6rem;margin:0}
+.sharedCatalogCorrection dl>div{display:grid;gap:.2rem}
+.sharedCatalogCorrection dt{font-weight:800;color:#526b63}
+.sharedCatalogCorrection dd{margin:0;overflow-wrap:anywhere}
+.sharedCatalogCorrection pre{max-height:220px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:.7rem;border-radius:8px;background:#f6f7f3}
+.sharedCatalogCorrectionActions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem}
+.sharedCatalogCorrectionActions .secondary{background:#fff;color:#07513d}
+.sharedCatalogAdmin form label:has(input[type=checkbox]){display:flex;align-items:flex-start;gap:.55rem}
+.sharedCatalogAdmin form input[type=checkbox]{width:auto;min-height:auto;margin:.25rem 0 0}
+.sharedCatalogAdmin textarea[name=variants]{direction:ltr;text-align:left;min-height:100px}
+.sharedCatalogCorrectionForm{margin-top:1rem;padding:clamp(1rem,3vw,1.5rem);border:1px solid #d9c98f;border-radius:18px;background:#fffdf7;color:#173c2d}
+.sharedCatalogCorrectionForm h2,.sharedCatalogCorrectionForm p{margin:0}
+.sharedCatalogCorrectionForm>p{color:#526b63;line-height:1.6}
+.sharedCatalogCorrectionForm form{display:grid;gap:.8rem;max-width:760px}
+.sharedCatalogCorrectionForm form>label{display:grid;gap:.35rem;font-weight:750}
+.sharedCatalogCorrectionForm select,.sharedCatalogCorrectionForm textarea{width:100%;min-width:0;box-sizing:border-box;border:1px solid #cad9cf;border-radius:10px;padding:.7rem .8rem;background:#fff;color:#173c2d;font:inherit}
+.sharedCatalogCorrectionForm textarea{resize:vertical}
+.sharedCatalogCorrectionForm button{min-height:42px;justify-self:start;border:1px solid #0a7754;border-radius:10px;padding:.55rem .9rem;background:#087756;color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.sharedCatalogCorrectionForm button:disabled{opacity:.55;cursor:not-allowed}
+.sharedCatalogCorrectionForm small{color:#526b63}
+@media(max-width:640px){.sharedCatalogSearchFields{grid-template-columns:1fr}.sharedCatalogSearchFields button{grid-column:auto}.sharedCatalogCandidates article{grid-template-columns:64px minmax(0,1fr)}.sharedCatalogCandidates img{width:64px;height:64px}.sharedCatalogCandidates article>button{grid-column:1/-1;justify-self:start}}
