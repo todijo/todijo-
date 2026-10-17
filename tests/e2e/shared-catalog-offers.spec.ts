@@ -252,8 +252,12 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   const cart = await page.evaluate((authenticatedBuyerId) => JSON.parse(localStorage.getItem(`todijo-cart-v1:${authenticatedBuyerId}`) ?? "[]") as Array<{ id: string; storeSlug: string; quantity: number }>, buyerId);
   expect(cart).toEqual([expect.objectContaining({ id: productBId, storeSlug: `shared-catalog-b-${suffix}`, quantity: 1 })]);
 
+  const shippingQuoteResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/shipping/quote") && response.request().method() === "POST",
+  );
   await page.goto("/en/checkout");
   await expect(page.locator(".shippingAddressCard")).toContainText("1 Rue de Test");
+  expect((await shippingQuoteResponse).status()).toBe(200);
   await expect(page.locator(".shippingQuoteCard")).toBeVisible();
   const checkoutCapture: { payload?: { requestId: string; items: Array<{ productId: string; quantity: number }> }; orderId?: string } = {};
   await page.route("**/api/checkout", async (route) => {
