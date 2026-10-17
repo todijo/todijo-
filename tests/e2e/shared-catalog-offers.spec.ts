@@ -199,7 +199,7 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   await expect(sellerPage.locator('[data-wizard-step="1"]')).toBeVisible();
   await expect(sellerPage.locator("#description")).toBeVisible();
   await sellerPage.locator("#description").fill("Seller-entered draft details that must survive returning to catalog search.");
-  await sellerPage.locator(".sellerProductWizard > button.sellerControlButton.secondary").click();
+  await sellerPage.getByRole("button", { name: wizardCopy.back, exact: true }).first().click();
   await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
   await expect(sellerPage.locator("#description")).toHaveValue("Seller-entered draft details that must survive returning to catalog search.");
   await sellerContext.close();
