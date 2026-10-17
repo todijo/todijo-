@@ -1,4 +1,11 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { sharedCatalogMessages } from "../../i18n/shared-catalog";
+import type { Locale } from "../../i18n/config";
+
+export async function startNewProductWizard(page: Page, locale: Locale) {
+  await page.getByRole("button", { name: sharedCatalogMessages[locale].newProduct, exact: true }).click();
+  await expect(page.locator("#category-main")).toBeVisible();
+}
 
 export function collectRuntimeErrors(page: Page) {
   const errors: string[] = [];

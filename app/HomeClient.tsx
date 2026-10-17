@@ -23,6 +23,7 @@ import { selectDistinctHeroProducts, shouldShowHomepageStores } from "@/lib/home
 import { pageNumbers } from "@/lib/pagination";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { HOMEPAGE_LOW_PRICE_PAGE_SIZE } from "@/lib/homepage-low-price-products";
+import { marketplaceProductIdentityKey, uniqueProductsByCatalog } from "@/lib/marketplace-product-identity";
 
 type MarketplaceProduct = MarketplaceCardProduct & {
   city: string;
@@ -45,17 +46,6 @@ function uniqueProductsById<T extends { id: string }>(products: readonly T[]) {
     return true;
   });
 }
-
-function uniqueProductsByCatalog<T extends { id: string; sharedCatalogProductId?: string | null }>(products: readonly T[]) {
-  const seen = new Set<string>();
-  return products.filter((product) => {
-    const key = product.sharedCatalogProductId ? `shared:${product.sharedCatalogProductId}` : `offer:${product.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 
 function ProductRail({ id, title, titleHref, products, soldOut, icon = "sparkles", viewAll, carousel = false, previous, next }: { id?: string; title: string; titleHref: string; products: MarketplaceProduct[]; soldOut: string; icon?: "sparkles" | "shopping"; viewAll: string; carousel?: boolean; previous?: string; next?: string }) {
   const rail = useRef<HTMLDivElement>(null);
@@ -116,8 +106,8 @@ export default function HomeClient({ products, heroProducts, newArrivals, bestSe
   const distinctBestSellers = useMemo(() => uniqueProductsById(bestSellers), [bestSellers]);
   const bestSellerIds = useMemo(() => new Set(distinctBestSellers.map((product) => product.id)), [distinctBestSellers]);
   const distinctNewArrivals = useMemo(() => uniqueProductsById(newArrivals).filter((product) => !bestSellerIds.has(product.id)), [bestSellerIds, newArrivals]);
-  const featuredRailIds = useMemo(() => new Set([...distinctBestSellers, ...distinctNewArrivals.slice(0,10)].map((product) => product.sharedCatalogProductId ? `shared:${product.sharedCatalogProductId}` : `offer:${product.id}`)), [distinctBestSellers, distinctNewArrivals]);
-  const distinctVisibleProducts = useMemo(() => uniqueProductsByCatalog(resultsOnly ? visibleProducts : visibleProducts.filter((product) => !featuredRailIds.has(product.sharedCatalogProductId ? `shared:${product.sharedCatalogProductId}` : `offer:${product.id}`))), [featuredRailIds, resultsOnly, visibleProducts]);
+  const featuredRailIds = useMemo(() => new Set([...distinctBestSellers, ...distinctNewArrivals.slice(0,10)].map(marketplaceProductIdentityKey)), [distinctBestSellers, distinctNewArrivals]);
+  const distinctVisibleProducts = useMemo(() => uniqueProductsByCatalog(resultsOnly ? visibleProducts : visibleProducts.filter((product) => !featuredRailIds.has(marketplaceProductIdentityKey(product)))), [featuredRailIds, resultsOnly, visibleProducts]);
   const featuredCategories = categories.slice(0, 4);
   const listingKey = useMemo(() => JSON.stringify(filters), [filters]);
   const incrementalUrl = useCallback((offset: number) => {

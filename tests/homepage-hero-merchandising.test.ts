@@ -37,7 +37,7 @@ test("main products use the established grid and shared card behavior", () => {
   const card = source("components/MarketplaceProductCard.tsx");
   const css = source("app/globals.css");
   assert.match(home, /<div className="discoveryProductGrid">[\s\S]*distinctVisibleProducts\.map/);
-  assert.match(home, /distinctVisibleProducts = useMemo\(\(\) => resultsOnly \? visibleProducts : visibleProducts\.filter\(\(product\) => !featuredRailIds\.has\(product\.id\)\)/);
+  assert.match(home, /distinctVisibleProducts = useMemo\(\(\) => uniqueProductsByCatalog\(resultsOnly \? visibleProducts : visibleProducts\.filter\(\(product\) => !featuredRailIds\.has\(marketplaceProductIdentityKey\(product\)\)\)\)/);
   assert.doesNotMatch(home, /homepageTieredProducts|homepageProductTier|productTiers/);
   assert.doesNotMatch(css, /homepageTieredProducts|homepageProductTier/);
   assert.match(card, /ProductCardWishlist/);
