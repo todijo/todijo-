@@ -192,6 +192,12 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
   await expect(sellerPage.locator("#name")).toHaveValue(title);
   await expect(sellerPage.locator('input[name="manufacturerName"]')).toHaveValue(brand);
+  await sellerPage.locator("#category-main").selectOption({ index: 1 });
+  await sellerPage.locator("#category-group").selectOption({ index: 1 });
+  await sellerPage.locator("#category").selectOption({ index: 1 });
+  await sellerPage.getByRole("button", { name: wizardCopy.continue, exact: true }).click();
+  await expect(sellerPage.locator('[data-wizard-step="1"]')).toBeVisible();
+  await expect(sellerPage.locator("#description")).toBeVisible();
   await sellerPage.locator("#description").fill("Seller-entered draft details that must survive returning to catalog search.");
   await sellerPage.getByRole("button", { name: wizardCopy.back, exact: true }).click();
   await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
