@@ -5,6 +5,9 @@ import { randomUUID } from "node:crypto";
 import { CANONICAL_LEAF_CATEGORIES } from "../../lib/desktop-category-taxonomy";
 import { createCheckout } from "../../lib/payments";
 import { productPath } from "../../lib/product-seo";
+import { catalogBrandModelKey } from "../../lib/shared-catalog-matching";
+import { sharedCatalogMessages, sharedCatalogSearchMessages } from "../../i18n/shared-catalog";
+import { sellerProductWizardCopy } from "../../i18n/seller-product-wizard";
 import { dismissCookieConsent } from "./helpers";
 
 const db = new PrismaClient();
@@ -95,7 +98,9 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   await db.sellerBusiness.update({ where: { id: businessBId }, data: { primaryStoreId: storeBId, billingStoreId: storeBId } });
   await db.user.update({ where: { id: sellerAId }, data: { primaryStoreId: storeAId } });
   await db.user.update({ where: { id: sellerBId }, data: { primaryStoreId: storeBId } });
-  await db.sharedCatalogProduct.create({ data: { id: sharedCatalogProductId, title, description, category, sourceLocale: "en", status: "PUBLISHED" } });
+  const brand = "Verified shared brand";
+  const modelReference = `model-${suffix}`;
+  await db.sharedCatalogProduct.create({ data: { id: sharedCatalogProductId, title, brand, modelReference, brandModelKey: catalogBrandModelKey(brand, modelReference), description, category, sourceLocale: "en", status: "PUBLISHED" } });
   await db.product.create({ data: {
     id: productAId,
     storeId: storeAId,
@@ -113,12 +118,97 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
     dataClass: "PRODUCTION",
     complianceDeclaredAt: now,
   } });
+  await db.product.create({ data: {
+    id: `legacy-product-${suffix}`,
+    storeId: storeAId,
+    name: `Legacy ${title}`,
+    slug: `legacy-shared-search-${suffix}`,
+    description,
+    price: "18.00",
+    currency: "EUR",
+    category,
+    condition: "NEUF",
+    stock: 2,
+    images: [],
+    status: "PUBLISHED",
+    dataClass: "PRODUCTION",
+    complianceDeclaredAt: now,
+  } });
 
   const sellerToken = await sessionToken(sellerBId);
+  const titleOnlyOffer = await request.post(`${baseUrl}/api/products`, { headers: { Cookie: `todijo_session=${sellerToken}` }, data: { storeId: storeBId, sharedCatalogProductId, sharedCatalogExactMatchConfirmed: true } });
+  expect(titleOnlyOffer.status()).toBe(400);
+  expect(await titleOnlyOffer.json()).toMatchObject({ error: "SHARED_CATALOG_IDENTITY_REQUIRED" });
+  const titleSearch = await request.get(`${baseUrl}/api/shared-catalog/matches?store=${storeBId}&title=${encodeURIComponent(title)}`, { headers: { Cookie: `todijo_session=${sellerToken}` } });
+  expect(titleSearch.status()).toBe(200);
+  const titleSearchBody = await titleSearch.json() as { products: Array<{ id: string; source: string; exactIdentity: boolean }> };
+  expect(titleSearchBody.products).toContainEqual(expect.objectContaining({ id: sharedCatalogProductId, source: "SHARED", exactIdentity: false }));
+  const identitySearch = await request.get(`${baseUrl}/api/shared-catalog/matches?store=${storeBId}&brand=${encodeURIComponent(brand)}&modelReference=${encodeURIComponent(modelReference)}`, { headers: { Cookie: `todijo_session=${sellerToken}` } });
+  expect(identitySearch.status()).toBe(200);
+  const identitySearchBody = await identitySearch.json() as { products: Array<{ id: string; source: string; exactIdentity: boolean }> };
+  expect(identitySearchBody.products).toContainEqual(expect.objectContaining({ id: sharedCatalogProductId, source: "SHARED", exactIdentity: true }));
+
+  const sellerContext = await browser.newContext();
+  const sellerPage = await sellerContext.newPage();
+  await addSession(sellerPage, sellerBId);
+  await sellerPage.goto(`/en/seller/products/new?store=${storeBId}`);
+  await dismissCookieConsent(sellerPage);
+  const sellerCopy = sharedCatalogSearchMessages.en;
+  const wizardCopy = sellerProductWizardCopy("en");
+  await expect(sellerPage.getByText(sharedCatalogMessages.en.noResults)).toHaveCount(0);
+  await expect(sellerPage.getByText(sellerCopy.newProductHelp)).toBeVisible();
+  await expect(sellerPage.getByText(sellerCopy.exactMatch)).toHaveCount(0);
+  let failFirstSearch = true;
+  await sellerPage.route("**/api/shared-catalog/matches?*", async (route) => {
+    if (failFirstSearch) {
+      failFirstSearch = false;
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "TEMPORARILY_UNAVAILABLE" }) });
+      return;
+    }
+    await route.continue();
+  });
+  await sellerPage.getByLabel(sharedCatalogMessages.en.productTitle, { exact: true }).fill(title);
+  await sellerPage.getByRole("button", { name: "Search catalog", exact: true }).click();
+  await expect(sellerPage.getByText(sellerCopy.searchError)).toBeVisible();
+  await expect(sellerPage.getByText(sharedCatalogMessages.en.noResults)).toHaveCount(0);
+  await sellerPage.getByRole("button", { name: sellerCopy.retry, exact: true }).click();
+  const suggestionCard = sellerPage.locator(".sharedCatalogCandidates article").filter({ has: sellerPage.getByRole("heading", { name: title, exact: true }) });
+  await expect(suggestionCard.getByText(sellerCopy.suggestion)).toBeVisible();
+  await expect(suggestionCard.getByRole("button")).toHaveCount(0);
+  const legacyCard = sellerPage.locator(".sharedCatalogCandidates article").filter({ has: sellerPage.getByRole("heading", { name: `Legacy ${title}`, exact: true }) });
+  await expect(legacyCard.getByText(sellerCopy.legacyReview)).toBeVisible();
+  await expect(legacyCard.getByRole("button")).toHaveCount(0);
+  await sellerPage.getByLabel("Brand", { exact: true }).fill(brand);
+  await sellerPage.getByLabel("Model reference", { exact: true }).fill(modelReference);
+  await sellerPage.getByRole("button", { name: "Search catalog", exact: true }).click();
+  const exactCard = sellerPage.locator(".sharedCatalogCandidates article").filter({ has: sellerPage.getByRole("heading", { name: title, exact: true }) });
+  await expect(exactCard.getByText(sellerCopy.exactMatch)).toBeVisible();
+  await exactCard.getByRole("button", { name: "Sell this product", exact: true }).click();
+  await sellerPage.getByRole("checkbox", { name: title, exact: true }).check();
+  await sellerPage.locator(".sharedCatalogConfirmation").getByRole("button", { name: "Sell this product", exact: true }).click();
+  await expect(sellerPage.locator("#category-main")).toBeVisible();
+  await sellerPage.getByRole("button", { name: wizardCopy.back, exact: true }).click();
+  await expect(sellerPage.getByLabel(sharedCatalogMessages.en.productTitle, { exact: true })).toHaveValue(title);
+  await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
+  await expect(sellerPage.locator("#name")).toHaveValue(title);
+  await expect(sellerPage.locator('input[name="manufacturerName"]')).toHaveValue(brand);
+  await sellerPage.locator("#category-main").selectOption({ index: 1 });
+  await sellerPage.locator("#category-group").selectOption({ index: 1 });
+  await sellerPage.locator("#category").selectOption({ index: 1 });
+  await sellerPage.getByRole("button", { name: wizardCopy.continue, exact: true }).click();
+  await expect(sellerPage.locator('[data-wizard-step="1"]')).toBeVisible();
+  await expect(sellerPage.locator("#description")).toBeVisible();
+  await sellerPage.locator("#description").fill("Seller-entered draft details that must survive returning to catalog search.");
+  await sellerPage.getByRole("button", { name: wizardCopy.back, exact: true }).first().click();
+  await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
+  await expect(sellerPage.locator("#description")).toHaveValue("Seller-entered draft details that must survive returning to catalog search.");
+  await sellerContext.close();
+
   const sellerOfferResponse = await request.post(`${baseUrl}/api/products`, { headers: { Cookie: `todijo_session=${sellerToken}` }, data: {
     storeId: storeBId,
     sharedCatalogProductId,
     sharedCatalogExactMatchConfirmed: true,
+    sharedCatalogIdentity: { brand, modelReference },
     name: title,
     description,
     category,
@@ -162,8 +252,12 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   const cart = await page.evaluate((authenticatedBuyerId) => JSON.parse(localStorage.getItem(`todijo-cart-v1:${authenticatedBuyerId}`) ?? "[]") as Array<{ id: string; storeSlug: string; quantity: number }>, buyerId);
   expect(cart).toEqual([expect.objectContaining({ id: productBId, storeSlug: `shared-catalog-b-${suffix}`, quantity: 1 })]);
 
+  const shippingQuoteResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/shipping/quote") && response.request().method() === "POST",
+  );
   await page.goto("/en/checkout");
   await expect(page.locator(".shippingAddressCard")).toContainText("1 Rue de Test");
+  expect((await shippingQuoteResponse).status()).toBe(200);
   await expect(page.locator(".shippingQuoteCard")).toBeVisible();
   const checkoutCapture: { payload?: { requestId: string; items: Array<{ productId: string; quantity: number }> }; orderId?: string } = {};
   await page.route("**/api/checkout", async (route) => {

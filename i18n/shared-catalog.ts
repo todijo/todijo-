@@ -1,8 +1,8 @@
 import type { Locale } from "./config";
 
 const en = {
-  title: "Find this product in the Todijo catalog",
-  intro: "Search by title, brand, model reference or barcode. A similar title is only a suggestion: confirm an exact match before adding your offer.",
+  title: "Before adding your product, check whether it already exists on Todijo.",
+  intro: "Simply search for your product name. If you find the exact same product, you can add your own offer with your price and stock without recreating its entire listing.",
   productTitle: "Product title",
   brand: "Brand",
   modelReference: "Model reference",
@@ -26,7 +26,7 @@ const en = {
 type SharedCatalogMessageShape = { [Key in keyof typeof en]: string };
 export const sharedCatalogMessages: Record<Locale, SharedCatalogMessageShape> = {
   en,
-  fr: { title: "Rechercher ce produit dans le catalogue Todijo", intro: "Recherchez par titre, marque, référence modèle ou code-barres. Un titre similaire est seulement une suggestion : confirmez qu’il s’agit exactement du même produit avant d’ajouter votre offre.", productTitle: "Titre du produit", brand: "Marque", modelReference: "Référence du modèle", gtin: "EAN / UPC / GTIN", search: "Rechercher dans le catalogue", searching: "Recherche…", noResults: "Aucun produit du catalogue partagé ne correspond à ces informations.", exactQuestion: "S’agit-il exactement du même produit, avec le même modèle et la même version ?", sellThis: "Vendre ce produit", newProduct: "Créer un nouveau produit", backToSearch: "Retour à la recherche du catalogue", offerTitle: "Votre offre", offerPrice: "Votre prix et votre stock restent propres à votre boutique.", otherOffers: "Autres offres des boutiques", price: "Prix", shipping: "Livraison", condition: "État", unavailable: "Actuellement indisponible" },
+  fr: { title: "Avant d'ajouter votre produit, vérifiez s'il existe déjà sur Todijo.", intro: "Recherchez simplement le nom de votre produit. Si vous trouvez exactement le même produit, vous pouvez ajouter votre propre offre avec votre prix et votre stock, sans recréer toute sa fiche.", productTitle: "Titre du produit", brand: "Marque", modelReference: "Référence du modèle", gtin: "EAN / UPC / GTIN", search: "Rechercher dans le catalogue", searching: "Recherche…", noResults: "Aucun produit du catalogue partagé ne correspond à ces informations.", exactQuestion: "S’agit-il exactement du même produit, avec le même modèle et la même version ?", sellThis: "Vendre ce produit", newProduct: "Créer un nouveau produit", backToSearch: "Retour à la recherche du catalogue", offerTitle: "Votre offre", offerPrice: "Votre prix et votre stock restent propres à votre boutique.", otherOffers: "Autres offres des boutiques", price: "Prix", shipping: "Livraison", condition: "État", unavailable: "Actuellement indisponible" },
   de: { title: "Dieses Produkt im Todijo-Katalog suchen", intro: "Suche nach Titel, Marke, Modellreferenz oder Barcode. Ein ähnlicher Titel ist nur ein Vorschlag: Bestätige die genaue Übereinstimmung, bevor du dein Angebot hinzufügst.", productTitle: "Produkttitel", brand: "Marke", modelReference: "Modellreferenz", gtin: "EAN / UPC / GTIN", search: "Katalog durchsuchen", searching: "Suche…", noResults: "Kein gemeinsamer Katalogeintrag passt zu diesen Angaben.", exactQuestion: "Ist es exakt dasselbe Produkt einschließlich Modell und Version?", sellThis: "Dieses Produkt verkaufen", newProduct: "Neues Produkt erstellen", backToSearch: "Zurück zur Katalogsuche", offerTitle: "Dein Angebot", offerPrice: "Preis und Bestand bleiben auf deinen Shop beschränkt.", otherOffers: "Weitere Shop-Angebote", price: "Preis", shipping: "Versand", condition: "Zustand", unavailable: "Derzeit nicht verfügbar" },
   es: { title: "Buscar este producto en el catálogo de Todijo", intro: "Busca por título, marca, referencia del modelo o código de barras. Un título parecido solo es una sugerencia: confirma que es exactamente el mismo producto antes de añadir tu oferta.", productTitle: "Título del producto", brand: "Marca", modelReference: "Referencia del modelo", gtin: "EAN / UPC / GTIN", search: "Buscar en el catálogo", searching: "Buscando…", noResults: "Ningún producto del catálogo compartido coincide con estos datos.", exactQuestion: "¿Es exactamente el mismo producto, incluido el modelo y la versión?", sellThis: "Vender este producto", newProduct: "Crear un producto nuevo", backToSearch: "Volver a buscar en el catálogo", offerTitle: "Tu oferta", offerPrice: "Tu precio y existencias son propios de tu tienda.", otherOffers: "Otras ofertas de tiendas", price: "Precio", shipping: "Envío", condition: "Estado", unavailable: "No disponible actualmente" },
   it: { title: "Cerca questo prodotto nel catalogo Todijo", intro: "Cerca per titolo, marca, riferimento del modello o codice a barre. Un titolo simile è solo un suggerimento: conferma che si tratta esattamente dello stesso prodotto prima di aggiungere la tua offerta.", productTitle: "Titolo del prodotto", brand: "Marca", modelReference: "Riferimento del modello", gtin: "EAN / UPC / GTIN", search: "Cerca nel catalogo", searching: "Ricerca…", noResults: "Nessun prodotto del catalogo condiviso corrisponde a questi dati.", exactQuestion: "È esattamente lo stesso prodotto, compresi modello e versione?", sellThis: "Vendi questo prodotto", newProduct: "Crea un nuovo prodotto", backToSearch: "Torna alla ricerca nel catalogo", offerTitle: "La tua offerta", offerPrice: "Prezzo e scorte restano specifici del tuo negozio.", otherOffers: "Altre offerte dei negozi", price: "Prezzo", shipping: "Spedizione", condition: "Condizione", unavailable: "Attualmente non disponibile" },
@@ -39,6 +39,143 @@ export const sharedCatalogMessages: Record<Locale, SharedCatalogMessageShape> = 
   zh: { title: "在 Todijo 目录中查找此商品", intro: "按标题、品牌、型号或条码搜索。相似标题仅供参考；添加报价前请确认商品完全相同。", productTitle: "商品标题", brand: "品牌", modelReference: "型号", gtin: "EAN / UPC / GTIN", search: "搜索目录", searching: "正在搜索…", noResults: "目录中没有与这些信息匹配的共享商品。", exactQuestion: "型号和版本都完全相同吗？", sellThis: "销售此商品", newProduct: "创建新商品", backToSearch: "返回目录搜索", offerTitle: "您的报价", offerPrice: "您的价格和库存仅属于您的店铺。", otherOffers: "其他店铺报价", price: "价格", shipping: "配送", condition: "商品状况", unavailable: "目前不可用" },
   pt: { title: "Encontrar este produto no catálogo Todijo", intro: "Pesquise por título, marca, referência do modelo ou código de barras. Um título semelhante é apenas uma sugestão: confirme que é exatamente o mesmo produto antes de adicionar a sua oferta.", productTitle: "Título do produto", brand: "Marca", modelReference: "Referência do modelo", gtin: "EAN / UPC / GTIN", search: "Pesquisar no catálogo", searching: "A pesquisar…", noResults: "Nenhum produto partilhado do catálogo corresponde a estes dados.", exactQuestion: "É exatamente o mesmo produto, incluindo modelo e versão?", sellThis: "Vender este produto", newProduct: "Criar um novo produto", backToSearch: "Voltar à pesquisa do catálogo", offerTitle: "A sua oferta", offerPrice: "O seu preço e stock são específicos da sua loja.", otherOffers: "Outras ofertas das lojas", price: "Preço", shipping: "Envio", condition: "Estado", unavailable: "Indisponível neste momento" },
   ru: { title: "Найти этот товар в каталоге Todijo", intro: "Ищите по названию, бренду, модели или штрихкоду. Похожее название — только подсказка: подтвердите точное совпадение перед добавлением предложения.", productTitle: "Название товара", brand: "Бренд", modelReference: "Модель", gtin: "EAN / UPC / GTIN", search: "Искать в каталоге", searching: "Поиск…", noResults: "В общем каталоге нет товара с такими данными.", exactQuestion: "Это точно тот же товар, включая модель и версию?", sellThis: "Продавать этот товар", newProduct: "Создать новый товар", backToSearch: "Вернуться к поиску каталога", offerTitle: "Ваше предложение", offerPrice: "Цена и остаток относятся только к вашему магазину.", otherOffers: "Предложения других магазинов", price: "Цена", shipping: "Доставка", condition: "Состояние", unavailable: "Сейчас недоступно" },
+};
+
+export const sharedCatalogSearchMessages: Record<Locale, {
+  newProductHelp: string;
+  exactMatch: string;
+  suggestion: string;
+  legacyReview: string;
+  retry: string;
+  searchError: string;
+  refineSearch: string;
+}> = {
+  en: {
+    newProductHelp: "Can't find your product, or prefer to create your own listing instead of joining a shared product page?",
+    exactMatch: "Verified catalog identity",
+    suggestion: "Product suggestion — review the details",
+    legacyReview: "Existing seller listing — not linked to the shared catalog",
+    retry: "Retry search",
+    searchError: "The search could not be completed. Check your connection and try again.",
+    refineSearch: "Add a brand, model reference or barcode to narrow your search.",
+  },
+  fr: {
+    newProductHelp: "Vous ne trouvez pas votre produit, ou vous préférez créer votre propre annonce plutôt que de rejoindre une fiche partagée ?",
+    exactMatch: "Identité du catalogue vérifiée",
+    suggestion: "Suggestion de produit — vérifiez les détails",
+    legacyReview: "Annonce vendeur existante — non liée au catalogue partagé",
+    retry: "Réessayer la recherche",
+    searchError: "La recherche n’a pas pu aboutir. Vérifiez votre connexion et réessayez.",
+    refineSearch: "Ajoutez une marque, une référence de modèle ou un code-barres pour préciser votre recherche.",
+  },
+  de: {
+    newProductHelp: "Sie finden Ihr Produkt nicht oder möchten lieber ein eigenes Angebot erstellen, statt eine gemeinsame Produktseite zu nutzen?",
+    exactMatch: "Katalogidentität bestätigt",
+    suggestion: "Produktvorschlag — Angaben prüfen",
+    legacyReview: "Bestehendes Verkäuferangebot — nicht mit dem gemeinsamen Katalog verknüpft",
+    retry: "Suche wiederholen",
+    searchError: "Die Suche konnte nicht abgeschlossen werden. Prüfe deine Verbindung und versuche es erneut.",
+    refineSearch: "Füge eine Marke, Modellreferenz oder einen Barcode hinzu, um die Suche einzugrenzen.",
+  },
+  es: {
+    newProductHelp: "¿No encuentras tu producto o prefieres crear tu propio anuncio en lugar de unirte a una ficha compartida?",
+    exactMatch: "Identidad del catálogo verificada",
+    suggestion: "Sugerencia de producto: revisa los detalles",
+    legacyReview: "Anuncio de vendedor existente, no vinculado al catálogo compartido",
+    retry: "Reintentar búsqueda",
+    searchError: "No se pudo completar la búsqueda. Comprueba tu conexión e inténtalo de nuevo.",
+    refineSearch: "Añade una marca, una referencia de modelo o un código de barras para concretar la búsqueda.",
+  },
+  it: {
+    newProductHelp: "Non trovi il tuo prodotto o preferisci creare una tua inserzione invece di unirti a una scheda condivisa?",
+    exactMatch: "Identità del catalogo verificata",
+    suggestion: "Suggerimento di prodotto — controlla i dettagli",
+    legacyReview: "Inserzione del venditore esistente — non collegata al catalogo condiviso",
+    retry: "Riprova la ricerca",
+    searchError: "Impossibile completare la ricerca. Controlla la connessione e riprova.",
+    refineSearch: "Aggiungi una marca, un riferimento modello o un codice a barre per restringere la ricerca.",
+  },
+  nl: {
+    newProductHelp: "Kun je je product niet vinden, of wil je liever je eigen aanbieding maken in plaats van een gedeelde productpagina te gebruiken?",
+    exactMatch: "Catalogusidentiteit geverifieerd",
+    suggestion: "Productsuggestie — controleer de gegevens",
+    legacyReview: "Bestaande verkopersvermelding — niet gekoppeld aan de gedeelde catalogus",
+    retry: "Zoekopdracht opnieuw proberen",
+    searchError: "De zoekopdracht kon niet worden voltooid. Controleer je verbinding en probeer het opnieuw.",
+    refineSearch: "Voeg een merk, modelreferentie of barcode toe om de zoekopdracht te verfijnen.",
+  },
+  tr: {
+    newProductHelp: "Ürününüzü bulamıyor musunuz veya paylaşılan bir ürün sayfasına katılmak yerine kendi ilanınızı mı oluşturmak istiyorsunuz?",
+    exactMatch: "Katalog kimliği doğrulandı",
+    suggestion: "Ürün önerisi — ayrıntıları inceleyin",
+    legacyReview: "Mevcut satıcı ilanı — paylaşılan kataloğa bağlı değil",
+    retry: "Aramayı yeniden dene",
+    searchError: "Arama tamamlanamadı. Bağlantınızı kontrol edip yeniden deneyin.",
+    refineSearch: "Aramayı daraltmak için bir marka, model referansı veya barkod ekleyin.",
+  },
+  ar: {
+    newProductHelp: "لم تجد منتجك، أو تفضّل إنشاء إعلانك الخاص بدلًا من الانضمام إلى صفحة منتج مشتركة؟",
+    exactMatch: "تم التحقق من هوية المنتج في الكتالوج",
+    suggestion: "اقتراح منتج — راجع التفاصيل",
+    legacyReview: "إعلان بائع موجود — غير مرتبط بالكتالوج المشترك",
+    retry: "إعادة البحث",
+    searchError: "تعذر إكمال البحث. تحقق من اتصالك ثم حاول مرة أخرى.",
+    refineSearch: "أضف علامة تجارية أو مرجع طراز أو رمزًا شريطيًا لتضييق نطاق البحث.",
+  },
+  fa: {
+    newProductHelp: "محصولتان را پیدا نمی‌کنید یا ترجیح می‌دهید به‌جای پیوستن به صفحهٔ مشترک، آگهی خودتان را بسازید؟",
+    exactMatch: "هویت محصول در کاتالوگ تأیید شده است",
+    suggestion: "پیشنهاد محصول — جزئیات را بررسی کنید",
+    legacyReview: "آگهی فروشندهٔ موجود — به کاتالوگ مشترک پیوند ندارد",
+    retry: "تلاش دوباره برای جستجو",
+    searchError: "جستجو کامل نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    refineSearch: "برای محدودکردن جستجو، برند، شمارهٔ مدل یا بارکد را اضافه کنید.",
+  },
+  hi: {
+    newProductHelp: "क्या आपको अपना उत्पाद नहीं मिला, या आप साझा उत्पाद पृष्ठ से जुड़ने के बजाय अपनी सूची बनाना चाहते हैं?",
+    exactMatch: "कैटलॉग पहचान सत्यापित",
+    suggestion: "उत्पाद सुझाव — विवरण जाँचें",
+    legacyReview: "मौजूदा विक्रेता सूची — साझा कैटलॉग से जुड़ी नहीं",
+    retry: "खोज फिर से करें",
+    searchError: "खोज पूरी नहीं हो सकी। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
+    refineSearch: "खोज सीमित करने के लिए ब्रांड, मॉडल संदर्भ या बारकोड जोड़ें।",
+  },
+  ku: {
+    newProductHelp: "کاڵاکەت نەدۆزییەوە، یان دەتەوێت لەبری بەشداری لە پەڕەی کاڵای هاوبەش، ڕاگەیاندنی خۆت دروست بکەیت؟",
+    exactMatch: "ناسنامەی کاتالۆگ پشتڕاستکرایەوە",
+    suggestion: "پێشنیاری کاڵا — زانیارییەکان بپشکنە",
+    legacyReview: "ڕاگەیاندنی فرۆشیاری هەبوو — بە کاتالۆگی هاوبەشەوە نەبەستراوە",
+    retry: "گەڕان دووبارە بکەرەوە",
+    searchError: "گەڕانەکە تەواو نەبوو. پەیوەندیت بپشکنە و دووبارە هەوڵ بدەوە.",
+    refineSearch: "بۆ سنووردارکردنی گەڕان براند، ناسنامەی مۆدێل یان بارکۆد زیاد بکە.",
+  },
+  zh: {
+    newProductHelp: "没有找到您的商品，或者您更希望创建自己的商品页面，而不是加入共享商品页面？",
+    exactMatch: "目录商品身份已验证",
+    suggestion: "商品建议 — 请核对详情",
+    legacyReview: "现有卖家商品 — 未关联共享目录",
+    retry: "重试搜索",
+    searchError: "无法完成搜索。请检查网络连接后重试。",
+    refineSearch: "添加品牌、型号或条码以缩小搜索范围。",
+  },
+  pt: {
+    newProductHelp: "Não encontra o seu produto ou prefere criar o seu próprio anúncio em vez de aderir a uma página partilhada?",
+    exactMatch: "Identidade do catálogo verificada",
+    suggestion: "Sugestão de produto — reveja os detalhes",
+    legacyReview: "Anúncio de vendedor existente — não ligado ao catálogo partilhado",
+    retry: "Tentar pesquisar novamente",
+    searchError: "Não foi possível concluir a pesquisa. Verifique a ligação e tente novamente.",
+    refineSearch: "Adicione uma marca, referência do modelo ou código de barras para restringir a pesquisa.",
+  },
+  ru: {
+    newProductHelp: "Не нашли товар или предпочитаете создать собственное объявление вместо добавления предложения к общей карточке?",
+    exactMatch: "Идентичность товара в каталоге подтверждена",
+    suggestion: "Предложение товара — проверьте данные",
+    legacyReview: "Существующее объявление продавца — не связано с общим каталогом",
+    retry: "Повторить поиск",
+    searchError: "Не удалось завершить поиск. Проверьте подключение и попробуйте снова.",
+    refineSearch: "Добавьте бренд, модель или штрихкод, чтобы уточнить поиск.",
+  },
 };
 
 const adminEn = { category: "Category", images: "Canonical images (one URL per line)", confirmImageRights: "I confirm that Todijo may use these images in the shared catalog", variantsJson: "Canonical variations (JSON array of attribute objects)", corrections: "pending corrections", publish: "Publish catalog item", archive: "Archive catalog item", chooseMainCategory: "Choose a main category", chooseCategoryGroup: "Choose a category group", chooseLeafCategory: "Choose a category", reviewCorrections: "Seller correction suggestions", sourceStore: "Store", sourceOffer: "Seller offer", proposedValue: "Proposed change", acceptCorrection: "Accept suggestion", rejectCorrection: "Reject suggestion", correctionReviewed: "Suggestion reviewed" };

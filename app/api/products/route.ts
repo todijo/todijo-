@@ -23,7 +23,7 @@ import {resolveProductPriceInput} from "@/lib/product-price-input";
 import { appendSellerBusinessAudit } from "@/lib/seller-business-audit";
 import { requireStoreCapability } from "@/lib/seller-business-access";
 import { requireProductCategoryScope } from "@/lib/seller-team-product-scope";
-import { normalizeCatalogVariantIdentity } from "@/lib/shared-catalog-matching";
+import { hasExactCatalogIdentityMatch, normalizeCatalogVariantIdentity, normalizeGtin } from "@/lib/shared-catalog-matching";
 
 export async function GET(request: Request) {
   const session = await readSession();
@@ -61,9 +61,14 @@ export async function POST(request: Request) {
     const store = await requireStorePublishingAccess(prisma, session.userId,storeId,"PRODUCT_CREATE");
     if (body.sharedCatalogProductId != null && body.sharedCatalogExactMatchConfirmed !== true) return NextResponse.json({ error: "SHARED_CATALOG_MATCH_CONFIRMATION_REQUIRED" }, { status: 400 });
     const sharedCatalogProduct = typeof body.sharedCatalogProductId === "string"
-      ? await prisma.sharedCatalogProduct.findFirst({ where: { id: body.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, brand: true, gtin: true, variants: { select: { id: true, identityKey: true } } } })
+      ? await prisma.sharedCatalogProduct.findFirst({ where: { id: body.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, brand: true, modelReference: true, gtin: true, variants: { select: { id: true, identityKey: true } } } })
       : null;
     if (body.sharedCatalogProductId != null && !sharedCatalogProduct) return NextResponse.json({ error: "SHARED_CATALOG_PRODUCT_UNAVAILABLE" }, { status: 404 });
+    if (sharedCatalogProduct && (!body.sharedCatalogExactMatchConfirmed || !body.sharedCatalogIdentity || !hasExactCatalogIdentityMatch({
+      gtin: normalizeGtin(typeof body.sharedCatalogIdentity.gtin === "string" ? body.sharedCatalogIdentity.gtin : ""),
+      brand: typeof body.sharedCatalogIdentity.brand === "string" ? body.sharedCatalogIdentity.brand : null,
+      modelReference: typeof body.sharedCatalogIdentity.modelReference === "string" ? body.sharedCatalogIdentity.modelReference : null,
+    }, sharedCatalogProduct))) return NextResponse.json({ error: "SHARED_CATALOG_IDENTITY_REQUIRED" }, { status: 400 });
     // Shared identity fields come from the Admin-published catalog record. The
     // seller controls only their offer fields (price, stock, shipping, condition).
     const name = sharedCatalogProduct?.title ?? String(body.name ?? "").trim();

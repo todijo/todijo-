@@ -13,7 +13,10 @@ test("new and edit product compliance fields share explicit light-surface contra
   assert.match(css, /\.sellerControlForm \.productComplianceFields input::placeholder[^}]*color:#6b7f77/);
   assert.match(css, /\.sellerControlForm \.listingDeclaration[^}]*color:#173b30/);
   assert.match(compliance, /className="productComplianceFields"/);
-  assert.match(source("app/seller/products/new/NewProductForm.tsx"), /<ProductComplianceFields\/>/);
+  const newProductForm = source("app/seller/products/new/NewProductForm.tsx");
+  assert.match(newProductForm, /function ProductDetailsForm[\s\S]*<ProductComplianceFields\b/);
+  assert.match(newProductForm, /productIdentifier:sharedCatalogProduct\?\.gtin\?\?initialDraft\?\.gtin/);
+  assert.match(newProductForm, /manufacturerName:sharedCatalogProduct\?\.brand\?\?initialDraft\?\.brand/);
   assert.match(source("app/seller/products/\[id\]/edit/EditProductForm.tsx"), /<ProductComplianceFields initial=\{product\}\/>/);
 });
 

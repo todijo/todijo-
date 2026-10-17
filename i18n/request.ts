@@ -15,7 +15,7 @@ import {supplierBulkMessages} from "./supplier-bulk";
 import {oauthReadinessMessages} from "./oauth-readiness";
 import {helpCenterMessages} from "./help-center";
 import {accountStatusMessages} from "./account-status";
-import { sharedCatalogAdminMessages, sharedCatalogMessages } from "./shared-catalog";
+import { sharedCatalogAdminMessages, sharedCatalogMessages, sharedCatalogSearchMessages } from "./shared-catalog";
 import {categoryNavigationMessages} from "./category-navigation";
 import { legalPhase5Messages } from "./legal-phase5";
 import {globalDropshippingMarginMessages} from "./global-dropshipping-margin";
@@ -62,7 +62,7 @@ export default getRequestConfig(async () => {
   messages.Shipping = { ...(await import(`../messages/shipping/${locale}.json`)).default, ...(advancedShippingMessages[locale] ?? advancedShippingMessages.en), ...(shippingHotfixMessages[locale]??shippingHotfixMessages.en),changeAddress:locale==="fr"?"Modifier l’adresse":"Change address",addAddress:buyerAddressMessages[locale].addAddress };
   messages.Supplier = { ...(supplierMessages[locale] ?? supplierMessages.en), ...supplierPricingMessages.en, ...(supplierPricingMessages[locale] ?? {}), ...(dropshippingAccessMessages[locale] ?? dropshippingAccessMessages.en), ...supplierBulkMessages.en, ...(supplierBulkMessages[locale] ?? {}),...supplierClassificationMessages.en,...(supplierClassificationMessages[locale]??{}) };
   messages.ProductVideo = productVideoMessages[locale] ?? productVideoMessages.en;
-  messages.SharedCatalog = { ...sharedCatalogMessages[locale], ...sharedCatalogAdminMessages[locale] };
+  messages.SharedCatalog = { ...sharedCatalogMessages[locale], ...sharedCatalogSearchMessages[locale], ...sharedCatalogAdminMessages[locale] };
   messages.HomeDiscovery = (await import(`../messages/home-discovery/${locale}.json`)).default;
   messages.Ux = (await import(`../messages/ux/${locale}.json`)).default;
   messages.ProductDetail = {...(["fa", "fr", "hi", "pt", "ru", "zh"].includes(locale)
