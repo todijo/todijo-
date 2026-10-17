@@ -111,19 +111,19 @@ jobs:
           docker_hub_image="docker.io/library/node:${NODE_BASE_TAG}@${NODE_BASE_DIGEST}"
 
           if docker pull "$mirror_image"; then
-            source_image="mirror.gcr.io/library/node:${NODE_BASE_TAG}"
+            source_image="$mirror_image"
           else
             echo "::warning::Node image cache unavailable; falling back to the official Docker Hub image at the same digest."
             docker pull "$docker_hub_image"
-            source_image="docker.io/library/node:${NODE_BASE_TAG}"
+            source_image="$docker_hub_image"
           fi
 
-          docker image tag "$source_image" todijo-node-ci:24.15.0-bookworm-slim
+          echo "NODE_BASE_IMAGE=$source_image" >> "$GITHUB_ENV"
 
       - name: Build production image
         run: >-
           docker build --pull=false
-          --build-arg NODE_BASE_IMAGE=todijo-node-ci:24.15.0-bookworm-slim
+          --build-arg "NODE_BASE_IMAGE=${NODE_BASE_IMAGE}"
           --tag todijo-security-phase1 .
 
       - name: Verify production runtime contents
