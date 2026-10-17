@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     const store = await requireStorePublishingAccess(prisma, session.userId,storeId,"PRODUCT_CREATE");
     if (body.sharedCatalogProductId != null && body.sharedCatalogExactMatchConfirmed !== true) return NextResponse.json({ error: "SHARED_CATALOG_MATCH_CONFIRMATION_REQUIRED" }, { status: 400 });
     const sharedCatalogProduct = typeof body.sharedCatalogProductId === "string"
-      ? await prisma.sharedCatalogProduct.findFirst({ where: { id: body.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, brand: true, gtin: true, variants: { select: { id: true, identityKey: true } } } })
+      ? await prisma.sharedCatalogProduct.findFirst({ where: { id: body.sharedCatalogProductId, status: "PUBLISHED" }, select: { id: true, title: true, description: true, category: true, brand: true, modelReference: true, gtin: true, variants: { select: { id: true, identityKey: true } } } })
       : null;
     if (body.sharedCatalogProductId != null && !sharedCatalogProduct) return NextResponse.json({ error: "SHARED_CATALOG_PRODUCT_UNAVAILABLE" }, { status: 404 });
     if (sharedCatalogProduct && (!body.sharedCatalogExactMatchConfirmed || !body.sharedCatalogIdentity || !hasExactCatalogIdentityMatch({
