@@ -1,4 +1,6 @@
-FROM public.ecr.aws/docker/library/node:24.15.0-bookworm-slim AS deps
+ARG NODE_BASE_IMAGE=public.ecr.aws/docker/library/node:24.15.0-bookworm-slim
+
+FROM ${NODE_BASE_IMAGE} AS deps
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -11,7 +13,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 
-FROM public.ecr.aws/docker/library/node:24.15.0-bookworm-slim AS builder
+FROM ${NODE_BASE_IMAGE} AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -26,7 +28,7 @@ RUN npx prisma generate
 RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 RUN npm prune --omit=dev
 
-FROM public.ecr.aws/docker/library/node:24.15.0-bookworm-slim AS runner
+FROM ${NODE_BASE_IMAGE} AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
