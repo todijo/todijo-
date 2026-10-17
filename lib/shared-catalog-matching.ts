@@ -78,11 +78,15 @@ export function hasExactCatalogIdentityMatch(candidate: CatalogIdentity, canonic
   const canonicalGtin = normalizeGtin(canonical.gtin);
   if (candidateGtin && canonicalGtin) return candidateGtin === canonicalGtin;
 
-  const brand = normalizeCatalogText(candidate.brand);
-  const model = normalizeCatalogText(candidate.modelReference);
-  const canonicalBrand = normalizeCatalogText(canonical.brand);
-  const canonicalModel = normalizeCatalogText(canonical.modelReference);
+  const brand = normalizeIdentityField(candidate.brand);
+  const model = normalizeIdentityField(candidate.modelReference);
+  const canonicalBrand = normalizeIdentityField(canonical.brand);
+  const canonicalModel = normalizeIdentityField(canonical.modelReference);
   return Boolean(brand && model && canonicalBrand && canonicalModel && brand === canonicalBrand && model === canonicalModel);
+}
+
+function normalizeIdentityField(value: string | null | undefined) {
+  return foldCatalogSearchText(value).replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
 }
 
 export function catalogSearchTerms(input: CatalogIdentity) {
@@ -92,4 +96,23 @@ export function catalogSearchTerms(input: CatalogIdentity) {
     modelReference: normalizeCatalogText(input.modelReference),
     gtin: normalizeGtin(input.gtin),
   };
+}
+
+export function foldCatalogSearchText(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("und");
+}
+
+export function catalogSearchTokens(input: CatalogIdentity) {
+  const source = [input.title, input.brand, input.modelReference]
+    .map(foldCatalogSearchText)
+    .join(" ");
+  return [...new Set(source.match(/[\p{L}\p{N}]{2,}/gu) ?? [])].slice(0, 10);
+}
+
+/** Prefix terms provide useful partial and word-order-independent discovery. */
+export function catalogPrefixSearchQuery(input: CatalogIdentity) {
+  return catalogSearchTokens(input).map((term) => `${term}:*`).join(" | ");
 }

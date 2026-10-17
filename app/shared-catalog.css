@@ -7,12 +7,20 @@
 .sharedCatalogSearchFields input,.sharedCatalogAdmin textarea{min-width:0;width:100%;box-sizing:border-box;border:1px solid #cad9cf;border-radius:10px;padding:.7rem .8rem;background:#fff;color:#173c2d;font:inherit}
 .sharedCatalogSearchFields button,.sharedCatalogCandidates button,.sharedCatalogConfirmation button,.sharedCatalogCorrectionActions button{min-height:42px;border:1px solid #0a7754;border-radius:10px;padding:.55rem .9rem;background:#087756;color:#fff;font:inherit;font-weight:800;cursor:pointer}
 .sharedCatalogSearchFields button{grid-column:1/-1;justify-self:start}
+.sharedCatalogMatch :focus-visible{outline:3px solid #b98a1c;outline-offset:3px}
+.sharedCatalogSearchStatus,.sharedCatalogSearchError{margin:0;padding:.8rem 1rem;border-radius:10px;background:#fff;border:1px solid #d5e4dc;color:#173c2d}
+.sharedCatalogSearchError{border-color:#c85f4b;color:#6f2418}
+.sharedCatalogSearchError button{min-height:40px;border:1px solid #0a7754;border-radius:9px;padding:.45rem .8rem;background:#087756;color:#fff;font:inherit;font-weight:800;cursor:pointer}
 .sharedCatalogCandidates{display:grid;gap:.7rem}
 .sharedCatalogCandidates article{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.8rem;border:1px solid #d5e4dc;border-radius:13px;background:#fff}
 .sharedCatalogCandidates article.isSelected{border-color:#087756;box-shadow:0 0 0 2px #08775622}
 .sharedCatalogCandidates img{width:88px;height:88px;object-fit:cover;border-radius:9px;background:#f4f5ef}
 .sharedCatalogCandidates h3,.sharedCatalogCandidates p{margin:.15rem 0;overflow-wrap:anywhere}
 .sharedCatalogCandidates p{color:#526b63;font-size:.9rem}
+.sharedCatalogMatchBadge{display:inline-block;max-width:100%;margin-bottom:.35rem;padding:.25rem .5rem;border-radius:999px;background:#fff3d5;color:#684b09;font-size:.78rem;font-weight:800;overflow-wrap:anywhere}
+.sharedCatalogMatchBadge.isVerified{background:#e4f3e9;color:#07513d}
+.sharedCatalogCreateNew{display:grid;gap:.45rem;margin-top:.25rem;padding:1rem;border-inline-start:4px solid #d9c98f;border-radius:10px;background:#fffdf7}
+.sharedCatalogCreateNew p{margin:0;color:#526b63;line-height:1.55}
 .sharedCatalogConfirmation{display:grid;gap:.7rem;border:1px solid #c9dbc9;border-radius:12px;background:#fff;padding:1rem}
 .sharedCatalogConfirmation label{display:flex;gap:.6rem;align-items:flex-start}
 .sharedCatalogConfirmation button:disabled,.sharedCatalogAdmin button:disabled{opacity:.55;cursor:not-allowed}

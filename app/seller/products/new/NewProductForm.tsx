@@ -24,19 +24,30 @@ import {loyaltyMessages} from "@/i18n/loyalty";
 import { sellerFreeModelCopy } from "@/i18n/seller-free-model";
 import { sellerProductWizardCopy } from "@/i18n/seller-product-wizard";
 import { localizedProductOptionName, localizedProductVariantValue, productVariantPreset, sellerProductUxCopy } from "@/i18n/seller-product-ux";
-import SharedCatalogMatch, { type SharedCatalogCandidate } from "./SharedCatalogMatch";
+import SharedCatalogMatch, { type SharedCatalogCandidate, type SharedCatalogSearchInput } from "./SharedCatalogMatch";
 import { sharedCatalogSellerMessages } from "@/i18n/shared-catalog";
 type PublicationBlocker={key:string;label:string;step:number;fieldId?:string;href?:string;actionLabel?:string};
 type ProductReviewSnapshot={name:string;description:string;category:string;condition:string;images:string[];video:ProductVideoInput|null;variantsEnabled:boolean;variantDraft:ProductVariantsDraft;variantImages:VariantImageAssignment[];price:string;compareAtPrice:string;stock:string;allowPrepurchaseQuestions:boolean;loyaltyEligible:boolean;shippingOverrideEnabled:boolean;shippingRule:ShippingDraft};
 type NewProductFormProps={currency:string;productCount:number;productLimit:number|null;storeShippingSummary?:string;storeId?:string;loyaltyRateBps:number;loyaltyProgramEnabled:boolean};
 export default function NewProductForm(props:NewProductFormProps) {
   const [catalogProduct,setCatalogProduct]=useState<SharedCatalogCandidate|null>(null);
+  const [initialDraft,setInitialDraft]=useState<SharedCatalogSearchInput|null>(null);
+  const [searchInput,setSearchInput]=useState<SharedCatalogSearchInput>({title:"",brand:"",modelReference:"",gtin:""});
   const [wizardStarted,setWizardStarted]=useState(false);
-  if(!wizardStarted)return <SharedCatalogMatch onSelect={candidate=>{setCatalogProduct(candidate);setWizardStarted(true)}} onCreateNew={()=>{setCatalogProduct(null);setWizardStarted(true)}}/>;
-  return <ProductDetailsForm {...props} sharedCatalogProduct={catalogProduct} onBackToCatalog={()=>setWizardStarted(false)}/>;
+  const [wizardMounted,setWizardMounted]=useState(false);
+  function startWizard(product:SharedCatalogCandidate|null,draft:SharedCatalogSearchInput|null) {
+    setCatalogProduct(product);
+    setInitialDraft(draft);
+    setWizardMounted(true);
+    setWizardStarted(true);
+  }
+  return <>
+    {!wizardStarted&&<SharedCatalogMatch storeId={props.storeId??""} initialValues={searchInput} onValuesChange={setSearchInput} onSelect={candidate=>startWizard(candidate,null)} onCreateNew={input=>startWizard(null,input)}/>}
+    {wizardMounted&&<div hidden={!wizardStarted}><ProductDetailsForm {...props} initialDraft={initialDraft} sharedCatalogProduct={catalogProduct} onBackToCatalog={()=>setWizardStarted(false)}/></div>}
+  </>;
 }
 
-function ProductDetailsForm({ currency, productCount, productLimit, storeShippingSummary,storeId="",loyaltyRateBps,loyaltyProgramEnabled,sharedCatalogProduct,onBackToCatalog }: NewProductFormProps & {sharedCatalogProduct:SharedCatalogCandidate|null;onBackToCatalog:()=>void}) {
+function ProductDetailsForm({ currency, productCount, productLimit, storeShippingSummary,storeId="",loyaltyRateBps,loyaltyProgramEnabled,sharedCatalogProduct,initialDraft,onBackToCatalog }: NewProductFormProps & {sharedCatalogProduct:SharedCatalogCandidate|null;initialDraft:SharedCatalogSearchInput|null;onBackToCatalog:()=>void}) {
   const router = useRouter();
   const t = useTranslations("SellerControl");
   const requestedLocale = useLocale();
@@ -168,7 +179,7 @@ function ProductDetailsForm({ currency, productCount, productLimit, storeShippin
         sizes: String(form.get("sizes") || "").split(",").map((value) => value.trim()).filter(Boolean),
         stock: productStockForForm(variantsEnabled, productStock), category: form.get("category"), condition: form.get("condition"), status,
         images, video, variantsEnabled, variants: variantsEnabled ? variantDraft : undefined, variantImages: variantsEnabled ? variantImages : [], allowPrepurchaseQuestions: form.get("allowPrepurchaseQuestions") === "on", loyaltyEligible: form.get("loyaltyEligible") === "on",
-        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}), sharedCatalogProductId:sharedCatalogProduct?.id??null, sharedCatalogExactMatchConfirmed:Boolean(sharedCatalogProduct),
+        productIdentifier: form.get("productIdentifier"), manufacturerName: form.get("manufacturerName"), manufacturerContact: form.get("manufacturerContact"), responsiblePerson: form.get("responsiblePerson"), safetyInformation: form.get("safetyInformation"), complianceInformation: form.get("complianceInformation"), complianceDeclaration: form.get("complianceDeclaration") === "on", shippingOverrideEnabled, ...(shippingOverrideEnabled?shippingDraftPayload(shippingRule):{}), sharedCatalogProductId:sharedCatalogProduct?.id??null, sharedCatalogExactMatchConfirmed:Boolean(sharedCatalogProduct), sharedCatalogIdentity:sharedCatalogProduct?{gtin:sharedCatalogProduct.gtin,brand:sharedCatalogProduct.brand,modelReference:sharedCatalogProduct.modelReference}:null,
       }),
     });
     const data = await response.json() as { error?: string; code?: string; product?: { id?: string } };
@@ -201,7 +212,7 @@ function ProductDetailsForm({ currency, productCount, productLimit, storeShippin
         {stepValidation?.step===1&&<p className="sellerProductWizardValidation" role="alert">{stepValidation.message}</p>}
         <SellerSection icon={FileText} title={t("basicInfo")} description={t("basicInfoHelp")}>
           <SellerFormField label={t("productName")} htmlFor="name" hint={t("productNameHint")} required>
-            <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} defaultValue={sharedCatalogProduct?.title} readOnly={Boolean(sharedCatalogProduct)} />
+            <input id="name" name="name" minLength={2} maxLength={120} required aria-describedby="name-hint" placeholder={t("productNamePlaceholder")} defaultValue={sharedCatalogProduct?.title??initialDraft?.title} readOnly={Boolean(sharedCatalogProduct)} />
           </SellerFormField>
           <SellerFormField label={t("description")} labelAside={<SellerHelpPopover label={uxCopy.helpButton}><p>{uxCopy.descriptionHelp}</p></SellerHelpPopover>} htmlFor="description" hint={t("descriptionHint")} required>
             <textarea id="description" name="description" rows={7} minLength={10} maxLength={5000} required aria-describedby="description-hint" placeholder={t("descriptionPlaceholder")} defaultValue={sharedCatalogProduct?.description} readOnly={Boolean(sharedCatalogProduct)} />
@@ -262,7 +273,7 @@ function ProductDetailsForm({ currency, productCount, productLimit, storeShippin
           </div>}
           {!blockersReady?<p className="sellerProductWizardReview">{wizard.reviewLoading}</p>:publishBlockers.length?<div className="sellerProductWizardBlockers"><strong>{wizard.reviewFix}</strong><ul>{publishBlockers.map(blocker=><li key={blocker.key}><span>{blocker.label}</span>{blocker.href?<a className="sellerProductWizardBlockerLink" href={blocker.href}>{blocker.actionLabel}</a>:<button type="button" onClick={()=>focusBlocker(blocker)}>{wizard.fix}</button>}</li>)}</ul></div>:<p className="sellerProductWizardReview">{wizard.complete}</p>}
         </SellerSection>
-        <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields/></SellerSection>
+        <SellerSection icon={Shapes} title={compliance("productComplianceTitle")} description={compliance("productComplianceHelp")}><ProductComplianceFields initial={{productIdentifier:sharedCatalogProduct?.gtin??initialDraft?.gtin,manufacturerName:sharedCatalogProduct?.brand??initialDraft?.brand}}/></SellerSection>
         </div>
       </div>
     </div>
