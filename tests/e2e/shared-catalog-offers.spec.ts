@@ -7,6 +7,7 @@ import { createCheckout } from "../../lib/payments";
 import { productPath } from "../../lib/product-seo";
 import { catalogBrandModelKey } from "../../lib/shared-catalog-matching";
 import { sharedCatalogMessages, sharedCatalogSearchMessages } from "../../i18n/shared-catalog";
+import { sellerProductWizardCopy } from "../../i18n/seller-product-wizard";
 import { dismissCookieConsent } from "./helpers";
 
 const db = new PrismaClient();
@@ -153,6 +154,7 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   await sellerPage.goto(`/en/seller/products/new?store=${storeBId}`);
   await dismissCookieConsent(sellerPage);
   const sellerCopy = sharedCatalogSearchMessages.en;
+  const wizardCopy = sellerProductWizardCopy("en");
   await expect(sellerPage.getByText(sharedCatalogMessages.en.noResults)).toHaveCount(0);
   await expect(sellerPage.getByText(sellerCopy.newProductHelp)).toBeVisible();
   await expect(sellerPage.getByText(sellerCopy.exactMatch)).toHaveCount(0);
@@ -185,13 +187,13 @@ test("a seller offer stays distinct from its shared identity through PDP, cart, 
   await sellerPage.getByRole("checkbox", { name: title, exact: true }).check();
   await sellerPage.locator(".sharedCatalogConfirmation").getByRole("button", { name: "Sell this product", exact: true }).click();
   await expect(sellerPage.locator("#category-main")).toBeVisible();
-  await sellerPage.getByRole("button", { name: "Back to catalog search", exact: true }).click();
+  await sellerPage.getByRole("button", { name: wizardCopy.back, exact: true }).click();
   await expect(sellerPage.getByLabel(sharedCatalogMessages.en.productTitle, { exact: true })).toHaveValue(title);
   await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
   await expect(sellerPage.locator("#name")).toHaveValue(title);
   await expect(sellerPage.locator('input[name="manufacturerName"]')).toHaveValue(brand);
   await sellerPage.locator("#description").fill("Seller-entered draft details that must survive returning to catalog search.");
-  await sellerPage.getByRole("button", { name: "Back to catalog search", exact: true }).click();
+  await sellerPage.getByRole("button", { name: wizardCopy.back, exact: true }).click();
   await sellerPage.getByRole("button", { name: sharedCatalogMessages.en.newProduct, exact: true }).click();
   await expect(sellerPage.locator("#description")).toHaveValue("Seller-entered draft details that must survive returning to catalog search.");
   await sellerContext.close();
